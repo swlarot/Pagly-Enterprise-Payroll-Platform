@@ -65,24 +65,18 @@ tests/
 ```
 <app>.vorluno.dev
 planilla.vorluno.dev
-menu.vorluno.dev
-docs.vorluno.dev
 ```
 
 ### Repositorios GitHub
 ```
 vorluno/<app>
 vorluno/planilla
-vorluno/menu
-vorluno/core360-integrations
 ```
 
 ### Identificadores Internos
 ```
 VOR-<APP>
 VOR-PLAN (Planilla)
-VOR-MENU (Menu)
-VOR-CRM (CRM)
 ```
 
 ### Namespaces C#/.NET
@@ -293,11 +287,6 @@ npm run build
 - [ ] Exportación a formatos contables
 - [ ] Dashboard de analytics
 
-## Documentación Adicional
-
-- [CLAUDE.md](./CLAUDE.md) - Guía para desarrollo con Claude Code CLI
-- [docs/PHASES.md](./docs/PHASES.md) - Plan de implementación por fases
-- [docs/CORE360_EXTRACTION.md](./docs/CORE360_EXTRACTION.md) - Documentación de referencia del sistema legacy
 
 ## Licencia
 
