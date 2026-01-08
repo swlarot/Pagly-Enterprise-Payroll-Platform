@@ -28,7 +28,7 @@ appsettings.*.local.json
 nul
 Thumbs.db
 
-# Documentación sensible (purgada del historial)
-CLAUDE.md
-CORE360_EXTRACTION.md
+# Documentación (excluir todos los .md excepto README.md)
+*.md
+!README.md
 docs/
