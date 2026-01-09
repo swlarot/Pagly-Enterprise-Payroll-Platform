@@ -1,9 +1,9 @@
 // ====================================================================
 // Planilla - RoundingPolicy Helper
-// Source: Core360 Stage 4, SGPE Decision
+// Source: Core360 Stage 4, Planilla Decision
 // Portado: 2025-12-26
 // Descripción: Política de redondeo para cálculos monetarios de planilla
-// Decisión SGPE: MidpointRounding.AwayFromZero (redondea 0.5 hacia arriba)
+// Decisión Planilla: MidpointRounding.AwayFromZero (redondea 0.5 hacia arriba)
 // ====================================================================
 
 namespace Vorluno.Planilla.Application.Helpers;

@@ -13,7 +13,7 @@ namespace Vorluno.Planilla.Application.DTOs;
 /// </summary>
 public record PayrollTaxConfigDto(
     int Id,
-    int CompanyId,
+    int TenantId,
     DateTime EffectiveStartDate,
     DateTime? EffectiveEndDate,
 
