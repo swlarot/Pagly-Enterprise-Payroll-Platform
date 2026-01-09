@@ -25,6 +25,8 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     public DbSet<Tenant> Tenants { get; set; }
     public DbSet<Subscription> Subscriptions { get; set; }
     public DbSet<TenantUser> TenantUsers { get; set; }
+    public DbSet<TenantInvitation> TenantInvitations { get; set; }
+    public DbSet<AuditLogEntry> AuditLogEntries { get; set; }
     public DbSet<StripeWebhookEvent> StripeWebhookEvents { get; set; }
 
     public DbSet<Empleado> Empleados { get; set; }
@@ -551,6 +553,77 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .OnDelete(DeleteBehavior.SetNull);
 
             // NO aplicar query filter (necesitamos procesar todos los webhooks)
+        });
+
+        // ====================================================================
+        // PHASE 3: Role and Permission Management
+        // ====================================================================
+
+        // TenantInvitation Configuration
+        modelBuilder.Entity<TenantInvitation>(entity =>
+        {
+            // Índice único para token de invitación
+            entity.HasIndex(i => i.Token)
+                .IsUnique()
+                .HasDatabaseName("IX_TenantInvitation_Token");
+
+            // Índice compuesto para búsquedas por tenant y email
+            entity.HasIndex(i => new { i.TenantId, i.Email })
+                .HasDatabaseName("IX_TenantInvitation_TenantId_Email");
+
+            // Índice para búsquedas por estado (no aceptadas, no expiradas, no revocadas)
+            entity.HasIndex(i => new { i.TenantId, i.AcceptedAt, i.ExpiresAt, i.IsRevoked })
+                .HasDatabaseName("IX_TenantInvitation_Status");
+
+            // Relación con Tenant
+            entity.HasOne(i => i.Tenant)
+                .WithMany()
+                .HasForeignKey(i => i.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Relación con CreatedBy (AppUser)
+            entity.HasOne(i => i.CreatedBy)
+                .WithMany()
+                .HasForeignKey(i => i.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Query filter por TenantId
+            entity.HasQueryFilter(i =>
+                _tenantContext == null ||
+                _tenantContext.TenantId == 0 ||
+                i.TenantId == _tenantContext.TenantId);
+        });
+
+        // AuditLogEntry Configuration
+        modelBuilder.Entity<AuditLogEntry>(entity =>
+        {
+            // Índice compuesto para búsquedas por tenant y fecha
+            entity.HasIndex(a => new { a.TenantId, a.CreatedAt })
+                .HasDatabaseName("IX_AuditLogEntry_TenantId_CreatedAt");
+
+            // Índice para búsquedas por acción
+            entity.HasIndex(a => new { a.TenantId, a.Action })
+                .HasDatabaseName("IX_AuditLogEntry_TenantId_Action");
+
+            // Índice para búsquedas por entidad
+            entity.HasIndex(a => new { a.TenantId, a.EntityType, a.EntityId })
+                .HasDatabaseName("IX_AuditLogEntry_TenantId_Entity");
+
+            // Índice para búsquedas por actor
+            entity.HasIndex(a => new { a.TenantId, a.ActorUserId })
+                .HasDatabaseName("IX_AuditLogEntry_TenantId_ActorUserId");
+
+            // Relación con Tenant
+            entity.HasOne(a => a.Tenant)
+                .WithMany()
+                .HasForeignKey(a => a.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Query filter por TenantId
+            entity.HasQueryFilter(a =>
+                _tenantContext == null ||
+                _tenantContext.TenantId == 0 ||
+                a.TenantId == _tenantContext.TenantId);
         });
     }
 }

@@ -83,7 +83,12 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy("RequireOwner", p => p.RequireRole("Owner"))
     .AddPolicy("RequireAdmin", p => p.RequireRole("Owner", "Admin"))
     .AddPolicy("RequireManager", p => p.RequireRole("Owner", "Admin", "Manager"))
-    .AddPolicy("RequireAccountant", p => p.RequireRole("Owner", "Admin", "Manager", "Accountant"));
+    .AddPolicy("RequireAccountant", p => p.RequireRole("Owner", "Admin", "Manager", "Accountant"))
+    // Phase 3: Granular policies for tenant management
+    .AddPolicy("TenantManageUsers", p => p.RequireRole("Owner", "Admin"))
+    .AddPolicy("TenantInvite", p => p.RequireRole("Owner", "Admin"))
+    .AddPolicy("PayrollManage", p => p.RequireRole("Owner", "Admin", "Manager"))
+    .AddPolicy("ReportsRead", p => p.RequireRole("Owner", "Admin", "Manager", "Accountant"));
 
 // 7. REGISTRAR SERVICIOS DE LA APLICACIÓN (UnitOfWork, etc.)
 builder.Services.ConfigureApplicationServices();
@@ -114,6 +119,12 @@ if (stripeOptions != null)
 // 11. REGISTRAR SERVICIOS STRIPE
 builder.Services.AddScoped<IStripeBillingService, StripeBillingService>();
 builder.Services.AddScoped<IPlanLimitService, PlanLimitService>();
+
+// 12. PHASE 3: REGISTRAR SERVICIOS DE TENANT MANAGEMENT
+builder.Services.AddScoped<IJwtTokenService, Vorluno.Planilla.Web.Services.JwtTokenService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddScoped<ITenantManagementService, TenantManagementService>();
+builder.Services.AddScoped<IInvitationService, InvitationService>();
 
 // --- FIN DE NUESTRA CONFIGURACIÓN PRINCIPAL ---
 

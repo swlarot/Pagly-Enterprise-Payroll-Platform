@@ -26,19 +26,22 @@ public class AuthController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthController> _logger;
+    private readonly Vorluno.Planilla.Application.Interfaces.IInvitationService? _invitationService;
 
     public AuthController(
         UserManager<AppUser> userManager,
         SignInManager<AppUser> signInManager,
         ApplicationDbContext context,
         IConfiguration configuration,
-        ILogger<AuthController> logger)
+        ILogger<AuthController> logger,
+        Vorluno.Planilla.Application.Interfaces.IInvitationService? invitationService = null)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _context = context;
         _configuration = configuration;
         _logger = logger;
+        _invitationService = invitationService;
     }
 
     /// <summary>
@@ -417,6 +420,64 @@ public class AuthController : ControllerBase
         );
 
         return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
+    }
+
+    /// <summary>
+    /// Acepta una invitación de usuario al tenant
+    /// POST /api/auth/accept-invite
+    /// Público (no requiere autenticación)
+    /// </summary>
+    [HttpPost("accept-invite")]
+    [AllowAnonymous]
+    public async Task<IActionResult> AcceptInvite([FromBody] Vorluno.Planilla.Application.DTOs.Tenant.AcceptInvitationDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        if (_invitationService == null)
+        {
+            return StatusCode(500, new { message = "Invitation service not configured" });
+        }
+
+        var result = await _invitationService.AcceptInvitationAsync(dto);
+
+        if (!result.Success)
+        {
+            return BadRequest(new { message = result.ErrorMessage });
+        }
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// Valida un token de invitación sin aceptarlo
+    /// GET /api/auth/validate-invite?token={token}
+    /// Público (no requiere autenticación)
+    /// </summary>
+    [HttpGet("validate-invite")]
+    [AllowAnonymous]
+    public async Task<IActionResult> ValidateInvite([FromQuery] string token)
+    {
+        if (string.IsNullOrEmpty(token))
+        {
+            return BadRequest(new { message = "Token requerido" });
+        }
+
+        if (_invitationService == null)
+        {
+            return StatusCode(500, new { message = "Invitation service not configured" });
+        }
+
+        var result = await _invitationService.ValidateInvitationTokenAsync(token);
+
+        if (!result.Success)
+        {
+            return BadRequest(new { message = result.ErrorMessage });
+        }
+
+        return Ok(result.Value);
     }
 
     private string GenerateUniqueSubdomain(string companyName)
