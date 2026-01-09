@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
@@ -11,17 +12,20 @@ namespace Vorluno.Planilla.Web.Controllers;
 /// <summary>
 /// Controlador de API para gestionar deducciones fijas de empleados.
 /// </summary>
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class DeduccionesController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ApplicationDbContext _context;
+    private readonly ITenantContext _tenantContext;
 
-    public DeduccionesController(IUnitOfWork unitOfWork, ApplicationDbContext context)
+    public DeduccionesController(IUnitOfWork unitOfWork, ApplicationDbContext context, ITenantContext tenantContext)
     {
         _unitOfWork = unitOfWork;
         _context = context;
+        _tenantContext = tenantContext;
     }
 
     /// <summary>
@@ -37,9 +41,10 @@ public class DeduccionesController : ControllerBase
         [FromQuery] TipoDeduccion? tipo,
         [FromQuery] bool? activas)
     {
+        var tenantId = _tenantContext.TenantId;
         var query = _context.DeduccionesFijas
+            .Where(d => d.TenantId == tenantId)
             .Include(d => d.Empleado)
-            .Where(d => d.CompanyId == 1)
             .AsQueryable();
 
         if (empleadoId.HasValue)
@@ -58,6 +63,7 @@ public class DeduccionesController : ControllerBase
         }
 
         var deducciones = await query
+            .AsNoTracking()
             .OrderBy(d => d.Prioridad)
             .ThenByDescending(d => d.CreatedAt)
             .ToListAsync();
@@ -74,9 +80,12 @@ public class DeduccionesController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
+        var tenantId = _tenantContext.TenantId;
         var deduccion = await _context.DeduccionesFijas
+            .Where(d => d.Id == id && d.TenantId == tenantId)
             .Include(d => d.Empleado)
-            .FirstOrDefaultAsync(d => d.Id == id && d.CompanyId == 1);
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
 
         if (deduccion == null)
         {
@@ -95,15 +104,18 @@ public class DeduccionesController : ControllerBase
     [HttpGet("empleado/{empleadoId}")]
     public async Task<IActionResult> GetByEmpleado(int empleadoId)
     {
-        var empleado = await _unitOfWork.Empleados.GetByIdAsync(empleadoId);
+        var tenantId = _tenantContext.TenantId;
+        var empleado = await _context.Empleados
+            .FirstOrDefaultAsync(e => e.Id == empleadoId && e.TenantId == tenantId);
         if (empleado == null)
         {
             return NotFound(new { message = "Empleado no encontrado" });
         }
 
         var deducciones = await _context.DeduccionesFijas
+            .Where(d => d.EmpleadoId == empleadoId && d.TenantId == tenantId)
             .Include(d => d.Empleado)
-            .Where(d => d.EmpleadoId == empleadoId && d.CompanyId == 1)
+            .AsNoTracking()
             .OrderBy(d => d.Prioridad)
             .ToListAsync();
 
@@ -135,10 +147,14 @@ public class DeduccionesController : ControllerBase
     /// <param name="request">Datos de la deducción a crear.</param>
     /// <returns>Deducción creada.</returns>
     [HttpPost]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Create(CreateDeduccionRequest request)
     {
+        var tenantId = _tenantContext.TenantId;
+
         // Validar empleado existe
-        var empleado = await _unitOfWork.Empleados.GetByIdAsync(request.EmpleadoId);
+        var empleado = await _context.Empleados
+            .FirstOrDefaultAsync(e => e.Id == request.EmpleadoId && e.TenantId == tenantId);
         if (empleado == null)
         {
             return BadRequest(new { message = "Empleado no encontrado" });
@@ -171,8 +187,8 @@ public class DeduccionesController : ControllerBase
 
         var deduccion = new DeduccionFija
         {
+            TenantId = tenantId,
             EmpleadoId = request.EmpleadoId,
-            CompanyId = 1,
             TipoDeduccion = request.TipoDeduccion,
             Descripcion = request.Descripcion,
             Monto = request.Monto,
@@ -207,10 +223,12 @@ public class DeduccionesController : ControllerBase
     /// <param name="request">Datos actualizados.</param>
     /// <returns>NoContent si fue exitoso.</returns>
     [HttpPut("{id}")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Update(int id, CreateDeduccionRequest request)
     {
+        var tenantId = _tenantContext.TenantId;
         var deduccion = await _context.DeduccionesFijas
-            .FirstOrDefaultAsync(d => d.Id == id && d.CompanyId == 1);
+            .FirstOrDefaultAsync(d => d.Id == id && d.TenantId == tenantId);
 
         if (deduccion == null)
         {
@@ -264,10 +282,12 @@ public class DeduccionesController : ControllerBase
     /// <param name="id">ID de la deducción.</param>
     /// <returns>NoContent si fue exitoso.</returns>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Owner,Admin")]
     public async Task<IActionResult> Desactivar(int id)
     {
+        var tenantId = _tenantContext.TenantId;
         var deduccion = await _context.DeduccionesFijas
-            .FirstOrDefaultAsync(d => d.Id == id && d.CompanyId == 1);
+            .FirstOrDefaultAsync(d => d.Id == id && d.TenantId == tenantId);
 
         if (deduccion == null)
         {

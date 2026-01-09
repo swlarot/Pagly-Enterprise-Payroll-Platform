@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
@@ -11,17 +12,20 @@ namespace Vorluno.Planilla.Web.Controllers;
 /// <summary>
 /// Controlador de API para gestionar préstamos a empleados.
 /// </summary>
+[Authorize] // ✅ SEGURIDAD: Todos los endpoints requieren autenticación
 [ApiController]
 [Route("api/[controller]")]
 public class PrestamosController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ApplicationDbContext _context;
+    private readonly ITenantContext _tenantContext;
 
-    public PrestamosController(IUnitOfWork unitOfWork, ApplicationDbContext context)
+    public PrestamosController(IUnitOfWork unitOfWork, ApplicationDbContext context, ITenantContext tenantContext)
     {
         _unitOfWork = unitOfWork;
         _context = context;
+        _tenantContext = tenantContext;
     }
 
     /// <summary>
@@ -31,11 +35,14 @@ public class PrestamosController : ControllerBase
     /// <param name="estado">Filtrar por estado (opcional).</param>
     /// <returns>Lista de préstamos.</returns>
     [HttpGet]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
     public async Task<IActionResult> GetAll([FromQuery] int? empleadoId, [FromQuery] EstadoPrestamo? estado)
     {
+        var tenantId = _tenantContext.TenantId;
         var query = _context.Prestamos
+            .Where(p => p.TenantId == tenantId)
             .Include(p => p.Empleado)
-            .Where(p => p.CompanyId == 1)
+            .AsNoTracking()
             .AsQueryable();
 
         if (empleadoId.HasValue)
@@ -60,16 +67,20 @@ public class PrestamosController : ControllerBase
     /// <param name="id">ID del préstamo.</param>
     /// <returns>Detalles del préstamo.</returns>
     [HttpGet("{id}")]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
     public async Task<IActionResult> GetById(int id)
     {
+        var tenantId = _tenantContext.TenantId;
         var prestamo = await _context.Prestamos
+            .Where(p => p.Id == id && p.TenantId == tenantId)
             .Include(p => p.Empleado)
             .Include(p => p.PagosPrestamo)
-            .FirstOrDefaultAsync(p => p.Id == id && p.CompanyId == 1);
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
 
         if (prestamo == null)
         {
-            return NotFound();
+            return NotFound(); // 404 previene info leak
         }
 
         var prestamoDto = MapToDto(prestamo);
@@ -82,17 +93,24 @@ public class PrestamosController : ControllerBase
     /// <param name="empleadoId">ID del empleado.</param>
     /// <returns>Lista de préstamos del empleado.</returns>
     [HttpGet("empleado/{empleadoId}")]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
     public async Task<IActionResult> GetByEmpleado(int empleadoId)
     {
-        var empleado = await _unitOfWork.Empleados.GetByIdAsync(empleadoId);
+        var tenantId = _tenantContext.TenantId;
+        var empleado = await _context.Empleados
+            .Where(e => e.Id == empleadoId && e.TenantId == tenantId)
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
+
         if (empleado == null)
         {
             return NotFound(new { message = "Empleado no encontrado" });
         }
 
         var prestamos = await _context.Prestamos
+            .Where(p => p.EmpleadoId == empleadoId && p.TenantId == tenantId)
             .Include(p => p.Empleado)
-            .Where(p => p.EmpleadoId == empleadoId && p.CompanyId == 1)
+            .AsNoTracking()
             .OrderByDescending(p => p.FechaInicio)
             .ToListAsync();
 
@@ -106,10 +124,15 @@ public class PrestamosController : ControllerBase
     /// <param name="request">Datos del préstamo a crear.</param>
     /// <returns>Préstamo creado.</returns>
     [HttpPost]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Create(CreatePrestamoRequest request)
     {
-        // Validar empleado existe
-        var empleado = await _unitOfWork.Empleados.GetByIdAsync(request.EmpleadoId);
+        var tenantId = _tenantContext.TenantId;
+        // Validar empleado existe y pertenece al tenant
+        var empleado = await _context.Empleados
+            .Where(e => e.Id == request.EmpleadoId && e.TenantId == tenantId)
+            .FirstOrDefaultAsync();
+
         if (empleado == null)
         {
             return BadRequest(new { message = "Empleado no encontrado" });
@@ -139,7 +162,7 @@ public class PrestamosController : ControllerBase
         var prestamo = new Prestamo
         {
             EmpleadoId = request.EmpleadoId,
-            CompanyId = 1,
+            TenantId = _tenantContext.TenantId,
             Descripcion = request.Descripcion,
             MontoOriginal = request.MontoOriginal,
             MontoPendiente = request.MontoOriginal,
@@ -166,8 +189,9 @@ public class PrestamosController : ControllerBase
 
         // Recargar con navegación
         prestamo = await _context.Prestamos
+            .Where(p => p.Id == prestamo.Id && p.TenantId == tenantId)
             .Include(p => p.Empleado)
-            .FirstOrDefaultAsync(p => p.Id == prestamo.Id);
+            .FirstOrDefaultAsync();
 
         var prestamoDto = MapToDto(prestamo!);
         return CreatedAtAction(nameof(GetById), new { id = prestamo!.Id }, prestamoDto);
@@ -180,14 +204,16 @@ public class PrestamosController : ControllerBase
     /// <param name="request">Datos actualizados.</param>
     /// <returns>NoContent si fue exitoso.</returns>
     [HttpPut("{id}")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Update(int id, CreatePrestamoRequest request)
     {
+        var tenantId = _tenantContext.TenantId;
         var prestamo = await _context.Prestamos
-            .FirstOrDefaultAsync(p => p.Id == id && p.CompanyId == 1);
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
 
         if (prestamo == null)
         {
-            return NotFound();
+            return NotFound(); // 404 previene info leak
         }
 
         // Validaciones
@@ -224,14 +250,16 @@ public class PrestamosController : ControllerBase
     /// <param name="id">ID del préstamo.</param>
     /// <returns>NoContent si fue exitoso.</returns>
     [HttpPost("{id}/suspender")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Suspender(int id)
     {
+        var tenantId = _tenantContext.TenantId;
         var prestamo = await _context.Prestamos
-            .FirstOrDefaultAsync(p => p.Id == id && p.CompanyId == 1);
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
 
         if (prestamo == null)
         {
-            return NotFound();
+            return NotFound(); // 404 previene info leak
         }
 
         if (prestamo.Estado != EstadoPrestamo.Activo)
@@ -252,14 +280,16 @@ public class PrestamosController : ControllerBase
     /// <param name="id">ID del préstamo.</param>
     /// <returns>NoContent si fue exitoso.</returns>
     [HttpPost("{id}/reactivar")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Reactivar(int id)
     {
+        var tenantId = _tenantContext.TenantId;
         var prestamo = await _context.Prestamos
-            .FirstOrDefaultAsync(p => p.Id == id && p.CompanyId == 1);
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
 
         if (prestamo == null)
         {
-            return NotFound();
+            return NotFound(); // 404 previene info leak
         }
 
         if (prestamo.Estado != EstadoPrestamo.Suspendido)
@@ -280,14 +310,16 @@ public class PrestamosController : ControllerBase
     /// <param name="id">ID del préstamo.</param>
     /// <returns>NoContent si fue exitoso.</returns>
     [HttpDelete("{id}/cancelar")]
+    [Authorize(Roles = "Owner,Admin")]
     public async Task<IActionResult> Cancelar(int id)
     {
+        var tenantId = _tenantContext.TenantId;
         var prestamo = await _context.Prestamos
-            .FirstOrDefaultAsync(p => p.Id == id && p.CompanyId == 1);
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
 
         if (prestamo == null)
         {
-            return NotFound();
+            return NotFound(); // 404 previene info leak
         }
 
         if (prestamo.Estado == EstadoPrestamo.Pagado)

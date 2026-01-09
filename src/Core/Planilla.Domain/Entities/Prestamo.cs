@@ -16,9 +16,9 @@ public class Prestamo
     public Empleado Empleado { get; set; } = null!;
 
     /// <summary>
-    /// ID de la compañía (multi-tenancy)
+    /// ID del tenant al que pertenece este préstamo
     /// </summary>
-    public int CompanyId { get; set; }
+    public int TenantId { get; set; }
 
     /// <summary>
     /// Descripción del préstamo (ej: "Préstamo personal", "Adelanto vacaciones")
@@ -87,4 +87,5 @@ public class Prestamo
 
     // Navegación
     public ICollection<PagoPrestamo> PagosPrestamo { get; set; } = new List<PagoPrestamo>();
+    public virtual Tenant? Tenant { get; set; }
 }

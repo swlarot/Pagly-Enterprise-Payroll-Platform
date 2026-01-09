@@ -25,8 +25,10 @@ public class Posicion
 
     public bool EstaActivo { get; set; } = true;
 
-    // Multi-tenant
-    public int CompanyId { get; set; }
+    /// <summary>
+    /// ID del tenant al que pertenece esta posición
+    /// </summary>
+    public int TenantId { get; set; }
 
     // Departamento al que pertenece
     public int DepartamentoId { get; set; }
@@ -45,6 +47,7 @@ public class Posicion
     // Navigation properties
     public virtual Departamento Departamento { get; set; } = null!;
     public virtual ICollection<Empleado> Empleados { get; set; } = new List<Empleado>();
+    public virtual Tenant? Tenant { get; set; }
 
     /// <summary>
     /// Obtiene el porcentaje de riesgo profesional según el nivel

@@ -166,7 +166,7 @@ const DeduccionesPage = () => {
 
             const payload = {
                 empleadoId: parseInt(formData.empleadoId),
-                tipoDeduccion: formData.tipoDeduccion,
+                tipoDeduccion: parseInt(formData.tipoDeduccion),
                 descripcion: formData.descripcion,
                 esPorcentaje: formData.esPorcentaje,
                 monto: formData.esPorcentaje ? 0 : parseFloat(formData.monto),

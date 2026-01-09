@@ -20,10 +20,10 @@ public class PayrollTaxConfiguration
     public int Id { get; set; }
 
     /// <summary>
-    /// ID de la empresa/compañía a la que aplica esta configuración
+    /// ID del tenant al que pertenece esta configuración
     /// </summary>
     [Required]
-    public int CompanyId { get; set; }
+    public int TenantId { get; set; }
 
     /// <summary>
     /// Fecha de inicio de vigencia de esta configuración
@@ -185,4 +185,7 @@ public class PayrollTaxConfiguration
     /// Fecha de última actualización del registro
     /// </summary>
     public DateTime? UpdatedAt { get; set; }
+
+    // Navigation property
+    public virtual Tenant? Tenant { get; set; }
 }

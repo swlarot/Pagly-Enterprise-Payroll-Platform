@@ -2,13 +2,14 @@
 // Planilla - PayrollHeadersController
 // Source: Core360 Stage 3
 // Creado: 2025-12-26
-// Descripción: Controller de workflow de planilla
+// Descripción: Controller de workflow de planilla con multi-tenancy seguro
 // Endpoints: CRUD + calculate, approve, pay, cancel
 // ====================================================================
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Application.Services;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
@@ -17,9 +18,10 @@ using Vorluno.Planilla.Infrastructure.Data;
 namespace Vorluno.Planilla.Web.Controllers;
 
 /// <summary>
-/// Controller para gestionar el workflow de planillas.
+/// Controller para gestionar el workflow de planillas con seguridad multi-tenant.
 /// Implementa CRUD básico y transiciones de estado (calculate, approve, pay, cancel).
 /// </summary>
+[Authorize] // ✅ SEGURIDAD: Todos los endpoints requieren autenticación
 [ApiController]
 [Route("api/[controller]")]
 public class PayrollHeadersController : ControllerBase
@@ -27,35 +29,35 @@ public class PayrollHeadersController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly PayrollStateMachine _stateMachine;
     private readonly PayrollCalculationOrchestratorPortable _orchestrator;
+    private readonly ITenantContext _tenantContext;
 
     public PayrollHeadersController(
         ApplicationDbContext context,
         PayrollStateMachine stateMachine,
-        PayrollCalculationOrchestratorPortable orchestrator)
+        PayrollCalculationOrchestratorPortable orchestrator,
+        ITenantContext tenantContext)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _stateMachine = stateMachine ?? throw new ArgumentNullException(nameof(stateMachine));
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
+        _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
     }
 
     /// <summary>
-    /// Lista todas las planillas, con filtros opcionales por CompanyId y Status.
-    /// GET /api/payrollheaders?companyId=1&status=Calculated
+    /// Lista todas las planillas del tenant actual con filtros opcionales.
+    /// GET /api/payrollheaders?status=Calculated
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
     public async Task<ActionResult<IEnumerable<PayrollHeader>>> GetPayrollHeaders(
-        [FromQuery] int? companyId,
         [FromQuery] PayrollStatus? status)
     {
+        var tenantId = _tenantContext.TenantId;
         var query = _context.PayrollHeaders
+            .Where(p => p.TenantId == tenantId) // ✅ SEGURIDAD: Filtrado por tenant obligatorio
             .Include(p => p.Details)
+            .AsNoTracking()
             .AsQueryable();
-
-        // Filtrar por CompanyId si se especifica
-        if (companyId.HasValue)
-        {
-            query = query.Where(p => p.CompanyId == companyId.Value);
-        }
 
         // Filtrar por Status si se especifica
         if (status.HasValue)
@@ -71,16 +73,20 @@ public class PayrollHeadersController : ControllerBase
     }
 
     /// <summary>
-    /// Obtiene una planilla específica por ID, incluyendo sus detalles.
+    /// Obtiene una planilla específica por ID del tenant actual.
     /// GET /api/payrollheaders/{id}
     /// </summary>
     [HttpGet("{id}")]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
     public async Task<ActionResult<PayrollHeader>> GetPayrollHeader(int id)
     {
+        var tenantId = _tenantContext.TenantId;
         var payrollHeader = await _context.PayrollHeaders
+            .Where(p => p.Id == id && p.TenantId == tenantId) // ✅ SEGURIDAD: Verificar tenant
             .Include(p => p.Details)
                 .ThenInclude(d => d.Empleado)
-            .FirstOrDefaultAsync(p => p.Id == id);
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
 
         if (payrollHeader == null)
         {
@@ -91,29 +97,32 @@ public class PayrollHeadersController : ControllerBase
     }
 
     /// <summary>
-    /// Crea una nueva planilla en estado Draft.
+    /// Crea una nueva planilla en estado Draft para el tenant actual.
     /// POST /api/payrollheaders
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<ActionResult<PayrollHeader>> CreatePayrollHeader([FromBody] CreatePayrollHeaderRequest request)
     {
+        var tenantId = _tenantContext.TenantId;
+
         // ====================================================================
         // Auto-generar PayrollNumber si no se proporciona o si ya existe
         // ====================================================================
         string payrollNumber = request.PayrollNumber;
 
-        // Verificar si el PayrollNumber ya existe para esta compañía
+        // Verificar si el PayrollNumber ya existe para este tenant
         bool numberExists = await _context.PayrollHeaders
-            .AnyAsync(p => p.CompanyId == request.CompanyId && p.PayrollNumber == payrollNumber);
+            .AnyAsync(p => p.TenantId == tenantId && p.PayrollNumber == payrollNumber);
 
         // Si no se proporciona o ya existe, auto-generar uno nuevo
         if (string.IsNullOrWhiteSpace(payrollNumber) || numberExists)
         {
             int year = request.PeriodStartDate.Year;
 
-            // Obtener el último número de planilla del año para esta compañía
+            // Obtener el último número de planilla del año para este tenant
             var lastPayroll = await _context.PayrollHeaders
-                .Where(p => p.CompanyId == request.CompanyId
+                .Where(p => p.TenantId == tenantId
                     && p.PayrollNumber.StartsWith($"{year}-"))
                 .OrderByDescending(p => p.PayrollNumber)
                 .FirstOrDefaultAsync();
@@ -135,11 +144,11 @@ public class PayrollHeadersController : ControllerBase
 
         var payrollHeader = new PayrollHeader
         {
-            CompanyId = request.CompanyId,
+            TenantId = tenantId, // ✅ SEGURIDAD: TenantId del token JWT
             PayrollNumber = payrollNumber,
-            PeriodStartDate = request.PeriodStartDate,
-            PeriodEndDate = request.PeriodEndDate,
-            PayDate = request.PayDate,
+            PeriodStartDate = DateTime.SpecifyKind(request.PeriodStartDate, DateTimeKind.Utc),
+            PeriodEndDate = DateTime.SpecifyKind(request.PeriodEndDate, DateTimeKind.Utc),
+            PayDate = DateTime.SpecifyKind(request.PayDate, DateTimeKind.Utc),
             Status = PayrollStatus.Draft,
             CreatedAt = DateTime.UtcNow
         };
@@ -150,11 +159,11 @@ public class PayrollHeadersController : ControllerBase
         {
             await _context.SaveChangesAsync();
         }
-        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("IX_PayrollHeader_CompanyId_PayrollNumber") == true)
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("IX_PayrollHeader_TenantId_PayrollNumber") == true)
         {
             return Conflict(new
             {
-                message = $"Ya existe una planilla con el número '{payrollNumber}' para esta compañía",
+                message = $"Ya existe una planilla con el número '{payrollNumber}' para tu empresa",
                 detail = "Por favor, intente nuevamente con un número diferente"
             });
         }
@@ -167,10 +176,12 @@ public class PayrollHeadersController : ControllerBase
     /// POST /api/payrollheaders/{id}/calculate
     /// </summary>
     [HttpPost("{id}/calculate")]
-    [Authorize(Policy = "CanCalculatePayroll")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<ActionResult> CalculatePayroll(int id, [FromServices] ILogger<PayrollHeadersController> logger)
     {
-        var payrollHeader = await _context.PayrollHeaders.FindAsync(id);
+        var tenantId = _tenantContext.TenantId;
+        var payrollHeader = await _context.PayrollHeaders
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
 
         if (payrollHeader == null)
         {
@@ -193,10 +204,10 @@ public class PayrollHeadersController : ControllerBase
         try
         {
             // ====================================================================
-            // 1. Obtener empleados activos de la compañía
+            // 1. Obtener empleados activos del tenant
             // ====================================================================
             var activeEmployees = await _context.Empleados
-                .Where(e => e.CompanyId == payrollHeader.CompanyId && e.EstaActivo)
+                .Where(e => e.TenantId == tenantId && e.EstaActivo) // ✅ SEGURIDAD: Filtrado por tenant
                 .ToListAsync();
 
             if (activeEmployees.Count == 0)
@@ -229,7 +240,7 @@ public class PayrollHeadersController : ControllerBase
             {
                 // Calcular usando el orquestador
                 var calculationResult = await _orchestrator.CalculateEmployeePayrollAsync(
-                    companyId: payrollHeader.CompanyId,
+                    companyId: tenantId,
                     grossPay: employee.SalarioBase,
                     payFrequency: employee.PayFrequency,
                     yearsCotized: employee.YearsCotized,
@@ -261,7 +272,8 @@ public class PayrollHeadersController : ControllerBase
                     OtherDeductions = 0,
                     TotalDeductions = calculationResult.TotalDeductions,
                     NetPay = calculationResult.NetPay,
-                    EmployerCost = calculationResult.TotalEmployerCost
+                    EmployerCost = calculationResult.TotalEmployerCost,
+                    TenantId = tenantId // ✅ SEGURIDAD: TenantId del tenant
                 };
 
                 _context.PayrollDetails.Add(detail);
@@ -282,7 +294,7 @@ public class PayrollHeadersController : ControllerBase
             payrollHeader.TotalEmployerCost = totalEmployerCost;
             payrollHeader.Status = PayrollStatus.Calculated;
             payrollHeader.ProcessedDate = DateTime.UtcNow;
-            payrollHeader.ProcessedBy = "system"; // TODO: Obtener del usuario autenticado con ICurrentUserService
+            payrollHeader.ProcessedBy = _tenantContext.UserId ?? "system";
             payrollHeader.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
@@ -323,8 +335,7 @@ public class PayrollHeadersController : ControllerBase
             return StatusCode(500, new {
                 message = "Error al calcular la planilla",
                 detail = ex.Message,
-                innerError = ex.InnerException?.Message,
-                stackTrace = ex.StackTrace?.Split('\n').Take(5).ToArray()
+                innerError = ex.InnerException?.Message
             });
         }
     }
@@ -334,10 +345,12 @@ public class PayrollHeadersController : ControllerBase
     /// POST /api/payrollheaders/{id}/approve
     /// </summary>
     [HttpPost("{id}/approve")]
-    [Authorize(Policy = "CanApprovePayroll")]
+    [Authorize(Roles = "Owner,Admin")]
     public async Task<ActionResult> ApprovePayroll(int id)
     {
-        var payrollHeader = await _context.PayrollHeaders.FindAsync(id);
+        var tenantId = _tenantContext.TenantId;
+        var payrollHeader = await _context.PayrollHeaders
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
 
         if (payrollHeader == null)
         {
@@ -358,7 +371,7 @@ public class PayrollHeadersController : ControllerBase
         payrollHeader.Status = PayrollStatus.Approved;
         payrollHeader.IsApproved = true;
         payrollHeader.ApprovedDate = DateTime.UtcNow;
-        payrollHeader.ApprovedBy = "system"; // TODO: Obtener del usuario autenticado
+        payrollHeader.ApprovedBy = _tenantContext.UserId ?? "system";
         payrollHeader.UpdatedAt = DateTime.UtcNow;
 
         try
@@ -385,10 +398,12 @@ public class PayrollHeadersController : ControllerBase
     /// NOTA: Stub - integración bancaria pendiente
     /// </summary>
     [HttpPost("{id}/pay")]
-    [Authorize(Policy = "CanPayPayroll")]
+    [Authorize(Roles = "Owner,Admin")]
     public async Task<ActionResult> PayPayroll(int id)
     {
-        var payrollHeader = await _context.PayrollHeaders.FindAsync(id);
+        var tenantId = _tenantContext.TenantId;
+        var payrollHeader = await _context.PayrollHeaders
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
 
         if (payrollHeader == null)
         {
@@ -421,10 +436,12 @@ public class PayrollHeadersController : ControllerBase
     /// POST /api/payrollheaders/{id}/cancel
     /// </summary>
     [HttpPost("{id}/cancel")]
-    [Authorize(Policy = "CanCancelPayroll")]
+    [Authorize(Roles = "Owner,Admin")]
     public async Task<ActionResult> CancelPayroll(int id)
     {
-        var payrollHeader = await _context.PayrollHeaders.FindAsync(id);
+        var tenantId = _tenantContext.TenantId;
+        var payrollHeader = await _context.PayrollHeaders
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
 
         if (payrollHeader == null)
         {
@@ -466,7 +483,6 @@ public class PayrollHeadersController : ControllerBase
 /// DTO para crear una nueva planilla.
 /// </summary>
 public record CreatePayrollHeaderRequest(
-    int CompanyId,
     string PayrollNumber,
     DateTime PeriodStartDate,
     DateTime PeriodEndDate,

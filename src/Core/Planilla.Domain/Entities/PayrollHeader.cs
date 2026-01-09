@@ -26,9 +26,9 @@ public class PayrollHeader
     public int Id { get; set; }
 
     /// <summary>
-    /// ID de la compañía dueña de la planilla.
+    /// ID del tenant al que pertenece esta planilla (multi-tenancy)
     /// </summary>
-    public int CompanyId { get; set; }
+    public int TenantId { get; set; }
 
     /// <summary>
     /// Número de planilla único (ej: "PL-2025-01", "QUIN-2025-02").
@@ -140,13 +140,7 @@ public class PayrollHeader
     // ====================================================================
     // Concurrencia optimista
     // ====================================================================
-
-    /// <summary>
-    /// Token de concurrencia optimista (auto-incrementado por EF Core).
-    /// Previene actualizaciones concurrentes conflictivas.
-    /// </summary>
-    [Timestamp]
-    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+    // PostgreSQL usa xmin (shadow property manejada por EF Core)
 
     // ====================================================================
     // Auditoría
@@ -170,4 +164,9 @@ public class PayrollHeader
     /// Detalles de la planilla (uno por empleado).
     /// </summary>
     public virtual ICollection<PayrollDetail> Details { get; set; } = new List<PayrollDetail>();
+
+    /// <summary>
+    /// Navigation property para Tenant
+    /// </summary>
+    public virtual Tenant? Tenant { get; set; }
 }

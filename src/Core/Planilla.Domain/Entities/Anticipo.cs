@@ -28,9 +28,9 @@ public class Anticipo
     public Empleado Empleado { get; set; } = null!;
 
     /// <summary>
-    /// ID de la compañía (multi-tenancy)
+    /// ID del tenant al que pertenece este anticipo
     /// </summary>
-    public int CompanyId { get; set; }
+    public int TenantId { get; set; }
 
     /// <summary>
     /// Monto del anticipo solicitado
@@ -80,4 +80,7 @@ public class Anticipo
     // Auditoría
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+
+    // Navigation property
+    public virtual Tenant? Tenant { get; set; }
 }

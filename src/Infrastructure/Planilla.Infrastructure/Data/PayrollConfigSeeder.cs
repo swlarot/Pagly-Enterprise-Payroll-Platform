@@ -100,7 +100,7 @@ public static class PayrollConfigSeeder
         {
             var entity = new PayrollTaxConfiguration
             {
-                CompanyId = config.CompanyId,
+                TenantId = config.TenantId,
                 EffectiveStartDate = config.EffectiveStartDate,
                 EffectiveEndDate = config.EffectiveEndDate,
                 Description = config.Description,
@@ -187,7 +187,7 @@ public static class PayrollConfigSeeder
         {
             var entity = new TaxBracket
             {
-                CompanyId = bracket.CompanyId,
+                TenantId = bracket.TenantId,
                 Year = bracket.Year,
                 Order = bracket.Order,
                 Description = bracket.Description,
@@ -215,7 +215,7 @@ public static class PayrollConfigSeeder
 
     private class PayrollConfigSeedItem
     {
-        public int CompanyId { get; set; }
+        public int TenantId { get; set; }
         public DateTime EffectiveStartDate { get; set; }
         public DateTime? EffectiveEndDate { get; set; }
         public string Description { get; set; } = string.Empty;
@@ -245,7 +245,7 @@ public static class PayrollConfigSeeder
 
     private class TaxBracketSeedItem
     {
-        public int CompanyId { get; set; }
+        public int TenantId { get; set; }
         public int Year { get; set; }
         public int Order { get; set; }
         public string Description { get; set; } = string.Empty;
