@@ -13,7 +13,7 @@ namespace Vorluno.Planilla.Application.DTOs;
 /// </summary>
 public record TaxBracketDto(
     int Id,
-    int CompanyId,
+    int TenantId,
     int Year,
     int Order,
     string Description,
