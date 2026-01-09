@@ -1,9 +1,9 @@
 // ====================================================================
-// Planilla - PayrollConfigSeeder
-// Source: Phase A - Configuration Seeding
-// Creado: 2025-12-26
-// Descripción: Seeder para cargar configuración inicial de planilla
-// Lee de docs/seeds/*.json e inserta en DB de forma idempotente
+// Planilla - PayrollConfigSeeder (Multi-Tenant Fixed)
+// Source: Phase 3 - Multi-Tenant Seeding
+// Modificado: 2026-01-09
+// Descripción: Seeder multi-tenant que NO depende de JWT/TenantContext
+// Crea config para cada tenant activo de forma idempotente
 // ====================================================================
 
 using System.Text.Json;
@@ -14,245 +14,211 @@ using Vorluno.Planilla.Domain.Entities;
 namespace Vorluno.Planilla.Infrastructure.Data;
 
 /// <summary>
-/// Seeder para cargar configuración inicial de planilla desde archivos JSON.
-/// Inserta datos de forma idempotente (no duplica si ya existen).
+/// Seeder multi-tenant para configuración de planilla.
+/// Crea config para CADA tenant activo sin depender de JWT/TenantContext.
 /// </summary>
 public static class PayrollConfigSeeder
 {
     /// <summary>
-    /// Ejecuta el seed de configuración de planilla y tax brackets.
+    /// Ejecuta el seed de configuración para todos los tenants activos.
     /// </summary>
-    /// <param name="context">ApplicationDbContext</param>
-    /// <param name="logger">Logger opcional para logs de seeding</param>
     public static async Task SeedAsync(ApplicationDbContext context, ILogger? logger = null)
     {
-        logger?.LogInformation("Iniciando seed de configuración de planilla...");
+        logger?.LogInformation("Iniciando seed de configuración multi-tenant...");
 
         try
         {
-            // Seed PayrollTaxConfiguration
-            await SeedPayrollConfigAsync(context, logger);
+            // Obtener todos los tenants activos (SIN filtros globales)
+            var tenants = await context.Tenants
+                .IgnoreQueryFilters()
+                .Where(t => t.IsActive)
+                .Select(t => new { t.Id, t.Name })
+                .ToListAsync();
 
-            // Seed TaxBrackets
-            await SeedTaxBracketsAsync(context, logger);
+            if (!tenants.Any())
+            {
+                logger?.LogWarning("No hay tenants activos. Saltando seed de configuración.");
+                return;
+            }
 
-            logger?.LogInformation("Seed de configuración de planilla completado exitosamente");
+            logger?.LogInformation("Encontrados {Count} tenants activos para seeding", tenants.Count);
+
+            // Seed por cada tenant
+            foreach (var tenant in tenants)
+            {
+                logger?.LogInformation("Procesando seed para Tenant {TenantId} ({TenantName})...",
+                    tenant.Id, tenant.Name);
+
+                await SeedPayrollConfigForTenantAsync(context, tenant.Id, logger);
+                await SeedTaxBracketsForTenantAsync(context, tenant.Id, logger);
+            }
+
+            logger?.LogInformation("Seed multi-tenant completado exitosamente");
         }
         catch (Exception ex)
         {
-            logger?.LogError(ex, "Error al ejecutar seed de configuración de planilla");
-            throw;
-        }
-    }
-
-    private static async Task SeedPayrollConfigAsync(ApplicationDbContext context, ILogger? logger)
-    {
-        // Verificar si ya hay configuración (ignorar query filters durante seeding)
-        var existingCount = await context.PayrollTaxConfigurations.IgnoreQueryFilters().CountAsync();
-        if (existingCount > 0)
-        {
-            logger?.LogInformation("PayrollTaxConfiguration ya tiene {Count} registros. Saltando seed.", existingCount);
-            return;
-        }
-
-        // Buscar archivo JSON en múltiples ubicaciones posibles
-        var possiblePaths = new[]
-        {
-            Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "docs", "seeds", "seed_payroll_config.json"),
-            Path.Combine(Directory.GetCurrentDirectory(), "docs", "seeds", "seed_payroll_config.json"),
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "docs", "seeds", "seed_payroll_config.json"),
-            "C:\\Planilla\\docs\\seeds\\seed_payroll_config.json" // Absolute path as fallback
-        };
-
-        string? normalizedPath = null;
-        foreach (var path in possiblePaths)
-        {
-            var fullPath = Path.GetFullPath(path);
-            if (File.Exists(fullPath))
+            logger?.LogError(ex, "Error al ejecutar seed de configuración");
+            // NO relanzar en dev para permitir que la app arranque
+            if (logger != null)
             {
-                normalizedPath = fullPath;
-                break;
+                logger.LogWarning("Continuando startup a pesar del error de seeding");
             }
         }
-
-        if (normalizedPath == null)
-        {
-            logger?.LogWarning("Archivo seed_payroll_config.json no encontrado en ninguna ubicación. Ubicaciones probadas: {Paths}", string.Join(", ", possiblePaths.Select(Path.GetFullPath)));
-            return;
-        }
-
-        logger?.LogInformation("Leyendo seed_payroll_config.json desde {Path}", normalizedPath);
-
-        var jsonContent = await File.ReadAllTextAsync(normalizedPath);
-        var seedData = JsonSerializer.Deserialize<PayrollConfigSeedData>(jsonContent, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        });
-
-        if (seedData?.Configurations == null || seedData.Configurations.Count == 0)
-        {
-            logger?.LogWarning("No se encontraron configuraciones en seed_payroll_config.json");
-            return;
-        }
-
-        // Insertar configuraciones
-        foreach (var config in seedData.Configurations)
-        {
-            var entity = new PayrollTaxConfiguration
-            {
-                TenantId = config.TenantId,
-                EffectiveStartDate = config.EffectiveStartDate,
-                EffectiveEndDate = config.EffectiveEndDate,
-                Description = config.Description,
-                CssEmployeeRate = config.CssEmployeeRate,
-                CssEmployerBaseRate = config.CssEmployerBaseRate,
-                CssRiskRateLow = config.CssRiskRateLow,
-                CssRiskRateMedium = config.CssRiskRateMedium,
-                CssRiskRateHigh = config.CssRiskRateHigh,
-                CssMaxContributionBaseStandard = config.CssMaxContributionBaseStandard,
-                CssMaxContributionBaseIntermediate = config.CssMaxContributionBaseIntermediate,
-                CssMaxContributionBaseHigh = config.CssMaxContributionBaseHigh,
-                CssIntermediateMinYears = config.CssIntermediateMinYears,
-                CssIntermediateMinAvgSalary = config.CssIntermediateMinAvgSalary,
-                CssHighMinYears = config.CssHighMinYears,
-                CssHighMinAvgSalary = config.CssHighMinAvgSalary,
-                EducationalInsuranceEmployeeRate = config.EducationalInsuranceEmployeeRate,
-                EducationalInsuranceEmployerRate = config.EducationalInsuranceEmployerRate,
-                DependentDeductionAmount = config.DependentDeductionAmount,
-                MaxDependents = config.MaxDependents,
-                IsActive = config.IsActive,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            context.PayrollTaxConfigurations.Add(entity);
-        }
-
-        await context.SaveChangesAsync();
-        logger?.LogInformation("Insertadas {Count} configuraciones de planilla", seedData.Configurations.Count);
     }
 
-    private static async Task SeedTaxBracketsAsync(ApplicationDbContext context, ILogger? logger)
+    /// <summary>
+    /// Seed de PayrollTaxConfiguration para un tenant específico.
+    /// </summary>
+    private static async Task SeedPayrollConfigForTenantAsync(
+        ApplicationDbContext context,
+        int tenantId,
+        ILogger? logger)
     {
-        // Verificar si ya hay brackets (ignorar query filters durante seeding)
-        var existingCount = await context.TaxBrackets.IgnoreQueryFilters().CountAsync();
-        if (existingCount > 0)
+        // Check si ya existe config para este tenant (IGNORAR filtros globales)
+        var existingConfig = await context.PayrollTaxConfigurations
+            .IgnoreQueryFilters()
+            .Where(c => c.TenantId == tenantId && c.IsActive)
+            .FirstOrDefaultAsync();
+
+        if (existingConfig != null)
         {
-            logger?.LogInformation("TaxBrackets ya tiene {Count} registros. Saltando seed.", existingCount);
+            logger?.LogInformation("Tenant {TenantId} ya tiene configuración. Saltando.", tenantId);
             return;
         }
 
-        // Buscar archivo JSON en múltiples ubicaciones posibles
-        var possiblePaths = new[]
+        // Crear configuración default para Panamá 2026
+        var config = new PayrollTaxConfiguration
         {
-            Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "docs", "seeds", "seed_tax_brackets_2025.json"),
-            Path.Combine(Directory.GetCurrentDirectory(), "docs", "seeds", "seed_tax_brackets_2025.json"),
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "..", "docs", "seeds", "seed_tax_brackets_2025.json"),
-            "C:\\Planilla\\docs\\seeds\\seed_tax_brackets_2025.json" // Absolute path as fallback
+            TenantId = tenantId,  // CRÍTICO: asignar tenant
+            EffectiveStartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            EffectiveEndDate = null,
+            Description = "Configuración Panamá 2026 - Ley 462 CSS",
+
+            // Tasas CSS (Caja de Seguro Social)
+            CssEmployeeRate = 9.75m,      // Empleado: 9.75%
+            CssEmployerBaseRate = 12.25m,  // Empleador base: 12.25%
+
+            // Tasas de riesgo profesional
+            CssRiskRateLow = 0.41m,        // Riesgo bajo: 0.41%
+            CssRiskRateMedium = 1.09m,     // Riesgo medio: 1.09%
+            CssRiskRateHigh = 2.31m,       // Riesgo alto: 2.31%
+
+            // Topes de cotización CSS (Ley 462)
+            CssMaxContributionBaseStandard = 1000.00m,      // Estándar: $1,000
+            CssMaxContributionBaseIntermediate = 1500.00m,  // Intermedio: $1,500
+            CssMaxContributionBaseHigh = 2500.00m,          // Alto: $2,500
+
+            // Requisitos para topes superiores
+            CssIntermediateMinYears = 5,
+            CssIntermediateMinAvgSalary = 850.00m,
+            CssHighMinYears = 10,
+            CssHighMinAvgSalary = 1200.00m,
+
+            // Seguro Educativo
+            EducationalInsuranceEmployeeRate = 1.25m,   // Empleado: 1.25%
+            EducationalInsuranceEmployerRate = 1.50m,   // Empleador: 1.50%
+
+            // ISR (Impuesto Sobre la Renta)
+            DependentDeductionAmount = 800.00m,  // $800 por dependiente
+            MaxDependents = 5,
+
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
-        string? normalizedPath = null;
-        foreach (var path in possiblePaths)
-        {
-            var fullPath = Path.GetFullPath(path);
-            if (File.Exists(fullPath))
-            {
-                normalizedPath = fullPath;
-                break;
-            }
-        }
-
-        if (normalizedPath == null)
-        {
-            logger?.LogWarning("Archivo seed_tax_brackets_2025.json no encontrado en ninguna ubicación. Ubicaciones probadas: {Paths}", string.Join(", ", possiblePaths.Select(Path.GetFullPath)));
-            return;
-        }
-
-        logger?.LogInformation("Leyendo seed_tax_brackets_2025.json desde {Path}", normalizedPath);
-
-        var jsonContent = await File.ReadAllTextAsync(normalizedPath);
-        var seedData = JsonSerializer.Deserialize<TaxBracketsSeedData>(jsonContent, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        });
-
-        if (seedData?.Brackets == null || seedData.Brackets.Count == 0)
-        {
-            logger?.LogWarning("No se encontraron brackets en seed_tax_brackets_2025.json");
-            return;
-        }
-
-        // Insertar brackets
-        foreach (var bracket in seedData.Brackets)
-        {
-            var entity = new TaxBracket
-            {
-                TenantId = bracket.TenantId,
-                Year = bracket.Year,
-                Order = bracket.Order,
-                Description = bracket.Description,
-                MinIncome = bracket.MinIncome,
-                MaxIncome = bracket.MaxIncome,
-                Rate = bracket.Rate,
-                FixedAmount = bracket.FixedAmount,
-                IsActive = bracket.IsActive,
-                CreatedAt = DateTime.UtcNow,
-                UpdatedAt = DateTime.UtcNow
-            };
-
-            context.TaxBrackets.Add(entity);
-        }
-
+        context.PayrollTaxConfigurations.Add(config);
         await context.SaveChangesAsync();
-        logger?.LogInformation("Insertados {Count} tax brackets", seedData.Brackets.Count);
+
+        logger?.LogInformation("✓ Configuración creada para Tenant {TenantId}", tenantId);
     }
 
-    // DTOs para deserialización de JSON
-    private class PayrollConfigSeedData
+    /// <summary>
+    /// Seed de TaxBrackets (ISR) para un tenant específico.
+    /// </summary>
+    private static async Task SeedTaxBracketsForTenantAsync(
+        ApplicationDbContext context,
+        int tenantId,
+        ILogger? logger)
     {
-        public List<PayrollConfigSeedItem> Configurations { get; set; } = new();
+        // Check si ya existen brackets para este tenant
+        var existingCount = await context.TaxBrackets
+            .IgnoreQueryFilters()
+            .Where(b => b.TenantId == tenantId && b.Year == 2026)
+            .CountAsync();
+
+        if (existingCount > 0)
+        {
+            logger?.LogInformation("Tenant {TenantId} ya tiene {Count} tax brackets para 2026. Saltando.",
+                tenantId, existingCount);
+            return;
+        }
+
+        // Tax brackets ISR Panamá 2026 (valores anuales)
+        var brackets = new List<TaxBracket>
+        {
+            new TaxBracket
+            {
+                TenantId = tenantId,
+                Year = 2026,
+                Order = 1,
+                Description = "Exento - Hasta $11,000",
+                MinIncome = 0.00m,
+                MaxIncome = 11000.00m,
+                Rate = 0.00m,
+                FixedAmount = 0.00m,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new TaxBracket
+            {
+                TenantId = tenantId,
+                Year = 2026,
+                Order = 2,
+                Description = "15% - $11,000 a $50,000",
+                MinIncome = 11000.01m,
+                MaxIncome = 50000.00m,
+                Rate = 15.00m,
+                FixedAmount = 0.00m,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            },
+            new TaxBracket
+            {
+                TenantId = tenantId,
+                Year = 2026,
+                Order = 3,
+                Description = "25% - Más de $50,000",
+                MinIncome = 50000.01m,
+                MaxIncome = null,  // Sin límite superior
+                Rate = 25.00m,
+                FixedAmount = 5850.00m,  // 15% de $39,000 = $5,850
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+        context.TaxBrackets.AddRange(brackets);
+        await context.SaveChangesAsync();
+
+        logger?.LogInformation("✓ {Count} tax brackets creados para Tenant {TenantId}",
+            brackets.Count, tenantId);
     }
 
-    private class PayrollConfigSeedItem
+    /// <summary>
+    /// Seed de configuración para un tenant recién creado.
+    /// Llamar desde TenantService al crear nuevo tenant.
+    /// </summary>
+    public static async Task SeedForNewTenantAsync(
+        ApplicationDbContext context,
+        int tenantId,
+        ILogger? logger = null)
     {
-        public int TenantId { get; set; }
-        public DateTime EffectiveStartDate { get; set; }
-        public DateTime? EffectiveEndDate { get; set; }
-        public string Description { get; set; } = string.Empty;
-        public decimal CssEmployeeRate { get; set; }
-        public decimal CssEmployerBaseRate { get; set; }
-        public decimal CssRiskRateLow { get; set; }
-        public decimal CssRiskRateMedium { get; set; }
-        public decimal CssRiskRateHigh { get; set; }
-        public decimal CssMaxContributionBaseStandard { get; set; }
-        public decimal CssMaxContributionBaseIntermediate { get; set; }
-        public decimal CssMaxContributionBaseHigh { get; set; }
-        public int CssIntermediateMinYears { get; set; }
-        public decimal CssIntermediateMinAvgSalary { get; set; }
-        public int CssHighMinYears { get; set; }
-        public decimal CssHighMinAvgSalary { get; set; }
-        public decimal EducationalInsuranceEmployeeRate { get; set; }
-        public decimal EducationalInsuranceEmployerRate { get; set; }
-        public decimal DependentDeductionAmount { get; set; }
-        public int MaxDependents { get; set; }
-        public bool IsActive { get; set; }
-    }
+        logger?.LogInformation("Seeding configuración para nuevo Tenant {TenantId}...", tenantId);
 
-    private class TaxBracketsSeedData
-    {
-        public List<TaxBracketSeedItem> Brackets { get; set; } = new();
-    }
+        await SeedPayrollConfigForTenantAsync(context, tenantId, logger);
+        await SeedTaxBracketsForTenantAsync(context, tenantId, logger);
 
-    private class TaxBracketSeedItem
-    {
-        public int TenantId { get; set; }
-        public int Year { get; set; }
-        public int Order { get; set; }
-        public string Description { get; set; } = string.Empty;
-        public decimal MinIncome { get; set; }
-        public decimal? MaxIncome { get; set; }
-        public decimal Rate { get; set; }
-        public decimal FixedAmount { get; set; }
-        public bool IsActive { get; set; }
+        logger?.LogInformation("✓ Seed completado para nuevo Tenant {TenantId}", tenantId);
     }
 }

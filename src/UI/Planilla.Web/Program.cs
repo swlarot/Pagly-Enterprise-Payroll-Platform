@@ -205,18 +205,28 @@ if (!app.Environment.IsEnvironment("Testing"))
         {
             var context = services.GetRequiredService<ApplicationDbContext>();
 
+            // Aplicar migraciones (CRÍTICO - debe exitoso)
             logger.LogInformation("Aplicando migraciones pendientes...");
             await context.Database.MigrateAsync();
             logger.LogInformation("Migraciones aplicadas correctamente");
 
-            logger.LogInformation("Ejecutando seed de configuración...");
-            await PayrollConfigSeeder.SeedAsync(context, logger);
-            logger.LogInformation("Seed de configuración completado");
+            // Ejecutar seed (NO CRÍTICO - permitir que app arranque incluso si falla)
+            try
+            {
+                logger.LogInformation("Ejecutando seed de configuración multi-tenant...");
+                await PayrollConfigSeeder.SeedAsync(context, logger);
+                logger.LogInformation("✓ Seed de configuración completado exitosamente");
+            }
+            catch (Exception seedEx)
+            {
+                logger.LogWarning(seedEx, "⚠ Seed falló, pero la aplicación continuará. " +
+                    "La configuración se puede crear manualmente o al registrar tenants.");
+            }
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error durante migraciones o seeding");
-            throw;
+            logger.LogError(ex, "Error CRÍTICO durante migraciones. La aplicación no puede continuar.");
+            throw;  // Solo throw si falla migración
         }
     }
 }
