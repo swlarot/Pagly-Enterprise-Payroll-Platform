@@ -1,4 +1,5 @@
 using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
@@ -11,6 +12,7 @@ namespace Vorluno.Planilla.Web.Controllers;
 /// <summary>
 /// Controlador de API para gestionar las operaciones CRUD de departamentos.
 /// </summary>
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class DepartamentosController : ControllerBase
@@ -18,12 +20,14 @@ public class DepartamentosController : ControllerBase
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
     private readonly ApplicationDbContext _context;
+    private readonly ITenantContext _tenantContext;
 
-    public DepartamentosController(IUnitOfWork unitOfWork, IMapper mapper, ApplicationDbContext context)
+    public DepartamentosController(IUnitOfWork unitOfWork, IMapper mapper, ApplicationDbContext context, ITenantContext tenantContext)
     {
         _unitOfWork = unitOfWork;
         _mapper = mapper;
         _context = context;
+        _tenantContext = tenantContext;
     }
 
     /// <summary>
@@ -32,10 +36,13 @@ public class DepartamentosController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
+        var tenantId = _tenantContext.TenantId;
         var departamentos = await _context.Departamentos
+            .Where(d => d.TenantId == tenantId)
             .Include(d => d.Manager)
             .Include(d => d.Empleados)
             .Include(d => d.Posiciones)
+            .AsNoTracking()
             .ToListAsync();
 
         var departamentosDto = departamentos.Select(d => new DepartamentoVerDto(
@@ -59,11 +66,14 @@ public class DepartamentosController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
+        var tenantId = _tenantContext.TenantId;
         var departamento = await _context.Departamentos
+            .Where(d => d.Id == id && d.TenantId == tenantId)
             .Include(d => d.Manager)
             .Include(d => d.Empleados)
             .Include(d => d.Posiciones)
-            .FirstOrDefaultAsync(d => d.Id == id);
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
 
         if (departamento == null)
         {
@@ -89,11 +99,14 @@ public class DepartamentosController : ControllerBase
     /// Crea un nuevo departamento.
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Create(DepartamentoCrearDto departamentoDto)
     {
+        var tenantId = _tenantContext.TenantId;
+
         // Verificar que el código sea único para la compañía
         var existe = await _context.Departamentos
-            .AnyAsync(d => d.Codigo == departamentoDto.Codigo);
+            .AnyAsync(d => d.Codigo == departamentoDto.Codigo && d.TenantId == tenantId);
 
         if (existe)
         {
@@ -112,11 +125,11 @@ public class DepartamentosController : ControllerBase
 
         var departamento = new Departamento
         {
+            TenantId = tenantId,
             Nombre = departamentoDto.Nombre,
             Codigo = departamentoDto.Codigo,
             Descripcion = departamentoDto.Descripcion,
             ManagerId = departamentoDto.ManagerId,
-            CompanyId = 1, // TODO: Obtener de ICurrentUserService cuando esté implementado
             CreatedAt = DateTime.UtcNow,
             EstaActivo = true
         };
@@ -148,9 +161,13 @@ public class DepartamentosController : ControllerBase
     /// Actualiza un departamento existente.
     /// </summary>
     [HttpPut("{id}")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Update(int id, DepartamentoActualizarDto departamentoDto)
     {
-        var departamento = await _unitOfWork.Repository<Departamento>().GetByIdAsync(id);
+        var tenantId = _tenantContext.TenantId;
+        var departamento = await _context.Departamentos
+            .FirstOrDefaultAsync(d => d.Id == id && d.TenantId == tenantId);
+
         if (departamento == null)
         {
             return NotFound();
@@ -158,7 +175,7 @@ public class DepartamentosController : ControllerBase
 
         // Verificar que el código sea único (excepto para este departamento)
         var existe = await _context.Departamentos
-            .AnyAsync(d => d.Codigo == departamentoDto.Codigo && d.Id != id);
+            .AnyAsync(d => d.Codigo == departamentoDto.Codigo && d.Id != id && d.TenantId == tenantId);
 
         if (existe)
         {
@@ -192,11 +209,14 @@ public class DepartamentosController : ControllerBase
     /// Elimina (desactiva) un departamento.
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Owner,Admin")]
     public async Task<IActionResult> Delete(int id)
     {
+        var tenantId = _tenantContext.TenantId;
         var departamento = await _context.Departamentos
+            .Where(d => d.Id == id && d.TenantId == tenantId)
             .Include(d => d.Posiciones)
-            .FirstOrDefaultAsync(d => d.Id == id);
+            .FirstOrDefaultAsync();
 
         if (departamento == null)
         {

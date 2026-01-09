@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
@@ -11,17 +12,20 @@ namespace Vorluno.Planilla.Web.Controllers;
 /// <summary>
 /// Controlador para gestionar horas extra de empleados
 /// </summary>
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class HorasExtraController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ApplicationDbContext _context;
+    private readonly ITenantContext _tenantContext;
 
-    public HorasExtraController(IUnitOfWork unitOfWork, ApplicationDbContext context)
+    public HorasExtraController(IUnitOfWork unitOfWork, ApplicationDbContext context, ITenantContext tenantContext)
     {
         _unitOfWork = unitOfWork;
         _context = context;
+        _tenantContext = tenantContext;
     }
 
     /// <summary>
@@ -34,7 +38,9 @@ public class HorasExtraController : ControllerBase
         [FromQuery] TipoHoraExtra? tipo = null,
         [FromQuery] bool? aprobadas = null)
     {
+        var tenantId = _tenantContext.TenantId;
         var query = _context.HorasExtra
+            .Where(h => h.TenantId == tenantId)
             .Include(h => h.Empleado)
             .AsQueryable();
 
@@ -50,7 +56,7 @@ public class HorasExtraController : ControllerBase
         if (aprobadas.HasValue)
             query = query.Where(h => h.EstaAprobada == aprobadas.Value);
 
-        var horasExtra = await query.OrderByDescending(h => h.Fecha).ToListAsync();
+        var horasExtra = await query.AsNoTracking().OrderByDescending(h => h.Fecha).ToListAsync();
 
         var dtos = horasExtra.Select(MapToDto);
         return Ok(dtos);
@@ -62,9 +68,12 @@ public class HorasExtraController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
+        var tenantId = _tenantContext.TenantId;
         var horaExtra = await _context.HorasExtra
+            .Where(h => h.Id == id && h.TenantId == tenantId)
             .Include(h => h.Empleado)
-            .FirstOrDefaultAsync(h => h.Id == id);
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
 
         if (horaExtra == null)
             return NotFound();
@@ -78,9 +87,11 @@ public class HorasExtraController : ControllerBase
     [HttpGet("empleado/{empleadoId}")]
     public async Task<IActionResult> GetByEmpleado(int empleadoId)
     {
+        var tenantId = _tenantContext.TenantId;
         var horasExtra = await _context.HorasExtra
+            .Where(h => h.EmpleadoId == empleadoId && h.TenantId == tenantId)
             .Include(h => h.Empleado)
-            .Where(h => h.EmpleadoId == empleadoId)
+            .AsNoTracking()
             .OrderByDescending(h => h.Fecha)
             .ToListAsync();
 
@@ -94,9 +105,11 @@ public class HorasExtraController : ControllerBase
     [HttpGet("pendientes")]
     public async Task<IActionResult> GetPendientes()
     {
+        var tenantId = _tenantContext.TenantId;
         var pendientes = await _context.HorasExtra
+            .Where(h => h.TenantId == tenantId && !h.EstaAprobada && h.PlanillaDetailId == null)
             .Include(h => h.Empleado)
-            .Where(h => !h.EstaAprobada && h.PlanillaDetailId == null)
+            .AsNoTracking()
             .OrderBy(h => h.Fecha)
             .ToListAsync();
 
@@ -125,10 +138,14 @@ public class HorasExtraController : ControllerBase
     /// Crea una nueva hora extra
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Create(CreateHoraExtraRequest request)
     {
+        var tenantId = _tenantContext.TenantId;
+
         // Verificar que el empleado existe
-        var empleado = await _unitOfWork.Repository<Empleado>().GetByIdAsync(request.EmpleadoId);
+        var empleado = await _context.Empleados
+            .FirstOrDefaultAsync(e => e.Id == request.EmpleadoId && e.TenantId == tenantId);
         if (empleado == null)
             return BadRequest(new { message = "El empleado especificado no existe." });
 
@@ -138,6 +155,7 @@ public class HorasExtraController : ControllerBase
 
         var horaExtra = new HoraExtra
         {
+            TenantId = tenantId,
             EmpleadoId = request.EmpleadoId,
             Fecha = request.Fecha.Date,
             TipoHoraExtra = request.TipoHoraExtra,
@@ -147,7 +165,6 @@ public class HorasExtraController : ControllerBase
             FactorMultiplicador = factor,
             Motivo = request.Motivo,
             EstaAprobada = false,
-            CompanyId = 1,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -166,16 +183,19 @@ public class HorasExtraController : ControllerBase
     /// Crea múltiples horas extra (batch)
     /// </summary>
     [HttpPost("batch")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> CreateBatch([FromBody] List<CreateHoraExtraRequest> requests)
     {
         if (requests == null || requests.Count == 0)
             return BadRequest(new { message = "Debe proporcionar al menos una hora extra." });
 
+        var tenantId = _tenantContext.TenantId;
         var horasExtra = new List<HoraExtra>();
 
         foreach (var request in requests)
         {
-            var empleado = await _unitOfWork.Repository<Empleado>().GetByIdAsync(request.EmpleadoId);
+            var empleado = await _context.Empleados
+                .FirstOrDefaultAsync(e => e.Id == request.EmpleadoId && e.TenantId == tenantId);
             if (empleado == null)
                 continue;
 
@@ -184,6 +204,7 @@ public class HorasExtraController : ControllerBase
 
             var horaExtra = new HoraExtra
             {
+                TenantId = tenantId,
                 EmpleadoId = request.EmpleadoId,
                 Fecha = request.Fecha.Date,
                 TipoHoraExtra = request.TipoHoraExtra,
@@ -193,7 +214,6 @@ public class HorasExtraController : ControllerBase
                 FactorMultiplicador = factor,
                 Motivo = request.Motivo,
                 EstaAprobada = false,
-                CompanyId = 1,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -214,9 +234,13 @@ public class HorasExtraController : ControllerBase
     /// Actualiza una hora extra
     /// </summary>
     [HttpPut("{id}")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Update(int id, CreateHoraExtraRequest request)
     {
-        var horaExtra = await _unitOfWork.Repository<HoraExtra>().GetByIdAsync(id);
+        var tenantId = _tenantContext.TenantId;
+        var horaExtra = await _context.HorasExtra
+            .FirstOrDefaultAsync(h => h.Id == id && h.TenantId == tenantId);
+
         if (horaExtra == null)
             return NotFound();
 
@@ -248,9 +272,13 @@ public class HorasExtraController : ControllerBase
     /// Aprueba una hora extra
     /// </summary>
     [HttpPost("{id}/aprobar")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Aprobar(int id)
     {
-        var horaExtra = await _unitOfWork.Repository<HoraExtra>().GetByIdAsync(id);
+        var tenantId = _tenantContext.TenantId;
+        var horaExtra = await _context.HorasExtra
+            .FirstOrDefaultAsync(h => h.Id == id && h.TenantId == tenantId);
+
         if (horaExtra == null)
             return NotFound();
 
@@ -272,9 +300,13 @@ public class HorasExtraController : ControllerBase
     /// Rechaza una hora extra
     /// </summary>
     [HttpPost("{id}/rechazar")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Rechazar(int id)
     {
-        var horaExtra = await _context.HorasExtra.FindAsync(id);
+        var tenantId = _tenantContext.TenantId;
+        var horaExtra = await _context.HorasExtra
+            .FirstOrDefaultAsync(h => h.Id == id && h.TenantId == tenantId);
+
         if (horaExtra == null)
             return NotFound();
 
@@ -288,9 +320,13 @@ public class HorasExtraController : ControllerBase
     /// Elimina una hora extra
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Owner,Admin")]
     public async Task<IActionResult> Delete(int id)
     {
-        var horaExtra = await _context.HorasExtra.FindAsync(id);
+        var tenantId = _tenantContext.TenantId;
+        var horaExtra = await _context.HorasExtra
+            .FirstOrDefaultAsync(h => h.Id == id && h.TenantId == tenantId);
+
         if (horaExtra == null)
             return NotFound();
 

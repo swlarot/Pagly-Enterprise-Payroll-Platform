@@ -12,15 +12,16 @@ namespace Vorluno.Planilla.Web.Controllers
     /// <summary>
     /// Controlador de API para gestionar las operaciones CRUD de los empleados.
     /// </summary>
-    // RISK: Authorization temporarily disabled for development/testing - re-enable for production
-    // [Authorize] // Proteger· todo el controlador una vez configuremos la seguridad.
+    [Authorize] // ‚úÖ SEGURIDAD: Todos los endpoints requieren autenticaci√≥n
     [ApiController]
-    [Route("api/[controller]")] // La ruta de acceso ser· /api/empleados
+    [Route("api/[controller]")] // La ruta de acceso ser√° /api/empleados
     public class EmpleadosController : ControllerBase
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly ApplicationDbContext _context;
+        private readonly ITenantContext _tenantContext;
+        private readonly IPlanLimitService _planLimitService;
 
         /// <summary>
         /// Inicializa una nueva instancia de la clase <see cref="EmpleadosController"/>.
@@ -28,43 +29,55 @@ namespace Vorluno.Planilla.Web.Controllers
         /// <param name="unitOfWork">La unidad de trabajo para el acceso a datos.</param>
         /// <param name="mapper">El servicio de mapeo de objetos (AutoMapper).</param>
         /// <param name="context">El contexto de la base de datos para consultas complejas.</param>
-        public EmpleadosController(IUnitOfWork unitOfWork, IMapper mapper, ApplicationDbContext context)
+        /// <param name="tenantContext">El contexto del tenant actual.</param>
+        /// <param name="planLimitService">Servicio de verificaci√≥n de l√≠mites del plan.</param>
+        public EmpleadosController(IUnitOfWork unitOfWork, IMapper mapper, ApplicationDbContext context, ITenantContext tenantContext, IPlanLimitService planLimitService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _context = context;
+            _tenantContext = tenantContext;
+            _planLimitService = planLimitService;
         }
 
         /// <summary>
-        /// Obtiene una lista de todos los empleados con su departamento y posiciÛn.
+        /// Obtiene una lista de todos los empleados con su departamento y posici√≥n.
         /// </summary>
         /// <returns>Una lista de empleados en formato DTO.</returns>
         [HttpGet]
+        [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
         public async Task<IActionResult> GetAll()
         {
+            var tenantId = _tenantContext.TenantId;
             var empleados = await _context.Empleados
+                .Where(e => e.TenantId == tenantId)
                 .Include(e => e.Departamento)
                 .Include(e => e.Posicion)
+                .AsNoTracking()
                 .ToListAsync();
             var empleadosDto = _mapper.Map<IEnumerable<EmpleadoVerDto>>(empleados);
             return Ok(empleadosDto);
         }
 
         /// <summary>
-        /// Obtiene un empleado especÌfico por su ID con su departamento y posiciÛn.
+        /// Obtiene un empleado espec√≠fico por su ID con su departamento y posici√≥n.
         /// </summary>
         /// <param name="id">El ID del empleado.</param>
         /// <returns>El empleado encontrado o un error 404 si no existe.</returns>
         [HttpGet("{id}")]
+        [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
         public async Task<IActionResult> GetById(int id)
         {
+            var tenantId = _tenantContext.TenantId;
             var empleado = await _context.Empleados
+                .Where(e => e.Id == id && e.TenantId == tenantId)
                 .Include(e => e.Departamento)
                 .Include(e => e.Posicion)
-                .FirstOrDefaultAsync(e => e.Id == id);
+                .AsNoTracking()
+                .FirstOrDefaultAsync();
             if (empleado == null)
             {
-                return NotFound(); // Retorna un 404 Not Found si no existe
+                return NotFound(); // Retorna un 404 Not Found si no existe o no pertenece al tenant
             }
             var empleadoDto = _mapper.Map<EmpleadoVerDto>(empleado);
             return Ok(empleadoDto);
@@ -76,25 +89,35 @@ namespace Vorluno.Planilla.Web.Controllers
         /// <param name="empleadoDto">Los datos del nuevo empleado.</param>
         /// <returns>El nuevo empleado creado.</returns>
         [HttpPost]
-        // [Authorize(Roles = "Admin")] // En el futuro, solo los administradores podr·n crear empleados.
+        [Authorize(Roles = "Owner,Admin,Manager")]
         public async Task<IActionResult> Create(EmpleadoCrearDto empleadoDto)
         {
+            var tenantId = _tenantContext.TenantId;
+
+            // ‚úÖ FEATURE GATING: Verificar l√≠mite de empleados del plan
+            var (allowed, reason) = await _planLimitService.CanCreateEmployeeAsync(tenantId);
+            if (!allowed)
+            {
+                return StatusCode(403, new { error = reason });
+            }
+
             var empleado = _mapper.Map<Empleado>(empleadoDto);
-            empleado.FechaContratacion = DateTime.UtcNow; // LÛgica de negocio simple
-            empleado.CompanyId = 1; // TODO: Obtener de ICurrentUserService cuando estÈ implementado
+            empleado.FechaContratacion = DateTime.UtcNow; // L√≥gica de negocio simple
+            empleado.TenantId = tenantId; // ‚úÖ SEGURIDAD: TenantId del token JWT
 
             await _unitOfWork.Empleados.AddAsync(empleado);
             await _unitOfWork.CompleteAsync(); // Guarda los cambios en la BD
 
-            // Recargar con navegaciÛn para el DTO
+            // Recargar con navegaci√≥n para el DTO
             empleado = await _context.Empleados
+                .Where(e => e.Id == empleado.Id && e.TenantId == tenantId)
                 .Include(e => e.Departamento)
                 .Include(e => e.Posicion)
-                .FirstOrDefaultAsync(e => e.Id == empleado.Id);
+                .FirstOrDefaultAsync();
 
             var empleadoCreadoDto = _mapper.Map<EmpleadoVerDto>(empleado);
 
-            // Devuelve una respuesta 201 Created con la ubicaciÛn del nuevo recurso
+            // Devuelve una respuesta 201 Created con la ubicaci√≥n del nuevo recurso
             return CreatedAtAction(nameof(GetById), new { id = empleado!.Id }, empleadoCreadoDto);
         }
 
@@ -103,47 +126,53 @@ namespace Vorluno.Planilla.Web.Controllers
         /// </summary>
         /// <param name="id">El ID del empleado a actualizar.</param>
         /// <param name="empleadoDto">Los datos actualizados del empleado.</param>
-        /// <returns>NoContent si la actualizaciÛn fue exitosa, NotFound si no existe.</returns>
+        /// <returns>NoContent si la actualizaci√≥n fue exitosa, NotFound si no existe.</returns>
         [HttpPut("{id}")]
-        // [Authorize(Roles = "Admin")] // En el futuro, solo los administradores podr·n actualizar empleados.
+        [Authorize(Roles = "Owner,Admin,Manager")]
         public async Task<IActionResult> Update(int id, EmpleadoActualizarDto empleadoDto)
         {
-            var empleado = await _unitOfWork.Empleados.GetByIdAsync(id);
+            var tenantId = _tenantContext.TenantId;
+            var empleado = await _context.Empleados
+                .FirstOrDefaultAsync(e => e.Id == id && e.TenantId == tenantId);
+
             if (empleado == null)
             {
-                return NotFound(); // Retorna un 404 Not Found si no existe
+                return NotFound(); // Retorna un 404 Not Found si no existe o no pertenece al tenant
             }
 
-            // RISK: Mantiene NumeroIdentificacion y FechaContratacion originales - solo actualiza campos permitidos
+            // Mantiene NumeroIdentificacion y FechaContratacion originales - solo actualiza campos permitidos
             _mapper.Map(empleadoDto, empleado);
 
             _unitOfWork.Empleados.Update(empleado);
             await _unitOfWork.CompleteAsync();
 
-            return NoContent(); // Retorna un 204 No Content para indicar Èxito
+            return NoContent(); // Retorna un 204 No Content para indicar √©xito
         }
 
         /// <summary>
         /// Elimina un empleado (soft delete usando EstaActivo = false).
         /// </summary>
         /// <param name="id">El ID del empleado a eliminar.</param>
-        /// <returns>NoContent si la eliminaciÛn fue exitosa, NotFound si no existe.</returns>
+        /// <returns>NoContent si la eliminaci√≥n fue exitosa, NotFound si no existe.</returns>
         [HttpDelete("{id}")]
-        // [Authorize(Roles = "Admin")] // En el futuro, solo los administradores podr·n eliminar empleados.
+        [Authorize(Roles = "Owner,Admin")]
         public async Task<IActionResult> Delete(int id)
         {
-            var empleado = await _unitOfWork.Empleados.GetByIdAsync(id);
+            var tenantId = _tenantContext.TenantId;
+            var empleado = await _context.Empleados
+                .FirstOrDefaultAsync(e => e.Id == id && e.TenantId == tenantId);
+
             if (empleado == null)
             {
-                return NotFound(); // Retorna un 404 Not Found si no existe
+                return NotFound(); // Retorna un 404 Not Found si no existe o no pertenece al tenant
             }
 
-            // RISK: Implementa soft delete usando EstaActivo = false; no hard delete de la base de datos
+            // Implementa soft delete usando EstaActivo = false; no hard delete de la base de datos
             empleado.EstaActivo = false;
             _unitOfWork.Empleados.Update(empleado);
             await _unitOfWork.CompleteAsync();
 
-            return NoContent(); // Retorna un 204 No Content para indicar Èxito
+            return NoContent(); // Retorna un 204 No Content para indicar √©xito
         }
     }
 }

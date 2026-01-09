@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
@@ -11,31 +12,38 @@ namespace Vorluno.Planilla.Web.Controllers;
 /// <summary>
 /// Controlador para gestionar ausencias de empleados
 /// </summary>
+[Authorize] // ✅ SEGURIDAD: Todos los endpoints requieren autenticación
 [ApiController]
 [Route("api/[controller]")]
 public class AusenciasController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ApplicationDbContext _context;
+    private readonly ITenantContext _tenantContext;
 
-    public AusenciasController(IUnitOfWork unitOfWork, ApplicationDbContext context)
+    public AusenciasController(IUnitOfWork unitOfWork, ApplicationDbContext context, ITenantContext tenantContext)
     {
         _unitOfWork = unitOfWork;
         _context = context;
+        _tenantContext = tenantContext;
     }
 
     /// <summary>
     /// Obtiene lista de ausencias con filtros
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
     public async Task<IActionResult> GetAll(
         [FromQuery] int? empleadoId = null,
         [FromQuery] TipoAusencia? tipo = null,
         [FromQuery] DateTime? fechaInicio = null,
         [FromQuery] DateTime? fechaFin = null)
     {
+        var tenantId = _tenantContext.TenantId;
         var query = _context.Ausencias
+            .Where(a => a.TenantId == tenantId)
             .Include(a => a.Empleado)
+            .AsNoTracking()
             .AsQueryable();
 
         if (empleadoId.HasValue)
@@ -60,14 +68,18 @@ public class AusenciasController : ControllerBase
     /// Obtiene una ausencia por ID
     /// </summary>
     [HttpGet("{id}")]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
     public async Task<IActionResult> GetById(int id)
     {
+        var tenantId = _tenantContext.TenantId;
         var ausencia = await _context.Ausencias
+            .Where(a => a.Id == id && a.TenantId == tenantId)
             .Include(a => a.Empleado)
-            .FirstOrDefaultAsync(a => a.Id == id);
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
 
         if (ausencia == null)
-            return NotFound();
+            return NotFound(); // 404 previene info leak
 
         return Ok(MapToDto(ausencia));
     }
@@ -76,11 +88,14 @@ public class AusenciasController : ControllerBase
     /// Obtiene ausencias de un empleado
     /// </summary>
     [HttpGet("empleado/{empleadoId}")]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
     public async Task<IActionResult> GetByEmpleado(int empleadoId)
     {
+        var tenantId = _tenantContext.TenantId;
         var ausencias = await _context.Ausencias
+            .Where(a => a.EmpleadoId == empleadoId && a.TenantId == tenantId)
             .Include(a => a.Empleado)
-            .Where(a => a.EmpleadoId == empleadoId)
+            .AsNoTracking()
             .OrderByDescending(a => a.FechaInicio)
             .ToListAsync();
 
@@ -110,9 +125,14 @@ public class AusenciasController : ControllerBase
     /// Crea una nueva ausencia
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Create(CreateAusenciaRequest request)
     {
-        var empleado = await _unitOfWork.Repository<Empleado>().GetByIdAsync(request.EmpleadoId);
+        var tenantId = _tenantContext.TenantId;
+        var empleado = await _context.Empleados
+            .Where(e => e.Id == request.EmpleadoId && e.TenantId == tenantId)
+            .FirstOrDefaultAsync();
+
         if (empleado == null)
             return BadRequest(new { message = "El empleado especificado no existe." });
 
@@ -134,7 +154,7 @@ public class AusenciasController : ControllerBase
             TieneJustificacion = request.TieneJustificacion,
             DocumentoReferencia = request.DocumentoReferencia,
             AfectaSalario = afectaSalario,
-            CompanyId = 1,
+            TenantId = _tenantContext.TenantId,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -143,8 +163,9 @@ public class AusenciasController : ControllerBase
 
         // Recargar con navegación
         ausencia = await _context.Ausencias
+            .Where(a => a.Id == ausencia.Id && a.TenantId == tenantId)
             .Include(a => a.Empleado)
-            .FirstOrDefaultAsync(a => a.Id == ausencia.Id);
+            .FirstOrDefaultAsync();
 
         return CreatedAtAction(nameof(GetById), new { id = ausencia!.Id }, MapToDto(ausencia));
     }
@@ -153,11 +174,15 @@ public class AusenciasController : ControllerBase
     /// Actualiza una ausencia
     /// </summary>
     [HttpPut("{id}")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Update(int id, CreateAusenciaRequest request)
     {
-        var ausencia = await _unitOfWork.Repository<Ausencia>().GetByIdAsync(id);
+        var tenantId = _tenantContext.TenantId;
+        var ausencia = await _context.Ausencias
+            .FirstOrDefaultAsync(a => a.Id == id && a.TenantId == tenantId);
+
         if (ausencia == null)
-            return NotFound();
+            return NotFound(); // 404 previene info leak
 
         if (ausencia.PlanillaDetailId != null)
             return BadRequest(new { message = "No se puede modificar una ausencia ya procesada en planilla." });
@@ -186,11 +211,15 @@ public class AusenciasController : ControllerBase
     /// Elimina una ausencia
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Owner,Admin")]
     public async Task<IActionResult> Delete(int id)
     {
-        var ausencia = await _context.Ausencias.FindAsync(id);
+        var tenantId = _tenantContext.TenantId;
+        var ausencia = await _context.Ausencias
+            .FirstOrDefaultAsync(a => a.Id == id && a.TenantId == tenantId);
+
         if (ausencia == null)
-            return NotFound();
+            return NotFound(); // 404 previene info leak
 
         if (ausencia.PlanillaDetailId != null)
             return BadRequest(new { message = "No se puede eliminar una ausencia ya procesada en planilla." });

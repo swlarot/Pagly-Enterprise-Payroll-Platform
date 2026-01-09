@@ -1,4 +1,5 @@
 using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
@@ -11,6 +12,7 @@ namespace Vorluno.Planilla.Web.Controllers;
 /// <summary>
 /// Controlador de API para gestionar las operaciones CRUD de posiciones.
 /// </summary>
+[Authorize]
 [ApiController]
 [Route("api/[controller]")]
 public class PosicionesController : ControllerBase
@@ -18,12 +20,14 @@ public class PosicionesController : ControllerBase
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
     private readonly ApplicationDbContext _context;
+    private readonly ITenantContext _tenantContext;
 
-    public PosicionesController(IUnitOfWork unitOfWork, IMapper mapper, ApplicationDbContext context)
+    public PosicionesController(IUnitOfWork unitOfWork, IMapper mapper, ApplicationDbContext context, ITenantContext tenantContext)
     {
         _unitOfWork = unitOfWork;
         _mapper = mapper;
         _context = context;
+        _tenantContext = tenantContext;
     }
 
     /// <summary>
@@ -33,7 +37,9 @@ public class PosicionesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] int? departamentoId = null)
     {
+        var tenantId = _tenantContext.TenantId;
         var query = _context.Posiciones
+            .Where(p => p.TenantId == tenantId)
             .Include(p => p.Departamento)
             .Include(p => p.Empleados)
             .AsQueryable();
@@ -43,7 +49,7 @@ public class PosicionesController : ControllerBase
             query = query.Where(p => p.DepartamentoId == departamentoId.Value);
         }
 
-        var posiciones = await query.ToListAsync();
+        var posiciones = await query.AsNoTracking().ToListAsync();
 
         var posicionesDto = posiciones.Select(p => new PosicionVerDto(
             p.Id,
@@ -68,10 +74,13 @@ public class PosicionesController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
+        var tenantId = _tenantContext.TenantId;
         var posicion = await _context.Posiciones
+            .Where(p => p.Id == id && p.TenantId == tenantId)
             .Include(p => p.Departamento)
             .Include(p => p.Empleados)
-            .FirstOrDefaultAsync(p => p.Id == id);
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
 
         if (posicion == null)
         {
@@ -99,10 +108,14 @@ public class PosicionesController : ControllerBase
     /// Crea una nueva posición.
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Create(PosicionCrearDto posicionDto)
     {
+        var tenantId = _tenantContext.TenantId;
+
         // Verificar que el departamento existe
-        var departamento = await _unitOfWork.Repository<Departamento>().GetByIdAsync(posicionDto.DepartamentoId);
+        var departamento = await _context.Departamentos
+            .FirstOrDefaultAsync(d => d.Id == posicionDto.DepartamentoId && d.TenantId == tenantId);
         if (departamento == null)
         {
             return BadRequest(new { message = "El departamento especificado no existe." });
@@ -110,7 +123,7 @@ public class PosicionesController : ControllerBase
 
         // Verificar que el código sea único para la compañía
         var existe = await _context.Posiciones
-            .AnyAsync(p => p.Codigo == posicionDto.Codigo);
+            .AnyAsync(p => p.Codigo == posicionDto.Codigo && p.TenantId == tenantId);
 
         if (existe)
         {
@@ -125,6 +138,7 @@ public class PosicionesController : ControllerBase
 
         var posicion = new Posicion
         {
+            TenantId = tenantId,
             Nombre = posicionDto.Nombre,
             Codigo = posicionDto.Codigo,
             Descripcion = posicionDto.Descripcion,
@@ -132,7 +146,6 @@ public class PosicionesController : ControllerBase
             SalarioMinimo = posicionDto.SalarioMinimo,
             SalarioMaximo = posicionDto.SalarioMaximo,
             NivelRiesgo = posicionDto.NivelRiesgo,
-            CompanyId = 1, // TODO: Obtener de ICurrentUserService cuando esté implementado
             CreatedAt = DateTime.UtcNow,
             EstaActivo = true
         };
@@ -166,16 +179,21 @@ public class PosicionesController : ControllerBase
     /// Actualiza una posición existente.
     /// </summary>
     [HttpPut("{id}")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Update(int id, PosicionActualizarDto posicionDto)
     {
-        var posicion = await _unitOfWork.Repository<Posicion>().GetByIdAsync(id);
+        var tenantId = _tenantContext.TenantId;
+        var posicion = await _context.Posiciones
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
+
         if (posicion == null)
         {
             return NotFound();
         }
 
         // Verificar que el departamento existe
-        var departamento = await _unitOfWork.Repository<Departamento>().GetByIdAsync(posicionDto.DepartamentoId);
+        var departamento = await _context.Departamentos
+            .FirstOrDefaultAsync(d => d.Id == posicionDto.DepartamentoId && d.TenantId == tenantId);
         if (departamento == null)
         {
             return BadRequest(new { message = "El departamento especificado no existe." });
@@ -183,7 +201,7 @@ public class PosicionesController : ControllerBase
 
         // Verificar que el código sea único (excepto para esta posición)
         var existe = await _context.Posiciones
-            .AnyAsync(p => p.Codigo == posicionDto.Codigo && p.Id != id);
+            .AnyAsync(p => p.Codigo == posicionDto.Codigo && p.Id != id && p.TenantId == tenantId);
 
         if (existe)
         {
@@ -216,11 +234,14 @@ public class PosicionesController : ControllerBase
     /// Elimina (desactiva) una posición.
     /// </summary>
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Owner,Admin")]
     public async Task<IActionResult> Delete(int id)
     {
+        var tenantId = _tenantContext.TenantId;
         var posicion = await _context.Posiciones
+            .Where(p => p.Id == id && p.TenantId == tenantId)
             .Include(p => p.Empleados)
-            .FirstOrDefaultAsync(p => p.Id == id);
+            .FirstOrDefaultAsync();
 
         if (posicion == null)
         {

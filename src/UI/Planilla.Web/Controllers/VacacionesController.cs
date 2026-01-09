@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
@@ -11,27 +12,34 @@ namespace Vorluno.Planilla.Web.Controllers;
 /// <summary>
 /// Controlador para gestionar solicitudes de vacaciones
 /// </summary>
+[Authorize] // ✅ SEGURIDAD: Todos los endpoints requieren autenticación
 [ApiController]
 [Route("api/[controller]")]
 public class VacacionesController : ControllerBase
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ApplicationDbContext _context;
+    private readonly ITenantContext _tenantContext;
 
-    public VacacionesController(IUnitOfWork unitOfWork, ApplicationDbContext context)
+    public VacacionesController(IUnitOfWork unitOfWork, ApplicationDbContext context, ITenantContext tenantContext)
     {
         _unitOfWork = unitOfWork;
         _context = context;
+        _tenantContext = tenantContext;
     }
 
     /// <summary>
     /// Obtiene lista de solicitudes de vacaciones
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
     public async Task<IActionResult> GetAll([FromQuery] int? empleadoId = null, [FromQuery] EstadoVacaciones? estado = null)
     {
+        var tenantId = _tenantContext.TenantId;
         var query = _context.SolicitudesVacaciones
+            .Where(v => v.TenantId == tenantId)
             .Include(v => v.Empleado)
+            .AsNoTracking()
             .AsQueryable();
 
         if (empleadoId.HasValue)
@@ -50,14 +58,18 @@ public class VacacionesController : ControllerBase
     /// Obtiene una solicitud por ID
     /// </summary>
     [HttpGet("{id}")]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
     public async Task<IActionResult> GetById(int id)
     {
+        var tenantId = _tenantContext.TenantId;
         var solicitud = await _context.SolicitudesVacaciones
+            .Where(v => v.Id == id && v.TenantId == tenantId)
             .Include(v => v.Empleado)
-            .FirstOrDefaultAsync(v => v.Id == id);
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
 
         if (solicitud == null)
-            return NotFound();
+            return NotFound(); // 404 previene info leak
 
         return Ok(MapToDto(solicitud));
     }
@@ -66,11 +78,14 @@ public class VacacionesController : ControllerBase
     /// Obtiene solicitudes de un empleado
     /// </summary>
     [HttpGet("empleado/{empleadoId}")]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
     public async Task<IActionResult> GetByEmpleado(int empleadoId)
     {
+        var tenantId = _tenantContext.TenantId;
         var solicitudes = await _context.SolicitudesVacaciones
+            .Where(v => v.EmpleadoId == empleadoId && v.TenantId == tenantId)
             .Include(v => v.Empleado)
-            .Where(v => v.EmpleadoId == empleadoId)
+            .AsNoTracking()
             .OrderByDescending(v => v.FechaSolicitud)
             .ToListAsync();
 
@@ -82,11 +97,14 @@ public class VacacionesController : ControllerBase
     /// Obtiene solicitudes pendientes de aprobar
     /// </summary>
     [HttpGet("pendientes")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> GetPendientes()
     {
+        var tenantId = _tenantContext.TenantId;
         var pendientes = await _context.SolicitudesVacaciones
+            .Where(v => v.TenantId == tenantId && v.Estado == EstadoVacaciones.Pendiente)
             .Include(v => v.Empleado)
-            .Where(v => v.Estado == EstadoVacaciones.Pendiente)
+            .AsNoTracking()
             .OrderBy(v => v.FechaSolicitud)
             .ToListAsync();
 
@@ -98,14 +116,22 @@ public class VacacionesController : ControllerBase
     /// Obtiene saldo de vacaciones de un empleado
     /// </summary>
     [HttpGet("saldo/{empleadoId}")]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
     public async Task<IActionResult> GetSaldo(int empleadoId)
     {
-        var empleado = await _context.Empleados.FindAsync(empleadoId);
+        var tenantId = _tenantContext.TenantId;
+        var empleado = await _context.Empleados
+            .Where(e => e.Id == empleadoId && e.TenantId == tenantId)
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
+
         if (empleado == null)
-            return NotFound();
+            return NotFound(); // 404 previene info leak
 
         var saldo = await _context.SaldosVacaciones
-            .FirstOrDefaultAsync(s => s.EmpleadoId == empleadoId);
+            .Where(s => s.EmpleadoId == empleadoId && s.TenantId == tenantId)
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
 
         if (saldo == null)
         {
@@ -131,18 +157,22 @@ public class VacacionesController : ControllerBase
     /// Obtiene calendario de vacaciones aprobadas
     /// </summary>
     [HttpGet("calendario")]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
     public async Task<IActionResult> GetCalendario([FromQuery] DateTime? fecha = null)
     {
+        var tenantId = _tenantContext.TenantId;
         var fechaConsulta = fecha ?? DateTime.Today;
         var inicioMes = new DateTime(fechaConsulta.Year, fechaConsulta.Month, 1);
         var finMes = inicioMes.AddMonths(1).AddDays(-1);
 
         var vacaciones = await _context.SolicitudesVacaciones
-            .Include(v => v.Empleado)
+            .Where(v => v.TenantId == tenantId)
             .Where(v => v.Estado == EstadoVacaciones.Aprobada ||
                        v.Estado == EstadoVacaciones.EnCurso ||
                        v.Estado == EstadoVacaciones.Completada)
             .Where(v => v.FechaInicio <= finMes && v.FechaFin >= inicioMes)
+            .Include(v => v.Empleado)
+            .AsNoTracking()
             .ToListAsync();
 
         var dtos = vacaciones.Select(MapToDto);
@@ -153,9 +183,14 @@ public class VacacionesController : ControllerBase
     /// Crea una nueva solicitud de vacaciones
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Create(CreateVacacionesRequest request)
     {
-        var empleado = await _unitOfWork.Repository<Empleado>().GetByIdAsync(request.EmpleadoId);
+        var tenantId = _tenantContext.TenantId;
+        var empleado = await _context.Empleados
+            .Where(e => e.Id == request.EmpleadoId && e.TenantId == tenantId)
+            .FirstOrDefaultAsync();
+
         if (empleado == null)
             return BadRequest(new { message = "El empleado especificado no existe." });
 
@@ -164,7 +199,8 @@ public class VacacionesController : ControllerBase
 
         // Obtener o crear saldo
         var saldo = await _context.SaldosVacaciones
-            .FirstOrDefaultAsync(s => s.EmpleadoId == request.EmpleadoId);
+            .Where(s => s.EmpleadoId == request.EmpleadoId && s.TenantId == tenantId)
+            .FirstOrDefaultAsync();
 
         if (saldo == null)
         {
@@ -187,7 +223,7 @@ public class VacacionesController : ControllerBase
             Estado = EstadoVacaciones.Pendiente,
             FechaSolicitud = DateTime.UtcNow,
             Observaciones = request.Observaciones,
-            CompanyId = 1,
+            TenantId = _tenantContext.TenantId,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -196,8 +232,9 @@ public class VacacionesController : ControllerBase
 
         // Recargar con navegación
         solicitud = await _context.SolicitudesVacaciones
+            .Where(v => v.Id == solicitud.Id && v.TenantId == tenantId)
             .Include(v => v.Empleado)
-            .FirstOrDefaultAsync(v => v.Id == solicitud.Id);
+            .FirstOrDefaultAsync();
 
         return CreatedAtAction(nameof(GetById), new { id = solicitud!.Id }, MapToDto(solicitud));
     }
@@ -206,11 +243,15 @@ public class VacacionesController : ControllerBase
     /// Aprueba una solicitud de vacaciones
     /// </summary>
     [HttpPost("{id}/aprobar")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Aprobar(int id)
     {
-        var solicitud = await _unitOfWork.Repository<SolicitudVacaciones>().GetByIdAsync(id);
+        var tenantId = _tenantContext.TenantId;
+        var solicitud = await _context.SolicitudesVacaciones
+            .FirstOrDefaultAsync(v => v.Id == id && v.TenantId == tenantId);
+
         if (solicitud == null)
-            return NotFound();
+            return NotFound(); // 404 previene info leak
 
         if (solicitud.Estado != EstadoVacaciones.Pendiente)
             return BadRequest(new { message = "Solo se pueden aprobar solicitudes pendientes." });
@@ -230,11 +271,15 @@ public class VacacionesController : ControllerBase
     /// Rechaza una solicitud de vacaciones
     /// </summary>
     [HttpPost("{id}/rechazar")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Rechazar(int id, [FromBody] RechazarVacacionesRequest request)
     {
-        var solicitud = await _unitOfWork.Repository<SolicitudVacaciones>().GetByIdAsync(id);
+        var tenantId = _tenantContext.TenantId;
+        var solicitud = await _context.SolicitudesVacaciones
+            .FirstOrDefaultAsync(v => v.Id == id && v.TenantId == tenantId);
+
         if (solicitud == null)
-            return NotFound();
+            return NotFound(); // 404 previene info leak
 
         if (solicitud.Estado != EstadoVacaciones.Pendiente)
             return BadRequest(new { message = "Solo se pueden rechazar solicitudes pendientes." });
@@ -255,11 +300,15 @@ public class VacacionesController : ControllerBase
     /// Cancela una solicitud de vacaciones
     /// </summary>
     [HttpDelete("{id}/cancelar")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Cancelar(int id)
     {
-        var solicitud = await _unitOfWork.Repository<SolicitudVacaciones>().GetByIdAsync(id);
+        var tenantId = _tenantContext.TenantId;
+        var solicitud = await _context.SolicitudesVacaciones
+            .FirstOrDefaultAsync(v => v.Id == id && v.TenantId == tenantId);
+
         if (solicitud == null)
-            return NotFound();
+            return NotFound(); // 404 previene info leak
 
         if (solicitud.Estado == EstadoVacaciones.Completada)
             return BadRequest(new { message = "No se puede cancelar una solicitud ya completada." });
@@ -287,7 +336,11 @@ public class VacacionesController : ControllerBase
 
     private async Task<SaldoVacaciones> CrearSaldoInicial(int empleadoId)
     {
-        var empleado = await _context.Empleados.FindAsync(empleadoId);
+        var tenantId = _tenantContext.TenantId;
+        var empleado = await _context.Empleados
+            .Where(e => e.Id == empleadoId && e.TenantId == tenantId)
+            .FirstOrDefaultAsync();
+
         if (empleado == null)
             throw new Exception("Empleado no encontrado");
 
@@ -305,7 +358,7 @@ public class VacacionesController : ControllerBase
             UltimaActualizacion = DateTime.UtcNow,
             PeriodoInicio = new DateTime(DateTime.Today.Year, 1, 1),
             PeriodoFin = new DateTime(DateTime.Today.Year, 12, 31),
-            CompanyId = 1,
+            TenantId = _tenantContext.TenantId,
             CreatedAt = DateTime.UtcNow
         };
 
