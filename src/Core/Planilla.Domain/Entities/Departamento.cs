@@ -15,8 +15,10 @@ public class Departamento
 
     public bool EstaActivo { get; set; } = true;
 
-    // Multi-tenant
-    public int CompanyId { get; set; }
+    /// <summary>
+    /// ID del tenant al que pertenece este departamento
+    /// </summary>
+    public int TenantId { get; set; }
 
     // Jefe del departamento (opcional)
     public int? ManagerId { get; set; }
@@ -29,4 +31,5 @@ public class Departamento
     public virtual Empleado? Manager { get; set; }
     public virtual ICollection<Empleado> Empleados { get; set; } = new List<Empleado>();
     public virtual ICollection<Posicion> Posiciones { get; set; } = new List<Posicion>();
+    public virtual Tenant? Tenant { get; set; }
 }

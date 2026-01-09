@@ -34,6 +34,11 @@ public class PayrollDetail
     /// </summary>
     public int EmpleadoId { get; set; }
 
+    /// <summary>
+    /// ID del tenant al que pertenece este detalle de planilla
+    /// </summary>
+    public int TenantId { get; set; }
+
     // ====================================================================
     // Ingresos (componentes del salario bruto)
     // ====================================================================
@@ -241,4 +246,9 @@ public class PayrollDetail
     /// Empleado al que corresponde este cálculo.
     /// </summary>
     public virtual Empleado? Empleado { get; set; }
+
+    /// <summary>
+    /// Tenant al que pertenece este detalle
+    /// </summary>
+    public virtual Tenant? Tenant { get; set; }
 }

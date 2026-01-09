@@ -9,15 +9,15 @@ public class Empleado
     public int Id { get; set; }
 
     [Required(ErrorMessage = "El nombre es obligatorio.")]
-    [StringLength(100, ErrorMessage = "El nombre no puede tener más de 100 caracteres.")]
+    [StringLength(100, ErrorMessage = "El nombre no puede tener mï¿½s de 100 caracteres.")]
     public string Nombre { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "El apellido es obligatorio.")]
-    [StringLength(100, ErrorMessage = "El apellido no puede tener más de 100 caracteres.")]
+    [StringLength(100, ErrorMessage = "El apellido no puede tener mï¿½s de 100 caracteres.")]
     public string Apellido { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "El número de identificación es obligatorio.")]
-    [StringLength(20, ErrorMessage = "El número de identificación no puede tener más de 20 caracteres.")]
+    [Required(ErrorMessage = "El nï¿½mero de identificaciï¿½n es obligatorio.")]
+    [StringLength(20, ErrorMessage = "El nï¿½mero de identificaciï¿½n no puede tener mï¿½s de 20 caracteres.")]
     public string NumeroIdentificacion { get; set; } = string.Empty;
 
     [Column(TypeName = "decimal(18, 2)")]
@@ -29,13 +29,13 @@ public class Empleado
     public bool EstaActivo { get; set; } = true;
 
     // ====================================================================
-    // Phase E: Campos para cálculo de planilla
+    // Phase E: Campos para cï¿½lculo de planilla
     // ====================================================================
 
     /// <summary>
-    /// ID de compañía para multi-tenancy
+    /// ID del tenant al que pertenece el empleado (multi-tenancy)
     /// </summary>
-    public int CompanyId { get; set; } = 1;
+    public int TenantId { get; set; }
 
     /// <summary>
     /// Departamento al que pertenece el empleado (opcional)
@@ -43,17 +43,17 @@ public class Empleado
     public int? DepartamentoId { get; set; }
 
     /// <summary>
-    /// Posición o cargo del empleado (opcional)
+    /// Posiciï¿½n o cargo del empleado (opcional)
     /// </summary>
     public int? PosicionId { get; set; }
 
     /// <summary>
-    /// Años cotizados en CSS (determina tope CSS: 25 años ? intermedio, 30 años ? alto)
+    /// Aï¿½os cotizados en CSS (determina tope CSS: 25 aï¿½os ? intermedio, 30 aï¿½os ? alto)
     /// </summary>
     public int YearsCotized { get; set; } = 0;
 
     /// <summary>
-    /// Salario promedio últimos 10 años (para determinar tope CSS alto)
+    /// Salario promedio ï¿½ltimos 10 aï¿½os (para determinar tope CSS alto)
     /// </summary>
     [Column(TypeName = "decimal(18, 2)")]
     public decimal AverageSalaryLast10Years { get; set; } = 0;
@@ -71,30 +71,33 @@ public class Empleado
     public string PayFrequency { get; set; } = "Quincenal";
 
     /// <summary>
-    /// Número de dependientes declarados (máximo 3 para deducción ISR)
+    /// Nï¿½mero de dependientes declarados (mï¿½ximo 3 para deducciï¿½n ISR)
     /// </summary>
     public int Dependents { get; set; } = 0;
 
     /// <summary>
-    /// Indica si el empleado está sujeto a CSS
+    /// Indica si el empleado estï¿½ sujeto a CSS
     /// </summary>
     public bool IsSubjectToCss { get; set; } = true;
 
     /// <summary>
-    /// Indica si el empleado está sujeto a Seguro Educativo
+    /// Indica si el empleado estï¿½ sujeto a Seguro Educativo
     /// </summary>
     public bool IsSubjectToEducationalInsurance { get; set; } = true;
 
     /// <summary>
-    /// Indica si el empleado está sujeto a Impuesto Sobre la Renta (ISR)
+    /// Indica si el empleado estï¿½ sujeto a Impuesto Sobre la Renta (ISR)
     /// </summary>
     public bool IsSubjectToIncomeTax { get; set; } = true;
 
-    // Propiedad de navegación: un empleado puede tener muchos recibos de sueldo.
-    // La clase ReciboDeSueldo ya está implementada y representa cada uno de ellos.
+    // Propiedad de navegaciï¿½n: un empleado puede tener muchos recibos de sueldo.
+    // La clase ReciboDeSueldo ya estï¿½ implementada y representa cada uno de ellos.
     public virtual ICollection<ReciboDeSueldo> RecibosDeSueldo { get; set; } = new List<ReciboDeSueldo>();
 
     // Navigation properties para Departamento y Posicion
     public virtual Departamento? Departamento { get; set; }
     public virtual Posicion? Posicion { get; set; }
+
+    // Navigation property para Tenant
+    public virtual Tenant? Tenant { get; set; }
 }

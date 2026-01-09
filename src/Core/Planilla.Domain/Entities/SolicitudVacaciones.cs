@@ -10,7 +10,11 @@ public class SolicitudVacaciones
     public int Id { get; set; }
     public int EmpleadoId { get; set; }
     public Empleado Empleado { get; set; } = null!;
-    public int CompanyId { get; set; }
+
+    /// <summary>
+    /// ID del tenant al que pertenece esta solicitud
+    /// </summary>
+    public int TenantId { get; set; }
 
     /// <summary>
     /// Fecha de inicio de las vacaciones
@@ -77,4 +81,7 @@ public class SolicitudVacaciones
     // Auditoría
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+
+    // Navigation property
+    public virtual Tenant? Tenant { get; set; }
 }

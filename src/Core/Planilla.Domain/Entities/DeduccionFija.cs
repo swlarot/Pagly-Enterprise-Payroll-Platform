@@ -16,9 +16,9 @@ public class DeduccionFija
     public Empleado Empleado { get; set; } = null!;
 
     /// <summary>
-    /// ID de la compañía (multi-tenancy)
+    /// ID del tenant al que pertenece esta deducción
     /// </summary>
-    public int CompanyId { get; set; }
+    public int TenantId { get; set; }
 
     /// <summary>
     /// Tipo de deducción
@@ -79,4 +79,7 @@ public class DeduccionFija
     // Auditoría
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+
+    // Navigation property
+    public virtual Tenant? Tenant { get; set; }
 }

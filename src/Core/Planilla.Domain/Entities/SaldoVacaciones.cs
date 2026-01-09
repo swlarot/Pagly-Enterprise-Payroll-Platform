@@ -12,7 +12,11 @@ public class SaldoVacaciones
     /// </summary>
     public int EmpleadoId { get; set; }
     public Empleado Empleado { get; set; } = null!;
-    public int CompanyId { get; set; }
+
+    /// <summary>
+    /// ID del tenant al que pertenece este saldo
+    /// </summary>
+    public int TenantId { get; set; }
 
     /// <summary>
     /// Días de vacaciones acumulados
@@ -47,4 +51,7 @@ public class SaldoVacaciones
     // Auditoría
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+
+    // Navigation property
+    public virtual Tenant? Tenant { get; set; }
 }

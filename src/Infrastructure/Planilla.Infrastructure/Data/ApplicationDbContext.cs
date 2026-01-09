@@ -1,7 +1,8 @@
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore; // <--- USANDO AÑADIDO
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore; // <--- USANDO Aï¿½ADIDO
 using Microsoft.EntityFrameworkCore;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Vorluno.Planilla.Application.Interfaces;
-using Vorluno.Planilla.Domain.Entities;                         // <--- USANDO AÑADIDO
+using Vorluno.Planilla.Domain.Entities;                         // <--- USANDO Aï¿½ADIDO
 
 namespace Vorluno.Planilla.Infrastructure.Data;
 
@@ -9,18 +10,27 @@ namespace Vorluno.Planilla.Infrastructure.Data;
 public class ApplicationDbContext : IdentityDbContext<AppUser>
 {
     private readonly ICurrentUserService? _currentUserService;
+    private readonly ITenantContext? _tenantContext;
 
     public ApplicationDbContext(
         DbContextOptions<ApplicationDbContext> options,
-        ICurrentUserService? currentUserService = null) : base(options)
+        ICurrentUserService? currentUserService = null,
+        ITenantContext? tenantContext = null) : base(options)
     {
         _currentUserService = currentUserService;
+        _tenantContext = tenantContext;
     }
+
+    // Multi-Tenant Entities
+    public DbSet<Tenant> Tenants { get; set; }
+    public DbSet<Subscription> Subscriptions { get; set; }
+    public DbSet<TenantUser> TenantUsers { get; set; }
+    public DbSet<StripeWebhookEvent> StripeWebhookEvents { get; set; }
 
     public DbSet<Empleado> Empleados { get; set; }
     public DbSet<ReciboDeSueldo> RecibosDeSueldo { get; set; }
 
-    // Phase A: Configuración de planilla (tasas CSS, SE, ISR)
+    // Phase A: Configuraciï¿½n de planilla (tasas CSS, SE, ISR)
     public DbSet<PayrollTaxConfiguration> PayrollTaxConfigurations { get; set; }
     public DbSet<TaxBracket> TaxBrackets { get; set; }
 
@@ -28,11 +38,11 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     public DbSet<PayrollHeader> PayrollHeaders { get; set; }
     public DbSet<PayrollDetail> PayrollDetails { get; set; }
 
-    // Organización: Departamentos y Posiciones
+    // Organizaciï¿½n: Departamentos y Posiciones
     public DbSet<Departamento> Departamentos { get; set; }
     public DbSet<Posicion> Posiciones { get; set; }
 
-    // Conceptos de Nómina: Préstamos, Deducciones y Anticipos
+    // Conceptos de Nï¿½mina: Prï¿½stamos, Deducciones y Anticipos
     public DbSet<Prestamo> Prestamos { get; set; }
     public DbSet<DeduccionFija> DeduccionesFijas { get; set; }
     public DbSet<Anticipo> Anticipos { get; set; }
@@ -46,21 +56,21 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Esta línea es crucial al heredar de IdentityDbContext
+        // Esta lï¿½nea es crucial al heredar de IdentityDbContext
         base.OnModelCreating(modelBuilder);
 
         modelBuilder.Entity<Empleado>()
             .HasIndex(e => e.NumeroIdentificacion)
             .IsUnique();
 
-        // Phase A: Configuración de PayrollTaxConfiguration
+        // Phase A: Configuraciï¿½n de PayrollTaxConfiguration
         modelBuilder.Entity<PayrollTaxConfiguration>(entity =>
         {
-            // Índice compuesto para búsquedas por compañía y fecha efectiva
-            entity.HasIndex(p => new { p.CompanyId, p.EffectiveStartDate })
-                .HasDatabaseName("IX_PayrollTaxConfiguration_CompanyId_EffectiveStartDate");
+            // ï¿½ndice compuesto para bï¿½squedas por tenant y fecha efectiva
+            entity.HasIndex(p => new { p.TenantId, p.EffectiveStartDate })
+                .HasDatabaseName("IX_PayrollTaxConfiguration_TenantId_EffectiveStartDate");
 
-            // Configuración de precisión para campos decimales (moneda)
+            // Configuraciï¿½n de precisiï¿½n para campos decimales (moneda)
             entity.Property(p => p.CssEmployeeRate).HasPrecision(5, 2);
             entity.Property(p => p.CssEmployerBaseRate).HasPrecision(5, 2);
             entity.Property(p => p.CssRiskRateLow).HasPrecision(5, 2);
@@ -75,57 +85,58 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             entity.Property(p => p.EducationalInsuranceEmployerRate).HasPrecision(5, 2);
             entity.Property(p => p.DependentDeductionAmount).HasPrecision(18, 2);
 
-            // Phase E: Global query filter para multi-tenancy
+            // Global query filter para multi-tenancy por TenantId
             entity.HasQueryFilter(p =>
-                _currentUserService == null ||
-                _currentUserService.CompanyId == null ||
-                (int?)p.CompanyId == _currentUserService.CompanyId);
+                _tenantContext == null ||
+                _tenantContext.TenantId == 0 ||
+                p.TenantId == _tenantContext.TenantId);
         });
 
-        // Phase A: Configuración de TaxBracket
+        // Phase A: Configuraciï¿½n de TaxBracket
         modelBuilder.Entity<TaxBracket>(entity =>
         {
-            // Índice compuesto para búsquedas por compañía y año fiscal
-            entity.HasIndex(t => new { t.CompanyId, t.Year })
-                .HasDatabaseName("IX_TaxBracket_CompanyId_Year");
+            // ï¿½ndice compuesto para bï¿½squedas por tenant y aï¿½o fiscal
+            entity.HasIndex(t => new { t.TenantId, t.Year })
+                .HasDatabaseName("IX_TaxBracket_TenantId_Year");
 
-            // Configuración de precisión para campos decimales (moneda)
+            // Configuraciï¿½n de precisiï¿½n para campos decimales (moneda)
             entity.Property(t => t.MinIncome).HasPrecision(18, 2);
             entity.Property(t => t.MaxIncome).HasPrecision(18, 2);
             entity.Property(t => t.Rate).HasPrecision(5, 2);
             entity.Property(t => t.FixedAmount).HasPrecision(18, 2);
 
-            // Phase E: Global query filter para multi-tenancy
+            // Global query filter para multi-tenancy por TenantId
             entity.HasQueryFilter(t =>
-                _currentUserService == null ||
-                _currentUserService.CompanyId == null ||
-                (int?)t.CompanyId == _currentUserService.CompanyId);
+                _tenantContext == null ||
+                _tenantContext.TenantId == 0 ||
+                t.TenantId == _tenantContext.TenantId);
         });
 
-        // Phase D: Configuración de PayrollHeader
+        // Phase D: Configuraciï¿½n de PayrollHeader
         modelBuilder.Entity<PayrollHeader>(entity =>
         {
-            // Índice único compuesto: PayrollNumber debe ser único por compañía
-            entity.HasIndex(p => new { p.CompanyId, p.PayrollNumber })
+            // ï¿½ndice ï¿½nico compuesto: PayrollNumber debe ser ï¿½nico por compaï¿½ï¿½a
+            entity.HasIndex(p => new { p.TenantId, p.PayrollNumber })
                 .IsUnique()
-                .HasDatabaseName("IX_PayrollHeader_CompanyId_PayrollNumber");
+                .HasDatabaseName("IX_PayrollHeader_TenantId_PayrollNumber");
 
-            // Índice para búsquedas por estado
-            entity.HasIndex(p => new { p.CompanyId, p.Status })
-                .HasDatabaseName("IX_PayrollHeader_CompanyId_Status");
+            // ï¿½ndice para bï¿½squedas por estado
+            entity.HasIndex(p => new { p.TenantId, p.Status })
+                .HasDatabaseName("IX_PayrollHeader_TenantId_Status");
 
-            // RowVersion como concurrency token
-            entity.Property(p => p.RowVersion)
-                .IsRowVersion()
+            // Concurrencia optimista usando xmin de PostgreSQL
+            entity.Property<uint>("xmin")
+                .HasColumnType("xid")
+                .ValueGeneratedOnAddOrUpdate()
                 .IsConcurrencyToken();
 
-            // Configuración de precisión para campos decimales (moneda)
+            // Configuraciï¿½n de precisiï¿½n para campos decimales (moneda)
             entity.Property(p => p.TotalGrossPay).HasPrecision(18, 2);
             entity.Property(p => p.TotalDeductions).HasPrecision(18, 2);
             entity.Property(p => p.TotalNetPay).HasPrecision(18, 2);
             entity.Property(p => p.TotalEmployerCost).HasPrecision(18, 2);
 
-            // Relación 1:N con PayrollDetail
+            // Relaciï¿½n 1:N con PayrollDetail
             entity.HasMany(p => p.Details)
                 .WithOne(d => d.PayrollHeader)
                 .HasForeignKey(d => d.PayrollHeaderId)
@@ -133,20 +144,20 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
 
             // Phase E: Global query filter para multi-tenancy
             entity.HasQueryFilter(p =>
-                _currentUserService == null ||
-                _currentUserService.CompanyId == null ||
-                (int?)p.CompanyId == _currentUserService.CompanyId);
+                _tenantContext == null ||
+                _tenantContext.TenantId == 0 ||
+                p.TenantId == _tenantContext.TenantId);
         });
 
-        // Phase D: Configuración de PayrollDetail
+        // Phase D: Configuraciï¿½n de PayrollDetail
         modelBuilder.Entity<PayrollDetail>(entity =>
         {
-            // Índice único compuesto: Un empleado solo puede aparecer una vez por planilla
+            // ï¿½ndice ï¿½nico compuesto: Un empleado solo puede aparecer una vez por planilla
             entity.HasIndex(d => new { d.PayrollHeaderId, d.EmpleadoId })
                 .IsUnique()
                 .HasDatabaseName("IX_PayrollDetail_PayrollHeaderId_EmpleadoId");
 
-            // Configuración de precisión para campos decimales (moneda)
+            // Configuraciï¿½n de precisiï¿½n para campos decimales (moneda)
             entity.Property(d => d.GrossPay).HasPrecision(18, 2);
             entity.Property(d => d.BaseSalary).HasPrecision(18, 2);
             entity.Property(d => d.OvertimePay).HasPrecision(18, 2);
@@ -177,34 +188,34 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             entity.Property(d => d.DiasVacaciones).HasPrecision(5, 2);
             entity.Property(d => d.MontoVacaciones).HasPrecision(18, 2);
 
-            // Relación N:1 con Empleado
+            // Relaciï¿½n N:1 con Empleado
             entity.HasOne(d => d.Empleado)
                 .WithMany()
                 .HasForeignKey(d => d.EmpleadoId)
                 .OnDelete(DeleteBehavior.Restrict); // NO borrar empleado si tiene detalles de planilla
         });
 
-        // Organización: Configuración de Departamento
+        // Organizaciï¿½n: Configuraciï¿½n de Departamento
         modelBuilder.Entity<Departamento>(entity =>
         {
-            // Índice único compuesto: Código debe ser único por compañía
-            entity.HasIndex(d => new { d.CompanyId, d.Codigo })
+            // ï¿½ndice ï¿½nico compuesto: Cï¿½digo debe ser ï¿½nico por compaï¿½ï¿½a
+            entity.HasIndex(d => new { d.TenantId, d.Codigo })
                 .IsUnique()
-                .HasDatabaseName("IX_Departamento_CompanyId_Codigo");
+                .HasDatabaseName("IX_Departamento_TenantId_Codigo");
 
-            // Relación con Manager (jefe del departamento) - opcional
+            // Relaciï¿½n con Manager (jefe del departamento) - opcional
             entity.HasOne(d => d.Manager)
                 .WithMany()
                 .HasForeignKey(d => d.ManagerId)
                 .OnDelete(DeleteBehavior.SetNull); // Si se borra el manager, poner NULL
 
-            // Relación 1:N con Empleados
+            // Relaciï¿½n 1:N con Empleados
             entity.HasMany(d => d.Empleados)
                 .WithOne(e => e.Departamento)
                 .HasForeignKey(e => e.DepartamentoId)
                 .OnDelete(DeleteBehavior.SetNull); // Si se borra departamento, poner NULL en empleados
 
-            // Relación 1:N con Posiciones
+            // Relaciï¿½n 1:N con Posiciones
             entity.HasMany(d => d.Posiciones)
                 .WithOne(p => p.Departamento)
                 .HasForeignKey(p => p.DepartamentoId)
@@ -212,84 +223,84 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
 
             // Global query filter para multi-tenancy
             entity.HasQueryFilter(d =>
-                _currentUserService == null ||
-                _currentUserService.CompanyId == null ||
-                (int?)d.CompanyId == _currentUserService.CompanyId);
+                _tenantContext == null ||
+                _tenantContext.TenantId == 0 ||
+                d.TenantId == _tenantContext.TenantId);
         });
 
-        // Organización: Configuración de Posicion
+        // Organizaciï¿½n: Configuraciï¿½n de Posicion
         modelBuilder.Entity<Posicion>(entity =>
         {
-            // Índice único compuesto: Código debe ser único por compañía
-            entity.HasIndex(p => new { p.CompanyId, p.Codigo })
+            // ï¿½ndice ï¿½nico compuesto: Cï¿½digo debe ser ï¿½nico por compaï¿½ï¿½a
+            entity.HasIndex(p => new { p.TenantId, p.Codigo })
                 .IsUnique()
-                .HasDatabaseName("IX_Posicion_CompanyId_Codigo");
+                .HasDatabaseName("IX_Posicion_TenantId_Codigo");
 
-            // Configuración de precisión para campos decimales (salarios)
+            // Configuraciï¿½n de precisiï¿½n para campos decimales (salarios)
             entity.Property(p => p.SalarioMinimo).HasPrecision(18, 2);
             entity.Property(p => p.SalarioMaximo).HasPrecision(18, 2);
 
-            // Relación 1:N con Empleados
+            // Relaciï¿½n 1:N con Empleados
             entity.HasMany(p => p.Empleados)
                 .WithOne(e => e.Posicion)
                 .HasForeignKey(e => e.PosicionId)
-                .OnDelete(DeleteBehavior.SetNull); // Si se borra posición, poner NULL en empleados
+                .OnDelete(DeleteBehavior.SetNull); // Si se borra posiciï¿½n, poner NULL en empleados
 
             // Global query filter para multi-tenancy
             entity.HasQueryFilter(p =>
-                _currentUserService == null ||
-                _currentUserService.CompanyId == null ||
-                (int?)p.CompanyId == _currentUserService.CompanyId);
+                _tenantContext == null ||
+                _tenantContext.TenantId == 0 ||
+                p.TenantId == _tenantContext.TenantId);
         });
 
-        // Conceptos de Nómina: Configuración de Prestamo
+        // Conceptos de Nï¿½mina: Configuraciï¿½n de Prestamo
         modelBuilder.Entity<Prestamo>(entity =>
         {
-            // Índice compuesto para búsquedas por empleado y estado
+            // ï¿½ndice compuesto para bï¿½squedas por empleado y estado
             entity.HasIndex(p => new { p.EmpleadoId, p.Estado })
                 .HasDatabaseName("IX_Prestamo_EmpleadoId_Estado");
 
-            // Configuración de precisión para campos decimales (moneda)
+            // Configuraciï¿½n de precisiï¿½n para campos decimales (moneda)
             entity.Property(p => p.MontoOriginal).HasPrecision(18, 2);
             entity.Property(p => p.MontoPendiente).HasPrecision(18, 2);
             entity.Property(p => p.CuotaMensual).HasPrecision(18, 2);
             entity.Property(p => p.TasaInteres).HasPrecision(5, 2);
 
-            // Relación N:1 con Empleado
+            // Relaciï¿½n N:1 con Empleado
             entity.HasOne(p => p.Empleado)
                 .WithMany()
                 .HasForeignKey(p => p.EmpleadoId)
-                .OnDelete(DeleteBehavior.Restrict); // NO borrar empleado si tiene préstamos
+                .OnDelete(DeleteBehavior.Restrict); // NO borrar empleado si tiene prï¿½stamos
 
-            // Relación 1:N con PagosPrestamo
+            // Relaciï¿½n 1:N con PagosPrestamo
             entity.HasMany(p => p.PagosPrestamo)
                 .WithOne(pp => pp.Prestamo)
                 .HasForeignKey(pp => pp.PrestamoId)
-                .OnDelete(DeleteBehavior.Cascade); // Borrar pagos si se borra el préstamo
+                .OnDelete(DeleteBehavior.Cascade); // Borrar pagos si se borra el prï¿½stamo
 
             // Global query filter para multi-tenancy
             entity.HasQueryFilter(p =>
-                _currentUserService == null ||
-                _currentUserService.CompanyId == null ||
-                (int?)p.CompanyId == _currentUserService.CompanyId);
+                _tenantContext == null ||
+                _tenantContext.TenantId == 0 ||
+                p.TenantId == _tenantContext.TenantId);
         });
 
-        // Conceptos de Nómina: Configuración de DeduccionFija
+        // Conceptos de Nï¿½mina: Configuraciï¿½n de DeduccionFija
         modelBuilder.Entity<DeduccionFija>(entity =>
         {
-            // Índice compuesto para búsquedas por empleado y estado
+            // ï¿½ndice compuesto para bï¿½squedas por empleado y estado
             entity.HasIndex(d => new { d.EmpleadoId, d.EstaActivo })
                 .HasDatabaseName("IX_DeduccionFija_EmpleadoId_EstaActivo");
 
-            // Índice para búsquedas por tipo
+            // ï¿½ndice para bï¿½squedas por tipo
             entity.HasIndex(d => d.TipoDeduccion)
                 .HasDatabaseName("IX_DeduccionFija_TipoDeduccion");
 
-            // Configuración de precisión para campos decimales
+            // Configuraciï¿½n de precisiï¿½n para campos decimales
             entity.Property(d => d.Monto).HasPrecision(18, 2);
             entity.Property(d => d.Porcentaje).HasPrecision(5, 2);
 
-            // Relación N:1 con Empleado
+            // Relaciï¿½n N:1 con Empleado
             entity.HasOne(d => d.Empleado)
                 .WithMany()
                 .HasForeignKey(d => d.EmpleadoId)
@@ -297,26 +308,26 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
 
             // Global query filter para multi-tenancy
             entity.HasQueryFilter(d =>
-                _currentUserService == null ||
-                _currentUserService.CompanyId == null ||
-                (int?)d.CompanyId == _currentUserService.CompanyId);
+                _tenantContext == null ||
+                _tenantContext.TenantId == 0 ||
+                d.TenantId == _tenantContext.TenantId);
         });
 
-        // Conceptos de Nómina: Configuración de Anticipo
+        // Conceptos de Nï¿½mina: Configuraciï¿½n de Anticipo
         modelBuilder.Entity<Anticipo>(entity =>
         {
-            // Índice compuesto para búsquedas por empleado y estado
+            // ï¿½ndice compuesto para bï¿½squedas por empleado y estado
             entity.HasIndex(a => new { a.EmpleadoId, a.Estado })
                 .HasDatabaseName("IX_Anticipo_EmpleadoId_Estado");
 
-            // Índice para búsquedas por fecha de descuento
+            // ï¿½ndice para bï¿½squedas por fecha de descuento
             entity.HasIndex(a => new { a.FechaDescuento, a.Estado })
                 .HasDatabaseName("IX_Anticipo_FechaDescuento_Estado");
 
-            // Configuración de precisión para campos decimales
+            // Configuraciï¿½n de precisiï¿½n para campos decimales
             entity.Property(a => a.Monto).HasPrecision(18, 2);
 
-            // Relación N:1 con Empleado
+            // Relaciï¿½n N:1 con Empleado
             entity.HasOne(a => a.Empleado)
                 .WithMany()
                 .HasForeignKey(a => a.EmpleadoId)
@@ -324,25 +335,25 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
 
             // Global query filter para multi-tenancy
             entity.HasQueryFilter(a =>
-                _currentUserService == null ||
-                _currentUserService.CompanyId == null ||
-                (int?)a.CompanyId == _currentUserService.CompanyId);
+                _tenantContext == null ||
+                _tenantContext.TenantId == 0 ||
+                a.TenantId == _tenantContext.TenantId);
         });
 
-        // Conceptos de Nómina: Configuración de PagoPrestamo
+        // Conceptos de Nï¿½mina: Configuraciï¿½n de PagoPrestamo
         modelBuilder.Entity<PagoPrestamo>(entity =>
         {
-            // Índice para búsquedas por préstamo
+            // ï¿½ndice para bï¿½squedas por prï¿½stamo
             entity.HasIndex(pp => pp.PrestamoId)
                 .HasDatabaseName("IX_PagoPrestamo_PrestamoId");
 
-            // Configuración de precisión para campos decimales
+            // Configuraciï¿½n de precisiï¿½n para campos decimales
             entity.Property(pp => pp.MontoPagado).HasPrecision(18, 2);
             entity.Property(pp => pp.SaldoAnterior).HasPrecision(18, 2);
             entity.Property(pp => pp.SaldoNuevo).HasPrecision(18, 2);
         });
 
-        // Asistencia: Configuración de HoraExtra
+        // Asistencia: Configuraciï¿½n de HoraExtra
         modelBuilder.Entity<HoraExtra>(entity =>
         {
             entity.HasIndex(h => new { h.EmpleadoId, h.Fecha })
@@ -361,12 +372,12 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasQueryFilter(h =>
-                _currentUserService == null ||
-                _currentUserService.CompanyId == null ||
-                (int?)h.CompanyId == _currentUserService.CompanyId);
+                _tenantContext == null ||
+                _tenantContext.TenantId == 0 ||
+                h.TenantId == _tenantContext.TenantId);
         });
 
-        // Asistencia: Configuración de Ausencia
+        // Asistencia: Configuraciï¿½n de Ausencia
         modelBuilder.Entity<Ausencia>(entity =>
         {
             entity.HasIndex(a => new { a.EmpleadoId, a.FechaInicio })
@@ -381,12 +392,12 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasQueryFilter(a =>
-                _currentUserService == null ||
-                _currentUserService.CompanyId == null ||
-                (int?)a.CompanyId == _currentUserService.CompanyId);
+                _tenantContext == null ||
+                _tenantContext.TenantId == 0 ||
+                a.TenantId == _tenantContext.TenantId);
         });
 
-        // Asistencia: Configuración de SolicitudVacaciones
+        // Asistencia: Configuraciï¿½n de SolicitudVacaciones
         modelBuilder.Entity<SolicitudVacaciones>(entity =>
         {
             entity.HasIndex(v => new { v.EmpleadoId, v.Estado })
@@ -403,18 +414,18 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasQueryFilter(v =>
-                _currentUserService == null ||
-                _currentUserService.CompanyId == null ||
-                (int?)v.CompanyId == _currentUserService.CompanyId);
+                _tenantContext == null ||
+                _tenantContext.TenantId == 0 ||
+                v.TenantId == _tenantContext.TenantId);
         });
 
-        // Asistencia: Configuración de SaldoVacaciones
+        // Asistencia: Configuraciï¿½n de SaldoVacaciones
         modelBuilder.Entity<SaldoVacaciones>(entity =>
         {
-            // Índice único: un empleado solo puede tener un saldo de vacaciones
-            entity.HasIndex(s => new { s.CompanyId, s.EmpleadoId })
+            // ï¿½ndice ï¿½nico: un empleado solo puede tener un saldo de vacaciones
+            entity.HasIndex(s => new { s.TenantId, s.EmpleadoId })
                 .IsUnique()
-                .HasDatabaseName("IX_SaldoVacaciones_CompanyId_EmpleadoId");
+                .HasDatabaseName("IX_SaldoVacaciones_TenantId_EmpleadoId");
 
             entity.Property(s => s.DiasAcumulados).HasPrecision(6, 2);
             entity.Property(s => s.DiasTomados).HasPrecision(6, 2);
@@ -426,9 +437,120 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasQueryFilter(s =>
-                _currentUserService == null ||
-                _currentUserService.CompanyId == null ||
-                (int?)s.CompanyId == _currentUserService.CompanyId);
+                _tenantContext == null ||
+                _tenantContext.TenantId == 0 ||
+                s.TenantId == _tenantContext.TenantId);
+        });
+
+        // ====================================================================
+        // MULTI-TENANT: Configuraciï¿½n de entidades SaaS
+        // ====================================================================
+
+        // Tenant Configuration
+        modelBuilder.Entity<Tenant>(entity =>
+        {
+            // ï¿½ndice ï¿½nico para subdomain
+            entity.HasIndex(t => t.Subdomain)
+                .IsUnique()
+                .HasDatabaseName("IX_Tenant_Subdomain");
+
+            // ï¿½ndice para RUC (ï¿½nico por RUC+DV)
+            entity.HasIndex(t => new { t.RUC, t.DV })
+                .IsUnique()
+                .HasDatabaseName("IX_Tenant_RUC_DV");
+
+            // Relaciï¿½n 1:1 con Subscription
+            entity.HasOne(t => t.Subscription)
+                .WithOne(s => s.Tenant)
+                .HasForeignKey<Subscription>(s => s.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Relaciï¿½n 1:N con TenantUsers
+            entity.HasMany(t => t.Users)
+                .WithOne(tu => tu.Tenant)
+                .HasForeignKey(tu => tu.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Relaciï¿½n 1:N con Empleados
+            entity.HasMany(t => t.Empleados)
+                .WithOne(e => e.Tenant)
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Relaciï¿½n 1:N con PayrollHeaders
+            entity.HasMany(t => t.PayrollHeaders)
+                .WithOne(p => p.Tenant)
+                .HasForeignKey(p => p.TenantId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // NO aplicar query filter a Tenant (necesitamos acceso global para admin)
+        });
+
+        // Subscription Configuration
+        modelBuilder.Entity<Subscription>(entity =>
+        {
+            // ï¿½ndice para bï¿½squedas por status
+            entity.HasIndex(s => s.Status)
+                .HasDatabaseName("IX_Subscription_Status");
+
+            // ï¿½ndice para Stripe Customer ID
+            entity.HasIndex(s => s.StripeCustomerId)
+                .HasDatabaseName("IX_Subscription_StripeCustomerId");
+
+            // Configuraciï¿½n de precisiï¿½n para MonthlyPrice
+            entity.Property(s => s.MonthlyPrice).HasPrecision(10, 2);
+
+            // NO aplicar query filter a Subscription (se filtra por Tenant)
+        });
+
+        // TenantUser Configuration
+        modelBuilder.Entity<TenantUser>(entity =>
+        {
+            // ï¿½ndice compuesto: TenantId + UserId (ï¿½nico)
+            entity.HasIndex(tu => new { tu.TenantId, tu.UserId })
+                .IsUnique()
+                .HasDatabaseName("IX_TenantUser_TenantId_UserId");
+
+            // ï¿½ndice para invitation token
+            entity.HasIndex(tu => tu.InvitationToken)
+                .HasDatabaseName("IX_TenantUser_InvitationToken");
+
+            // Relaciï¿½n con AppUser
+            entity.HasOne(tu => tu.User)
+                .WithMany()
+                .HasForeignKey(tu => tu.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Query filter por TenantId
+            entity.HasQueryFilter(tu =>
+                _tenantContext == null ||
+                _tenantContext.TenantId == 0 ||
+                tu.TenantId == _tenantContext.TenantId);
+        });
+
+        // StripeWebhookEvent Configuration
+        modelBuilder.Entity<StripeWebhookEvent>(entity =>
+        {
+            // Ãndice Ãºnico para Stripe Event ID (idempotency)
+            entity.HasIndex(e => e.StripeEventId)
+                .IsUnique()
+                .HasDatabaseName("IX_StripeWebhookEvent_StripeEventId");
+
+            // Ãndice para bÃºsquedas por TenantId
+            entity.HasIndex(e => e.TenantId)
+                .HasDatabaseName("IX_StripeWebhookEvent_TenantId");
+
+            // Ãndice para bÃºsquedas por Status
+            entity.HasIndex(e => e.Status)
+                .HasDatabaseName("IX_StripeWebhookEvent_Status");
+
+            // RelaciÃ³n con Tenant (nullable)
+            entity.HasOne(e => e.Tenant)
+                .WithMany()
+                .HasForeignKey(e => e.TenantId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // NO aplicar query filter (necesitamos procesar todos los webhooks)
         });
     }
 }

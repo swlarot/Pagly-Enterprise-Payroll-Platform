@@ -14,6 +14,11 @@ public class PagoPrestamo
     public Prestamo Prestamo { get; set; } = null!;
 
     /// <summary>
+    /// ID del tenant al que pertenece este pago
+    /// </summary>
+    public int TenantId { get; set; }
+
+    /// <summary>
     /// ID del detalle de planilla donde se descontó (si aplica)
     /// </summary>
     public int? PlanillaDetailId { get; set; }
@@ -50,4 +55,7 @@ public class PagoPrestamo
 
     // Auditoría
     public DateTime CreatedAt { get; set; }
+
+    // Navigation property
+    public virtual Tenant? Tenant { get; set; }
 }
