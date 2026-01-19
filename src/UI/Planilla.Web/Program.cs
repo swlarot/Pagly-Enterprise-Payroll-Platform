@@ -30,19 +30,33 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 // 2. REGISTRAR EL DBCONTEXT PARA INYECCI�N DE DEPENDENCIAS
 //    Le decimos a la aplicaci�n c�mo crear instancias de nuestro ApplicationDbContext,
 //    configur�ndolo para que use SQL Server con la cadena de conexi�n.
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+// En entorno de Testing, se configurará In-Memory en CustomWebApplicationFactory
+if (!builder.Environment.IsEnvironment("Testing"))
 {
-    options.UseNpgsql(connectionString);
-    // Ignorar advertencia de modelo pendiente durante desarrollo
-    options.ConfigureWarnings(warnings =>
-        warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
-});
+    builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    {
+        options.UseNpgsql(connectionString);
+        // Ignorar advertencia de modelo pendiente durante desarrollo
+        options.ConfigureWarnings(warnings =>
+            warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+    });
+}
 
 // 3. CONFIGURAR ASP.NET CORE IDENTITY
 //    Configura el sistema de usuarios y roles, usando nuestro ApplicationDbContext para almacenar los datos
 //    y nuestra clase AppUser como el modelo de usuario.
 builder.Services.AddIdentity<AppUser, IdentityRole>(options => {
-    options.SignIn.RequireConfirmedAccount = true;
+    // En Testing, no requerir confirmed account para simplificar tests
+    options.SignIn.RequireConfirmedAccount = !builder.Environment.IsEnvironment("Testing");
+    // En Testing, relajar requisitos de password
+    if (builder.Environment.IsEnvironment("Testing"))
+    {
+        options.Password.RequireDigit = false;
+        options.Password.RequiredLength = 6;
+        options.Password.RequireNonAlphanumeric = false;
+        options.Password.RequireUppercase = false;
+        options.Password.RequireLowercase = false;
+    }
 })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
