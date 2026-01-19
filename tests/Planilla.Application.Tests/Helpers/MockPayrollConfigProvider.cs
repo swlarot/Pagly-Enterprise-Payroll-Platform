@@ -54,7 +54,7 @@ public class MockPayrollConfigProvider : IPayrollConfigProvider
     /// <summary>
     /// Obtiene configuración de tasas de CSS, SE, ISR.
     /// </summary>
-    public Task<PayrollTaxConfigDto?> GetTaxConfigAsync(int companyId, DateTime effectiveDate)
+    public Task<PayrollTaxConfigDto?> GetTaxConfigAsync(int tenantId, DateTime effectiveDate)
     {
         // Si se configuró para retornar null (simula configuración faltante)
         if (_returnNullConfig)
@@ -68,7 +68,7 @@ public class MockPayrollConfigProvider : IPayrollConfigProvider
     /// <summary>
     /// Obtiene brackets de ISR para un año fiscal.
     /// </summary>
-    public Task<List<TaxBracketDto>> GetTaxBracketsAsync(int companyId, int year)
+    public Task<List<TaxBracketDto>> GetTaxBracketsAsync(int tenantId, int year)
     {
         return Task.FromResult(_taxBrackets);
     }
@@ -80,7 +80,7 @@ public class MockPayrollConfigProvider : IPayrollConfigProvider
     {
         return new PayrollTaxConfigDto(
             Id: 1,
-            CompanyId: 1,
+            TenantId: 1,
             EffectiveStartDate: new DateTime(2025, 1, 1),
             EffectiveEndDate: null,
 
@@ -131,7 +131,7 @@ public class MockPayrollConfigProvider : IPayrollConfigProvider
             // Tramo 1: Exento (B/. 0 - B/. 11,000)
             new TaxBracketDto(
                 Id: 1,
-                CompanyId: 1,
+                TenantId: 1,
                 Year: 2025,
                 Order: 1,
                 Description: "Exento",
@@ -144,7 +144,7 @@ public class MockPayrollConfigProvider : IPayrollConfigProvider
             // Tramo 2: 15% (B/. 11,001 - B/. 50,000)
             new TaxBracketDto(
                 Id: 2,
-                CompanyId: 1,
+                TenantId: 1,
                 Year: 2025,
                 Order: 2,
                 Description: "15% sobre excedente de B/. 11,000",
@@ -157,7 +157,7 @@ public class MockPayrollConfigProvider : IPayrollConfigProvider
             // Tramo 3: 25% (B/. 50,001+)
             new TaxBracketDto(
                 Id: 3,
-                CompanyId: 1,
+                TenantId: 1,
                 Year: 2025,
                 Order: 3,
                 Description: "25% sobre excedente de B/. 50,000",
