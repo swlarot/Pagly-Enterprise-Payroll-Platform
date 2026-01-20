@@ -3,8 +3,8 @@ export interface RegisterDto {
   email: string;
   password: string;
   companyName: string;
-  ruc: string;
-  dv: string;
+  ruc?: string;
+  dv?: string;
 }
 
 export interface LoginDto {

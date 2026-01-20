@@ -17,8 +17,8 @@ export default function RegisterPage() {
     e.preventDefault();
 
     // Validation
-    if (!email || !password || !companyName || !ruc || !dv) {
-      toast.error('Por favor completa todos los campos');
+    if (!email || !password || !companyName) {
+      toast.error('Por favor completa los campos obligatorios');
       return;
     }
 
@@ -27,12 +27,14 @@ export default function RegisterPage() {
       return;
     }
 
-    if (!/^\d+$/.test(ruc)) {
+    // Validar RUC solo si se proporciona
+    if (ruc && !/^\d+$/.test(ruc)) {
       toast.error('El RUC debe contener solo números');
       return;
     }
 
-    if (!/^\d+$/.test(dv)) {
+    // Validar DV solo si se proporciona
+    if (dv && !/^\d+$/.test(dv)) {
       toast.error('El DV debe contener solo números');
       return;
     }
@@ -40,7 +42,13 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      await register({ email, password, companyName, ruc, dv });
+      await register({
+        email,
+        password,
+        companyName,
+        ...(ruc && { ruc }),  // Solo incluir si tiene valor
+        ...(dv && { dv })     // Solo incluir si tiene valor
+      });
       toast.success('Registro exitoso. Bienvenido a Planilla');
       navigate('/dashboard', { replace: true });
     } catch (error: any) {
@@ -122,7 +130,7 @@ export default function RegisterPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label htmlFor="ruc" className="block text-sm font-medium text-gray-700 mb-2">
-                  RUC
+                  RUC <span className="text-gray-400 font-normal">(Opcional)</span>
                 </label>
                 <input
                   id="ruc"
@@ -137,7 +145,7 @@ export default function RegisterPage() {
 
               <div>
                 <label htmlFor="dv" className="block text-sm font-medium text-gray-700 mb-2">
-                  DV
+                  DV <span className="text-gray-400 font-normal">(Opcional)</span>
                 </label>
                 <input
                   id="dv"
