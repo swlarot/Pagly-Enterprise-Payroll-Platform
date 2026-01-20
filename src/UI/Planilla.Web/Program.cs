@@ -143,6 +143,17 @@ builder.Services.AddScoped<IInvitationService, InvitationService>();
 
 // --- FIN DE NUESTRA CONFIGURACIÓN PRINCIPAL ---
 
+// 13. CONFIGURAR CORS PARA DESARROLLO
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowReactApp", policy =>
+    {
+        policy.WithOrigins("http://localhost:5173") // Vite dev server
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
 
 // RISK: Removing Blazor services - Web API + Identity backend only
 builder.Services.AddControllers()
@@ -266,6 +277,9 @@ else
 app.UseHttpsRedirection();
 app.UseStaticFiles(); // Serves static files including React SPA from wwwroot
 app.UseRouting();
+
+// CORS must be after UseRouting and before UseAuthentication
+app.UseCors("AllowReactApp");
 
 // RISK: Removing UseAntiforgery - React SPA will handle CSRF via API tokens
 app.UseAuthentication(); // Must come before UseAuthorization
