@@ -125,6 +125,64 @@ public class TenantManagementService : ITenantManagementService
     }
 
     /// <summary>
+    /// Obtiene métricas de uso del tenant actual (usuarios, empleados, compañías vs límites del plan)
+    /// </summary>
+    public async Task<Result<TenantUsageDto>> GetUsageAsync()
+    {
+        try
+        {
+            var tenantId = _tenantContext.TenantId;
+            if (tenantId == 0)
+            {
+                return Result<TenantUsageDto>.Fail("Tenant context no encontrado");
+            }
+
+            var tenant = await _context.Tenants
+                .Include(t => t.Subscription)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(t => t.Id == tenantId);
+
+            if (tenant == null)
+            {
+                return Result<TenantUsageDto>.Fail("Tenant no encontrado");
+            }
+
+            // Obtener métricas de uso
+            var usersCount = await _context.TenantUsers
+                .CountAsync(tu => tu.TenantId == tenantId && tu.IsActive);
+
+            var employeesCount = await _context.Empleados
+                .CountAsync(e => e.TenantId == tenantId);
+
+            var companiesCount = 1; // Por ahora asumimos 1 compañía por tenant
+
+            var pendingInvitationsCount = await _context.TenantInvitations
+                .CountAsync(i => i.TenantId == tenantId && i.IsActive && !i.AcceptedAt.HasValue && !i.IsRevoked && i.ExpiresAt > DateTime.UtcNow);
+
+            // Obtener límites del plan
+            var limits = PlanFeatures.GetLimits(tenant.Subscription?.Plan ?? SubscriptionPlan.Free);
+
+            var usage = new TenantUsageDto
+            {
+                UsersCount = usersCount,
+                EmployeesCount = employeesCount,
+                CompaniesCount = companiesCount,
+                PendingInvitationsCount = pendingInvitationsCount,
+                MaxUsers = limits.MaxUsers,
+                MaxEmployees = limits.MaxEmployees,
+                MaxCompanies = limits.MaxCompanies
+            };
+
+            return Result<TenantUsageDto>.Ok(usage);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting tenant usage");
+            return Result<TenantUsageDto>.Fail("Error al obtener métricas de uso del tenant");
+        }
+    }
+
+    /// <summary>
     /// Actualiza información del tenant actual
     /// SOLO Owner/Admin pueden actualizar
     /// </summary>

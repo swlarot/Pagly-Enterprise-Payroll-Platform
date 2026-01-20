@@ -50,6 +50,23 @@ public class TenantController : ControllerBase
     }
 
     /// <summary>
+    /// GET /api/tenant/usage - Obtiene métricas de uso del tenant actual
+    /// Roles: Todos los autenticados pueden ver métricas de su tenant
+    /// </summary>
+    [HttpGet("usage")]
+    public async Task<IActionResult> GetUsage()
+    {
+        var result = await _tenantService.GetUsageAsync();
+
+        if (!result.Success)
+        {
+            return BadRequest(new { error = result.ErrorMessage });
+        }
+
+        return Ok(result.Value);
+    }
+
+    /// <summary>
     /// PUT /api/tenant - Actualiza información del tenant actual
     /// Roles: Owner, Admin
     /// Audit Log: TenantUpdated

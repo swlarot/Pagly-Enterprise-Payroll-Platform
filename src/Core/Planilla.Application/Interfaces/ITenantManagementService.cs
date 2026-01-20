@@ -14,6 +14,11 @@ public interface ITenantManagementService
     Task<Result<TenantDto>> GetCurrentTenantAsync();
 
     /// <summary>
+    /// Obtiene métricas de uso del tenant actual (usuarios, empleados, compañías vs límites del plan)
+    /// </summary>
+    Task<Result<TenantUsageDto>> GetUsageAsync();
+
+    /// <summary>
     /// Actualiza información del tenant actual
     /// </summary>
     Task<Result<TenantDto>> UpdateTenantAsync(UpdateTenantDto dto);

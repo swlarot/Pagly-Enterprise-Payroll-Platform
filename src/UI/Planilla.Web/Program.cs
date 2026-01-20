@@ -88,7 +88,8 @@ builder.Services.AddAuthentication(options =>
         ValidIssuer = jwtIssuer,
         ValidAudience = jwtAudience,
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-        ClockSkew = TimeSpan.Zero // Elimina el buffer de 5 minutos por defecto
+        ClockSkew = TimeSpan.Zero, // Elimina el buffer de 5 minutos por defecto
+        RoleClaimType = "tenant_role" // Map "tenant_role" claim to Role for [Authorize(Roles=...)]
     };
 });
 

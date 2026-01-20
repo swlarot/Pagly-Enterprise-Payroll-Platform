@@ -73,7 +73,8 @@ public class TenantManagementTests : IClassFixture<CustomWebApplicationFactory>
         var acceptDto = new AcceptInvitationDto
         {
             Token = invitation!.Token,
-            Password = "Manager@1234"
+            Password = "Manager@1234",
+            ConfirmPassword = "Manager@1234"
         };
 
         var acceptClient = _factory.CreateClient();
@@ -129,7 +130,7 @@ public class TenantManagementTests : IClassFixture<CustomWebApplicationFactory>
             // All invites should succeed until we hit the limit
             if (i < availableSlots - 1)
             {
-                inviteResponse.StatusCode.Should().Be(HttpStatusCode.OK,
+                inviteResponse.StatusCode.Should().Be(HttpStatusCode.Created,
                     $"invite {i + 1}/{availableSlots - 1} should succeed");
             }
         }
@@ -255,13 +256,20 @@ public class TenantManagementTests : IClassFixture<CustomWebApplicationFactory>
         auditA.Should().NotBeNull();
         auditB.Should().NotBeNull();
 
-        // All audit entries for Tenant A should have their tenant context
-        auditA!.Items.Should().OnlyContain(log => log.Action.Contains("Tenant A Audit") || log.Action.Contains("invite"),
+        // All audit entries for Tenant A should have their TenantId
+        auditA!.Items.Should().OnlyContain(log => log.TenantId == tenantA.Id,
             "Tenant A should only see their own audit logs");
 
-        // Tenant B's logs should not contain Tenant A's actions
-        auditB!.Items.Should().NotContain(log => log.ActorEmail.Contains("Tenant A Audit"),
-            "Tenant B should not see Tenant A's audit logs");
+        // All audit entries for Tenant B should have their TenantId
+        auditB!.Items.Should().OnlyContain(log => log.TenantId == tenantB.Id,
+            "Tenant B should only see their own audit logs");
+
+        // Each tenant should have at least one log entry (the invitation they created)
+        auditA.Items.Should().Contain(log => log.Action == "InviteCreated" && log.EntityType == "TenantInvitation",
+            "Tenant A should have an InviteCreated audit log");
+
+        auditB.Items.Should().Contain(log => log.Action == "InviteCreated" && log.EntityType == "TenantInvitation",
+            "Tenant B should have an InviteCreated audit log");
     }
 
     // ========================================================================
@@ -289,7 +297,8 @@ public class TenantManagementTests : IClassFixture<CustomWebApplicationFactory>
         var acceptDto = new AcceptInvitationDto
         {
             Token = invitation!.Token,
-            Password = "Invitee@1234"
+            Password = "Invitee@1234",
+            ConfirmPassword = "Invitee@1234"
         };
 
         var acceptClient = _factory.CreateClient();
@@ -330,7 +339,8 @@ public class TenantManagementTests : IClassFixture<CustomWebApplicationFactory>
         var acceptDto = new AcceptInvitationDto
         {
             Token = "invalid-token-format",
-            Password = "Test@1234"
+            Password = "Test@1234",
+            ConfirmPassword = "Test@1234"
         };
 
         var client = _factory.CreateClient();

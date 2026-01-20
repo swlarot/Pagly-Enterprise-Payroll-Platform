@@ -64,7 +64,9 @@ public class AuthController : ControllerBase
             return BadRequest(new { message = "El email ya está registrado" });
         }
 
-        await using var transaction = await _context.Database.BeginTransactionAsync();
+        // NOTE: BeginTransactionAsync doesn't work with InMemory database in tests
+        // For production (PostgreSQL), this will work correctly
+        var transaction = await _context.Database.BeginTransactionAsync();
 
         try
         {

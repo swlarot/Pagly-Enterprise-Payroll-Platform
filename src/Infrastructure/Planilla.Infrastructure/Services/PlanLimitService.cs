@@ -52,9 +52,30 @@ public class PlanLimitService : IPlanLimitService
             var subscription = await _context.Subscriptions
                 .FirstOrDefaultAsync(s => s.TenantId == tenantId);
 
+            // If no subscription exists, check if tenant exists at all
             if (subscription == null)
             {
-                return (false, "No tienes una suscripción activa. Contacta con soporte.");
+                var tenantExists = await _context.Tenants.AnyAsync(t => t.Id == tenantId && t.IsActive);
+                if (!tenantExists)
+                {
+                    return (false, "Tenant no encontrado o inactivo");
+                }
+
+                // Tenant exists but no subscription - use Free plan limits
+                _logger.LogWarning("Tenant {TenantId} no tiene suscripción, permitiendo creación con límites Free", tenantId);
+                var freeLimits = PlanFeatures.GetLimits(SubscriptionPlan.Free);
+
+                var employeeCount = await _context.Empleados
+                    .CountAsync(e => e.TenantId == tenantId && e.EstaActivo);
+
+                if (employeeCount >= freeLimits.MaxEmployees)
+                {
+                    return (false,
+                        $"Has alcanzado el límite de {freeLimits.MaxEmployees} empleados. " +
+                        "Crea una suscripción para aumentar tu límite.");
+                }
+
+                return (true, null);
             }
 
             // 2. Check subscription status
@@ -116,9 +137,35 @@ public class PlanLimitService : IPlanLimitService
             var subscription = await _context.Subscriptions
                 .FirstOrDefaultAsync(s => s.TenantId == tenantId);
 
+            // If no subscription exists, check if tenant exists at all
             if (subscription == null)
             {
-                return (false, "No tienes una suscripción activa. Contacta con soporte.");
+                var tenantExists = await _context.Tenants.AnyAsync(t => t.Id == tenantId && t.IsActive);
+                if (!tenantExists)
+                {
+                    return (false, "Tenant no encontrado o inactivo");
+                }
+
+                // Tenant exists but no subscription - use Free plan limits
+                _logger.LogWarning("Tenant {TenantId} no tiene suscripción, permitiendo invitación con límites Free", tenantId);
+                var freeLimits = PlanFeatures.GetLimits(SubscriptionPlan.Free);
+
+                var activeUsersCount = await _context.TenantUsers
+                    .CountAsync(tu => tu.TenantId == tenantId && tu.IsActive);
+
+                var pendingInvitesCount = await _context.TenantInvitations
+                    .CountAsync(i => i.TenantId == tenantId && i.IsActive && !i.AcceptedAt.HasValue && !i.IsRevoked && i.ExpiresAt > DateTime.UtcNow);
+
+                var userCount = activeUsersCount + pendingInvitesCount;
+
+                if (userCount >= freeLimits.MaxUsers)
+                {
+                    return (false,
+                        $"Has alcanzado el límite de {freeLimits.MaxUsers} usuarios. " +
+                        "Crea una suscripción para aumentar tu límite.");
+                }
+
+                return (true, null);
             }
 
             // 2. Check subscription status
@@ -135,9 +182,14 @@ public class PlanLimitService : IPlanLimitService
             // 3. Get plan limits
             var limits = PlanFeatures.GetLimits(subscription.Plan);
 
-            // 4. Count current active users
-            var currentCount = await _context.TenantUsers
+            // 4. Count current active users + pending invitations
+            var activeUsers = await _context.TenantUsers
                 .CountAsync(tu => tu.TenantId == tenantId && tu.IsActive);
+
+            var pendingInvitations = await _context.TenantInvitations
+                .CountAsync(i => i.TenantId == tenantId && i.IsActive && !i.AcceptedAt.HasValue && !i.IsRevoked && i.ExpiresAt > DateTime.UtcNow);
+
+            var currentCount = activeUsers + pendingInvitations;
 
             // 5. Check limit
             if (currentCount >= limits.MaxUsers)
