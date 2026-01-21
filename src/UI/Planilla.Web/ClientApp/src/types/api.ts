@@ -104,6 +104,22 @@ export interface InvitationDto {
   token: string;
   expiresAt: string;
   isActive: boolean;
+  createdAt: string;
+  inviteUrl?: string;
+}
+
+export interface ValidateInviteResponseDto {
+  isValid: boolean;
+  tenantName: string;
+  role: TenantRole;
+  roleName: string;
+  email: string;
+  message?: string;
+}
+
+export interface UpdateTenantUserDto {
+  role?: TenantRole;
+  isActive?: boolean;
 }
 
 export interface AuditLogDto {

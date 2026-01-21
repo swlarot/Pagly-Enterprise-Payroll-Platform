@@ -4,6 +4,7 @@ import type {
   LoginDto,
   AcceptInvitationDto,
   AuthResponseDto,
+  ValidateInviteResponseDto,
 } from '../types/api';
 
 export const authService = {
@@ -17,6 +18,10 @@ export const authService = {
 
   async me(): Promise<AuthResponseDto> {
     return api.get<AuthResponseDto>('/api/auth/me');
+  },
+
+  async validateInvite(token: string): Promise<ValidateInviteResponseDto> {
+    return api.get<ValidateInviteResponseDto>(`/api/auth/validate-invite?token=${token}`);
   },
 
   async acceptInvite(dto: AcceptInvitationDto): Promise<AuthResponseDto> {

@@ -5,6 +5,7 @@ import type {
   CreateInvitationDto,
   InvitationDto,
   TenantUsageDto,
+  UpdateTenantUserDto,
 } from '../types/api';
 
 export const tenantService = {
@@ -16,12 +17,24 @@ export const tenantService = {
     return api.get<TenantUserDto[]>('/api/tenant/users');
   },
 
-  async inviteUser(dto: CreateInvitationDto): Promise<InvitationDto> {
-    return api.post<InvitationDto>('/api/tenant/invite', dto);
+  async updateUser(userId: number, dto: UpdateTenantUserDto): Promise<void> {
+    return api.patch<void>(`/api/tenant/users/${userId}`, dto);
   },
 
   async removeUser(userId: number): Promise<void> {
     return api.delete<void>(`/api/tenant/users/${userId}`);
+  },
+
+  async inviteUser(dto: CreateInvitationDto): Promise<InvitationDto> {
+    return api.post<InvitationDto>('/api/tenant/invite', dto);
+  },
+
+  async getInvitations(): Promise<InvitationDto[]> {
+    return api.get<InvitationDto[]>('/api/tenant/invitations');
+  },
+
+  async revokeInvitation(invitationId: number): Promise<void> {
+    return api.delete<void>(`/api/tenant/invitations/${invitationId}`);
   },
 
   async getUsage(): Promise<TenantUsageDto> {
