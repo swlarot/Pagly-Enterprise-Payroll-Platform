@@ -75,7 +75,7 @@ public class AuthController : ControllerBase
             {
                 UserName = dto.Email,
                 Email = dto.Email,
-                EmailConfirmed = false,  // TODO: Implementar confirmación por email
+                EmailConfirmed = true,  // TODO: Implementar confirmación por email en producción
                 NombreCompleto = dto.CompanyName
             };
 
@@ -503,5 +503,36 @@ public class AuthController : ControllerBase
         }
 
         return subdomain;
+    }
+
+    /// <summary>
+    /// DEVELOPMENT ONLY: Confirma todos los emails no confirmados
+    /// </summary>
+    [HttpPost("dev/confirm-all-emails")]
+    public async Task<IActionResult> DevConfirmAllEmails()
+    {
+        // Solo permitir en Development
+        if (!_configuration.GetValue<bool>("IsDevelopment", false) &&
+            Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") != "Development")
+        {
+            return NotFound();
+        }
+
+        var unconfirmedUsers = await _userManager.Users
+            .Where(u => !u.EmailConfirmed)
+            .ToListAsync();
+
+        var count = 0;
+        foreach (var user in unconfirmedUsers)
+        {
+            user.EmailConfirmed = true;
+            await _userManager.UpdateAsync(user);
+            count++;
+        }
+
+        return Ok(new {
+            message = $"Se confirmaron {count} emails",
+            emails = unconfirmedUsers.Select(u => u.Email).ToList()
+        });
     }
 }
