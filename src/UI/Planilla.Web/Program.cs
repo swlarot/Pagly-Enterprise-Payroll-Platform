@@ -1,5 +1,6 @@
 // RISK: Removing Blazor components - converting to Web API + React SPA architecture
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -45,18 +46,17 @@ if (!builder.Environment.IsEnvironment("Testing"))
 // 3. CONFIGURAR ASP.NET CORE IDENTITY
 //    Configura el sistema de usuarios y roles, usando nuestro ApplicationDbContext para almacenar los datos
 //    y nuestra clase AppUser como el modelo de usuario.
+//    PAGLY: Políticas de contraseña relajadas - sin caracteres especiales requeridos
 builder.Services.AddIdentity<AppUser, IdentityRole>(options => {
-    // En Testing, no requerir confirmed account para simplificar tests
-    options.SignIn.RequireConfirmedAccount = !builder.Environment.IsEnvironment("Testing");
-    // En Testing, relajar requisitos de password
-    if (builder.Environment.IsEnvironment("Testing"))
-    {
-        options.Password.RequireDigit = false;
-        options.Password.RequiredLength = 6;
-        options.Password.RequireNonAlphanumeric = false;
-        options.Password.RequireUppercase = false;
-        options.Password.RequireLowercase = false;
-    }
+    // No requerir email confirmado - usuarios creados por admin
+    options.SignIn.RequireConfirmedAccount = false;
+    // Políticas de contraseña relajadas para Pagly
+    // Solo requerimos longitud mínima razonable (8 caracteres)
+    options.Password.RequireDigit = false;
+    options.Password.RequiredLength = 8;
+    options.Password.RequireNonAlphanumeric = false;  // Sin caracteres especiales
+    options.Password.RequireUppercase = false;
+    options.Password.RequireLowercase = false;
 })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
@@ -103,7 +103,12 @@ builder.Services.AddAuthorizationBuilder()
     .AddPolicy("TenantManageUsers", p => p.RequireRole("Owner", "Admin"))
     .AddPolicy("TenantInvite", p => p.RequireRole("Owner", "Admin"))
     .AddPolicy("PayrollManage", p => p.RequireRole("Owner", "Admin", "Manager"))
-    .AddPolicy("ReportsRead", p => p.RequireRole("Owner", "Admin", "Manager", "Accountant"));
+    .AddPolicy("ReportsRead", p => p.RequireRole("Owner", "Admin", "Manager", "Accountant"))
+    // Phase 4: System Admin policy - verifica el claim is_system_admin
+    .AddPolicy("RequireSystemAdmin", p => p.Requirements.Add(new Vorluno.Planilla.Web.Authorization.SystemAdminRequirement()));
+
+// Registrar el handler de autorización para SystemAdmin
+builder.Services.AddSingleton<IAuthorizationHandler, Vorluno.Planilla.Web.Authorization.SystemAdminAuthorizationHandler>();
 
 // 7. REGISTRAR SERVICIOS DE LA APLICACIÓN (UnitOfWork, etc.)
 builder.Services.ConfigureApplicationServices();
@@ -174,9 +179,9 @@ builder.Services.AddSwaggerGen(options =>
 {
     options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
     {
-        Title = "Planilla API",
+        Title = "Pagly API",
         Version = "v1",
-        Description = "Multi-tenant Payroll SaaS API for Panama"
+        Description = "Multi-tenant Payroll SaaS API for Panama - Admin-managed users only"
     });
 
     // Configure JWT Bearer authentication
@@ -252,6 +257,19 @@ if (!app.Environment.IsEnvironment("Testing"))
             {
                 logger.LogWarning(seedEx, "⚠ Seed falló, pero la aplicación continuará. " +
                     "La configuración se puede crear manualmente o al registrar tenants.");
+            }
+
+            // Ejecutar seed de administradores del sistema
+            try
+            {
+                logger.LogInformation("Ejecutando seed de administradores del sistema...");
+                var userManager = services.GetRequiredService<UserManager<AppUser>>();
+                await SystemAdminSeeder.SeedAsync(userManager, logger);
+                logger.LogInformation("✓ Seed de administradores completado exitosamente");
+            }
+            catch (Exception adminSeedEx)
+            {
+                logger.LogWarning(adminSeedEx, "⚠ Seed de administradores falló, pero la aplicación continuará.");
             }
         }
         catch (Exception ex)

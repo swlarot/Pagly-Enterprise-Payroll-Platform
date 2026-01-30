@@ -34,6 +34,14 @@ public class TenantMiddleware
                 return;
             }
 
+            // SystemAdmins no necesitan validación de tenant
+            var isSystemAdminClaim = context.User?.FindFirst("is_system_admin");
+            if (isSystemAdminClaim?.Value == "true")
+            {
+                await _next(context);
+                return;
+            }
+
             if (context.User?.Identity?.IsAuthenticated == true && tenantContext.HasTenant)
             {
                 // El TenantContext ya obtiene el ID del claim automáticamente
