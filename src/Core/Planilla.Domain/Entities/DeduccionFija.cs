@@ -1,11 +1,12 @@
 using Vorluno.Planilla.Domain.Enums;
+using Vorluno.Planilla.Domain.Interfaces;
 
 namespace Vorluno.Planilla.Domain.Entities;
 
 /// <summary>
 /// Representa una deducción fija que se aplica automáticamente al empleado en cada planilla.
 /// </summary>
-public class DeduccionFija
+public class DeduccionFija : ITenantEntity
 {
     public int Id { get; set; }
 

@@ -1,11 +1,12 @@
 using Vorluno.Planilla.Domain.Enums;
+using Vorluno.Planilla.Domain.Interfaces;
 
 namespace Vorluno.Planilla.Domain.Entities;
 
 /// <summary>
 /// Representa horas extra trabajadas por un empleado
 /// </summary>
-public class HoraExtra
+public class HoraExtra : ITenantEntity
 {
     public int Id { get; set; }
     public int EmpleadoId { get; set; }

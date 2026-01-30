@@ -1,9 +1,11 @@
+using Vorluno.Planilla.Domain.Interfaces;
+
 namespace Vorluno.Planilla.Domain.Entities;
 
 /// <summary>
 /// Representa el saldo de días de vacaciones de un empleado
 /// </summary>
-public class SaldoVacaciones
+public class SaldoVacaciones : ITenantEntity
 {
     public int Id { get; set; }
 

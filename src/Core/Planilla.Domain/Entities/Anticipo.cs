@@ -1,4 +1,5 @@
 using Vorluno.Planilla.Domain.Enums;
+using Vorluno.Planilla.Domain.Interfaces;
 
 namespace Vorluno.Planilla.Domain.Entities;
 
@@ -17,7 +18,7 @@ public enum EstadoAnticipo
 /// <summary>
 /// Representa un anticipo de salario solicitado por un empleado.
 /// </summary>
-public class Anticipo
+public class Anticipo : ITenantEntity
 {
     public int Id { get; set; }
 

@@ -1,11 +1,12 @@
 using Vorluno.Planilla.Domain.Enums;
+using Vorluno.Planilla.Domain.Interfaces;
 
 namespace Vorluno.Planilla.Domain.Entities;
 
 /// <summary>
 /// Representa una solicitud de vacaciones de un empleado
 /// </summary>
-public class SolicitudVacaciones
+public class SolicitudVacaciones : ITenantEntity
 {
     public int Id { get; set; }
     public int EmpleadoId { get; set; }

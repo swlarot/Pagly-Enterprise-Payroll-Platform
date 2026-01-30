@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Vorluno.Planilla.Domain.Enums;
+using Vorluno.Planilla.Domain.Interfaces;
 
 namespace Vorluno.Planilla.Domain.Entities;
 
@@ -7,7 +8,7 @@ namespace Vorluno.Planilla.Domain.Entities;
 /// Representa la relación entre un usuario y un tenant,
 /// incluyendo el rol del usuario dentro del tenant.
 /// </summary>
-public class TenantUser : BaseEntity
+public class TenantUser : BaseEntity, ITenantEntity
 {
     /// <summary>
     /// ID del tenant

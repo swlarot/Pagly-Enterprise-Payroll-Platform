@@ -10,6 +10,7 @@
 // ====================================================================
 
 using System.ComponentModel.DataAnnotations;
+using Vorluno.Planilla.Domain.Interfaces;
 
 namespace Vorluno.Planilla.Domain.Entities;
 
@@ -17,7 +18,7 @@ namespace Vorluno.Planilla.Domain.Entities;
 /// Detalle de planilla que representa el cálculo de nómina de un empleado en un período.
 /// Almacena todos los ingresos, deducciones y costos patronales calculados.
 /// </summary>
-public class PayrollDetail
+public class PayrollDetail : ITenantEntity
 {
     /// <summary>
     /// ID único del detalle.

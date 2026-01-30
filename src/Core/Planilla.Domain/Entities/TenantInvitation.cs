@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Vorluno.Planilla.Domain.Enums;
+using Vorluno.Planilla.Domain.Interfaces;
 
 namespace Vorluno.Planilla.Domain.Entities;
 
@@ -7,7 +8,7 @@ namespace Vorluno.Planilla.Domain.Entities;
 /// Representa una invitación para que un usuario se una a un tenant.
 /// Las invitaciones tienen un token único y fecha de expiración.
 /// </summary>
-public class TenantInvitation : BaseEntity
+public class TenantInvitation : BaseEntity, ITenantEntity
 {
     /// <summary>
     /// ID del tenant que envía la invitación

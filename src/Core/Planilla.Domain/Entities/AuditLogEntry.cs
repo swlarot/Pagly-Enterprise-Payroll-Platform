@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Vorluno.Planilla.Domain.Interfaces;
 
 namespace Vorluno.Planilla.Domain.Entities;
 
@@ -6,7 +7,7 @@ namespace Vorluno.Planilla.Domain.Entities;
 /// Registra eventos de auditoría para cumplimiento y seguridad.
 /// Cada entrada captura quién hizo qué, cuándo y desde dónde.
 /// </summary>
-public class AuditLogEntry : BaseEntity
+public class AuditLogEntry : BaseEntity, ITenantEntity
 {
     /// <summary>
     /// ID del tenant al que pertenece esta entrada de auditoría

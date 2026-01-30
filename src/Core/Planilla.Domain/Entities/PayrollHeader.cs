@@ -11,6 +11,7 @@
 
 using System.ComponentModel.DataAnnotations;
 using Vorluno.Planilla.Domain.Enums;
+using Vorluno.Planilla.Domain.Interfaces;
 
 namespace Vorluno.Planilla.Domain.Entities;
 
@@ -18,7 +19,7 @@ namespace Vorluno.Planilla.Domain.Entities;
 /// Encabezado de planilla que representa un período de pago completo.
 /// Una planilla agrupa múltiples PayrollDetail (uno por empleado).
 /// </summary>
-public class PayrollHeader
+public class PayrollHeader : ITenantEntity
 {
     /// <summary>
     /// ID único de la planilla.

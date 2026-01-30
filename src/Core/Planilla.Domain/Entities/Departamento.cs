@@ -1,9 +1,11 @@
+using Vorluno.Planilla.Domain.Interfaces;
+
 namespace Vorluno.Planilla.Domain.Entities;
 
 /// <summary>
 /// Representa un departamento o área organizacional de la empresa
 /// </summary>
-public class Departamento
+public class Departamento : ITenantEntity
 {
     public int Id { get; set; }
 

@@ -1,9 +1,11 @@
+using Vorluno.Planilla.Domain.Interfaces;
+
 namespace Vorluno.Planilla.Domain.Entities;
 
 /// <summary>
 /// Representa un pago individual de una cuota de préstamo (historial).
 /// </summary>
-public class PagoPrestamo
+public class PagoPrestamo : ITenantEntity
 {
     public int Id { get; set; }
 
