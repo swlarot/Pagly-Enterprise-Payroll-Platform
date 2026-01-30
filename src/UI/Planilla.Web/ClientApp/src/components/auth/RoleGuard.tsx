@@ -1,4 +1,5 @@
 import React, { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import type { TenantRole } from '../../types/api';
 
@@ -33,12 +34,12 @@ export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
           <p className="text-gray-600 mb-6">
             No tienes los permisos necesarios para acceder a este recurso.
           </p>
-          <a
-            href="/"
+          <Link
+            to="/dashboard"
             className="inline-block px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
           >
             Volver al Dashboard
-          </a>
+          </Link>
         </div>
       </div>
     );
