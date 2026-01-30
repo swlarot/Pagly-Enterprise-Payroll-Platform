@@ -235,6 +235,9 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("IsSystemAdmin")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("boolean");
 
@@ -610,11 +613,19 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.HasIndex("DepartamentoId");
 
                     b.HasIndex("NumeroIdentificacion")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasDatabaseName("IX_Empleado_NumeroIdentificacion");
 
                     b.HasIndex("PosicionId");
 
-                    b.HasIndex("TenantId");
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("IX_Empleado_TenantId");
+
+                    b.HasIndex("TenantId", "DepartamentoId")
+                        .HasDatabaseName("IX_Empleado_TenantId_DepartamentoId");
+
+                    b.HasIndex("TenantId", "EstaActivo")
+                        .HasDatabaseName("IX_Empleado_TenantId_EstaActivo");
 
                     b.ToTable("Empleados");
                 });
@@ -741,7 +752,8 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.HasIndex("PrestamoId")
                         .HasDatabaseName("IX_PagoPrestamo_PrestamoId");
 
-                    b.HasIndex("TenantId");
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("IX_PagoPrestamo_TenantId");
 
                     b.ToTable("PagosPrestamos");
                 });
@@ -1250,9 +1262,74 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
 
                     b.HasIndex("EmpleadoId");
 
-                    b.HasIndex("TenantId");
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("IX_ReciboDeSueldo_TenantId");
+
+                    b.HasIndex("TenantId", "EmpleadoId")
+                        .HasDatabaseName("IX_ReciboDeSueldo_TenantId_EmpleadoId");
+
+                    b.HasIndex("TenantId", "FechaGeneracion")
+                        .HasDatabaseName("IX_ReciboDeSueldo_TenantId_FechaGeneracion");
 
                     b.ToTable("RecibosDeSueldo");
+                });
+
+            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedByIp")
+                        .HasMaxLength(45)
+                        .HasColumnType("character varying(45)");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsRevoked")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("ReplacedByTokenId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RevokedReason")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("Token")
+                        .IsUnique()
+                        .HasDatabaseName("IX_RefreshToken_Token");
+
+                    b.HasIndex("ExpiresAt", "IsRevoked")
+                        .HasDatabaseName("IX_RefreshToken_ExpiresAt_IsRevoked");
+
+                    b.HasIndex("UserId", "IsRevoked", "ExpiresAt")
+                        .HasDatabaseName("IX_RefreshToken_UserId_IsRevoked_ExpiresAt");
+
+                    b.ToTable("RefreshTokens");
                 });
 
             modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.SaldoVacaciones", b =>
@@ -2070,6 +2147,25 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.Navigation("Empleado");
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.RefreshToken", b =>
+                {
+                    b.HasOne("Vorluno.Planilla.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vorluno.Planilla.Domain.Entities.AppUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tenant");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.SaldoVacaciones", b =>
