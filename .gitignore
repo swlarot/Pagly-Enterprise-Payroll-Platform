@@ -1,34 +1,18 @@
-﻿# Visual Studio
-.vs/
-*.user
-*.suo
+# Logs
+*.log
+backend.log
+backend-error.log
+frontend.log
+frontend-error.log
 
-# Build artifacts
-**/bin/
-**/obj/
-**/Debug/
-**/Release/
-*.dll
-*.pdb
-*.cache
+# Test scripts temporales
+test-*.ps1
+test-*.html
 
-# Node/Vite
-node_modules/
-dist/
+# Resúmenes temporales
+RESUMEN-*.txt
 
-# Secrets
-appsettings.Development.json
-appsettings.*.local.json
-
-# IDE
-.vscode/
-.claude/
-
-# Windows artifacts
-nul
-Thumbs.db
-
-# Documentación (excluir todos los .md excepto README.md)
-*.md
-!README.md
-docs/
+# Scripts de restart temporales
+quick-restart.ps1
+restart-all.ps1
+restart-services.ps1
