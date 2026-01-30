@@ -16,3 +16,29 @@ RESUMEN-*.txt
 quick-restart.ps1
 restart-all.ps1
 restart-services.ps1
+
+# Documentación (no subir al repo)
+*.md
+!README.md
+
+# Build outputs
+bin/
+obj/
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+nul
+
+# Carpetas de configuración
+.claude/
+docs/
+scripts/
