@@ -253,6 +253,124 @@ public class PlanLimitService : IPlanLimitService
     }
 
     /// <summary>
+    /// Checks if tenant can export Excel files
+    /// </summary>
+    public async Task<(bool allowed, string? reason)> CanExportExcelAsync(int tenantId)
+    {
+        try
+        {
+            var subscription = await _context.Subscriptions
+                .FirstOrDefaultAsync(s => s.TenantId == tenantId);
+
+            if (subscription == null)
+            {
+                return (false, "No tienes una suscripción activa. Suscríbete a un plan para exportar Excel.");
+            }
+
+            // During trial, allow exports
+            if (subscription.Status == SubscriptionStatus.Trialing)
+                return (true, null);
+
+            // Check subscription status
+            if (subscription.Status == SubscriptionStatus.PastDue)
+            {
+                return (false, "Tu suscripción tiene un pago pendiente. Actualiza tu método de pago.");
+            }
+
+            if (subscription.Status == SubscriptionStatus.Canceled)
+            {
+                return (false, "Tu suscripción ha sido cancelada. Reactiva tu suscripción.");
+            }
+
+            if (subscription.Status != SubscriptionStatus.Active)
+            {
+                return (false, "Tu suscripción no está activa.");
+            }
+
+            // Check plan features
+            var limits = PlanFeatures.GetLimits(subscription.Plan);
+            if (!limits.CanExportExcel)
+            {
+                var nextPlan = GetNextPlan(subscription.Plan);
+                if (nextPlan.HasValue)
+                {
+                    return (false, $"La exportación a Excel requiere el plan {nextPlan.Value} o superior. Actualiza tu plan para desbloquear esta función.");
+                }
+                else
+                {
+                    return (false, "La exportación a Excel no está disponible en tu plan actual.");
+                }
+            }
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error verificando permiso de exportación Excel para Tenant {TenantId}", tenantId);
+            return (false, "Error verificando permisos. Intenta de nuevo.");
+        }
+    }
+
+    /// <summary>
+    /// Checks if tenant can export PDF files
+    /// </summary>
+    public async Task<(bool allowed, string? reason)> CanExportPdfAsync(int tenantId)
+    {
+        try
+        {
+            var subscription = await _context.Subscriptions
+                .FirstOrDefaultAsync(s => s.TenantId == tenantId);
+
+            if (subscription == null)
+            {
+                return (false, "No tienes una suscripción activa. Suscríbete a un plan para exportar PDF.");
+            }
+
+            // During trial, allow exports
+            if (subscription.Status == SubscriptionStatus.Trialing)
+                return (true, null);
+
+            // Check subscription status
+            if (subscription.Status == SubscriptionStatus.PastDue)
+            {
+                return (false, "Tu suscripción tiene un pago pendiente. Actualiza tu método de pago.");
+            }
+
+            if (subscription.Status == SubscriptionStatus.Canceled)
+            {
+                return (false, "Tu suscripción ha sido cancelada. Reactiva tu suscripción.");
+            }
+
+            if (subscription.Status != SubscriptionStatus.Active)
+            {
+                return (false, "Tu suscripción no está activa.");
+            }
+
+            // Check plan features
+            var limits = PlanFeatures.GetLimits(subscription.Plan);
+            if (!limits.CanExportPdf)
+            {
+                var nextPlan = GetNextPlan(subscription.Plan);
+                if (nextPlan.HasValue)
+                {
+                    return (false, $"La exportación a PDF requiere el plan {nextPlan.Value} o superior. Actualiza tu plan para desbloquear esta función.");
+                }
+                else
+                {
+                    return (false, "La exportación a PDF no está disponible en tu plan actual.");
+                }
+            }
+
+            return (true, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error verificando permiso de exportación PDF para Tenant {TenantId}", tenantId);
+            return (false, "Error verificando permisos. Intenta de nuevo.");
+        }
+    }
+
+    /// <summary>
     /// Checks if tenant can use API
     /// </summary>
     public async Task<bool> CanUseApiAsync(int tenantId)

@@ -1,8 +1,12 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore; // <--- USANDO A�ADIDO
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
+using System.Linq.Expressions;
+using System.Reflection;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;                         // <--- USANDO A�ADIDO
+using Vorluno.Planilla.Domain.Interfaces;
 
 namespace Vorluno.Planilla.Infrastructure.Data;
 
@@ -28,6 +32,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     public DbSet<TenantInvitation> TenantInvitations { get; set; }
     public DbSet<AuditLogEntry> AuditLogEntries { get; set; }
     public DbSet<StripeWebhookEvent> StripeWebhookEvents { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
 
     public DbSet<Empleado> Empleados { get; set; }
     public DbSet<ReciboDeSueldo> RecibosDeSueldo { get; set; }
@@ -61,9 +66,59 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
         // Esta l�nea es crucial al heredar de IdentityDbContext
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<Empleado>()
-            .HasIndex(e => e.NumeroIdentificacion)
-            .IsUnique();
+        // ====================================================================
+        // GLOBAL QUERY FILTERS para Multi-Tenancy (SEGURIDAD CRÍTICA)
+        // ====================================================================
+        // Aplica automáticamente filtro por TenantId a TODAS las entidades que implementan ITenantEntity
+        // Esto garantiza que ninguna query pueda acceder accidentalmente a datos de otro tenant
+        ApplyGlobalQueryFilters(modelBuilder);
+
+        // ====================================================================
+        // ÍNDICES DE PERFORMANCE (CRITICAL PARA PRODUCTION)
+        // ====================================================================
+        // Configuración de índices para entidades críticas
+        modelBuilder.Entity<Empleado>(entity =>
+        {
+            // Índice único en número de identificación
+            entity.HasIndex(e => e.NumeroIdentificacion)
+                .IsUnique()
+                .HasDatabaseName("IX_Empleado_NumeroIdentificacion");
+
+            // Índice en TenantId para queries frecuentes
+            entity.HasIndex(e => e.TenantId)
+                .HasDatabaseName("IX_Empleado_TenantId");
+
+            // Índice compuesto para búsquedas por tenant y estado activo
+            entity.HasIndex(e => new { e.TenantId, e.EstaActivo })
+                .HasDatabaseName("IX_Empleado_TenantId_EstaActivo");
+
+            // Índice compuesto para búsquedas por tenant y departamento
+            entity.HasIndex(e => new { e.TenantId, e.DepartamentoId })
+                .HasDatabaseName("IX_Empleado_TenantId_DepartamentoId");
+        });
+
+        modelBuilder.Entity<ReciboDeSueldo>(entity =>
+        {
+            // Índice en TenantId
+            entity.HasIndex(r => r.TenantId)
+                .HasDatabaseName("IX_ReciboDeSueldo_TenantId");
+
+            // Índice compuesto para búsquedas por tenant y empleado
+            entity.HasIndex(r => new { r.TenantId, r.EmpleadoId })
+                .HasDatabaseName("IX_ReciboDeSueldo_TenantId_EmpleadoId");
+
+            // Índice compuesto para búsquedas por tenant y fecha
+            entity.HasIndex(r => new { r.TenantId, r.FechaGeneracion })
+                .HasDatabaseName("IX_ReciboDeSueldo_TenantId_FechaGeneracion");
+        });
+
+        // PayrollDetail ya tiene índice compuesto en PayrollHeaderId y EmpleadoId
+        // PagoPrestamo solo necesita índice en TenantId individual
+        modelBuilder.Entity<PagoPrestamo>(entity =>
+        {
+            entity.HasIndex(pp => pp.TenantId)
+                .HasDatabaseName("IX_PagoPrestamo_TenantId");
+        });
 
         // Phase A: Configuraci�n de PayrollTaxConfiguration
         modelBuilder.Entity<PayrollTaxConfiguration>(entity =>
@@ -87,11 +142,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             entity.Property(p => p.EducationalInsuranceEmployerRate).HasPrecision(5, 2);
             entity.Property(p => p.DependentDeductionAmount).HasPrecision(18, 2);
 
-            // Global query filter para multi-tenancy por TenantId
-            entity.HasQueryFilter(p =>
-                _tenantContext == null ||
-                _tenantContext.TenantId == 0 ||
-                p.TenantId == _tenantContext.TenantId);
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
 
         // Phase A: Configuraci�n de TaxBracket
@@ -107,11 +158,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             entity.Property(t => t.Rate).HasPrecision(5, 2);
             entity.Property(t => t.FixedAmount).HasPrecision(18, 2);
 
-            // Global query filter para multi-tenancy por TenantId
-            entity.HasQueryFilter(t =>
-                _tenantContext == null ||
-                _tenantContext.TenantId == 0 ||
-                t.TenantId == _tenantContext.TenantId);
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
 
         // Phase D: Configuraci�n de PayrollHeader
@@ -144,11 +191,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .HasForeignKey(d => d.PayrollHeaderId)
                 .OnDelete(DeleteBehavior.Cascade); // Borrar detalles si se borra el header
 
-            // Phase E: Global query filter para multi-tenancy
-            entity.HasQueryFilter(p =>
-                _tenantContext == null ||
-                _tenantContext.TenantId == 0 ||
-                p.TenantId == _tenantContext.TenantId);
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
 
         // Phase D: Configuraci�n de PayrollDetail
@@ -223,11 +266,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .HasForeignKey(p => p.DepartamentoId)
                 .OnDelete(DeleteBehavior.Restrict); // NO borrar departamento si tiene posiciones
 
-            // Global query filter para multi-tenancy
-            entity.HasQueryFilter(d =>
-                _tenantContext == null ||
-                _tenantContext.TenantId == 0 ||
-                d.TenantId == _tenantContext.TenantId);
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
 
         // Organizaci�n: Configuraci�n de Posicion
@@ -248,11 +287,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .HasForeignKey(e => e.PosicionId)
                 .OnDelete(DeleteBehavior.SetNull); // Si se borra posici�n, poner NULL en empleados
 
-            // Global query filter para multi-tenancy
-            entity.HasQueryFilter(p =>
-                _tenantContext == null ||
-                _tenantContext.TenantId == 0 ||
-                p.TenantId == _tenantContext.TenantId);
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
 
         // Conceptos de N�mina: Configuraci�n de Prestamo
@@ -281,10 +316,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .OnDelete(DeleteBehavior.Cascade); // Borrar pagos si se borra el pr�stamo
 
             // Global query filter para multi-tenancy
-            entity.HasQueryFilter(p =>
-                _tenantContext == null ||
-                _tenantContext.TenantId == 0 ||
-                p.TenantId == _tenantContext.TenantId);
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
 
         // Conceptos de N�mina: Configuraci�n de DeduccionFija
@@ -309,10 +341,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .OnDelete(DeleteBehavior.Restrict); // NO borrar empleado si tiene deducciones
 
             // Global query filter para multi-tenancy
-            entity.HasQueryFilter(d =>
-                _tenantContext == null ||
-                _tenantContext.TenantId == 0 ||
-                d.TenantId == _tenantContext.TenantId);
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
 
         // Conceptos de N�mina: Configuraci�n de Anticipo
@@ -336,10 +365,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .OnDelete(DeleteBehavior.Restrict); // NO borrar empleado si tiene anticipos
 
             // Global query filter para multi-tenancy
-            entity.HasQueryFilter(a =>
-                _tenantContext == null ||
-                _tenantContext.TenantId == 0 ||
-                a.TenantId == _tenantContext.TenantId);
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
 
         // Conceptos de N�mina: Configuraci�n de PagoPrestamo
@@ -373,10 +399,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .HasForeignKey(h => h.EmpleadoId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasQueryFilter(h =>
-                _tenantContext == null ||
-                _tenantContext.TenantId == 0 ||
-                h.TenantId == _tenantContext.TenantId);
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
 
         // Asistencia: Configuraci�n de Ausencia
@@ -393,10 +416,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .HasForeignKey(a => a.EmpleadoId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasQueryFilter(a =>
-                _tenantContext == null ||
-                _tenantContext.TenantId == 0 ||
-                a.TenantId == _tenantContext.TenantId);
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
 
         // Asistencia: Configuraci�n de SolicitudVacaciones
@@ -415,10 +435,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .HasForeignKey(v => v.EmpleadoId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasQueryFilter(v =>
-                _tenantContext == null ||
-                _tenantContext.TenantId == 0 ||
-                v.TenantId == _tenantContext.TenantId);
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
 
         // Asistencia: Configuraci�n de SaldoVacaciones
@@ -438,10 +455,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .HasForeignKey(s => s.EmpleadoId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasQueryFilter(s =>
-                _tenantContext == null ||
-                _tenantContext.TenantId == 0 ||
-                s.TenantId == _tenantContext.TenantId);
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
 
         // ====================================================================
@@ -524,10 +538,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Query filter por TenantId
-            entity.HasQueryFilter(tu =>
-                _tenantContext == null ||
-                _tenantContext.TenantId == 0 ||
-                tu.TenantId == _tenantContext.TenantId);
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
 
         // StripeWebhookEvent Configuration
@@ -588,10 +599,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .OnDelete(DeleteBehavior.Restrict);
 
             // Query filter por TenantId
-            entity.HasQueryFilter(i =>
-                _tenantContext == null ||
-                _tenantContext.TenantId == 0 ||
-                i.TenantId == _tenantContext.TenantId);
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
 
         // AuditLogEntry Configuration
@@ -620,10 +628,88 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Query filter por TenantId
-            entity.HasQueryFilter(a =>
-                _tenantContext == null ||
-                _tenantContext.TenantId == 0 ||
-                a.TenantId == _tenantContext.TenantId);
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
+
+        // RefreshToken Configuration
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            // Índice único en Token para búsquedas rápidas
+            entity.HasIndex(rt => rt.Token)
+                .IsUnique()
+                .HasDatabaseName("IX_RefreshToken_Token");
+
+            // Índice compuesto para búsquedas por usuario
+            entity.HasIndex(rt => new { rt.UserId, rt.IsRevoked, rt.ExpiresAt })
+                .HasDatabaseName("IX_RefreshToken_UserId_IsRevoked_ExpiresAt");
+
+            // Índice para cleanup de tokens expirados
+            entity.HasIndex(rt => new { rt.ExpiresAt, rt.IsRevoked })
+                .HasDatabaseName("IX_RefreshToken_ExpiresAt_IsRevoked");
+
+            // Relación con User
+            entity.HasOne(rt => rt.User)
+                .WithMany()
+                .HasForeignKey(rt => rt.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Relación con Tenant
+            entity.HasOne(rt => rt.Tenant)
+                .WithMany()
+                .HasForeignKey(rt => rt.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    /// <summary>
+    /// Aplica automáticamente query filters por TenantId a todas las entidades que implementan ITenantEntity.
+    /// Este método usa reflexión para detectar entidades multi-tenant y aplicar el filtro globalmente.
+    /// CRÍTICO PARA SEGURIDAD: Garantiza que ninguna query pueda acceder a datos de otro tenant.
+    /// </summary>
+    private void ApplyGlobalQueryFilters(ModelBuilder modelBuilder)
+    {
+        // Obtener todas las entity types del modelo
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            // Verificar si la entidad implementa ITenantEntity
+            if (typeof(ITenantEntity).IsAssignableFrom(entityType.ClrType))
+            {
+                // Crear expresión lambda: e => e.TenantId == _tenantContext.TenantId
+                var parameter = Expression.Parameter(entityType.ClrType, "e");
+
+                // Acceso a la propiedad TenantId de la entidad
+                var tenantIdProperty = Expression.Property(parameter, nameof(ITenantEntity.TenantId));
+
+                // Acceso a _tenantContext.TenantId
+                var tenantContextField = Expression.Field(Expression.Constant(this), nameof(_tenantContext));
+                var tenantContextTenantId = Expression.Property(tenantContextField, nameof(ITenantContext.TenantId));
+
+                // Condición: _tenantContext == null || _tenantContext.TenantId == 0 || e.TenantId == _tenantContext.TenantId
+                var tenantContextNullCheck = Expression.Equal(tenantContextField, Expression.Constant(null, typeof(ITenantContext)));
+                var tenantIdZeroCheck = Expression.Equal(tenantContextTenantId, Expression.Constant(0));
+                var tenantIdMatch = Expression.Equal(tenantIdProperty, tenantContextTenantId);
+
+                var filterExpression = Expression.OrElse(
+                    Expression.OrElse(tenantContextNullCheck, tenantIdZeroCheck),
+                    tenantIdMatch
+                );
+
+                // Crear lambda: e => (_tenantContext == null || _tenantContext.TenantId == 0 || e.TenantId == _tenantContext.TenantId)
+                var lambda = Expression.Lambda(filterExpression, parameter);
+
+                // Aplicar el query filter usando reflexión
+                // Necesitamos llamar a Entity<T>() para obtener EntityTypeBuilder<T>
+                var entityMethod = typeof(ModelBuilder)
+                    .GetMethods()
+                    .First(m => m.Name == "Entity" && m.IsGenericMethodDefinition && m.GetParameters().Length == 0);
+                var genericEntityMethod = entityMethod.MakeGenericMethod(entityType.ClrType);
+                var entityTypeBuilder = genericEntityMethod.Invoke(modelBuilder, null);
+
+                // Ahora llamamos HasQueryFilter en EntityTypeBuilder<T>
+                var entityTypeBuilderType = typeof(EntityTypeBuilder<>).MakeGenericType(entityType.ClrType);
+                var hasQueryFilterMethod = entityTypeBuilderType.GetMethod("HasQueryFilter", new[] { lambda.GetType() });
+                hasQueryFilterMethod!.Invoke(entityTypeBuilder, new object[] { lambda });
+            }
+        }
     }
 }

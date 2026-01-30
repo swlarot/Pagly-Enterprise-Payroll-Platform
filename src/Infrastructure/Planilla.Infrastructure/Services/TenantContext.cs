@@ -32,7 +32,9 @@ public class TenantContext : ITenantContext
             var claim = _httpContextAccessor.HttpContext?.User?.FindFirst("tenant_id");
             if (claim != null && int.TryParse(claim.Value, out var tenantId))
             {
-                if (tenantId <= 0)
+                // SystemAdmins pueden tener tenant_id = 0
+                var isSystemAdmin = IsSystemAdmin;
+                if (tenantId <= 0 && !isSystemAdmin)
                 {
                     throw new UnauthorizedAccessException("Invalid tenant context: TenantId must be greater than 0");
                 }
@@ -76,6 +78,15 @@ public class TenantContext : ITenantContext
         {
             var claim = _httpContextAccessor.HttpContext?.User?.FindFirst(ClaimTypes.NameIdentifier);
             return claim?.Value;
+        }
+    }
+
+    public bool IsSystemAdmin
+    {
+        get
+        {
+            var claim = _httpContextAccessor.HttpContext?.User?.FindFirst("is_system_admin");
+            return claim?.Value == "true";
         }
     }
 
