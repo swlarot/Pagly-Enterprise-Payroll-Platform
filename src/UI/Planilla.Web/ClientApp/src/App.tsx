@@ -4,19 +4,24 @@ import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { RoleGuard } from './components/auth/RoleGuard';
+import { SystemAdminRoute } from './components/auth/SystemAdminRoute';
 import AuthLayout from './components/layout/AuthLayout';
 import { TenantRole } from './types/api';
 
 // Auth Pages
 import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
 import AcceptInvitePage from './pages/AcceptInvitePage';
 
-// Admin Pages
+// Admin Pages (Tenant)
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import UsersPage from './pages/UsersPage';
 import AuditLogPage from './pages/AuditLogPage';
-import BillingPage from './pages/BillingPage';
+
+// System Admin Pages
+import SystemAdminDashboardPage from './pages/SystemAdminDashboardPage';
+import TenantsManagementPage from './pages/TenantsManagementPage';
+import CreateTenantPage from './pages/CreateTenantPage';
+import TenantDetailsPage from './pages/TenantDetailsPage';
 
 // Existing Pages
 import EmpleadosPage from './pages/EmpleadosPage';
@@ -62,10 +67,43 @@ function App() {
       />
 
       <Routes>
-        {/* Public Routes */}
+        {/* Public Routes - Login Only (No Self-Registration) */}
         <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
         <Route path="/accept-invite" element={<AcceptInvitePage />} />
+
+        {/* System Admin Routes */}
+        <Route
+          path="/system-admin/dashboard"
+          element={
+            <SystemAdminRoute>
+              <SystemAdminDashboardPage />
+            </SystemAdminRoute>
+          }
+        />
+        <Route
+          path="/system-admin/tenants"
+          element={
+            <SystemAdminRoute>
+              <TenantsManagementPage />
+            </SystemAdminRoute>
+          }
+        />
+        <Route
+          path="/system-admin/tenants/create"
+          element={
+            <SystemAdminRoute>
+              <CreateTenantPage />
+            </SystemAdminRoute>
+          }
+        />
+        <Route
+          path="/system-admin/tenants/:id"
+          element={
+            <SystemAdminRoute>
+              <TenantDetailsPage />
+            </SystemAdminRoute>
+          }
+        />
 
         {/* Protected Routes */}
         <Route
@@ -114,21 +152,9 @@ function App() {
           }
         />
 
-        {/* Billing - Owner Only */}
-        <Route
-          path="/billing"
-          element={
-            <ProtectedRoute>
-              <RoleGuard allowedRoles={[TenantRole.Owner]}>
-                <AuthLayout>
-                  <BillingPage />
-                </AuthLayout>
-              </RoleGuard>
-            </ProtectedRoute>
-          }
-        />
+        {/* Billing removed from client app - managed via Admin Panel only */}
 
-        {/* Existing Planilla Routes - All Authenticated Users */}
+        {/* Existing Pagly Routes - All Authenticated Users */}
         <Route
           path="/empleados"
           element={
