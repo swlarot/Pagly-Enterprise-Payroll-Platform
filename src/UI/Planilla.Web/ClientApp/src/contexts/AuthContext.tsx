@@ -4,21 +4,19 @@ import type {
   UserInfoDto,
   TenantInfoDto,
   SubscriptionInfoDto,
-  RegisterDto,
-  LoginDto,
-  AcceptInvitationDto,
   TenantRole,
 } from '../types/api';
-import { isTokenExpired } from '../utils/jwt';
+import { isTokenExpired, parseJwt } from '../utils/jwt';
 
+// PAGLY: Auto-registro deshabilitado - usuarios creados solo via Admin Panel
 interface AuthContextType {
   user: UserInfoDto | null;
   tenant: TenantInfoDto | null;
   subscription: SubscriptionInfoDto | null;
   isAuthenticated: boolean;
+  isSystemAdmin: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (dto: RegisterDto) => Promise<void>;
   logout: () => void;
   acceptInvite: (token: string, password: string, confirmPassword: string) => Promise<void>;
   canAccessFeature: (feature: keyof SubscriptionInfoDto) => boolean;
@@ -31,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserInfoDto | null>(null);
   const [tenant, setTenant] = useState<TenantInfoDto | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionInfoDto | null>(null);
+  const [isSystemAdmin, setIsSystemAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Auto-login on mount if token exists
@@ -53,6 +52,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(data.user);
       setTenant(data.tenant);
       setSubscription(data.subscription);
+
+      // Extract isSystemAdmin from token
+      const payload = parseJwt(token);
+      setIsSystemAdmin(payload?.is_system_admin === 'true' || payload?.is_system_admin === 'True');
     } catch (error) {
       console.error('Auth validation failed:', error);
       localStorage.removeItem('auth_token');
@@ -64,29 +67,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const data = await authService.login({ email, password });
     localStorage.setItem('auth_token', data.token);
+    localStorage.setItem('refresh_token', data.refreshToken);
     setUser(data.user);
     setTenant(data.tenant);
     setSubscription(data.subscription);
+
+    // Extract isSystemAdmin from token
+    const payload = parseJwt(data.token);
+    setIsSystemAdmin(payload?.is_system_admin === 'true' || payload?.is_system_admin === 'True');
   };
 
-  const register = async (dto: RegisterDto) => {
-    const data = await authService.register(dto);
-    localStorage.setItem('auth_token', data.token);
-    setUser(data.user);
-    setTenant(data.tenant);
-    setSubscription(data.subscription);
-  };
+  // PAGLY: register function removed - users created only via Admin Panel
 
   const logout = () => {
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('refresh_token');
     setUser(null);
     setTenant(null);
     setSubscription(null);
+    setIsSystemAdmin(false);
   };
 
   const acceptInvite = async (token: string, password: string, confirmPassword: string) => {
     const data = await authService.acceptInvite({ token, password, confirmPassword });
     localStorage.setItem('auth_token', data.token);
+    localStorage.setItem('refresh_token', data.refreshToken);
     setUser(data.user);
     setTenant(data.tenant);
     setSubscription(data.subscription);
@@ -108,9 +113,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     tenant,
     subscription,
     isAuthenticated: !!user,
+    isSystemAdmin,
     isLoading,
     login,
-    register,
     logout,
     acceptInvite,
     canAccessFeature,

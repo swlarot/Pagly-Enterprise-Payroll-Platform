@@ -4,6 +4,7 @@ export interface JwtPayload {
   tenant_id: string;
   tenant_role: string;
   plan: string;
+  is_system_admin?: string;
   exp: number;
   iat: number;
 }

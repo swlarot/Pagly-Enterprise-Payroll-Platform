@@ -20,6 +20,7 @@ export interface AcceptInvitationDto {
 
 export interface AuthResponseDto {
   token: string;
+  refreshToken: string;
   expiresAt: string;
   user: UserInfoDto;
   tenant: TenantInfoDto;
@@ -153,6 +154,32 @@ export interface TenantUsageDto {
   maxCompanies: number;
 }
 
+export interface SubscriptionUsageDto {
+  plan: SubscriptionPlan;
+  planName: string;
+  status: SubscriptionStatus;
+  statusName: string;
+  trialEndsAt?: string;
+  employeeCount: number;
+  employeeLimit: number;
+  employeePercentage: number;
+  employeeLimitReached?: boolean;
+  userCount: number;
+  userLimit: number;
+  userPercentage: number;
+  userLimitReached?: boolean;
+  canExportExcel: boolean;
+  canExportPdf: boolean;
+  canUseApi: boolean;
+  hasEmailNotifications: boolean;
+  hasAuditLog: boolean;
+  monthlyPrice: number;
+  upgradeUrl?: string;
+  billingUrl?: string;
+  hasWarnings?: boolean;
+  warningMessages: string[];
+}
+
 export interface TenantDto {
   id: number;
   name: string;
@@ -160,4 +187,185 @@ export interface TenantDto {
   ruc: string;
   dv: string;
   isActive: boolean;
+}
+
+// System Admin DTOs
+export interface SystemMetricsDto {
+  totalTenants: number;
+  activeTenants: number;
+  totalUsers: number;
+  totalEmployees: number;
+  planDistribution: {
+    free: number;
+    starter: number;
+    professional: number;
+    enterprise: number;
+  };
+  recentGrowth: {
+    last7Days: {
+      newTenants: number;
+      newUsers: number;
+    };
+    last30Days: {
+      newTenants: number;
+      newUsers: number;
+    };
+  };
+}
+
+export interface TenantListItemDto {
+  id: number;
+  name: string;
+  subdomain: string;
+  ruc: string;
+  dv: string;
+  isActive: boolean;
+  createdAt: string;
+  plan: SubscriptionPlan;
+  planName: string;
+  subscriptionStatus: SubscriptionStatus;
+  subscriptionStatusName: string;
+  employeeCount: number;
+  userCount: number;
+  ownerEmail: string;
+}
+
+export interface TenantDetailDto {
+  id: number;
+  name: string;
+  subdomain: string;
+  ruc: string;
+  dv: string;
+  isActive: boolean;
+  createdAt: string;
+  subscription: {
+    plan: SubscriptionPlan;
+    planName: string;
+    status: SubscriptionStatus;
+    statusName: string;
+    startDate: string;
+    trialEndsAt?: string;
+    maxEmployees: number;
+    maxUsers: number;
+    monthlyPrice: number;
+  };
+  owner: {
+    userId: string;
+    email: string;
+    joinedAt: string;
+    lastLoginAt?: string;
+  };
+  usage: {
+    employeesCount: number;
+    usersCount: number;
+    companiesCount: number;
+  };
+  users: {
+    userId: string;
+    email: string;
+    role: TenantRole;
+    roleName: string;
+    isActive: boolean;
+    joinedAt: string;
+    lastLoginAt?: string;
+  }[];
+}
+
+export interface CreateTenantDto {
+  name: string;
+  ruc: string;
+  dv: string;
+  ownerEmail: string;
+  ownerPassword: string;
+  ownerFullName?: string;
+  address?: string;
+  phone?: string;
+  companyEmail?: string;
+}
+
+export interface UpdateTenantDto {
+  name?: string;
+  ruc?: string;
+  dv?: string;
+  isActive?: boolean;
+}
+
+export interface UpdateTenantSubscriptionDto {
+  plan: SubscriptionPlan;
+  extendTrialDays?: number;
+}
+
+// Admin Panel DTOs
+export interface AdminTenantDto {
+  id: number;
+  name: string;
+  subdomain: string;
+  ruc?: string;
+  dv?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  createdAt: string;
+  isActive: boolean;
+  subscription?: SubscriptionInfoDto;
+  owner?: OwnerInfoDto;
+  usage: AdminTenantUsageDto;
+}
+
+export interface OwnerInfoDto {
+  userId: string;
+  email: string;
+  fullName?: string;
+  joinedAt: string;
+  lastLoginAt?: string;
+}
+
+export interface AdminTenantUsageDto {
+  totalUsers: number;
+  activeUsers: number;
+  totalEmployees: number;
+  activeEmployees: number;
+  totalPayrolls: number;
+  pendingInvitations: number;
+  maxUsers: number;
+  maxEmployees: number;
+  userUsagePercentage: number;
+  employeeUsagePercentage: number;
+}
+
+export interface CreateTenantDto {
+  name: string;
+  ruc: string;
+  dv: string;
+  ownerEmail: string;
+  ownerPassword: string;
+  ownerFullName?: string;
+  address?: string;
+  phone?: string;
+  companyEmail?: string;
+}
+
+export interface UpdateAdminTenantDto {
+  name?: string;
+  ruc?: string;
+  dv?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  isActive?: boolean;
+}
+
+// Admin Tenant User DTO (for system admin panel)
+export interface AdminTenantUserDto {
+  id: number;
+  userId: string;
+  email: string;
+  fullName?: string;
+  role: TenantRole;
+  roleName: string;
+  isActive: boolean;
+  joinedAt: string;
+  lastLoginAt?: string;
+  isPendingInvitation: boolean;
+  invitationExpiresAt?: string;
 }
