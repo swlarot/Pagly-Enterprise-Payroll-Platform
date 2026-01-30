@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { useToast } from '../components/ToastContext';
+import toast from 'react-hot-toast';
 
 const ConfiguracionPage = () => {
-    const { showToast } = useToast();
     const [activeTab, setActiveTab] = useState('empresa');
     const [companyData, setCompanyData] = useState({
         nombreEmpresa: 'Empresa Demo S.A.',
@@ -21,7 +20,7 @@ const ConfiguracionPage = () => {
 
     const handleSaveCompany = (e) => {
         e.preventDefault();
-        showToast({ type: 'info', message: 'Funcionalidad de guardado próximamente disponible' });
+        toast('Funcionalidad de guardado próximamente disponible', { icon: 'ℹ️' });
     };
 
     return (

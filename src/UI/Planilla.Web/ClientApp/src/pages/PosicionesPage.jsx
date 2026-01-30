@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useToast } from '../components/ToastContext';
+import toast from 'react-hot-toast';
 import ConfirmModal from '../components/ConfirmModal';
 
 const PosicionesPage = () => {
@@ -11,7 +11,6 @@ const PosicionesPage = () => {
     const [editingPos, setEditingPos] = useState(null);
     const [showConfirm, setShowConfirm] = useState(false);
     const [posToDeactivate, setPosToDeactivate] = useState(null);
-    const { showToast } = useToast();
 
     const [formData, setFormData] = useState({
         codigo: '',
@@ -42,7 +41,7 @@ const PosicionesPage = () => {
             const data = await response.json();
             setPosiciones(data);
         } catch (error) {
-            showToast('Error al cargar posiciones', 'error');
+            toast.error('Error al cargar posiciones');
         } finally {
             setLoading(false);
         }
@@ -55,7 +54,7 @@ const PosicionesPage = () => {
             const data = await response.json();
             setDepartamentos(data.filter(d => d.estaActivo));
         } catch (error) {
-            showToast('Error al cargar departamentos', 'error');
+            toast.error('Error al cargar departamentos');
         }
     };
 
@@ -107,7 +106,7 @@ const PosicionesPage = () => {
         const salarioMax = parseFloat(formData.salarioMaximo);
 
         if (salarioMax < salarioMin) {
-            showToast('El salario máximo no puede ser menor que el mínimo', 'error');
+            toast.error('El salario máximo no puede ser menor que el mínimo');
             return;
         }
 
@@ -142,14 +141,11 @@ const PosicionesPage = () => {
                 throw new Error(error.message || 'Error al guardar');
             }
 
-            showToast(
-                editingPos ? 'Posición actualizada exitosamente' : 'Posición creada exitosamente',
-                'success'
-            );
+            toast.success(editingPos ? 'Posición actualizada exitosamente' : 'Posición creada exitosamente');
             handleCloseModal();
             fetchPosiciones();
         } catch (error) {
-            showToast(error.message, 'error');
+            toast.error(error.message);
         }
     };
 
@@ -164,12 +160,12 @@ const PosicionesPage = () => {
                 throw new Error(error.message || 'Error al desactivar');
             }
 
-            showToast('Posición desactivada exitosamente', 'success');
+            toast.success('Posición desactivada exitosamente');
             setShowConfirm(false);
             setPosToDeactivate(null);
             fetchPosiciones();
         } catch (error) {
-            showToast(error.message, 'error');
+            toast.error(error.message);
         }
     };
 

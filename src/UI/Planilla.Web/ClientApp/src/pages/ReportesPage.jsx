@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useToast } from '../components/ToastContext';
+import toast from 'react-hot-toast';
 
 const ReportesPage = () => {
-    const { showToast } = useToast();
 
     // State management
     const [planillas, setPlanillas] = useState([]);
@@ -25,13 +24,13 @@ const ReportesPage = () => {
             const planillasValidas = data.filter(p => p.status >= 1);
             setPlanillas(planillasValidas);
         } catch (error) {
-            showToast({ type: 'error', message: error.message });
+            toast.error(error.message);
         }
     };
 
     const descargarExcel = async (tipo) => {
         if (!selectedPlanilla) {
-            showToast({ type: 'warning', message: 'Seleccione una planilla primero' });
+            toast('Seleccione una planilla primero', { icon: '⚠️' });
             return;
         }
         setLoading(true);
@@ -47,9 +46,9 @@ const ReportesPage = () => {
             a.click();
             a.remove();
             window.URL.revokeObjectURL(url);
-            showToast({ type: 'success', message: 'Excel descargado correctamente' });
+            toast.success('Excel descargado correctamente');
         } catch (error) {
-            showToast({ type: 'error', message: error.message });
+            toast.error(error.message);
         } finally {
             setLoading(false);
         }
@@ -57,7 +56,7 @@ const ReportesPage = () => {
 
     const descargarPdf = async (tipo) => {
         if (!selectedPlanilla) {
-            showToast({ type: 'warning', message: 'Seleccione una planilla primero' });
+            toast('Seleccione una planilla primero', { icon: '⚠️' });
             return;
         }
         setLoading(true);
@@ -73,9 +72,9 @@ const ReportesPage = () => {
             a.click();
             a.remove();
             window.URL.revokeObjectURL(url);
-            showToast({ type: 'success', message: 'PDF descargado correctamente' });
+            toast.success('PDF descargado correctamente');
         } catch (error) {
-            showToast({ type: 'error', message: error.message });
+            toast.error(error.message);
         } finally {
             setLoading(false);
         }
@@ -83,7 +82,7 @@ const ReportesPage = () => {
 
     const verReporte = async (tipo) => {
         if (!selectedPlanilla) {
-            showToast({ type: 'warning', message: 'Seleccione una planilla primero' });
+            toast('Seleccione una planilla primero', { icon: '⚠️' });
             return;
         }
         setLoading(true);
@@ -95,7 +94,7 @@ const ReportesPage = () => {
             setModalType(tipo);
             setModalOpen(true);
         } catch (error) {
-            showToast({ type: 'error', message: error.message });
+            toast.error(error.message);
         } finally {
             setLoading(false);
         }
