@@ -1,11 +1,12 @@
 using Vorluno.Planilla.Domain.Enums;
+using Vorluno.Planilla.Domain.Interfaces;
 
 namespace Vorluno.Planilla.Domain.Entities;
 
 /// <summary>
 /// Representa una ausencia laboral de un empleado
 /// </summary>
-public class Ausencia
+public class Ausencia : ITenantEntity
 {
     public int Id { get; set; }
     public int EmpleadoId { get; set; }

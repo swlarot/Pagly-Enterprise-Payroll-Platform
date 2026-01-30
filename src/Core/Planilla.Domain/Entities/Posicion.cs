@@ -1,3 +1,5 @@
+using Vorluno.Planilla.Domain.Interfaces;
+
 namespace Vorluno.Planilla.Domain.Entities;
 
 /// <summary>
@@ -13,7 +15,7 @@ public enum NivelRiesgo
 /// <summary>
 /// Representa una posición o cargo dentro de un departamento
 /// </summary>
-public class Posicion
+public class Posicion : ITenantEntity
 {
     public int Id { get; set; }
 

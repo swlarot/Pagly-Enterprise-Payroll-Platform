@@ -1,11 +1,12 @@
 using Vorluno.Planilla.Domain.Enums;
+using Vorluno.Planilla.Domain.Interfaces;
 
 namespace Vorluno.Planilla.Domain.Entities;
 
 /// <summary>
 /// Representa un préstamo otorgado a un empleado que se descuenta en cuotas.
 /// </summary>
-public class Prestamo
+public class Prestamo : ITenantEntity
 {
     public int Id { get; set; }
 

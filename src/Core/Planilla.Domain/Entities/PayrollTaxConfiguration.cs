@@ -7,6 +7,7 @@
 // ====================================================================
 
 using System.ComponentModel.DataAnnotations;
+using Vorluno.Planilla.Domain.Interfaces;
 
 namespace Vorluno.Planilla.Domain.Entities;
 
@@ -14,7 +15,7 @@ namespace Vorluno.Planilla.Domain.Entities;
 /// Configuración de tasas e impuestos de planilla con vigencia temporal.
 /// Maneja tasas escalonadas de CSS según Ley 462 de Panamá.
 /// </summary>
-public class PayrollTaxConfiguration
+public class PayrollTaxConfiguration : ITenantEntity
 {
     [Key]
     public int Id { get; set; }

@@ -1,9 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Vorluno.Planilla.Domain.Interfaces;
 
 namespace Vorluno.Planilla.Domain.Entities;
 
-public class ReciboDeSueldo
+public class ReciboDeSueldo : ITenantEntity
 {
     [Key]
     public int Id { get; set; }
