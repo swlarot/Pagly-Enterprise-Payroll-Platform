@@ -24,6 +24,11 @@ public interface ITenantContext
     string? UserId { get; }
 
     /// <summary>
+    /// Indica si el usuario actual es un SystemAdmin
+    /// </summary>
+    bool IsSystemAdmin { get; }
+
+    /// <summary>
     /// Indica si hay un tenant en el contexto actual
     /// </summary>
     bool HasTenant { get; }

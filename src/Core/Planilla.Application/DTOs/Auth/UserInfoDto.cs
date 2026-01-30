@@ -11,4 +11,5 @@ public class UserInfoDto
     public string Email { get; set; } = string.Empty;
     public TenantRole Role { get; set; }
     public string RoleName { get; set; } = string.Empty;
+    public bool IsSystemAdmin { get; set; } = false;
 }
