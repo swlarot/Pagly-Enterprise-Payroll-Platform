@@ -20,9 +20,19 @@ public interface IPlanLimitService
     Task<(bool allowed, string? reason)> CanInviteUserAsync(int tenantId);
 
     /// <summary>
-    /// Checks if tenant can export reports
+    /// Checks if tenant can export reports (Excel or PDF)
     /// </summary>
     Task<bool> CanExportReportsAsync(int tenantId);
+
+    /// <summary>
+    /// Checks if tenant can export Excel files
+    /// </summary>
+    Task<(bool allowed, string? reason)> CanExportExcelAsync(int tenantId);
+
+    /// <summary>
+    /// Checks if tenant can export PDF files
+    /// </summary>
+    Task<(bool allowed, string? reason)> CanExportPdfAsync(int tenantId);
 
     /// <summary>
     /// Checks if tenant can use API
