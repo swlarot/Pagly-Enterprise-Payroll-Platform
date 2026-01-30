@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Vorluno.Planilla.Application.DTOs.Tenant;
 using Vorluno.Planilla.Application.Interfaces;
+using Vorluno.Planilla.Web.Filters;
 
 namespace Vorluno.Planilla.Web.Controllers;
 
@@ -162,6 +163,7 @@ public class TenantController : ControllerBase
     /// </summary>
     [HttpPost("invite")]
     [Authorize(Policy = "TenantInvite")]
+    [PlanLimits(PlanLimitType.InviteUser)] // ✅ PLAN LIMITS: Verifica automáticamente límite de usuarios
     public async Task<IActionResult> CreateInvitation([FromBody] CreateInvitationDto dto)
     {
         if (!ModelState.IsValid)

@@ -7,6 +7,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Vorluno.Planilla.Application.DTOs.Auth;
+using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Domain.Models;
@@ -27,6 +28,7 @@ public class AuthController : ControllerBase
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthController> _logger;
     private readonly Vorluno.Planilla.Application.Interfaces.IInvitationService? _invitationService;
+    private readonly IJwtTokenService _jwtTokenService;
 
     public AuthController(
         UserManager<AppUser> userManager,
@@ -34,10 +36,12 @@ public class AuthController : ControllerBase
         ApplicationDbContext context,
         IConfiguration configuration,
         ILogger<AuthController> logger,
+        IJwtTokenService jwtTokenService,
         Vorluno.Planilla.Application.Interfaces.IInvitationService? invitationService = null)
     {
         _userManager = userManager;
         _signInManager = signInManager;
+        _jwtTokenService = jwtTokenService;
         _context = context;
         _configuration = configuration;
         _logger = logger;
@@ -45,12 +49,29 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Registra un nuevo usuario y crea su tenant con suscripción de prueba
-    /// POST /api/auth/register
+    /// PAGLY: Registro deshabilitado para usuarios públicos.
+    /// Los tenants y usuarios se crean exclusivamente desde el Admin Panel interno.
+    /// Este endpoint retorna 403 Forbidden para cualquier intento de registro público.
     /// </summary>
     [HttpPost("register")]
     [AllowAnonymous]
-    public async Task<IActionResult> Register([FromBody] RegisterDto dto)
+    public IActionResult Register([FromBody] RegisterDto dto)
+    {
+        // PAGLY: Auto-registro deshabilitado - solo Admin Panel puede crear usuarios
+        return StatusCode(403, new {
+            message = "El registro de usuarios no está disponible. Contacte a su administrador para obtener acceso."
+        });
+    }
+
+    /// <summary>
+    /// [INTERNAL - ADMIN PANEL ONLY]
+    /// Registra un nuevo tenant con usuario owner - solo para uso interno del Admin Panel
+    /// POST /api/auth/admin/create-tenant
+    /// Requiere autenticación de super-admin (implementar en Admin Panel separado)
+    /// </summary>
+    [HttpPost("admin/create-tenant")]
+    [Authorize(Roles = "Owner,Admin")]  // Solo admins existentes pueden crear tenants
+    public async Task<IActionResult> AdminCreateTenant([FromBody] RegisterDto dto)
     {
         if (!ModelState.IsValid)
         {
@@ -145,13 +166,18 @@ public class AuthController : ControllerBase
             _logger.LogInformation("New tenant registered: {TenantId} ({TenantName}) by user {UserId}",
                 tenant.Id, tenant.Name, user.Id);
 
-            // 6. Generar JWT
+            // 6. Generar JWT (access token)
             var token = GenerateJwtToken(user, tenant, tenantUser);
 
-            // 7. Construir respuesta
+            // 7. Generar refresh token
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var refreshToken = await _jwtTokenService.GenerateRefreshTokenAsync(user.Id, tenant.Id, ipAddress);
+
+            // 8. Construir respuesta
             var response = new AuthResponseDto
             {
                 Token = token.Token,
+                RefreshToken = refreshToken.Token,
                 ExpiresAt = token.ExpiresAt,
                 User = new UserInfoDto
                 {
@@ -228,7 +254,30 @@ public class AuthController : ControllerBase
                 return Unauthorized(new { message = "Credenciales inválidas" });
             }
 
-            // 3. Obtener primer tenant activo del usuario
+            // 3. Si es SystemAdmin, generar token especial sin Tenant
+            if (user.IsSystemAdmin)
+            {
+                var systemAdminToken = GenerateSystemAdminJwtToken(user);
+
+                var systemAdminResponse = new AuthResponseDto
+                {
+                    Token = systemAdminToken.Token,
+                    RefreshToken = "", // SystemAdmins no usan refresh tokens por ahora
+                    ExpiresAt = systemAdminToken.ExpiresAt,
+                    User = new UserInfoDto
+                    {
+                        UserId = user.Id,
+                        Email = user.Email!,
+                        Role = TenantRole.Owner, // Dummy role para SystemAdmins
+                        RoleName = "SystemAdmin",
+                        IsSystemAdmin = true
+                    }
+                };
+
+                return Ok(systemAdminResponse);
+            }
+
+            // 4. Obtener primer tenant activo del usuario
             var tenantUser = await _context.TenantUsers
                 .Include(tu => tu.Tenant)
                     .ThenInclude(t => t.Subscription)
@@ -241,21 +290,26 @@ public class AuthController : ControllerBase
                 return Unauthorized(new { message = "No tienes acceso a ninguna empresa activa" });
             }
 
-            // 4. Actualizar último login
+            // 5. Actualizar último login
             tenantUser.LastLoginAt = DateTime.UtcNow;
             _context.TenantUsers.Update(tenantUser);
             await _context.SaveChangesAsync();
 
-            // 5. Generar JWT
+            // 6. Generar JWT (access token)
             var token = GenerateJwtToken(user, tenantUser.Tenant, tenantUser);
 
-            // 6. Obtener límites del plan
+            // 7. Generar refresh token
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var refreshToken = await _jwtTokenService.GenerateRefreshTokenAsync(user.Id, tenantUser.TenantId, ipAddress);
+
+            // 8. Obtener límites del plan
             var limits = PlanFeatures.GetLimits(tenantUser.Tenant.Subscription.Plan);
 
-            // 7. Construir respuesta
+            // 9. Construir respuesta
             var response = new AuthResponseDto
             {
                 Token = token.Token,
+                RefreshToken = refreshToken.Token,
                 ExpiresAt = token.ExpiresAt,
                 User = new UserInfoDto
                 {
@@ -317,17 +371,42 @@ public class AuthController : ControllerBase
                 return Unauthorized();
             }
 
-            var tenantIdClaim = User.FindFirst("tenant_id")?.Value;
-            if (string.IsNullOrEmpty(tenantIdClaim) || !int.TryParse(tenantIdClaim, out var tenantId))
-            {
-                return Unauthorized(new { message = "Tenant no identificado" });
-            }
-
-            // Obtener usuario completo con tenant y suscripción
+            // Obtener usuario
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
             {
                 return NotFound(new { message = "Usuario no encontrado" });
+            }
+
+            // CASO 1: Usuario es SystemAdmin (no tiene tenant)
+            var isSystemAdminClaim = User.FindFirst("is_system_admin")?.Value;
+            if (isSystemAdminClaim == "true" || user.IsSystemAdmin)
+            {
+                var systemAdminResponse = new AuthResponseDto
+                {
+                    Token = string.Empty,  // No devolver token en /me
+                    ExpiresAt = DateTime.MinValue,
+                    User = new UserInfoDto
+                    {
+                        UserId = user.Id,
+                        Email = user.Email!,
+                        Role = TenantRole.Owner, // Dummy role para SystemAdmins
+                        RoleName = "SystemAdmin",
+                        IsSystemAdmin = true
+                    },
+                    Tenant = null,  // SystemAdmins no tienen tenant
+                    Subscription = null  // SystemAdmins no tienen suscripción
+                };
+
+                _logger.LogInformation("SystemAdmin {UserId} accessed /me endpoint", user.Id);
+                return Ok(systemAdminResponse);
+            }
+
+            // CASO 2: Usuario regular con tenant
+            var tenantIdClaim = User.FindFirst("tenant_id")?.Value;
+            if (string.IsNullOrEmpty(tenantIdClaim) || !int.TryParse(tenantIdClaim, out var tenantId) || tenantId <= 0)
+            {
+                return Unauthorized(new { message = "Tenant no identificado" });
             }
 
             var tenantUser = await _context.TenantUsers
@@ -351,7 +430,8 @@ public class AuthController : ControllerBase
                     UserId = user.Id,
                     Email = user.Email!,
                     Role = tenantUser.Role,
-                    RoleName = tenantUser.Role.ToString()
+                    RoleName = tenantUser.Role.ToString(),
+                    IsSystemAdmin = false
                 },
                 Tenant = new TenantInfoDto
                 {
@@ -410,7 +490,43 @@ public class AuthController : ControllerBase
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim("tenant_id", tenant.Id.ToString()),
             new Claim("tenant_role", tenantUser.Role.ToString()),
-            new Claim("plan", tenant.Subscription.Plan.ToString())
+            new Claim("plan", tenant.Subscription.Plan.ToString()),
+            new Claim("is_system_admin", user.IsSystemAdmin.ToString().ToLower())
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: jwtIssuer,
+            audience: jwtAudience,
+            claims: claims,
+            expires: expiresAt,
+            signingCredentials: credentials
+        );
+
+        return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
+    }
+
+    private (string Token, DateTime ExpiresAt) GenerateSystemAdminJwtToken(AppUser user)
+    {
+        var jwtKey = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
+        var jwtIssuer = _configuration["Jwt:Issuer"] ?? "Planilla";
+        var jwtAudience = _configuration["Jwt:Audience"] ?? "Planilla";
+        var jwtExpireHours = int.Parse(_configuration["Jwt:ExpireHours"] ?? "24");
+
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+        var expiresAt = DateTime.UtcNow.AddHours(jwtExpireHours);
+
+        // Para SystemAdmins: sin tenant_id, sin tenant_role, sin plan
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id),
+            new Claim(JwtRegisteredClaimNames.Email, user.Email!),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim("is_system_admin", "true"),
+            new Claim("tenant_id", "0"), // 0 = sin tenant
+            new Claim("tenant_role", "SystemAdmin"), // Dummy para compatibilidad
+            new Claim("plan", "Enterprise") // Dummy para compatibilidad
         };
 
         var token = new JwtSecurityToken(
@@ -534,5 +650,138 @@ public class AuthController : ControllerBase
             message = $"Se confirmaron {count} emails",
             emails = unconfirmedUsers.Select(u => u.Email).ToList()
         });
+    }
+
+    /// <summary>
+    /// POST /api/auth/refresh - Renueva el access token usando un refresh token
+    /// </summary>
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequestDto dto)
+    {
+        if (string.IsNullOrEmpty(dto.RefreshToken))
+        {
+            return BadRequest(new { message = "Refresh token es requerido" });
+        }
+
+        try
+        {
+            // 1. Validar refresh token
+            var refreshToken = await _jwtTokenService.ValidateRefreshTokenAsync(dto.RefreshToken);
+            if (refreshToken == null)
+            {
+                return Unauthorized(new { message = "Refresh token inválido o expirado" });
+            }
+
+            // 2. Obtener usuario y tenant
+            var user = await _userManager.FindByIdAsync(refreshToken.UserId);
+            if (user == null)
+            {
+                return Unauthorized(new { message = "Usuario no encontrado" });
+            }
+
+            var tenantUser = await _context.TenantUsers
+                .Include(tu => tu.Tenant)
+                    .ThenInclude(t => t.Subscription)
+                .FirstOrDefaultAsync(tu => tu.UserId == user.Id && tu.TenantId == refreshToken.TenantId && tu.IsActive);
+
+            if (tenantUser == null || !tenantUser.Tenant.IsActive)
+            {
+                return Unauthorized(new { message = "Tenant no encontrado o inactivo" });
+            }
+
+            // 3. Generar nuevo access token
+            var newToken = GenerateJwtToken(user, tenantUser.Tenant, tenantUser);
+
+            // 4. Generar nuevo refresh token (rotación de tokens)
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var newRefreshToken = await _jwtTokenService.GenerateRefreshTokenAsync(user.Id, tenantUser.TenantId, ipAddress);
+
+            // 5. Revocar el refresh token anterior (rotación)
+            await _jwtTokenService.RevokeRefreshTokenAsync(dto.RefreshToken, "token_rotated", newRefreshToken.Id);
+
+            // 6. Obtener límites del plan
+            var limits = PlanFeatures.GetLimits(tenantUser.Tenant.Subscription.Plan);
+
+            // 7. Construir respuesta
+            var response = new AuthResponseDto
+            {
+                Token = newToken.Token,
+                RefreshToken = newRefreshToken.Token,
+                ExpiresAt = newToken.ExpiresAt,
+                User = new UserInfoDto
+                {
+                    UserId = user.Id,
+                    Email = user.Email!,
+                    Role = tenantUser.Role,
+                    RoleName = tenantUser.Role.ToString()
+                },
+                Tenant = new TenantInfoDto
+                {
+                    Id = tenantUser.Tenant.Id,
+                    Name = tenantUser.Tenant.Name,
+                    Subdomain = tenantUser.Tenant.Subdomain,
+                    RUC = tenantUser.Tenant.RUC,
+                    DV = tenantUser.Tenant.DV
+                },
+                Subscription = new SubscriptionInfoDto
+                {
+                    Plan = tenantUser.Tenant.Subscription.Plan,
+                    PlanName = tenantUser.Tenant.Subscription.Plan.ToString(),
+                    Status = tenantUser.Tenant.Subscription.Status,
+                    StatusName = tenantUser.Tenant.Subscription.Status.ToString(),
+                    TrialEndsAt = tenantUser.Tenant.Subscription.TrialEndsAt,
+                    MaxEmployees = tenantUser.Tenant.Subscription.GetEffectiveMaxEmployees(),
+                    MaxUsers = tenantUser.Tenant.Subscription.GetEffectiveMaxUsers(),
+                    MaxCompanies = limits.MaxCompanies,
+                    CanExportExcel = limits.CanExportExcel,
+                    CanExportPdf = limits.CanExportPdf,
+                    CanUseApi = limits.CanUseApi,
+                    MonthlyPrice = tenantUser.Tenant.Subscription.MonthlyPrice
+                }
+            };
+
+            _logger.LogInformation("User {UserId} refreshed token for tenant {TenantId}",
+                user.Id, tenantUser.TenantId);
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error refreshing token");
+            return StatusCode(500, new { message = "Error al renovar el token" });
+        }
+    }
+
+    /// <summary>
+    /// POST /api/auth/revoke - Revoca un refresh token (logout)
+    /// </summary>
+    [HttpPost("revoke")]
+    [Authorize]
+    public async Task<IActionResult> RevokeToken([FromBody] RefreshTokenRequestDto dto)
+    {
+        if (string.IsNullOrEmpty(dto.RefreshToken))
+        {
+            return BadRequest(new { message = "Refresh token es requerido" });
+        }
+
+        try
+        {
+            var success = await _jwtTokenService.RevokeRefreshTokenAsync(dto.RefreshToken, "logout");
+
+            if (!success)
+            {
+                return NotFound(new { message = "Refresh token no encontrado" });
+            }
+
+            _logger.LogInformation("Refresh token revoked by user");
+
+            return Ok(new { message = "Sesión cerrada exitosamente" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error revoking token");
+            return StatusCode(500, new { message = "Error al cerrar sesión" });
+        }
     }
 }

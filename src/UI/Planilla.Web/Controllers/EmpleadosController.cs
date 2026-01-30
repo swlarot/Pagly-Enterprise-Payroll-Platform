@@ -6,6 +6,7 @@ using Vorluno.Planilla.Application.DTOs;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Web.Filters;
 
 namespace Vorluno.Planilla.Web.Controllers
 {
@@ -90,16 +91,10 @@ namespace Vorluno.Planilla.Web.Controllers
         /// <returns>El nuevo empleado creado.</returns>
         [HttpPost]
         [Authorize(Roles = "Owner,Admin,Manager")]
+        [PlanLimits(PlanLimitType.CreateEmployee)] // ✅ PLAN LIMITS: Verifica automáticamente límite de empleados
         public async Task<IActionResult> Create(EmpleadoCrearDto empleadoDto)
         {
             var tenantId = _tenantContext.TenantId;
-
-            // ✅ FEATURE GATING: Verificar límite de empleados del plan
-            var (allowed, reason) = await _planLimitService.CanCreateEmployeeAsync(tenantId);
-            if (!allowed)
-            {
-                return StatusCode(403, new { error = reason });
-            }
 
             var empleado = _mapper.Map<Empleado>(empleadoDto);
             empleado.FechaContratacion = DateTime.UtcNow; // Lógica de negocio simple

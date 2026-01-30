@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 using Vorluno.Planilla.Application.DTOs.Reportes;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Infrastructure.Services;
+using Vorluno.Planilla.Web.Filters;
 
 namespace Vorluno.Planilla.Web.Controllers;
 
@@ -131,20 +132,11 @@ public class ReportesController : ControllerBase
     /// Exporta el reporte de CSS a Excel
     /// </summary>
     [HttpGet("css/{planillaId}/excel")]
+    [PlanLimits(PlanLimitType.ExportExcel)] // ✅ PLAN LIMITS: Verifica automáticamente permiso de exportación Excel
     public async Task<IActionResult> ExportarCssExcel(int planillaId)
     {
         try
         {
-            // ✅ FEATURE GATING: Verificar si el plan permite exportar reportes
-            var canExport = await _planLimitService.CanExportReportsAsync(_tenantContext.TenantId);
-            if (!canExport)
-            {
-                return StatusCode(403, new
-                {
-                    error = "Tu plan actual no permite exportar reportes. Actualiza a un plan superior para acceder a esta funcionalidad."
-                });
-            }
-
             var reporte = await _reportesService.GenerarReporteCss(planillaId);
             var bytes = _exportacionService.ExportarExcelCss(reporte);
             var fileName = $"PlanillaCSS_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
@@ -165,20 +157,11 @@ public class ReportesController : ControllerBase
     /// Exporta el reporte de Seguro Educativo a Excel
     /// </summary>
     [HttpGet("seguro-educativo/{planillaId}/excel")]
+    [PlanLimits(PlanLimitType.ExportExcel)] // ✅ PLAN LIMITS: Verifica automáticamente permiso de exportación Excel
     public async Task<IActionResult> ExportarSeExcel(int planillaId)
     {
         try
         {
-            // ✅ FEATURE GATING: Verificar si el plan permite exportar reportes
-            var canExport = await _planLimitService.CanExportReportsAsync(_tenantContext.TenantId);
-            if (!canExport)
-            {
-                return StatusCode(403, new
-                {
-                    error = "Tu plan actual no permite exportar reportes. Actualiza a un plan superior para acceder a esta funcionalidad."
-                });
-            }
-
             var reporte = await _reportesService.GenerarReporteSe(planillaId);
             var bytes = _exportacionService.ExportarExcelSe(reporte);
             var fileName = $"SeguroEducativo_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
@@ -203,20 +186,11 @@ public class ReportesController : ControllerBase
     /// Exporta el reporte de CSS a PDF
     /// </summary>
     [HttpGet("css/{planillaId}/pdf")]
+    [PlanLimits(PlanLimitType.ExportPdf)] // ✅ PLAN LIMITS: Verifica automáticamente permiso de exportación PDF
     public async Task<IActionResult> ExportarCssPdf(int planillaId)
     {
         try
         {
-            // ✅ FEATURE GATING: Verificar si el plan permite exportar reportes
-            var canExport = await _planLimitService.CanExportReportsAsync(_tenantContext.TenantId);
-            if (!canExport)
-            {
-                return StatusCode(403, new
-                {
-                    error = "Tu plan actual no permite exportar reportes. Actualiza a un plan superior para acceder a esta funcionalidad."
-                });
-            }
-
             var reporte = await _reportesService.GenerarReporteCss(planillaId);
             var bytes = _exportacionService.ExportarPdfCss(reporte);
             var fileName = $"PlanillaCSS_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
@@ -237,20 +211,11 @@ public class ReportesController : ControllerBase
     /// Exporta el reporte de Seguro Educativo a PDF
     /// </summary>
     [HttpGet("seguro-educativo/{planillaId}/pdf")]
+    [PlanLimits(PlanLimitType.ExportPdf)] // ✅ PLAN LIMITS: Verifica automáticamente permiso de exportación PDF
     public async Task<IActionResult> ExportarSePdf(int planillaId)
     {
         try
         {
-            // ✅ FEATURE GATING: Verificar si el plan permite exportar reportes
-            var canExport = await _planLimitService.CanExportReportsAsync(_tenantContext.TenantId);
-            if (!canExport)
-            {
-                return StatusCode(403, new
-                {
-                    error = "Tu plan actual no permite exportar reportes. Actualiza a un plan superior para acceder a esta funcionalidad."
-                });
-            }
-
             var reporte = await _reportesService.GenerarReporteSe(planillaId);
             var bytes = _exportacionService.ExportarPdfSe(reporte);
             var fileName = $"SeguroEducativo_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
