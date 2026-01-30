@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -7,7 +7,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, isSystemAdmin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -26,7 +26,22 @@ export default function LoginPage() {
     try {
       await login(email, password);
       toast.success('Inicio de sesión exitoso');
-      navigate(from, { replace: true });
+
+      // Check if user is system admin after login
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        const { parseJwt } = await import('../utils/jwt');
+        const payload = parseJwt(token);
+        const isAdmin = payload?.is_system_admin === 'true' || payload?.is_system_admin === 'True';
+
+        if (isAdmin) {
+          navigate('/system-admin/dashboard', { replace: true });
+        } else {
+          navigate(from, { replace: true });
+        }
+      } else {
+        navigate(from, { replace: true });
+      }
     } catch (error: any) {
       toast.error(error.message || 'Error al iniciar sesión');
     } finally {
@@ -35,21 +50,21 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-xl shadow-lg mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-600 rounded-xl shadow-lg mb-4">
             <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Planilla</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Pagly</h1>
           <p className="text-gray-600 mt-2">Sistema de Gestión de Nómina</p>
         </div>
 
@@ -67,7 +82,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
                 placeholder="usuario@empresa.com"
                 disabled={isLoading}
               />
@@ -82,7 +97,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
                 placeholder="••••••••"
                 disabled={isLoading}
               />
@@ -91,7 +106,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-emerald-600 text-white py-3 rounded-lg font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>
@@ -105,17 +120,14 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-gray-600">
-              ¿No tienes una cuenta?{' '}
-              <Link to="/register" className="text-blue-600 hover:text-blue-700 font-medium">
-                Regístrate
-              </Link>
+            <p className="text-gray-500 text-sm">
+              Si necesitas acceso, contacta a tu administrador.
             </p>
           </div>
         </div>
 
         <p className="text-center text-gray-500 text-sm mt-8">
-          © {new Date().getFullYear()} Planilla. Todos los derechos reservados.
+          © {new Date().getFullYear()} Pagly. Todos los derechos reservados.
         </p>
       </div>
     </div>

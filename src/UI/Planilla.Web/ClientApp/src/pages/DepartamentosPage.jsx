@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useToast } from '../components/ToastContext';
+import toast from 'react-hot-toast';
 import ConfirmModal from '../components/ConfirmModal';
 
 const DepartamentosPage = () => {
@@ -11,7 +11,6 @@ const DepartamentosPage = () => {
     const [editingDept, setEditingDept] = useState(null);
     const [showConfirm, setShowConfirm] = useState(false);
     const [deptToDeactivate, setDeptToDeactivate] = useState(null);
-    const { showToast } = useToast();
 
     const [formData, setFormData] = useState({
         codigo: '',
@@ -33,7 +32,7 @@ const DepartamentosPage = () => {
             const data = await response.json();
             setDepartamentos(data);
         } catch (error) {
-            showToast('Error al cargar departamentos', 'error');
+            toast.error('Error al cargar departamentos');
         } finally {
             setLoading(false);
         }
@@ -113,14 +112,11 @@ const DepartamentosPage = () => {
                 throw new Error(error.message || 'Error al guardar');
             }
 
-            showToast(
-                editingDept ? 'Departamento actualizado exitosamente' : 'Departamento creado exitosamente',
-                'success'
-            );
+            toast.success(editingDept ? 'Departamento actualizado exitosamente' : 'Departamento creado exitosamente');
             handleCloseModal();
             fetchDepartamentos();
         } catch (error) {
-            showToast(error.message, 'error');
+            toast.error(error.message);
         }
     };
 
@@ -135,18 +131,18 @@ const DepartamentosPage = () => {
                 throw new Error(error.message || 'Error al desactivar');
             }
 
-            showToast('Departamento desactivado exitosamente', 'success');
+            toast.success('Departamento desactivado exitosamente');
             setShowConfirm(false);
             setDeptToDeactivate(null);
             fetchDepartamentos();
         } catch (error) {
-            showToast(error.message, 'error');
+            toast.error(error.message);
         }
     };
 
     const filteredDepartamentos = departamentos.filter(dept =>
-        dept.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        dept.codigo.toLowerCase().includes(searchTerm.toLowerCase())
+        (dept.nombre ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (dept.codigo ?? '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const stats = {

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useToast } from '../components/ToastContext';
+import toast from 'react-hot-toast';
 
 const EmpleadosPage = () => {
-    const { showToast } = useToast();
     // State management
     const [empleados, setEmpleados] = useState([]);
     const [departamentos, setDepartamentos] = useState([]);
@@ -50,7 +49,7 @@ const EmpleadosPage = () => {
             const data = await response.json();
             setEmpleados(data);
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar empleados: ${err.message}` });
+            toast.error(`Error al cargar empleados: ${err.message}`);
         } finally {
             setLoading(false);
         }
@@ -65,7 +64,7 @@ const EmpleadosPage = () => {
             const data = await response.json();
             setDepartamentos(data.filter(d => d.estaActivo));
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar departamentos: ${err.message}` });
+            toast.error(`Error al cargar departamentos: ${err.message}`);
         }
     };
 
@@ -78,15 +77,15 @@ const EmpleadosPage = () => {
             const data = await response.json();
             setPosiciones(data.filter(p => p.estaActivo));
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar posiciones: ${err.message}` });
+            toast.error(`Error al cargar posiciones: ${err.message}`);
         }
     };
 
     // Filter employees based on search term
     const filteredEmpleados = empleados.filter(emp =>
-        emp.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.apellido.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.numeroIdentificacion.includes(searchTerm)
+        (emp.nombre ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (emp.apellido ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (emp.numeroIdentificacion ?? '').includes(searchTerm)
     );
 
     const activeEmpleados = empleados.filter(emp => emp.estaActivo);
@@ -137,16 +136,13 @@ const EmpleadosPage = () => {
             await fetchEmpleados();
 
             // Show success message
-            showToast({
-                type: 'success',
-                message: editingId ? 'Empleado actualizado exitosamente' : 'Empleado creado exitosamente'
-            });
+            toast.success(editingId ? 'Empleado actualizado exitosamente' : 'Empleado creado exitosamente');
 
             // Reset form and close modal
             resetForm();
 
         } catch (err) {
-            showToast({ type: 'error', message: `Error al guardar empleado: ${err.message}` });
+            toast.error(`Error al guardar empleado: ${err.message}`);
         }
     };
 
@@ -180,11 +176,11 @@ const EmpleadosPage = () => {
                 throw new Error(`Error ${response.status}: ${response.statusText}`);
             }
             await fetchEmpleados();
-            showToast({ type: 'success', message: 'Empleado desactivado exitosamente' });
+            toast.success('Empleado desactivado exitosamente');
             setShowConfirmDelete(false);
             setEmpleadoToDelete(null);
         } catch (err) {
-            showToast({ type: 'error', message: `Error al desactivar empleado: ${err.message}` });
+            toast.error(`Error al desactivar empleado: ${err.message}`);
         }
     };
 

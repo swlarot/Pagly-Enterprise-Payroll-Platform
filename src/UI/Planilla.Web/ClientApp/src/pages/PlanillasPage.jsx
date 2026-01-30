@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useToast } from '../components/ToastContext';
+import toast from 'react-hot-toast';
 import { SkeletonCard, SkeletonTable } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 
 const PlanillasPage = () => {
-    const { showToast } = useToast();
     const [planillas, setPlanillas] = useState([]);
     const [empleadosCount, setEmpleadosCount] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -80,7 +79,7 @@ const PlanillasPage = () => {
             setEmpleadosCount(empleadosData.filter(e => e.estaActivo).length);
 
         } catch (err) {
-            showToast({ type: 'error', message: err.message });
+            toast.error(err.message);
         } finally {
             setLoading(false);
         }
@@ -137,12 +136,12 @@ const PlanillasPage = () => {
         const payDate = new Date(formData.payDate);
 
         if (endDate <= startDate) {
-            showToast({ type: 'error', message: 'La fecha fin debe ser posterior a la fecha inicio' });
+            toast.error('La fecha fin debe ser posterior a la fecha inicio');
             return;
         }
 
         if (payDate < endDate) {
-            showToast({ type: 'error', message: 'La fecha de pago debe ser igual o posterior a la fecha fin del período' });
+            toast.error('La fecha de pago debe ser igual o posterior a la fecha fin del período');
             return;
         }
 
@@ -158,11 +157,11 @@ const PlanillasPage = () => {
                 throw new Error(`Error ${response.status}: ${errorText}`);
             }
 
-            showToast({ type: 'success', message: 'Planilla creada exitosamente' });
+            toast.success('Planilla creada exitosamente');
             setShowNewModal(false);
             await fetchData();
         } catch (err) {
-            showToast({ type: 'error', message: err.message });
+            toast.error(err.message);
         }
     };
 
@@ -184,14 +183,11 @@ const PlanillasPage = () => {
             const result = await response.json();
             const employeeCount = result.details?.length || empleadosCount;
 
-            showToast({
-                type: 'success',
-                message: `Planilla calculada: ${employeeCount} empleados procesados`
-            });
+            toast.success(`Planilla calculada: ${employeeCount} empleados procesados`);
 
             await fetchData();
         } catch (err) {
-            showToast({ type: 'error', message: err.message });
+            toast.error(err.message);
         } finally {
             setProcessingAction(null);
         }
@@ -212,10 +208,10 @@ const PlanillasPage = () => {
                 throw new Error(`Error al aprobar: ${errorText}`);
             }
 
-            showToast({ type: 'success', message: 'Planilla aprobada exitosamente' });
+            toast.success('Planilla aprobada exitosamente');
             await fetchData();
         } catch (err) {
-            showToast({ type: 'error', message: err.message });
+            toast.error(err.message);
         } finally {
             setProcessingAction(null);
         }
@@ -230,7 +226,7 @@ const PlanillasPage = () => {
             setPlanillaDetails(data);
             setShowDetailsModal(true);
         } catch (err) {
-            showToast({ type: 'error', message: err.message });
+            toast.error(err.message);
         }
     };
 
