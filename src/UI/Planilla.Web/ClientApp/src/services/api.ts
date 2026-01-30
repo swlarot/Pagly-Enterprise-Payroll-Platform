@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+import config from './config';
+
+const API_BASE_URL = config.apiUrl;
 
 export interface ApiError {
   message: string;
@@ -6,16 +8,96 @@ export interface ApiError {
 }
 
 export class ApiException extends Error {
-  constructor(public statusCode: number, message: string) {
+  constructor(
+    public statusCode: number,
+    message: string,
+    public code?: string,
+    public details?: any
+  ) {
     super(message);
     this.name = 'ApiException';
   }
 }
 
-async function handleResponse<T>(response: Response): Promise<T> {
-  // Handle 401 - Auto logout
+// Flag to prevent infinite refresh loops
+let isRefreshing = false;
+let refreshPromise: Promise<string> | null = null;
+
+async function tryRefreshToken(): Promise<string | null> {
+  const refreshToken = localStorage.getItem('refresh_token');
+
+  if (!refreshToken) {
+    return null;
+  }
+
+  // Prevent concurrent refresh attempts
+  if (isRefreshing && refreshPromise) {
+    return refreshPromise;
+  }
+
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem('auth_token', data.token);
+        localStorage.setItem('refresh_token', data.refreshToken);
+        return data.token;
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Token refresh failed:', error);
+      return null;
+    } finally {
+      isRefreshing = false;
+      refreshPromise = null;
+    }
+  })();
+
+  return refreshPromise;
+}
+
+async function handleResponse<T>(response: Response, originalRequest?: {
+  url: string;
+  method: string;
+  headers: HeadersInit;
+  body?: any;
+}): Promise<T> {
+  // Handle 401 - Try refresh token first
   if (response.status === 401) {
-    localStorage.removeItem('auth_token');
+    const newToken = await tryRefreshToken();
+
+    if (newToken && originalRequest) {
+      // Retry original request with new token
+      const retryHeaders = { ...originalRequest.headers, Authorization: `Bearer ${newToken}` };
+      const retryResponse = await fetch(originalRequest.url, {
+        method: originalRequest.method,
+        headers: retryHeaders,
+        body: originalRequest.body ? JSON.stringify(originalRequest.body) : undefined,
+      });
+
+      // Recursively handle the retry response (but don't pass originalRequest to prevent infinite loop)
+      if (retryResponse.status === 401) {
+        // Refresh failed, logout
+        localStorage.clear();
+        window.location.href = '/login';
+        throw new ApiException(401, 'Sesión expirada. Por favor inicia sesión nuevamente.');
+      }
+
+      return handleResponse<T>(retryResponse);
+    }
+
+    // No refresh token or refresh failed, logout
+    localStorage.clear();
     window.location.href = '/login';
     throw new ApiException(401, 'Sesión expirada. Por favor inicia sesión nuevamente.');
   }
@@ -33,8 +115,34 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
   // Handle non-OK responses
   if (!response.ok) {
+    const errorCode = data?.error || data?.code;
     const message = data?.message || data?.error || data?.title || 'Error en la solicitud';
-    throw new ApiException(response.status, message);
+
+    // Dispatch specific error events
+    if (errorCode === 'PLAN_LIMIT_REACHED') {
+      window.dispatchEvent(new CustomEvent('planLimitReached', {
+        detail: {
+          message,
+          limitType: data?.limitType,
+          currentCount: data?.currentCount,
+          maxCount: data?.maxCount,
+          currentPlan: data?.currentPlan,
+          upgradeUrl: data?.upgradeUrl || '/billing',
+        }
+      }));
+    }
+
+    if (errorCode === 'SUBSCRIPTION_INACTIVE' || errorCode === 'SUBSCRIPTION_PAST_DUE') {
+      window.dispatchEvent(new CustomEvent('subscriptionIssue', {
+        detail: {
+          message,
+          status: data?.status,
+          billingUrl: data?.billingUrl || '/billing',
+        }
+      }));
+    }
+
+    throw new ApiException(response.status, message, errorCode, data);
   }
 
   return data;
@@ -55,46 +163,56 @@ function getHeaders(): HeadersInit {
 
 export const api = {
   async get<T>(endpoint: string): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const headers = getHeaders();
+    const response = await fetch(url, {
       method: 'GET',
-      headers: getHeaders(),
+      headers,
     });
-    return handleResponse<T>(response);
+    return handleResponse<T>(response, { url, method: 'GET', headers });
   },
 
   async post<T>(endpoint: string, body?: any): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const headers = getHeaders();
+    const response = await fetch(url, {
       method: 'POST',
-      headers: getHeaders(),
+      headers,
       body: body ? JSON.stringify(body) : undefined,
     });
-    return handleResponse<T>(response);
+    return handleResponse<T>(response, { url, method: 'POST', headers, body });
   },
 
   async put<T>(endpoint: string, body?: any): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const headers = getHeaders();
+    const response = await fetch(url, {
       method: 'PUT',
-      headers: getHeaders(),
+      headers,
       body: body ? JSON.stringify(body) : undefined,
     });
-    return handleResponse<T>(response);
+    return handleResponse<T>(response, { url, method: 'PUT', headers, body });
   },
 
   async patch<T>(endpoint: string, body?: any): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const headers = getHeaders();
+    const response = await fetch(url, {
       method: 'PATCH',
-      headers: getHeaders(),
+      headers,
       body: body ? JSON.stringify(body) : undefined,
     });
-    return handleResponse<T>(response);
+    return handleResponse<T>(response, { url, method: 'PATCH', headers, body });
   },
 
   async delete<T>(endpoint: string): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const headers = getHeaders();
+    const response = await fetch(url, {
       method: 'DELETE',
-      headers: getHeaders(),
+      headers,
     });
-    return handleResponse<T>(response);
+    return handleResponse<T>(response, { url, method: 'DELETE', headers });
   },
 
   async download(endpoint: string, filename: string): Promise<void> {
