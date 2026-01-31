@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useToast } from '../components/ToastContext';
+import toast from 'react-hot-toast';
+import { api } from '../services/api';
 
 const HorasExtraPage = () => {
-    const { showToast } = useToast();
 
     // State management
     const [horasExtra, setHorasExtra] = useState([]);
@@ -38,12 +38,10 @@ const HorasExtraPage = () => {
     const fetchHorasExtra = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/horasextra');
-            if (!response.ok) throw new Error(`Error ${response.status}`);
-            const data = await response.json();
+            const data = await api.get('/api/horasextra');
             setHorasExtra(data);
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar horas extra: ${err.message}` });
+            toast.error(`Error al cargar horas extra: ${err.message}`);
         } finally {
             setLoading(false);
         }
@@ -51,23 +49,19 @@ const HorasExtraPage = () => {
 
     const fetchEmpleados = async () => {
         try {
-            const response = await fetch('/api/empleados');
-            if (!response.ok) throw new Error(`Error ${response.status}`);
-            const data = await response.json();
+            const data = await api.get('/api/empleados');
             setEmpleados(data.filter(e => e.estaActivo));
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar empleados: ${err.message}` });
+            toast.error(`Error al cargar empleados: ${err.message}`);
         }
     };
 
     const fetchTipos = async () => {
         try {
-            const response = await fetch('/api/horasextra/tipos');
-            if (!response.ok) throw new Error(`Error ${response.status}`);
-            const data = await response.json();
+            const data = await api.get('/api/horasextra/tipos');
             setTipos(data);
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar tipos: ${err.message}` });
+            toast.error(`Error al cargar tipos: ${err.message}`);
         }
     };
 
@@ -116,9 +110,6 @@ const HorasExtraPage = () => {
         e.preventDefault();
 
         try {
-            const url = editingId ? `/api/horasextra/${editingId}` : '/api/horasextra';
-            const method = editingId ? 'PUT' : 'POST';
-
             const payload = {
                 empleadoId: parseInt(formData.empleadoId),
                 fecha: formData.fecha,
@@ -128,36 +119,27 @@ const HorasExtraPage = () => {
                 motivo: formData.motivo
             };
 
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText);
+            if (editingId) {
+                await api.put(`/api/horasextra/${editingId}`, payload);
+            } else {
+                await api.post('/api/horasextra', payload);
             }
 
             await fetchHorasExtra();
-            showToast({
-                type: 'success',
-                message: editingId ? 'Hora extra actualizada' : 'Hora extra registrada'
-            });
+            toast.success(editingId ? 'Hora extra actualizada' : 'Hora extra registrada');
             resetForm();
         } catch (err) {
-            showToast({ type: 'error', message: `Error: ${err.message}` });
+            toast.error(`Error: ${err.message}`);
         }
     };
 
     const handleAprobar = async (id) => {
         try {
-            const response = await fetch(`/api/horasextra/${id}/aprobar`, { method: 'POST' });
-            if (!response.ok) throw new Error('Error al aprobar');
+            await api.post(`/api/horasextra/${id}/aprobar`, {});
             await fetchHorasExtra();
-            showToast({ type: 'success', message: 'Hora extra aprobada' });
+            toast.success('Hora extra aprobada');
         } catch (err) {
-            showToast({ type: 'error', message: err.message });
+            toast.error(err.message);
         }
     };
 
@@ -165,12 +147,11 @@ const HorasExtraPage = () => {
         if (!window.confirm('¿Está seguro de rechazar esta hora extra?')) return;
 
         try {
-            const response = await fetch(`/api/horasextra/${id}/rechazar`, { method: 'POST' });
-            if (!response.ok) throw new Error('Error al rechazar');
+            await api.post(`/api/horasextra/${id}/rechazar`, {});
             await fetchHorasExtra();
-            showToast({ type: 'success', message: 'Hora extra rechazada' });
+            toast.success('Hora extra rechazada');
         } catch (err) {
-            showToast({ type: 'error', message: err.message });
+            toast.error(err.message);
         }
     };
 

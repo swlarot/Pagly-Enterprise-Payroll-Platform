@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { api } from '../services/api';
 
 const EmpleadosPage = () => {
     // State management
@@ -40,16 +41,10 @@ const EmpleadosPage = () => {
     const fetchEmpleados = async () => {
         try {
             setLoading(true);
-
-            const response = await fetch('/api/empleados');
-            if (!response.ok) {
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
-            }
-
-            const data = await response.json();
+            const data = await api.get('/api/empleados');
             setEmpleados(data);
         } catch (err) {
-            toast.error(`Error al cargar empleados: ${err.message}`);
+            toast.error(err.message || 'Error al cargar empleados');
         } finally {
             setLoading(false);
         }
@@ -57,27 +52,19 @@ const EmpleadosPage = () => {
 
     const fetchDepartamentos = async () => {
         try {
-            const response = await fetch('/api/departamentos');
-            if (!response.ok) {
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
-            }
-            const data = await response.json();
+            const data = await api.get('/api/departamentos');
             setDepartamentos(data.filter(d => d.estaActivo));
         } catch (err) {
-            toast.error(`Error al cargar departamentos: ${err.message}`);
+            toast.error(err.message || 'Error al cargar departamentos');
         }
     };
 
     const fetchPosiciones = async (departamentoId) => {
         try {
-            const response = await fetch(`/api/posiciones?departamentoId=${departamentoId}`);
-            if (!response.ok) {
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
-            }
-            const data = await response.json();
+            const data = await api.get(`/api/posiciones?departamentoId=${departamentoId}`);
             setPosiciones(data.filter(p => p.estaActivo));
         } catch (err) {
-            toast.error(`Error al cargar posiciones: ${err.message}`);
+            toast.error(err.message || 'Error al cargar posiciones');
         }
     };
 

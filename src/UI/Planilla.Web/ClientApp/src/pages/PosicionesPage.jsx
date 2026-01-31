@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { api } from '../services/api';
 import ConfirmModal from '../components/ConfirmModal';
 
 const PosicionesPage = () => {
@@ -36,12 +37,10 @@ const PosicionesPage = () => {
             const url = selectedDeptId
                 ? `/api/posiciones?departamentoId=${selectedDeptId}`
                 : '/api/posiciones';
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('Error al cargar posiciones');
-            const data = await response.json();
+            const data = await api.get(url);
             setPosiciones(data);
         } catch (error) {
-            toast.error('Error al cargar posiciones');
+            toast.error(error.message || 'Error al cargar posiciones');
         } finally {
             setLoading(false);
         }
@@ -49,12 +48,10 @@ const PosicionesPage = () => {
 
     const fetchDepartamentos = async () => {
         try {
-            const response = await fetch('/api/departamentos');
-            if (!response.ok) throw new Error('Error al cargar departamentos');
-            const data = await response.json();
+            const data = await api.get('/api/departamentos');
             setDepartamentos(data.filter(d => d.estaActivo));
         } catch (error) {
-            toast.error('Error al cargar departamentos');
+            toast.error(error.message || 'Error al cargar departamentos');
         }
     };
 

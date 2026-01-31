@@ -46,6 +46,8 @@ public class AdminController : ControllerBase
         {
             var tenants = await _context.Tenants
                 .Include(t => t.Subscription)
+                .Include(t => t.Users)
+                    .ThenInclude(tu => tu.User)
                 .OrderByDescending(t => t.CreatedAt)
                 .Select(t => new AdminTenantDto
                 {
@@ -74,6 +76,17 @@ public class AdminController : ControllerBase
                         CanUseApi = PlanFeatures.GetLimits(t.Subscription.Plan).CanUseApi,
                         MonthlyPrice = t.Subscription.MonthlyPrice
                     },
+                    Owner = t.Users
+                        .Where(u => u.Role == TenantRole.Owner)
+                        .Select(u => new OwnerInfoDto
+                        {
+                            UserId = u.UserId,
+                            Email = u.User != null ? u.User.Email ?? string.Empty : string.Empty,
+                            FullName = u.User != null ? u.User.NombreCompleto : null,
+                            JoinedAt = u.JoinedAt,
+                            LastLoginAt = u.LastLoginAt
+                        })
+                        .FirstOrDefault(),
                     Usage = new AdminTenantUsageDto
                     {
                         TotalUsers = t.Users.Count,
@@ -680,6 +693,246 @@ public class AdminController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// GET /api/admin/tenants/{id}/audit - Obtiene logs de auditoría de un tenant específico
+    /// Requiere: IsSystemAdmin = true
+    /// </summary>
+    [HttpGet("tenants/{id}/audit")]
+    public async Task<IActionResult> GetTenantAuditLog(
+        int id,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50,
+        [FromQuery] DateTime? from = null,
+        [FromQuery] DateTime? to = null,
+        [FromQuery] string? action = null,
+        [FromQuery] string? userId = null)
+    {
+        try
+        {
+            // Verificar que el tenant existe
+            var tenant = await _context.Tenants.FindAsync(id);
+            if (tenant == null)
+            {
+                return NotFound(new { error = "Tenant no encontrado" });
+            }
+
+            // Limitar pageSize
+            if (pageSize > 100) pageSize = 100;
+            if (pageSize < 1) pageSize = 50;
+            if (page < 1) page = 1;
+
+            // Construir query
+            var query = _context.AuditLogEntries
+                .Where(a => a.TenantId == id);
+
+            // Aplicar filtros
+            if (from.HasValue)
+                query = query.Where(a => a.CreatedAt >= from.Value);
+
+            if (to.HasValue)
+                query = query.Where(a => a.CreatedAt <= to.Value);
+
+            if (!string.IsNullOrEmpty(action))
+                query = query.Where(a => a.Action == action);
+
+            if (!string.IsNullOrEmpty(userId))
+                query = query.Where(a => a.ActorUserId == userId);
+
+            // Obtener total
+            var total = await query.CountAsync();
+
+            // Obtener datos paginados
+            var logs = await query
+                .OrderByDescending(a => a.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(a => new AuditLogDto
+                {
+                    Id = a.Id,
+                    Action = a.Action,
+                    EntityType = a.EntityType,
+                    EntityId = a.EntityId,
+                    ActorEmail = a.ActorEmail,
+                    IpAddress = a.IpAddress,
+                    UserAgent = a.UserAgent,
+                    MetadataJson = a.MetadataJson,
+                    CreatedAt = a.CreatedAt
+                })
+                .ToListAsync();
+
+            var result = new AuditLogPagedResultDto
+            {
+                Total = total,
+                Page = page,
+                PageSize = pageSize,
+                Data = logs
+            };
+
+            _logger.LogInformation(
+                "SystemAdmin {AdminId} retrieved audit logs for tenant {TenantId} (Page {Page}, Filters: {Filters})",
+                User.FindFirst("sub")?.Value, id, page, new { from, to, action, userId });
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting audit logs for tenant {TenantId}", id);
+            return StatusCode(500, new { error = "Error al obtener los logs de auditoría" });
+        }
+    }
+
+    /// <summary>
+    /// POST /api/admin/tenants/{id}/users - Invita un usuario a un tenant
+    /// Requiere: IsSystemAdmin = true
+    /// </summary>
+    [HttpPost("tenants/{id}/users")]
+    public async Task<IActionResult> InviteUserToTenant(int id, [FromBody] InviteUserRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        // No permitir crear Owner desde este endpoint
+        if (request.Role == TenantRole.Owner)
+        {
+            return BadRequest(new { error = "No se puede crear usuarios con rol Owner desde este endpoint" });
+        }
+
+        using var transaction = await _context.Database.BeginTransactionAsync();
+
+        try
+        {
+            // 1. Verificar que el tenant existe
+            var tenant = await _context.Tenants
+                .Include(t => t.Subscription)
+                .Include(t => t.Users)
+                .FirstOrDefaultAsync(t => t.Id == id);
+
+            if (tenant == null)
+            {
+                return NotFound(new { error = "Tenant no encontrado" });
+            }
+
+            // 2. VALIDAR LÍMITES DEL PLAN
+            var currentUserCount = tenant.Users.Count(u => u.IsActive);
+            var maxUsers = GetMaxUsersForPlan(tenant.Subscription?.Plan ?? SubscriptionPlan.Free);
+
+            if (currentUserCount >= maxUsers)
+            {
+                return BadRequest(new
+                {
+                    error = $"El tenant ha alcanzado el límite de {maxUsers} usuarios para el plan {tenant.Subscription?.Plan}. " +
+                            $"Actualmente tiene {currentUserCount} usuarios activos."
+                });
+            }
+
+            // 3. Buscar o crear usuario en Identity
+            var user = await _userManager.FindByEmailAsync(request.Email);
+
+            if (user == null)
+            {
+                // Crear nuevo usuario
+                user = new AppUser
+                {
+                    UserName = request.Email,
+                    Email = request.Email,
+                    EmailConfirmed = true,
+                    NombreCompleto = request.FullName,
+                    IsSystemAdmin = false
+                };
+
+                var createResult = await _userManager.CreateAsync(user, request.Password);
+                if (!createResult.Succeeded)
+                {
+                    var errors = string.Join(", ", createResult.Errors.Select(e => e.Description));
+                    return BadRequest(new { error = "Error al crear usuario", details = errors });
+                }
+            }
+
+            // 4. Verificar si ya existe TenantUser
+            var existingTenantUser = await _context.TenantUsers
+                .FirstOrDefaultAsync(tu => tu.TenantId == id && tu.UserId == user.Id);
+
+            if (existingTenantUser != null)
+            {
+                return Conflict(new { error = "El usuario ya pertenece a este tenant" });
+            }
+
+            // 5. Crear TenantUser
+            var tenantUser = new TenantUser
+            {
+                TenantId = id,
+                UserId = user.Id,
+                Role = request.Role,
+                IsActive = true,
+                JoinedAt = DateTime.UtcNow,
+                CreatedAt = DateTime.UtcNow,
+                IsPendingInvitation = false
+            };
+
+            _context.TenantUsers.Add(tenantUser);
+            await _context.SaveChangesAsync();
+
+            // 6. AUDIT LOG
+            var adminUserId = User.FindFirst("sub")?.Value ?? "system";
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var userAgent = HttpContext.Request.Headers["User-Agent"].ToString();
+
+            var auditLog = new AuditLogEntry
+            {
+                TenantId = id,
+                ActorUserId = adminUserId,
+                ActorEmail = User.FindFirst("email")?.Value ?? "system@admin.com",
+                Action = "InviteUser",
+                EntityType = "TenantUser",
+                EntityId = tenantUser.Id.ToString(),
+                IpAddress = ipAddress,
+                UserAgent = userAgent,
+                MetadataJson = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    UserEmail = user.Email,
+                    Role = request.Role.ToString(),
+                    InvitedBy = adminUserId
+                }),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.AuditLogEntries.Add(auditLog);
+            await _context.SaveChangesAsync();
+
+            await transaction.CommitAsync();
+
+            _logger.LogInformation(
+                "SystemAdmin {AdminId} invited user {Email} to tenant {TenantId} with role {Role}",
+                adminUserId, user.Email, id, request.Role);
+
+            // 7. Retornar DTO
+            var response = new AdminTenantUserDto
+            {
+                Id = tenantUser.Id,
+                UserId = user.Id,
+                Email = user.Email ?? string.Empty,
+                FullName = user.NombreCompleto,
+                Role = tenantUser.Role,
+                RoleName = tenantUser.Role.ToString(),
+                IsActive = tenantUser.IsActive,
+                JoinedAt = tenantUser.JoinedAt,
+                LastLoginAt = tenantUser.LastLoginAt,
+                IsPendingInvitation = tenantUser.IsPendingInvitation,
+                InvitationExpiresAt = tenantUser.InvitationExpiresAt
+            };
+
+            return CreatedAtAction(nameof(GetTenantUsers), new { id }, response);
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            _logger.LogError(ex, "Error inviting user to tenant {TenantId}", id);
+            return StatusCode(500, new { error = "Error al invitar usuario al tenant" });
+        }
+    }
+
     // ========================================================================
     // HELPER METHODS
     // ========================================================================
@@ -728,5 +981,20 @@ public class AdminController : ControllerBase
         }
 
         return subdomain;
+    }
+
+    /// <summary>
+    /// Obtiene el máximo de usuarios permitidos según el plan
+    /// </summary>
+    private int GetMaxUsersForPlan(SubscriptionPlan plan)
+    {
+        return plan switch
+        {
+            SubscriptionPlan.Free => 1,
+            SubscriptionPlan.Starter => 3,
+            SubscriptionPlan.Professional => 10,
+            SubscriptionPlan.Enterprise => int.MaxValue,
+            _ => 1
+        };
     }
 }

@@ -6,6 +6,8 @@ import type {
   CreateTenantDto,
   UpdateAdminTenantDto,
   UpdateTenantSubscriptionDto,
+  InviteUserRequest,
+  AuditLogPagedResultDto,
 } from '../types/api';
 
 export const systemAdminService = {
@@ -42,4 +44,32 @@ export const systemAdminService = {
   // Tenant users management
   getTenantUsers: (tenantId: number) =>
     api.get<AdminTenantUserDto[]>(`/api/admin/tenants/${tenantId}/users`),
+
+  inviteUserToTenant: (tenantId: number, data: InviteUserRequest) =>
+    api.post<AdminTenantUserDto>(`/api/admin/tenants/${tenantId}/users`, data),
+
+  // Audit log
+  getTenantAuditLog: (
+    tenantId: number,
+    params?: {
+      page?: number;
+      pageSize?: number;
+      from?: string;
+      to?: string;
+      action?: string;
+      userId?: string;
+    }
+  ) => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.pageSize) queryParams.append('pageSize', params.pageSize.toString());
+    if (params?.from) queryParams.append('from', params.from);
+    if (params?.to) queryParams.append('to', params.to);
+    if (params?.action) queryParams.append('action', params.action);
+    if (params?.userId) queryParams.append('userId', params.userId);
+
+    const queryString = queryParams.toString();
+    const url = `/api/admin/tenants/${tenantId}/audit${queryString ? `?${queryString}` : ''}`;
+    return api.get<AuditLogPagedResultDto>(url);
+  },
 };

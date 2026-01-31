@@ -75,13 +75,17 @@ public class InvitationService : IInvitationService
                 return Result<InvitationResponseDto>.Fail(reason ?? "No puedes invitar más usuarios en tu plan actual");
             }
 
-            // Verificar que el email no esté ya asociado al tenant
+            // Verificar que el email no esté ya activo en el tenant
             var existingUser = await _context.TenantUsers
-                .AnyAsync(tu => tu.TenantId == tenantId && tu.InvitedEmail == dto.Email);
+                .Include(tu => tu.User)
+                .AnyAsync(tu => tu.TenantId == tenantId &&
+                               tu.User != null &&
+                               tu.User.Email == dto.Email &&
+                               tu.IsActive);
 
             if (existingUser)
             {
-                return Result<InvitationResponseDto>.Fail("Este usuario ya está en el tenant");
+                return Result<InvitationResponseDto>.Fail("Este usuario ya está activo en el tenant");
             }
 
             // Verificar que no haya invitaciones pendientes para este email

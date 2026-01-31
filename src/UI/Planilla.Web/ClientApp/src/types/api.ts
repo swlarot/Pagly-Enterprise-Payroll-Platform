@@ -23,8 +23,22 @@ export interface AuthResponseDto {
   refreshToken: string;
   expiresAt: string;
   user: UserInfoDto;
-  tenant: TenantInfoDto;
-  subscription: SubscriptionInfoDto;
+  tenant: TenantInfoDto | null;
+  subscription: SubscriptionInfoDto | null;
+  availableTenants?: TenantSummaryDto[];
+  requiresTenantSelection?: boolean;
+}
+
+export interface TenantSummaryDto {
+  id: number;
+  name: string;
+  role: TenantRole;
+  roleName: string;
+  subdomain: string;
+}
+
+export interface SelectTenantDto {
+  tenantId: number;
 }
 
 export interface UserInfoDto {
@@ -32,6 +46,7 @@ export interface UserInfoDto {
   email: string;
   role: TenantRole;
   roleName: string;
+  isSystemAdmin?: boolean;
 }
 
 export interface TenantInfoDto {
@@ -368,4 +383,32 @@ export interface AdminTenantUserDto {
   lastLoginAt?: string;
   isPendingInvitation: boolean;
   invitationExpiresAt?: string;
+}
+
+// Invite User Request (system admin)
+export interface InviteUserRequest {
+  email: string;
+  fullName: string;
+  password: string;
+  role: TenantRole;
+}
+
+// Audit Log DTOs
+export interface AuditLogDto {
+  id: number;
+  action: string;
+  entityType: string;
+  entityId?: string;
+  actorEmail: string;
+  ipAddress?: string;
+  userAgent?: string;
+  metadataJson?: string;
+  createdAt: string;
+}
+
+export interface AuditLogPagedResultDto {
+  total: number;
+  page: number;
+  pageSize: number;
+  data: AuditLogDto[];
 }

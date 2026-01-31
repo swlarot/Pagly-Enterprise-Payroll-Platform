@@ -8,8 +8,12 @@ import { Modal } from '../components/ui/Modal';
 import { Select } from '../components/ui/Select';
 import { Input } from '../components/ui/Input';
 import { systemAdminService } from '../services/systemAdminService';
-import type { AdminTenantDto, AdminTenantUserDto } from '../types/api';
-import { SubscriptionPlan, SubscriptionStatus, TenantRole } from '../types/api';
+import { InviteUserModal } from '../components/admin/InviteUserModal';
+import { RoleBadge } from '../components/admin/RoleBadge';
+import { StatusBadge } from '../components/admin/StatusBadge';
+import { ActionBadge } from '../components/admin/ActionBadge';
+import type { AdminTenantDto, AdminTenantUserDto, AuditLogDto, AuditLogPagedResultDto } from '../types/api';
+import { SubscriptionPlan, SubscriptionStatus } from '../types/api';
 import {
   ArrowLeft,
   Building2,
@@ -21,19 +25,39 @@ import {
   AlertCircle,
   CheckCircle2,
   XCircle,
-  Clock,
-  Mail,
-  Shield,
+  UserPlus,
+  FileText,
+  Info,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+type TabType = 'info' | 'users' | 'audit';
 
 export default function TenantDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+
+  // Main state
   const [tenant, setTenant] = useState<AdminTenantDto | null>(null);
-  const [users, setUsers] = useState<AdminTenantUserDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabType>('info');
+
+  // Users tab state
+  const [users, setUsers] = useState<AdminTenantUserDto[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+
+  // Audit log tab state
+  const [auditLogs, setAuditLogs] = useState<AuditLogDto[]>([]);
+  const [isLoadingAudit, setIsLoadingAudit] = useState(false);
+  const [auditFilters, setAuditFilters] = useState({
+    page: 1,
+    pageSize: 50,
+    from: '',
+    to: '',
+    action: '',
+  });
+  const [auditTotal, setAuditTotal] = useState(0);
 
   // Modals
   const [showChangePlanModal, setShowChangePlanModal] = useState(false);
@@ -48,38 +72,22 @@ export default function TenantDetailsPage() {
   useEffect(() => {
     if (id) {
       loadTenant();
-      loadUsers();
     }
   }, [id]);
 
-  const loadUsers = async () => {
-    try {
-      setIsLoadingUsers(true);
-      const data = await systemAdminService.getTenantUsers(parseInt(id!));
-      setUsers(data);
-    } catch (error: any) {
-      console.error('Error loading users:', error);
-    } finally {
-      setIsLoadingUsers(false);
+  useEffect(() => {
+    if (id && activeTab === 'users') {
+      loadUsers();
+    } else if (id && activeTab === 'audit') {
+      loadAuditLogs();
     }
-  };
+  }, [id, activeTab]);
 
-  const getRoleBadgeColor = (role: TenantRole) => {
-    switch (role) {
-      case TenantRole.Owner:
-        return 'bg-purple-100 text-purple-800';
-      case TenantRole.Admin:
-        return 'bg-blue-100 text-blue-800';
-      case TenantRole.Manager:
-        return 'bg-green-100 text-green-800';
-      case TenantRole.Accountant:
-        return 'bg-amber-100 text-amber-800';
-      case TenantRole.Employee:
-        return 'bg-gray-100 text-gray-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
+  useEffect(() => {
+    if (activeTab === 'audit' && id) {
+      loadAuditLogs();
     }
-  };
+  }, [auditFilters]);
 
   const loadTenant = async () => {
     try {
@@ -92,6 +100,33 @@ export default function TenantDetailsPage() {
       navigate('/system-admin/tenants');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadUsers = async () => {
+    try {
+      setIsLoadingUsers(true);
+      const data = await systemAdminService.getTenantUsers(parseInt(id!));
+      setUsers(data);
+    } catch (error: any) {
+      console.error('Error loading users:', error);
+      toast.error('Error al cargar usuarios');
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
+  const loadAuditLogs = async () => {
+    try {
+      setIsLoadingAudit(true);
+      const data = await systemAdminService.getTenantAuditLog(parseInt(id!), auditFilters);
+      setAuditLogs(data.data);
+      setAuditTotal(data.total);
+    } catch (error: any) {
+      console.error('Error loading audit logs:', error);
+      toast.error('Error al cargar logs de auditoría');
+    } finally {
+      setIsLoadingAudit(false);
     }
   };
 
@@ -260,274 +295,424 @@ export default function TenantDetailsPage() {
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Subscription Info */}
+        {/* Tabs */}
+        <div className="border-b border-gray-200 mb-6">
+          <div className="flex gap-4">
+            <button
+              onClick={() => setActiveTab('info')}
+              className={`flex items-center gap-2 px-4 py-2 border-b-2 font-medium transition-colors ${
+                activeTab === 'info'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+              }`}
+            >
+              <Info className="w-4 h-4" />
+              Información
+            </button>
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`flex items-center gap-2 px-4 py-2 border-b-2 font-medium transition-colors ${
+                activeTab === 'users'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Usuarios ({users.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('audit')}
+              className={`flex items-center gap-2 px-4 py-2 border-b-2 font-medium transition-colors ${
+                activeTab === 'audit'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+              }`}
+            >
+              <FileText className="w-4 h-4" />
+              Audit Log ({auditTotal})
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === 'info' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Subscription Info */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-900">Información de Suscripción</h3>
+                    <Button variant="ghost" size="sm" icon={Edit} onClick={() => setShowChangePlanModal(true)}>
+                      Cambiar
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardBody className="space-y-4">
+                  {tenant.subscription ? (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Plan Actual</span>
+                        <Badge variant={getPlanBadgeVariant(tenant.subscription.plan)}>
+                          {tenant.subscription.planName}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Estado</span>
+                        <Badge variant={getStatusBadgeVariant(tenant.subscription.status)}>
+                          {tenant.subscription.statusName}
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-gray-600">Precio Mensual</span>
+                        <span className="font-medium text-gray-900">
+                          ${tenant.subscription.monthlyPrice.toFixed(2)}
+                        </span>
+                      </div>
+
+                      {tenant.subscription.trialEndsAt && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600">Trial Expira</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900">
+                              {new Date(tenant.subscription.trialEndsAt).toLocaleDateString('es-PA')}
+                            </span>
+                            <button
+                              onClick={() => setShowExtendTrialModal(true)}
+                              className="text-xs text-blue-600 hover:text-blue-700"
+                            >
+                              Extender
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Usage Progress Bars */}
+                      <div className="pt-4 border-t border-gray-200 space-y-3">
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="text-gray-600">Uso de Empleados</span>
+                            <span className="font-medium text-gray-900">
+                              {Math.round((tenant.usage.totalEmployees / (tenant.subscription.maxEmployees || 1)) * 100)}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-blue-600 h-2 rounded-full"
+                              style={{
+                                width: `${Math.min((tenant.usage.totalEmployees / (tenant.subscription.maxEmployees || 1)) * 100, 100)}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="text-gray-600">Uso de Usuarios</span>
+                            <span className="font-medium text-gray-900">
+                              {Math.round((tenant.usage.totalUsers / (tenant.subscription.maxUsers || 1)) * 100)}%
+                            </span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-green-600 h-2 rounded-full"
+                              style={{
+                                width: `${Math.min((tenant.usage.totalUsers / (tenant.subscription.maxUsers || 1)) * 100, 100)}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-4 text-gray-500">
+                      Este tenant no tiene una suscripción activa
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+
+              {/* Owner Info */}
+              <Card>
+                <CardHeader>
+                  <h3 className="font-semibold text-gray-900">Propietario del Tenant</h3>
+                </CardHeader>
+                <CardBody className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Email</p>
+                    <p className="font-medium text-gray-900">{tenant.owner?.email}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm text-gray-600 mb-1">Usuario desde</p>
+                    <p className="font-medium text-gray-900">
+                      {tenant.owner?.joinedAt && new Date(tenant.owner.joinedAt).toLocaleDateString('es-PA')}
+                    </p>
+                  </div>
+
+                  {tenant.owner?.lastLoginAt && (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-1">Último acceso</p>
+                      <p className="font-medium text-gray-900">
+                        {new Date(tenant.owner.lastLoginAt).toLocaleDateString('es-PA')}
+                      </p>
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+            </div>
+
+            {/* Actions */}
+            <Card>
+              <CardHeader>
+                <h3 className="font-semibold text-gray-900">Acciones Administrativas</h3>
+              </CardHeader>
+              <CardBody>
+                <div className="flex gap-3">
+                  <Button variant="outline" icon={Edit} onClick={() => setShowChangePlanModal(true)}>
+                    Cambiar Plan
+                  </Button>
+                  {tenant.subscription?.trialEndsAt && (
+                    <Button variant="outline" icon={Calendar} onClick={() => setShowExtendTrialModal(true)}>
+                      Extender Trial
+                    </Button>
+                  )}
+                  <Button
+                    variant={tenant.isActive ? 'danger' : 'success'}
+                    icon={tenant.isActive ? XCircle : CheckCircle2}
+                    onClick={() => setShowDeactivateModal(true)}
+                  >
+                    {tenant.isActive ? 'Desactivar' : 'Reactivar'} Tenant
+                  </Button>
+                </div>
+              </CardBody>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === 'users' && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-gray-900">Información de Suscripción</h3>
-                <Button variant="ghost" size="sm" icon={Edit} onClick={() => setShowChangePlanModal(true)}>
-                  Cambiar
+                <div className="flex items-center gap-3">
+                  <Users className="w-5 h-5 text-gray-600" />
+                  <h3 className="font-semibold text-gray-900">
+                    Usuarios del Tenant ({users.length}/{tenant.usage.maxUsers})
+                  </h3>
+                </div>
+                <Button icon={UserPlus} onClick={() => setShowInviteModal(true)}>
+                  Invitar Usuario
                 </Button>
               </div>
             </CardHeader>
-            <CardBody className="space-y-4">
-              {tenant.subscription ? (
+            <CardBody>
+              {isLoadingUsers ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                </div>
+              ) : users.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No hay usuarios registrados en este tenant
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Usuario
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Rol
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Estado
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Desde
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Último Acceso
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {users.map((user) => (
+                        <tr key={user.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+                                <span className="text-white text-xs font-bold">
+                                  {user.email.substring(0, 2).toUpperCase()}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{user.email}</p>
+                                {user.fullName && (
+                                  <p className="text-xs text-gray-500">{user.fullName}</p>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <RoleBadge role={user.role} showIcon />
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <StatusBadge isActive={user.isActive} />
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {new Date(user.joinedAt).toLocaleDateString('es-PA')}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {user.lastLoginAt
+                              ? new Date(user.lastLoginAt).toLocaleDateString('es-PA')
+                              : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        )}
+
+        {activeTab === 'audit' && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">
+                  Audit Log ({auditTotal} eventos)
+                </h3>
+              </div>
+            </CardHeader>
+            <CardBody>
+              {/* Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <Input
+                  label="Desde"
+                  type="date"
+                  value={auditFilters.from}
+                  onChange={(e) => setAuditFilters({ ...auditFilters, from: e.target.value, page: 1 })}
+                />
+                <Input
+                  label="Hasta"
+                  type="date"
+                  value={auditFilters.to}
+                  onChange={(e) => setAuditFilters({ ...auditFilters, to: e.target.value, page: 1 })}
+                />
+                <Input
+                  label="Acción"
+                  type="text"
+                  value={auditFilters.action}
+                  onChange={(e) => setAuditFilters({ ...auditFilters, action: e.target.value, page: 1 })}
+                  placeholder="Ej: InviteUser, Create, Update"
+                />
+              </div>
+
+              {isLoadingAudit ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                </div>
+              ) : auditLogs.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No hay eventos de auditoría registrados
+                </div>
+              ) : (
                 <>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Plan Actual</span>
-                    <Badge variant={getPlanBadgeVariant(tenant.subscription.plan)}>
-                      {tenant.subscription.planName}
-                    </Badge>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Fecha
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Usuario
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Acción
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Entidad
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            IP
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {auditLogs.map((log) => (
+                          <tr key={log.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                              {new Date(log.createdAt).toLocaleString('es-PA')}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {log.actorEmail}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              <ActionBadge action={log.action} />
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                              {log.entityType}
+                              {log.entityId && <span className="text-xs text-gray-400"> (#{log.entityId})</span>}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {log.ipAddress || '-'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Estado</span>
-                    <Badge variant={getStatusBadgeVariant(tenant.subscription.status)}>
-                      {tenant.subscription.statusName}
-                    </Badge>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-600">Precio Mensual</span>
-                    <span className="font-medium text-gray-900">
-                      ${tenant.subscription.monthlyPrice.toFixed(2)}
-                    </span>
-                  </div>
-
-                      {tenant.subscription.trialEndsAt && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Trial Expira</span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">
-                          {new Date(tenant.subscription.trialEndsAt).toLocaleDateString('es-PA')}
-                        </span>
-                        <button
-                          onClick={() => setShowExtendTrialModal(true)}
-                          className="text-xs text-blue-600 hover:text-blue-700"
+                  {/* Pagination */}
+                  {auditTotal > auditFilters.pageSize && (
+                    <div className="mt-4 flex items-center justify-between">
+                      <div className="text-sm text-gray-600">
+                        Mostrando {(auditFilters.page - 1) * auditFilters.pageSize + 1} -{' '}
+                        {Math.min(auditFilters.page * auditFilters.pageSize, auditTotal)} de {auditTotal}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={auditFilters.page === 1}
+                          onClick={() => setAuditFilters({ ...auditFilters, page: auditFilters.page - 1 })}
                         >
-                          Extender
-                        </button>
+                          Anterior
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={auditFilters.page * auditFilters.pageSize >= auditTotal}
+                          onClick={() => setAuditFilters({ ...auditFilters, page: auditFilters.page + 1 })}
+                        >
+                          Siguiente
+                        </Button>
                       </div>
                     </div>
                   )}
                 </>
-              ) : (
-                <div className="text-center py-4 text-gray-500">
-                  Este tenant no tiene una suscripción activa
-                </div>
-              )}
-
-              {/* Usage Progress Bars */}
-              {tenant.subscription && (
-                <div className="pt-4 border-t border-gray-200 space-y-3">
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-600">Uso de Empleados</span>
-                      <span className="font-medium text-gray-900">
-                        {Math.round((tenant.usage.totalEmployees / (tenant.subscription.maxEmployees || 1)) * 100)}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full"
-                        style={{
-                          width: `${Math.min((tenant.usage.totalEmployees / (tenant.subscription.maxEmployees || 1)) * 100, 100)}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-gray-600">Uso de Usuarios</span>
-                      <span className="font-medium text-gray-900">
-                        {Math.round((tenant.usage.totalUsers / (tenant.subscription.maxUsers || 1)) * 100)}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-green-600 h-2 rounded-full"
-                        style={{
-                          width: `${Math.min((tenant.usage.totalUsers / (tenant.subscription.maxUsers || 1)) * 100, 100)}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
               )}
             </CardBody>
           </Card>
+        )}
 
-          {/* Owner Info */}
-          <Card>
-            <CardHeader>
-              <h3 className="font-semibold text-gray-900">Propietario del Tenant</h3>
-            </CardHeader>
-            <CardBody className="space-y-4">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Email</p>
-                <p className="font-medium text-gray-900">{tenant.owner.email}</p>
-              </div>
+        {/* Modals */}
+        <InviteUserModal
+          tenantId={parseInt(id!)}
+          isOpen={showInviteModal}
+          onClose={() => setShowInviteModal(false)}
+          onSuccess={() => {
+            loadUsers();
+            loadTenant(); // Reload to update usage stats
+          }}
+        />
 
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Usuario desde</p>
-                <p className="font-medium text-gray-900">
-                  {new Date(tenant.owner.joinedAt).toLocaleDateString('es-PA')}
-                </p>
-              </div>
-
-              {tenant.owner.lastLoginAt && (
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Último acceso</p>
-                  <p className="font-medium text-gray-900">
-                    {new Date(tenant.owner.lastLoginAt).toLocaleDateString('es-PA')}
-                  </p>
-                </div>
-              )}
-            </CardBody>
-          </Card>
-        </div>
-
-        {/* Users List */}
-        <Card className="mt-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Users className="w-5 h-5 text-gray-600" />
-                <h3 className="font-semibold text-gray-900">
-                  Usuarios del Tenant ({users.length}/{tenant.usage.maxUsers})
-                </h3>
-              </div>
-              <div className="flex items-center gap-4 text-sm">
-                <span className="flex items-center gap-1 text-green-600">
-                  <CheckCircle2 className="w-4 h-4" />
-                  {users.filter(u => u.isActive && !u.isPendingInvitation).length} activos
-                </span>
-                <span className="flex items-center gap-1 text-amber-600">
-                  <Clock className="w-4 h-4" />
-                  {users.filter(u => u.isPendingInvitation).length} pendientes
-                </span>
-              </div>
-            </div>
-          </CardHeader>
-          <CardBody>
-            {isLoadingUsers ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
-              </div>
-            ) : users.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No hay usuarios registrados en este tenant
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Usuario
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Rol
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Estado
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Desde
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Último Acceso
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {users.map((user) => (
-                      <tr key={user.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                              <span className="text-white text-xs font-bold">
-                                {user.email.substring(0, 2).toUpperCase()}
-                              </span>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">{user.email}</p>
-                              {user.fullName && (
-                                <p className="text-xs text-gray-500">{user.fullName}</p>
-                              )}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(user.role)}`}>
-                            {user.role === TenantRole.Owner && <Shield className="w-3 h-3" />}
-                            {user.roleName}
-                          </span>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          {user.isPendingInvitation ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                              <Mail className="w-3 h-3" />
-                              Invitación pendiente
-                            </span>
-                          ) : user.isActive ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                              <CheckCircle2 className="w-3 h-3" />
-                              Activo
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                              <XCircle className="w-3 h-3" />
-                              Inactivo
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {new Date(user.joinedAt).toLocaleDateString('es-PA')}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {user.lastLoginAt
-                            ? new Date(user.lastLoginAt).toLocaleDateString('es-PA')
-                            : '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </CardBody>
-        </Card>
-
-        {/* Actions */}
-        <Card className="mt-6">
-          <CardHeader>
-            <h3 className="font-semibold text-gray-900">Acciones Administrativas</h3>
-          </CardHeader>
-          <CardBody>
-            <div className="flex gap-3">
-              <Button variant="outline" icon={Edit} onClick={() => setShowChangePlanModal(true)}>
-                Cambiar Plan
-              </Button>
-              {tenant.subscription?.trialEndsAt && (
-                <Button variant="outline" icon={Calendar} onClick={() => setShowExtendTrialModal(true)}>
-                  Extender Trial
-                </Button>
-              )}
-              <Button
-                variant={tenant.isActive ? 'danger' : 'success'}
-                icon={tenant.isActive ? XCircle : CheckCircle2}
-                onClick={() => setShowDeactivateModal(true)}
-              >
-                {tenant.isActive ? 'Desactivar' : 'Reactivar'} Tenant
-              </Button>
-            </div>
-          </CardBody>
-        </Card>
-
-        {/* Change Plan Modal */}
         <Modal
           isOpen={showChangePlanModal}
           onClose={() => setShowChangePlanModal(false)}
@@ -559,7 +744,6 @@ export default function TenantDetailsPage() {
           </div>
         </Modal>
 
-        {/* Extend Trial Modal */}
         <Modal
           isOpen={showExtendTrialModal}
           onClose={() => setShowExtendTrialModal(false)}
@@ -586,7 +770,6 @@ export default function TenantDetailsPage() {
           </div>
         </Modal>
 
-        {/* Deactivate Modal */}
         <Modal
           isOpen={showDeactivateModal}
           onClose={() => setShowDeactivateModal(false)}
