@@ -23,6 +23,7 @@ namespace Vorluno.Planilla.Web.Controllers
         private readonly ApplicationDbContext _context;
         private readonly ITenantContext _tenantContext;
         private readonly IPlanLimitService _planLimitService;
+        private readonly IAuditLogService _auditLogService;
 
         /// <summary>
         /// Inicializa una nueva instancia de la clase <see cref="EmpleadosController"/>.
@@ -32,13 +33,15 @@ namespace Vorluno.Planilla.Web.Controllers
         /// <param name="context">El contexto de la base de datos para consultas complejas.</param>
         /// <param name="tenantContext">El contexto del tenant actual.</param>
         /// <param name="planLimitService">Servicio de verificación de límites del plan.</param>
-        public EmpleadosController(IUnitOfWork unitOfWork, IMapper mapper, ApplicationDbContext context, ITenantContext tenantContext, IPlanLimitService planLimitService)
+        /// <param name="auditLogService">Servicio de auditoría para registrar acciones.</param>
+        public EmpleadosController(IUnitOfWork unitOfWork, IMapper mapper, ApplicationDbContext context, ITenantContext tenantContext, IPlanLimitService planLimitService, IAuditLogService auditLogService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _context = context;
             _tenantContext = tenantContext;
             _planLimitService = planLimitService;
+            _auditLogService = auditLogService;
         }
 
         /// <summary>
@@ -112,6 +115,27 @@ namespace Vorluno.Planilla.Web.Controllers
 
             var empleadoCreadoDto = _mapper.Map<EmpleadoVerDto>(empleado);
 
+            // ✅ AUDIT LOG: Registrar creación de empleado
+            try
+            {
+                await _auditLogService.LogAsync(
+                    "EmployeeCreated",
+                    "Employee",
+                    empleado!.Id.ToString(),
+                    new Dictionary<string, string>
+                    {
+                        ["EmployeeName"] = $"{empleado.Nombre} {empleado.Apellido}",
+                        ["IdentificationNumber"] = empleado.NumeroIdentificacion ?? "N/A",
+                        ["DepartmentId"] = empleado.DepartamentoId?.ToString() ?? "N/A",
+                        ["PositionId"] = empleado.PosicionId?.ToString() ?? "N/A",
+                        ["BaseSalary"] = empleado.SalarioBase.ToString("N2")
+                    });
+            }
+            catch (Exception)
+            {
+                // No bloqueamos la operación si falla el audit log
+            }
+
             // Devuelve una respuesta 201 Created con la ubicación del nuevo recurso
             return CreatedAtAction(nameof(GetById), new { id = empleado!.Id }, empleadoCreadoDto);
         }
@@ -141,6 +165,25 @@ namespace Vorluno.Planilla.Web.Controllers
             _unitOfWork.Empleados.Update(empleado);
             await _unitOfWork.CompleteAsync();
 
+            // ✅ AUDIT LOG: Registrar actualización de empleado
+            try
+            {
+                await _auditLogService.LogAsync(
+                    "EmployeeUpdated",
+                    "Employee",
+                    id.ToString(),
+                    new Dictionary<string, string>
+                    {
+                        ["EmployeeName"] = $"{empleado.Nombre} {empleado.Apellido}",
+                        ["DepartmentId"] = empleado.DepartamentoId?.ToString() ?? "N/A",
+                        ["PositionId"] = empleado.PosicionId?.ToString() ?? "N/A"
+                    });
+            }
+            catch (Exception)
+            {
+                // No bloqueamos la operación si falla el audit log
+            }
+
             return NoContent(); // Retorna un 204 No Content para indicar éxito
         }
 
@@ -166,6 +209,24 @@ namespace Vorluno.Planilla.Web.Controllers
             empleado.EstaActivo = false;
             _unitOfWork.Empleados.Update(empleado);
             await _unitOfWork.CompleteAsync();
+
+            // ✅ AUDIT LOG: Registrar eliminación de empleado
+            try
+            {
+                await _auditLogService.LogAsync(
+                    "EmployeeDeleted",
+                    "Employee",
+                    id.ToString(),
+                    new Dictionary<string, string>
+                    {
+                        ["EmployeeName"] = $"{empleado.Nombre} {empleado.Apellido}",
+                        ["IdentificationNumber"] = empleado.NumeroIdentificacion ?? "N/A"
+                    });
+            }
+            catch (Exception)
+            {
+                // No bloqueamos la operación si falla el audit log
+            }
 
             return NoContent(); // Retorna un 204 No Content para indicar éxito
         }

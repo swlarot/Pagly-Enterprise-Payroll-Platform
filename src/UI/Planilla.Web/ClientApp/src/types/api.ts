@@ -412,3 +412,77 @@ export interface AuditLogPagedResultDto {
   pageSize: number;
   data: AuditLogDto[];
 }
+
+// System User DTOs (for listing ALL users in the system)
+export interface SystemUserDto {
+  userId: string;
+  email: string;
+  fullName: string;
+  createdAt: string;
+  isActive: boolean;
+  isSystemAdmin: boolean;
+  tenants: UserTenantMembershipDto[];
+}
+
+export interface UserTenantMembershipDto {
+  tenantId: number;
+  tenantName: string;
+  role: string;
+  joinedAt: string;
+  isActive: boolean;
+  lastLoginAt?: string;
+}
+
+export interface SystemUserPagedResultDto {
+  data: SystemUserDto[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+// Plan Usage DTOs
+export interface PlanUsageDto {
+  planName: string;
+  planDisplayName: string;
+  monthlyPrice: number;
+  limits: PlanLimitsDto;
+  usage: PlanUsageStatsDto;
+  remaining: PlanRemainingDto;
+  features: FeatureAvailabilityDto[];
+  canInviteUsers: boolean;
+  canCreateEmployees: boolean;
+  canCreateCompanies: boolean;
+  shouldUpgrade: boolean;
+  upgradeMessage: string | null;
+}
+
+export interface PlanLimitsDto {
+  maxEmployees: number;
+  maxUsers: number;
+  maxCompanies: number;
+}
+
+export interface PlanUsageStatsDto {
+  activeEmployees: number;
+  activeUsers: number;
+  pendingInvitations: number;
+  activeCompanies: number;
+}
+
+export interface PlanRemainingDto {
+  employees: number;
+  users: number;
+  companies: number;
+  employeesPercentage: number;
+  usersPercentage: number;
+  companiesPercentage: number;
+}
+
+export interface FeatureAvailabilityDto {
+  featureName: string;
+  isAvailable: boolean;
+  description: string;
+}

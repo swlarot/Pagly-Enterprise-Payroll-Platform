@@ -20,12 +20,14 @@ public class PrestamosController : ControllerBase
     private readonly IUnitOfWork _unitOfWork;
     private readonly ApplicationDbContext _context;
     private readonly ITenantContext _tenantContext;
+    private readonly IAuditLogService _auditLogService;
 
-    public PrestamosController(IUnitOfWork unitOfWork, ApplicationDbContext context, ITenantContext tenantContext)
+    public PrestamosController(IUnitOfWork unitOfWork, ApplicationDbContext context, ITenantContext tenantContext, IAuditLogService auditLogService)
     {
         _unitOfWork = unitOfWork;
         _context = context;
         _tenantContext = tenantContext;
+        _auditLogService = auditLogService;
     }
 
     /// <summary>
@@ -193,6 +195,29 @@ public class PrestamosController : ControllerBase
             .Include(p => p.Empleado)
             .FirstOrDefaultAsync();
 
+        // ✅ AUDIT LOG: Registrar creación de préstamo
+        try
+        {
+            await _auditLogService.LogAsync(
+                "LoanCreated",
+                "Loan",
+                prestamo!.Id.ToString(),
+                new Dictionary<string, string>
+                {
+                    ["EmployeeId"] = prestamo.EmpleadoId.ToString(),
+                    ["EmployeeName"] = prestamo.Empleado != null ? $"{prestamo.Empleado.Nombre} {prestamo.Empleado.Apellido}" : "N/A",
+                    ["Amount"] = prestamo.MontoOriginal.ToString("N2"),
+                    ["MonthlyPayment"] = prestamo.CuotaMensual.ToString("N2"),
+                    ["Installments"] = prestamo.NumeroCuotas.ToString(),
+                    ["InterestRate"] = prestamo.TasaInteres.ToString("N2"),
+                    ["Description"] = prestamo.Descripcion ?? "N/A"
+                });
+        }
+        catch (Exception)
+        {
+            // No bloqueamos la operación si falla el audit log
+        }
+
         var prestamoDto = MapToDto(prestamo!);
         return CreatedAtAction(nameof(GetById), new { id = prestamo!.Id }, prestamoDto);
     }
@@ -241,6 +266,26 @@ public class PrestamosController : ControllerBase
         prestamo.UpdatedAt = DateTime.UtcNow;
 
         await _unitOfWork.CompleteAsync();
+
+        // ✅ AUDIT LOG: Registrar actualización de préstamo
+        try
+        {
+            await _auditLogService.LogAsync(
+                "LoanUpdated",
+                "Loan",
+                id.ToString(),
+                new Dictionary<string, string>
+                {
+                    ["MonthlyPayment"] = prestamo.CuotaMensual.ToString("N2"),
+                    ["InterestRate"] = prestamo.TasaInteres.ToString("N2"),
+                    ["Description"] = prestamo.Descripcion ?? "N/A"
+                });
+        }
+        catch (Exception)
+        {
+            // No bloqueamos la operación si falla el audit log
+        }
+
         return NoContent();
     }
 
@@ -336,6 +381,27 @@ public class PrestamosController : ControllerBase
         prestamo.UpdatedAt = DateTime.UtcNow;
 
         await _unitOfWork.CompleteAsync();
+
+        // ✅ AUDIT LOG: Registrar cancelación de préstamo
+        try
+        {
+            await _auditLogService.LogAsync(
+                "LoanCancelled",
+                "Loan",
+                id.ToString(),
+                new Dictionary<string, string>
+                {
+                    ["OriginalAmount"] = prestamo.MontoOriginal.ToString("N2"),
+                    ["RemainingBalance"] = prestamo.MontoPendiente.ToString("N2"),
+                    ["InstallmentsPaid"] = prestamo.CuotasPagadas.ToString(),
+                    ["TotalInstallments"] = prestamo.NumeroCuotas.ToString()
+                });
+        }
+        catch (Exception)
+        {
+            // No bloqueamos la operación si falla el audit log
+        }
+
         return NoContent();
     }
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { UsageDashboard } from '../components/UsageDashboard';
+import PlanUsageCard from '../components/tenant/PlanUsageCard';
 import { TenantRole } from '../types/api';
 
 export default function AdminDashboardPage() {
@@ -30,11 +31,15 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Usage Dashboard - New Component */}
-      <UsageDashboard />
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column: Usage Dashboard and Quick Actions */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Usage Dashboard - New Component */}
+          <UsageDashboard />
 
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {hasRole(TenantRole.Owner, TenantRole.Admin) && (
           <Link
             to="/users"
@@ -119,6 +124,13 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         </Link>
+          </div>
+        </div>
+
+        {/* Right Column: Plan Usage Card */}
+        <div className="lg:col-span-1">
+          <PlanUsageCard />
+        </div>
       </div>
     </div>
   );

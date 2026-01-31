@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Planilla.Application.Services;
 using Vorluno.Planilla.Application.Common;
 using Vorluno.Planilla.Application.DTOs.Auth;
 using Vorluno.Planilla.Application.DTOs.Tenant;
@@ -27,6 +28,7 @@ public class InvitationService : IInvitationService
     private readonly UserManager<AppUser> _userManager;
     private readonly IConfiguration _configuration;
     private readonly IJwtTokenService _jwtTokenService;
+    private readonly IEmailService _emailService;
     private readonly ILogger<InvitationService> _logger;
 
     public InvitationService(
@@ -37,6 +39,7 @@ public class InvitationService : IInvitationService
         UserManager<AppUser> userManager,
         IConfiguration configuration,
         IJwtTokenService jwtTokenService,
+        IEmailService emailService,
         ILogger<InvitationService> logger)
     {
         _context = context;
@@ -46,6 +49,7 @@ public class InvitationService : IInvitationService
         _userManager = userManager;
         _configuration = configuration;
         _jwtTokenService = jwtTokenService;
+        _emailService = emailService;
         _logger = logger;
     }
 
@@ -123,8 +127,37 @@ public class InvitationService : IInvitationService
             _logger.LogInformation("Invitation created for {Email} in tenant {TenantId}", dto.Email, tenantId);
 
             // Construir URL de invitación (asumiendo frontend en /accept-invite)
-            var baseUrl = _configuration["App:FrontendUrl"] ?? "https://localhost:5173";
+            var baseUrl = _configuration["App:BaseUrl"] ?? "https://localhost:5001";
             var inviteUrl = $"{baseUrl}/accept-invite?token={invitation.Token}";
+
+            // Enviar email de invitación (no bloquear si falla)
+            try
+            {
+                var tenant = await _context.Tenants
+                    .FirstOrDefaultAsync(t => t.Id == tenantId);
+
+                var inviter = await _userManager.FindByIdAsync(_tenantContext.UserId!);
+                var inviterName = inviter?.NombreCompleto ?? inviter?.Email ?? "el administrador";
+
+                if (tenant != null)
+                {
+                    await _emailService.SendInvitationEmailAsync(
+                        recipientEmail: dto.Email,
+                        recipientName: dto.Email.Split('@')[0], // Usar parte del email como nombre temporal
+                        tenantName: tenant.Name,
+                        inviterName: inviterName,
+                        inviteUrl: inviteUrl,
+                        expiresAt: invitation.ExpiresAt
+                    );
+
+                    _logger.LogInformation("Invitation email sent successfully to {Email}", dto.Email);
+                }
+            }
+            catch (Exception emailEx)
+            {
+                // Log error pero no bloquear la invitación
+                _logger.LogWarning(emailEx, "Failed to send invitation email to {Email}. Invitation was created successfully but email delivery failed.", dto.Email);
+            }
 
             var response = new InvitationResponseDto
             {
