@@ -1,0 +1,212 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    SCREENSHOT DEL COMPONENTE PlanUsageCard
+                         (Representación Visual Detallada)
+═══════════════════════════════════════════════════════════════════════════════
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│  ┌─────────────────────────────────────────────────────────────────────┐ │
+│  │ ░░░░░░░░░░░░░░░░░░░ HEADER (Gradiente Azul) ░░░░░░░░░░░░░░░░░░░░░░ │ │
+│  │                                                                     │ │
+│  │  👑 Plan Profesional                      ┌──────────────────┐     │ │
+│  │                                           │  ⬆ Actualizar   │     │ │
+│  │  $79.99/mes                                │     Plan        │     │ │
+│  │                                           └──────────────────┘     │ │
+│  │                                            (Botón Amarillo)        │ │
+│  └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                           │
+│  ┌─────────────────────────────────────────────────────────────────────┐ │
+│  │ ⚠️  Has alcanzado el 90% del límite de empleados.                  │ │
+│  │     Considera actualizar tu plan para agregar más empleados.        │ │
+│  └─────────────────────────────────────────────────────────────────────┘ │
+│  (Banner Amarillo - solo visible si shouldUpgrade = true)                │
+│                                                                           │
+│  ┌─────────────────────────────────────────────────────────────────────┐ │
+│  │                        📊 BARRAS DE USO                             │ │
+│  │                                                                     │ │
+│  │  👥 Empleados                                          45 / 100    │ │
+│  │  ██████████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░             │ │
+│  │  55 disponibles                                            45%     │ │
+│  │                                           (Barra Azul: 50-74%)     │ │
+│  │                                                                     │ │
+│  │  ✓ Usuarios                                              7 / 10    │ │
+│  │  5 activos, 2 pendientes                                           │ │
+│  │  ██████████████████████████████░░░░░░░░░░░░░░░░░░░░░░░             │ │
+│  │  3 disponibles                                             70%     │ │
+│  │                                           (Barra Azul: 50-74%)     │ │
+│  │                                                                     │ │
+│  │  🏢 Compañías                                             1 / 3    │ │
+│  │  ████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░             │ │
+│  │  2 disponibles                                             33%     │ │
+│  │                                          (Barra Verde: < 50%)      │ │
+│  └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                           │
+│  ─────────────────────────────────────────────────────────────────────── │
+│                                                                           │
+│  ┌─────────────────────────────────────────────────────────────────────┐ │
+│  │              ✨ CARACTERÍSTICAS DEL PLAN                            │ │
+│  │                                                                     │ │
+│  │  ✅ Exportar Excel            ✅ Exportar PDF                      │ │
+│  │  ✅ Acceso API                ✅ Notificaciones Email              │ │
+│  │  ✅ Registro de Auditoría     ✅ Soporte Prioritario               │ │
+│  │  ❌ Whitelabel                ❌ SSO (SAML/OAuth)                  │ │
+│  │                                                                     │ │
+│  └─────────────────────────────────────────────────────────────────────┘ │
+│                                                                           │
+└───────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+DETALLES VISUALES:
+
+1. HEADER (Gradiente Azul)
+   - Fondo: Gradiente de #2563eb a #1d4ed8
+   - Texto: Blanco (#ffffff)
+   - Icono: Corona (👑) dorada
+   - Tipografía: Título en 2xl bold, precio en text-blue-100
+
+2. BOTÓN "ACTUALIZAR PLAN"
+   - Color: bg-yellow-500 hover:bg-yellow-600
+   - Icono: TrendingUp (⬆)
+   - Texto: Blanco
+   - Bordes redondeados: rounded-lg
+   - Solo visible si shouldUpgrade = true
+
+3. ALERTA DE UPGRADE
+   - Fondo: #fef3c7 (yellow-50)
+   - Borde izquierdo: 4px #eab308 (yellow-500)
+   - Icono: AlertTriangle (⚠️) amarillo
+   - Texto: #92400e (yellow-800)
+
+4. BARRAS DE PROGRESO
+   - Altura: 10px (h-2.5)
+   - Fondo gris: #e5e7eb (gray-200)
+   - Bordes redondeados completos
+   - Animación: transition-all duration-300
+   - Colores dinámicos según porcentaje:
+     * < 50%: bg-green-500 (#22c55e)
+     * 50-74%: bg-blue-500 (#3b82f6)
+     * 75-89%: bg-yellow-500 (#eab308)
+     * >= 90%: bg-red-600 (#dc2626)
+
+5. FEATURES
+   - Grid 2 columnas en desktop
+   - Checkmark verde (✅): CheckCircle lucide, #16a34a
+   - X gris (❌): XCircle lucide, #9ca3af
+   - Texto disponible: text-gray-900
+   - Texto no disponible: text-gray-500 + line-through
+   - Tooltip en hover muestra descripción
+
+6. TIPOGRAFÍA
+   - Título plan: text-2xl font-bold
+   - Precio: text-blue-100
+   - Labels barras: font-medium text-gray-900
+   - Valores: text-sm font-semibold
+   - Porcentajes: text-xs font-medium (color según umbral)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ESTADOS DEL COMPONENTE:
+
+A. LOADING
+   ┌─────────────────────────────┐
+   │                             │
+   │         🔄                  │
+   │    (Spinner animado)        │
+   │                             │
+   └─────────────────────────────┘
+
+B. ERROR
+   ┌─────────────────────────────┐
+   │   ❌ No se pudo cargar la   │
+   │   información del plan      │
+   └─────────────────────────────┘
+
+C. PLAN FREE (Límite Alcanzado)
+   ┌─────────────────────────────┐
+   │ 👑 Plan Free  [ACTUALIZAR]  │
+   │ $0.00/mes                   │
+   ├─────────────────────────────┤
+   │ ⚠️ Has alcanzado el límite │
+   │                             │
+   │ 👥 5 / 5  ████████ 100% 🔴 │
+   │ ✓ 1 / 1  ████████ 100% 🔴 │
+   └─────────────────────────────┘
+
+D. PLAN ENTERPRISE (Ilimitado)
+   ┌─────────────────────────────┐
+   │ 👑 Plan Enterprise          │
+   │ $199.99/mes                 │
+   ├─────────────────────────────┤
+   │ 👥 250 / ∞  ░░░░░░░ 0%     │
+   │ ✓  15 / ∞  ░░░░░░░ 0%     │
+   │ 🏢  5 / ∞  ░░░░░░░ 0%     │
+   │                             │
+   │ ✅ Todas las características│
+   └─────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+INTEGRACIÓN EN ADMIN DASHBOARD:
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                          ADMIN DASHBOARD                                  │
+├───────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  Bienvenido, admin@empresa.com · Admin                                   │
+│                                                                           │
+│  ┌─────────────────────────┐                                             │
+│  │ Empresa ABC S.A.        │                                             │
+│  │ RUC: 12345-67-890123    │                                             │
+│  └─────────────────────────┘                                             │
+│                                                                           │
+│  ┌────────────────────────────────────┬──────────────────────────────┐   │
+│  │  COLUMNA IZQUIERDA (2/3)           │  COLUMNA DERECHA (1/3)       │   │
+│  │                                    │                              │   │
+│  │  ┌──────────────────────────┐      │  ┌────────────────────────┐ │   │
+│  │  │   Usage Dashboard        │      │  │                        │ │   │
+│  │  │   (Métricas existentes)  │      │  │   PlanUsageCard        │ │   │
+│  │  └──────────────────────────┘      │  │   (NUEVO)              │ │   │
+│  │                                    │  │                        │ │   │
+│  │  ┌──────────┬──────────┐           │  │  👑 Plan Professional │ │   │
+│  │  │ Gestionar│   Audit  │           │  │  $79.99/mes          │ │   │
+│  │  │ Usuarios │    Log   │           │  │                      │ │   │
+│  │  └──────────┴──────────┘           │  │  👥 45/100  45%      │ │   │
+│  │                                    │  │  ✓  7/10   70%      │ │   │
+│  │  ┌──────────┐                      │  │  🏢 1/3    33%      │ │   │
+│  │  │Empleados │                      │  │                      │ │   │
+│  │  └──────────┘                      │  │  ✅ Features...      │ │   │
+│  │                                    │  └────────────────────────┘ │   │
+│  └────────────────────────────────────┴──────────────────────────────┘   │
+│                                                                           │
+└───────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+
+RESPONSIVE BREAKPOINTS:
+
+Mobile (< 768px):
+- Card ocupa 100% ancho
+- Features en 1 columna
+- Padding reducido
+
+Tablet (768px - 1023px):
+- Card ocupa 100% ancho
+- Features en 2 columnas
+
+Desktop (>= 1024px):
+- Card ocupa 1/3 del grid (lg:col-span-1)
+- Features en 2 columnas
+- Layout óptimo con sidebar
+
+═══════════════════════════════════════════════════════════════════════════════
+
+ACCESIBILIDAD:
+
+- Colores con contraste WCAG AA
+- Iconos con significado semántico
+- Tooltips descriptivos (title attribute)
+- Loading state para screen readers
+- Textos alternativos para estados
+
+═══════════════════════════════════════════════════════════════════════════════

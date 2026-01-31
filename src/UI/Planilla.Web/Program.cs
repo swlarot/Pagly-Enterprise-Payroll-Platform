@@ -145,6 +145,8 @@ builder.Services.AddScoped<IJwtTokenService, Vorluno.Planilla.Web.Services.JwtTo
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<ITenantManagementService, TenantManagementService>();
 builder.Services.AddScoped<IInvitationService, InvitationService>();
+builder.Services.AddScoped<global::Planilla.Application.Services.IEmailService, Vorluno.Planilla.Infrastructure.Services.EmailService>();
+builder.Services.AddScoped<global::Planilla.Application.Services.IPlanUsageService, Vorluno.Planilla.Infrastructure.Services.PlanUsageService>();
 
 // --- FIN DE NUESTRA CONFIGURACIÓN PRINCIPAL ---
 

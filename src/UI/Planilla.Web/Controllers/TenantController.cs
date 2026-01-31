@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Planilla.Application.Services;
 using Vorluno.Planilla.Application.DTOs.Tenant;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Web.Filters;
@@ -19,17 +20,23 @@ public class TenantController : ControllerBase
     private readonly ITenantManagementService _tenantService;
     private readonly IInvitationService _invitationService;
     private readonly IAuditLogService _auditLogService;
+    private readonly IPlanUsageService _planUsageService;
+    private readonly ITenantContext _tenantContext;
     private readonly ILogger<TenantController> _logger;
 
     public TenantController(
         ITenantManagementService tenantService,
         IInvitationService invitationService,
         IAuditLogService auditLogService,
+        IPlanUsageService planUsageService,
+        ITenantContext tenantContext,
         ILogger<TenantController> logger)
     {
         _tenantService = tenantService;
         _invitationService = invitationService;
         _auditLogService = auditLogService;
+        _planUsageService = planUsageService;
+        _tenantContext = tenantContext;
         _logger = logger;
     }
 
@@ -65,6 +72,27 @@ public class TenantController : ControllerBase
         }
 
         return Ok(result.Value);
+    }
+
+    /// <summary>
+    /// GET /api/tenant/plan-usage - Obtiene uso detallado del plan con límites, uso actual, y features disponibles
+    /// Roles: Todos los autenticados pueden ver el uso de su plan
+    /// Respuesta: Límites del plan, uso actual, porcentajes, features disponibles, warnings de upgrade
+    /// </summary>
+    [HttpGet("plan-usage")]
+    public async Task<IActionResult> GetPlanUsage()
+    {
+        try
+        {
+            var tenantId = _tenantContext.TenantId;
+            var usage = await _planUsageService.GetPlanUsageAsync(tenantId);
+            return Ok(usage);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error al obtener uso del plan");
+            return BadRequest(new { error = "Error al obtener información del plan" });
+        }
     }
 
     /// <summary>

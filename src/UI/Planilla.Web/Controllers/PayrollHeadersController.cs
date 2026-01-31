@@ -30,17 +30,20 @@ public class PayrollHeadersController : ControllerBase
     private readonly PayrollStateMachine _stateMachine;
     private readonly PayrollCalculationOrchestratorPortable _orchestrator;
     private readonly ITenantContext _tenantContext;
+    private readonly IAuditLogService _auditLogService;
 
     public PayrollHeadersController(
         ApplicationDbContext context,
         PayrollStateMachine stateMachine,
         PayrollCalculationOrchestratorPortable orchestrator,
-        ITenantContext tenantContext)
+        ITenantContext tenantContext,
+        IAuditLogService auditLogService)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _stateMachine = stateMachine ?? throw new ArgumentNullException(nameof(stateMachine));
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
         _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
+        _auditLogService = auditLogService ?? throw new ArgumentNullException(nameof(auditLogService));
     }
 
     /// <summary>
@@ -158,6 +161,27 @@ public class PayrollHeadersController : ControllerBase
         try
         {
             await _context.SaveChangesAsync();
+
+            // ✅ AUDIT LOG: Registrar creación de planilla
+            try
+            {
+                await _auditLogService.LogAsync(
+                    "PayrollCreated",
+                    "PayrollHeader",
+                    payrollHeader.Id.ToString(),
+                    new Dictionary<string, string>
+                    {
+                        ["PayrollNumber"] = payrollHeader.PayrollNumber,
+                        ["PeriodStart"] = payrollHeader.PeriodStartDate.ToString("yyyy-MM-dd"),
+                        ["PeriodEnd"] = payrollHeader.PeriodEndDate.ToString("yyyy-MM-dd"),
+                        ["PayDate"] = payrollHeader.PayDate.ToString("yyyy-MM-dd"),
+                        ["Status"] = payrollHeader.Status.ToString()
+                    });
+            }
+            catch (Exception)
+            {
+                // No bloqueamos la operación si falla el audit log
+            }
         }
         catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("IX_PayrollHeader_TenantId_PayrollNumber") == true)
         {
@@ -300,6 +324,30 @@ public class PayrollHeadersController : ControllerBase
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
+            // ✅ AUDIT LOG: Registrar cálculo de planilla
+            try
+            {
+                await _auditLogService.LogAsync(
+                    "PayrollCalculated",
+                    "PayrollHeader",
+                    id.ToString(),
+                    new Dictionary<string, string>
+                    {
+                        ["PayrollNumber"] = payrollHeader.PayrollNumber,
+                        ["PeriodStart"] = payrollHeader.PeriodStartDate.ToString("yyyy-MM-dd"),
+                        ["PeriodEnd"] = payrollHeader.PeriodEndDate.ToString("yyyy-MM-dd"),
+                        ["TotalEmployees"] = activeEmployees.Count.ToString(),
+                        ["TotalGrossPay"] = totalGrossPay.ToString("N2"),
+                        ["TotalDeductions"] = totalDeductions.ToString("N2"),
+                        ["TotalNetPay"] = totalNetPay.ToString("N2"),
+                        ["TotalEmployerCost"] = totalEmployerCost.ToString("N2")
+                    });
+            }
+            catch (Exception)
+            {
+                // No bloqueamos la operación si falla el audit log
+            }
+
             return Ok(new
             {
                 message = "Planilla calculada exitosamente",
@@ -377,6 +425,27 @@ public class PayrollHeadersController : ControllerBase
         try
         {
             await _context.SaveChangesAsync();
+
+            // ✅ AUDIT LOG: Registrar aprobación de planilla
+            try
+            {
+                await _auditLogService.LogAsync(
+                    "PayrollApproved",
+                    "PayrollHeader",
+                    id.ToString(),
+                    new Dictionary<string, string>
+                    {
+                        ["PayrollNumber"] = payrollHeader.PayrollNumber,
+                        ["TotalNetPay"] = payrollHeader.TotalNetPay.ToString("N2"),
+                        ["ApprovedBy"] = payrollHeader.ApprovedBy ?? "Unknown",
+                        ["ApprovedDate"] = payrollHeader.ApprovedDate?.ToString("yyyy-MM-dd HH:mm") ?? "N/A"
+                    });
+            }
+            catch (Exception)
+            {
+                // No bloqueamos la operación si falla el audit log
+            }
+
             return Ok(new
             {
                 message = "Planilla aprobada exitosamente",
@@ -465,6 +534,26 @@ public class PayrollHeadersController : ControllerBase
         try
         {
             await _context.SaveChangesAsync();
+
+            // ✅ AUDIT LOG: Registrar cancelación de planilla
+            try
+            {
+                await _auditLogService.LogAsync(
+                    "PayrollCancelled",
+                    "PayrollHeader",
+                    id.ToString(),
+                    new Dictionary<string, string>
+                    {
+                        ["PayrollNumber"] = payrollHeader.PayrollNumber,
+                        ["PreviousStatus"] = PayrollStatus.Approved.ToString(), // Asumimos que venía de Approved
+                        ["CancelledDate"] = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm")
+                    });
+            }
+            catch (Exception)
+            {
+                // No bloqueamos la operación si falla el audit log
+            }
+
             return Ok(new
             {
                 message = "Planilla cancelada exitosamente",

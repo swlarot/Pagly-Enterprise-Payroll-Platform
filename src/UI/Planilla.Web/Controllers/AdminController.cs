@@ -782,6 +782,116 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
+    /// GET /api/admin/system/users - Lista TODOS los usuarios del sistema con sus membresías de tenants
+    /// Requiere: IsSystemAdmin = true
+    /// IMPORTANTE: No filtra por tenant - muestra todos los usuarios del sistema
+    /// </summary>
+    [HttpGet("system/users")]
+    public async Task<IActionResult> GetAllSystemUsers(
+        [FromQuery] string? search = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        try
+        {
+            // Limitar pageSize
+            if (pageSize > 100) pageSize = 100;
+            if (pageSize < 1) pageSize = 20;
+            if (page < 1) page = 1;
+
+            // Query base de usuarios
+            var query = _context.Users.AsQueryable();
+
+            // Filtro de búsqueda (case-insensitive)
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var searchLower = search.ToLower();
+                query = query.Where(u =>
+                    u.Email!.ToLower().Contains(searchLower) ||
+                    (u.NombreCompleto != null && u.NombreCompleto.ToLower().Contains(searchLower)) ||
+                    u.UserName!.ToLower().Contains(searchLower));
+            }
+
+            // Total count
+            var total = await query.CountAsync();
+
+            // Paginación
+            var users = await query
+                .OrderBy(u => u.Email)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(u => new
+                {
+                    u.Id,
+                    u.Email,
+                    u.NombreCompleto,
+                    u.IsSystemAdmin,
+                    // ASP.NET Identity no tiene CreatedAt por defecto, usar DateTime.MinValue como placeholder
+                    CreatedAt = DateTime.UtcNow // TODO: Agregar CreatedAt a AppUser si es necesario
+                })
+                .ToListAsync();
+
+            // Obtener membresías de tenants para cada usuario
+            var userIds = users.Select(u => u.Id).ToList();
+            var tenantMemberships = await _context.TenantUsers
+                .Where(tu => userIds.Contains(tu.UserId))
+                .Include(tu => tu.Tenant)
+                .Select(tu => new
+                {
+                    tu.UserId,
+                    TenantMembership = new UserTenantMembershipDto
+                    {
+                        TenantId = tu.TenantId,
+                        TenantName = tu.Tenant.Name,
+                        Role = tu.Role.ToString(),
+                        JoinedAt = tu.JoinedAt,
+                        IsActive = tu.IsActive,
+                        LastLoginAt = tu.LastLoginAt
+                    }
+                })
+                .ToListAsync();
+
+            // Agrupar por userId
+            var membershipsByUser = tenantMemberships
+                .GroupBy(tm => tm.UserId)
+                .ToDictionary(g => g.Key, g => g.Select(x => x.TenantMembership).ToList());
+
+            // Mapear a DTOs
+            var result = users.Select(u => new SystemUserDto
+            {
+                UserId = u.Id,
+                Email = u.Email ?? string.Empty,
+                FullName = u.NombreCompleto ?? u.Email ?? "Sin nombre",
+                CreatedAt = u.CreatedAt,
+                IsActive = true, // TODO: Agregar IsActive a AppUser si es necesario
+                IsSystemAdmin = u.IsSystemAdmin,
+                Tenants = membershipsByUser.ContainsKey(u.Id)
+                    ? membershipsByUser[u.Id]
+                    : new List<UserTenantMembershipDto>()
+            }).ToList();
+
+            var response = new SystemUserPagedResultDto
+            {
+                Data = result,
+                Total = total,
+                Page = page,
+                PageSize = pageSize
+            };
+
+            _logger.LogInformation(
+                "SystemAdmin {AdminId} listed all system users (Total: {Total}, Page: {Page}, Search: {Search})",
+                User.FindFirst("sub")?.Value, total, page, search ?? "none");
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting all system users");
+            return StatusCode(500, new { error = "Error al obtener los usuarios del sistema" });
+        }
+    }
+
+    /// <summary>
     /// POST /api/admin/tenants/{id}/users - Invita un usuario a un tenant
     /// Requiere: IsSystemAdmin = true
     /// </summary>

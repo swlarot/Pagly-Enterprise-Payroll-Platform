@@ -6,6 +6,7 @@ import type {
   InvitationDto,
   TenantUsageDto,
   UpdateTenantUserDto,
+  PlanUsageDto,
 } from '../types/api';
 
 export const tenantService = {
@@ -39,5 +40,9 @@ export const tenantService = {
 
   async getUsage(): Promise<TenantUsageDto> {
     return api.get<TenantUsageDto>('/api/tenant/usage');
+  },
+
+  async getPlanUsage(): Promise<PlanUsageDto> {
+    return api.get<PlanUsageDto>('/api/tenant/plan-usage');
   },
 };

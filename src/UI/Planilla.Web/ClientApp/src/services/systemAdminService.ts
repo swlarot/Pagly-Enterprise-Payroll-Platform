@@ -8,11 +8,28 @@ import type {
   UpdateTenantSubscriptionDto,
   InviteUserRequest,
   AuditLogPagedResultDto,
+  SystemUserPagedResultDto,
 } from '../types/api';
 
 export const systemAdminService = {
   // Dashboard metrics
   getMetrics: () => api.get<SystemMetricsDto>('/api/admin/metrics'),
+
+  // System-wide user management
+  getAllSystemUsers: (params?: {
+    search?: string;
+    page?: number;
+    pageSize?: number;
+  }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.pageSize) queryParams.append('pageSize', params.pageSize.toString());
+
+    const queryString = queryParams.toString();
+    const url = `/api/admin/system/users${queryString ? `?${queryString}` : ''}`;
+    return api.get<SystemUserPagedResultDto>(url);
+  },
 
   // Tenant management
   getAllTenants: (params?: {
