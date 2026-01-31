@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useToast } from '../components/ToastContext';
+import toast from 'react-hot-toast';
+import { api } from '../services/api';
 
 const AusenciasPage = () => {
-    const { showToast } = useToast();
 
     // State management
     const [ausencias, setAusencias] = useState([]);
@@ -38,12 +38,10 @@ const AusenciasPage = () => {
     const fetchAusencias = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/ausencias');
-            if (!response.ok) throw new Error(`Error ${response.status}`);
-            const data = await response.json();
+            const data = await api.get('/api/ausencias');
             setAusencias(data);
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar ausencias: ${err.message}` });
+            toast.error(`Error al cargar ausencias: ${err.message}`);
         } finally {
             setLoading(false);
         }
@@ -51,23 +49,19 @@ const AusenciasPage = () => {
 
     const fetchEmpleados = async () => {
         try {
-            const response = await fetch('/api/empleados');
-            if (!response.ok) throw new Error(`Error ${response.status}`);
-            const data = await response.json();
+            const data = await api.get('/api/empleados');
             setEmpleados(data.filter(e => e.estaActivo));
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar empleados: ${err.message}` });
+            toast.error(`Error al cargar empleados: ${err.message}`);
         }
     };
 
     const fetchTipos = async () => {
         try {
-            const response = await fetch('/api/ausencias/tipos');
-            if (!response.ok) throw new Error(`Error ${response.status}`);
-            const data = await response.json();
+            const data = await api.get('/api/ausencias/tipos');
             setTipos(data);
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar tipos: ${err.message}` });
+            toast.error(`Error al cargar tipos: ${err.message}`);
         }
     };
 
@@ -96,9 +90,6 @@ const AusenciasPage = () => {
         e.preventDefault();
 
         try {
-            const url = editingId ? `/api/ausencias/${editingId}` : '/api/ausencias';
-            const method = editingId ? 'PUT' : 'POST';
-
             const payload = {
                 empleadoId: parseInt(formData.empleadoId),
                 tipoAusencia: parseInt(formData.tipoAusencia),
@@ -109,25 +100,17 @@ const AusenciasPage = () => {
                 documentoReferencia: formData.documentoReferencia || null
             };
 
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText);
+            if (editingId) {
+                await api.put(`/api/ausencias/${editingId}`, payload);
+            } else {
+                await api.post('/api/ausencias', payload);
             }
 
             await fetchAusencias();
-            showToast({
-                type: 'success',
-                message: editingId ? 'Ausencia actualizada' : 'Ausencia registrada'
-            });
+            toast.success(editingId ? 'Ausencia actualizada' : 'Ausencia registrada');
             resetForm();
         } catch (err) {
-            showToast({ type: 'error', message: `Error: ${err.message}` });
+            toast.error(`Error: ${err.message}`);
         }
     };
 
@@ -149,12 +132,11 @@ const AusenciasPage = () => {
         if (!window.confirm('¿Está seguro de eliminar esta ausencia?')) return;
 
         try {
-            const response = await fetch(`/api/ausencias/${id}`, { method: 'DELETE' });
-            if (!response.ok) throw new Error('Error al eliminar');
+            await api.delete(`/api/ausencias/${id}`);
             await fetchAusencias();
-            showToast({ type: 'success', message: 'Ausencia eliminada' });
+            toast.success('Ausencia eliminada');
         } catch (err) {
-            showToast({ type: 'error', message: err.message });
+            toast.error(err.message);
         }
     };
 

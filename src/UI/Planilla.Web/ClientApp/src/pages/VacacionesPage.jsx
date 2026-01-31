@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useToast } from '../components/ToastContext';
+import toast from 'react-hot-toast';
+import { api } from '../services/api';
 
 const VacacionesPage = () => {
-    const { showToast } = useToast();
 
     // State management
     const [vacaciones, setVacaciones] = useState([]);
@@ -37,12 +37,10 @@ const VacacionesPage = () => {
     const fetchVacaciones = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/vacaciones');
-            if (!response.ok) throw new Error(`Error ${response.status}`);
-            const data = await response.json();
+            const data = await api.get('/api/vacaciones');
             setVacaciones(data);
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar vacaciones: ${err.message}` });
+            toast.error(`Error al cargar vacaciones: ${err.message}`);
         } finally {
             setLoading(false);
         }
@@ -51,23 +49,21 @@ const VacacionesPage = () => {
     const fetchSaldos = async () => {
         try {
             const saldosPromises = empleados.map(emp =>
-                fetch(`/api/vacaciones/saldo/${emp.id}`).then(r => r.ok ? r.json() : null)
+                api.get(`/api/vacaciones/saldo/${emp.id}`).catch(() => null)
             );
             const saldosData = await Promise.all(saldosPromises);
             setSaldos(saldosData.filter(s => s !== null));
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar saldos: ${err.message}` });
+            toast.error(`Error al cargar saldos: ${err.message}`);
         }
     };
 
     const fetchEmpleados = async () => {
         try {
-            const response = await fetch('/api/empleados');
-            if (!response.ok) throw new Error(`Error ${response.status}`);
-            const data = await response.json();
+            const data = await api.get('/api/empleados');
             setEmpleados(data.filter(e => e.estaActivo));
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar empleados: ${err.message}` });
+            toast.error(`Error al cargar empleados: ${err.message}`);
         }
     };
 
@@ -121,33 +117,23 @@ const VacacionesPage = () => {
                 observaciones: formData.observaciones || null
             };
 
-            const response = await fetch('/api/vacaciones', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.message || 'Error al crear solicitud');
-            }
+            await api.post('/api/vacaciones', payload);
 
             await fetchVacaciones();
-            showToast({ type: 'success', message: 'Solicitud de vacaciones creada' });
+            toast.success('Solicitud de vacaciones creada');
             resetForm();
         } catch (err) {
-            showToast({ type: 'error', message: `Error: ${err.message}` });
+            toast.error(`Error: ${err.message}`);
         }
     };
 
     const handleAprobar = async (id) => {
         try {
-            const response = await fetch(`/api/vacaciones/${id}/aprobar`, { method: 'POST' });
-            if (!response.ok) throw new Error('Error al aprobar');
+            await api.post(`/api/vacaciones/${id}/aprobar`, {});
             await fetchVacaciones();
-            showToast({ type: 'success', message: 'Solicitud aprobada' });
+            toast.success('Solicitud aprobada');
         } catch (err) {
-            showToast({ type: 'error', message: err.message });
+            toast.error(err.message);
         }
     };
 
@@ -159,25 +145,20 @@ const VacacionesPage = () => {
 
     const handleRechazar = async () => {
         if (!motivoRechazo.trim()) {
-            showToast({ type: 'error', message: 'Debe especificar el motivo del rechazo' });
+            toast.error('Debe especificar el motivo del rechazo');
             return;
         }
 
         try {
-            const response = await fetch(`/api/vacaciones/${solicitudToReject.id}/rechazar`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ motivo: motivoRechazo })
-            });
+            await api.post(`/api/vacaciones/${solicitudToReject.id}/rechazar`, { motivo: motivoRechazo });
 
-            if (!response.ok) throw new Error('Error al rechazar');
             await fetchVacaciones();
-            showToast({ type: 'success', message: 'Solicitud rechazada' });
+            toast.success('Solicitud rechazada');
             setShowRejectModal(false);
             setSolicitudToReject(null);
             setMotivoRechazo('');
         } catch (err) {
-            showToast({ type: 'error', message: err.message });
+            toast.error(err.message);
         }
     };
 
@@ -185,12 +166,11 @@ const VacacionesPage = () => {
         if (!window.confirm('¿Está seguro de cancelar esta solicitud?')) return;
 
         try {
-            const response = await fetch(`/api/vacaciones/${id}/cancelar`, { method: 'DELETE' });
-            if (!response.ok) throw new Error('Error al cancelar');
+            await api.delete(`/api/vacaciones/${id}/cancelar`);
             await fetchVacaciones();
-            showToast({ type: 'success', message: 'Solicitud cancelada' });
+            toast.success('Solicitud cancelada');
         } catch (err) {
-            showToast({ type: 'error', message: err.message });
+            toast.error(err.message);
         }
     };
 

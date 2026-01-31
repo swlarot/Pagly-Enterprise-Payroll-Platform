@@ -277,18 +277,58 @@ public class AuthController : ControllerBase
                 return Ok(systemAdminResponse);
             }
 
-            // 4. Obtener primer tenant activo del usuario
-            var tenantUser = await _context.TenantUsers
+            // 4. Obtener TODOS los tenants activos del usuario
+            var userTenants = await _context.TenantUsers
                 .Include(tu => tu.Tenant)
                     .ThenInclude(t => t.Subscription)
                 .Where(tu => tu.UserId == user.Id && tu.IsActive && tu.Tenant.IsActive)
-                .OrderBy(tu => tu.JoinedAt)  // Primer tenant que se unió
-                .FirstOrDefaultAsync();
+                .OrderBy(tu => tu.JoinedAt)
+                .ToListAsync();
 
-            if (tenantUser == null)
+            if (userTenants.Count == 0)
             {
                 return Unauthorized(new { message = "No tienes acceso a ninguna empresa activa" });
             }
+
+            // 4.1. Si el usuario tiene múltiples tenants, retornar la lista para selección
+            if (userTenants.Count > 1)
+            {
+                var availableTenants = userTenants.Select(tu => new TenantSummaryDto
+                {
+                    Id = tu.TenantId,
+                    Name = tu.Tenant.Name,
+                    Role = tu.Role,
+                    RoleName = tu.Role.ToString(),
+                    Subdomain = tu.Tenant.Subdomain
+                }).ToList();
+
+                // Retornar respuesta con lista de tenants, sin seleccionar ninguno aún
+                var multiTenantResponse = new AuthResponseDto
+                {
+                    Token = string.Empty, // No generar token aún
+                    RefreshToken = string.Empty,
+                    ExpiresAt = DateTime.MinValue,
+                    User = new UserInfoDto
+                    {
+                        UserId = user.Id,
+                        Email = user.Email!,
+                        Role = TenantRole.Owner, // Dummy, se actualizará al seleccionar
+                        RoleName = "Multiple"
+                    },
+                    Tenant = null, // No hay tenant seleccionado aún
+                    Subscription = null,
+                    AvailableTenants = availableTenants,
+                    RequiresTenantSelection = true
+                };
+
+                _logger.LogInformation("User {UserId} has {Count} tenants, requiring selection",
+                    user.Id, userTenants.Count);
+
+                return Ok(multiTenantResponse);
+            }
+
+            // 4.2. Si solo tiene un tenant, continuar con el flujo normal
+            var tenantUser = userTenants.First();
 
             // 5. Actualizar último login
             tenantUser.LastLoginAt = DateTime.UtcNow;
@@ -305,7 +345,19 @@ public class AuthController : ControllerBase
             // 8. Obtener límites del plan
             var limits = PlanFeatures.GetLimits(tenantUser.Tenant.Subscription.Plan);
 
-            // 9. Construir respuesta
+            // 9. Construir respuesta (con un solo tenant seleccionado)
+            var singleTenantList = new List<TenantSummaryDto>
+            {
+                new TenantSummaryDto
+                {
+                    Id = tenantUser.TenantId,
+                    Name = tenantUser.Tenant.Name,
+                    Role = tenantUser.Role,
+                    RoleName = tenantUser.Role.ToString(),
+                    Subdomain = tenantUser.Tenant.Subdomain
+                }
+            };
+
             var response = new AuthResponseDto
             {
                 Token = token.Token,
@@ -340,7 +392,9 @@ public class AuthController : ControllerBase
                     CanExportPdf = limits.CanExportPdf,
                     CanUseApi = limits.CanUseApi,
                     MonthlyPrice = tenantUser.Tenant.Subscription.MonthlyPrice
-                }
+                },
+                AvailableTenants = singleTenantList,
+                RequiresTenantSelection = false // Solo un tenant, no requiere selección
             };
 
             _logger.LogInformation("User {UserId} logged in to tenant {TenantId}",
@@ -783,5 +837,136 @@ public class AuthController : ControllerBase
             _logger.LogError(ex, "Error revoking token");
             return StatusCode(500, new { message = "Error al cerrar sesión" });
         }
+    }
+
+    /// <summary>
+    /// POST /api/auth/select-tenant - Selecciona un tenant cuando el usuario pertenece a múltiples empresas
+    /// Requiere autenticación pero acepta token sin tenant_id válido (primer login)
+    /// </summary>
+    [HttpPost("select-tenant")]
+    [Authorize]
+    public async Task<IActionResult> SelectTenant([FromBody] SelectTenantDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        try
+        {
+            // 1. Obtener userId del token actual
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized(new { message = "Usuario no identificado" });
+            }
+
+            // 2. Verificar que el usuario existe
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return NotFound(new { message = "Usuario no encontrado" });
+            }
+
+            // 3. Verificar que el usuario tiene acceso al tenant solicitado
+            var tenantUser = await _context.TenantUsers
+                .Include(tu => tu.Tenant)
+                    .ThenInclude(t => t.Subscription)
+                .FirstOrDefaultAsync(tu => tu.UserId == userId
+                    && tu.TenantId == dto.TenantId
+                    && tu.IsActive
+                    && tu.Tenant.IsActive);
+
+            if (tenantUser == null)
+            {
+                return Forbidden(new { message = "No tienes acceso a esta empresa o está inactiva" });
+            }
+
+            // 4. Actualizar último login
+            tenantUser.LastLoginAt = DateTime.UtcNow;
+            _context.TenantUsers.Update(tenantUser);
+            await _context.SaveChangesAsync();
+
+            // 5. Generar nuevo JWT con el tenant seleccionado
+            var token = GenerateJwtToken(user, tenantUser.Tenant, tenantUser);
+
+            // 6. Generar refresh token
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var refreshToken = await _jwtTokenService.GenerateRefreshTokenAsync(user.Id, tenantUser.TenantId, ipAddress);
+
+            // 7. Obtener límites del plan
+            var limits = PlanFeatures.GetLimits(tenantUser.Tenant.Subscription.Plan);
+
+            // 8. Obtener lista de todos los tenants del usuario (para mantener disponibilidad)
+            var allUserTenants = await _context.TenantUsers
+                .Where(tu => tu.UserId == userId && tu.IsActive)
+                .Include(tu => tu.Tenant)
+                .OrderBy(tu => tu.JoinedAt)
+                .ToListAsync();
+
+            var availableTenants = allUserTenants.Select(tu => new TenantSummaryDto
+            {
+                Id = tu.TenantId,
+                Name = tu.Tenant.Name,
+                Role = tu.Role,
+                RoleName = tu.Role.ToString(),
+                Subdomain = tu.Tenant.Subdomain
+            }).ToList();
+
+            // 9. Construir respuesta
+            var response = new AuthResponseDto
+            {
+                Token = token.Token,
+                RefreshToken = refreshToken.Token,
+                ExpiresAt = token.ExpiresAt,
+                User = new UserInfoDto
+                {
+                    UserId = user.Id,
+                    Email = user.Email!,
+                    Role = tenantUser.Role,
+                    RoleName = tenantUser.Role.ToString()
+                },
+                Tenant = new TenantInfoDto
+                {
+                    Id = tenantUser.Tenant.Id,
+                    Name = tenantUser.Tenant.Name,
+                    Subdomain = tenantUser.Tenant.Subdomain,
+                    RUC = tenantUser.Tenant.RUC,
+                    DV = tenantUser.Tenant.DV
+                },
+                Subscription = new SubscriptionInfoDto
+                {
+                    Plan = tenantUser.Tenant.Subscription.Plan,
+                    PlanName = tenantUser.Tenant.Subscription.Plan.ToString(),
+                    Status = tenantUser.Tenant.Subscription.Status,
+                    StatusName = tenantUser.Tenant.Subscription.Status.ToString(),
+                    TrialEndsAt = tenantUser.Tenant.Subscription.TrialEndsAt,
+                    MaxEmployees = tenantUser.Tenant.Subscription.GetEffectiveMaxEmployees(),
+                    MaxUsers = tenantUser.Tenant.Subscription.GetEffectiveMaxUsers(),
+                    MaxCompanies = limits.MaxCompanies,
+                    CanExportExcel = limits.CanExportExcel,
+                    CanExportPdf = limits.CanExportPdf,
+                    CanUseApi = limits.CanUseApi,
+                    MonthlyPrice = tenantUser.Tenant.Subscription.MonthlyPrice
+                },
+                AvailableTenants = availableTenants,
+                RequiresTenantSelection = false // Ya seleccionó
+            };
+
+            _logger.LogInformation("User {UserId} selected tenant {TenantId} ({TenantName})",
+                user.Id, tenantUser.TenantId, tenantUser.Tenant.Name);
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error selecting tenant");
+            return StatusCode(500, new { message = "Error al seleccionar empresa" });
+        }
+    }
+
+    private IActionResult Forbidden(object value)
+    {
+        return StatusCode(403, value);
     }
 }

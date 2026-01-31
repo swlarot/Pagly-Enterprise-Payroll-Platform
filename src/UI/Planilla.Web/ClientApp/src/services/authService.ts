@@ -4,6 +4,7 @@ import type {
   AcceptInvitationDto,
   AuthResponseDto,
   ValidateInviteResponseDto,
+  SelectTenantDto,
 } from '../types/api';
 
 // PAGLY: Auto-registro deshabilitado - usuarios creados solo via Admin Panel
@@ -26,5 +27,9 @@ export const authService = {
 
   async refreshToken(refreshToken: string): Promise<AuthResponseDto> {
     return api.post<AuthResponseDto>('/api/auth/refresh', { refreshToken });
+  },
+
+  async selectTenant(dto: SelectTenantDto): Promise<AuthResponseDto> {
+    return api.post<AuthResponseDto>('/api/auth/select-tenant', dto);
   },
 };

@@ -11,6 +11,7 @@ import { TenantRole } from './types/api';
 // Auth Pages
 import LoginPage from './pages/LoginPage';
 import AcceptInvitePage from './pages/AcceptInvitePage';
+import TenantSelectorPage from './pages/TenantSelectorPage';
 
 // Admin Pages (Tenant)
 import AdminDashboardPage from './pages/AdminDashboardPage';
@@ -70,6 +71,7 @@ function App() {
         {/* Public Routes - Login Only (No Self-Registration) */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/accept-invite" element={<AcceptInvitePage />} />
+        <Route path="/select-tenant" element={<TenantSelectorPage />} />
 
         {/* System Admin Routes */}
         <Route

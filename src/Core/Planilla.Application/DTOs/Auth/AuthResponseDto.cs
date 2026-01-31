@@ -34,4 +34,15 @@ public class AuthResponseDto
     /// Información de la suscripción (null para SystemAdmins)
     /// </summary>
     public SubscriptionInfoDto? Subscription { get; set; }
+
+    /// <summary>
+    /// Lista de todos los tenants a los que el usuario tiene acceso
+    /// Solo se llena en login, null en otros endpoints
+    /// </summary>
+    public List<TenantSummaryDto>? AvailableTenants { get; set; }
+
+    /// <summary>
+    /// Indica si el usuario debe seleccionar un tenant (tiene más de 1)
+    /// </summary>
+    public bool RequiresTenantSelection { get; set; }
 }

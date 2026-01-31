@@ -5,6 +5,7 @@ import type {
   TenantInfoDto,
   SubscriptionInfoDto,
   TenantRole,
+  TenantSummaryDto,
 } from '../types/api';
 import { isTokenExpired, parseJwt } from '../utils/jwt';
 
@@ -13,10 +14,12 @@ interface AuthContextType {
   user: UserInfoDto | null;
   tenant: TenantInfoDto | null;
   subscription: SubscriptionInfoDto | null;
+  availableTenants: TenantSummaryDto[];
   isAuthenticated: boolean;
   isSystemAdmin: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ requiresTenantSelection: boolean; availableTenants?: TenantSummaryDto[] }>;
+  selectTenant: (tenantId: number) => Promise<void>;
   logout: () => void;
   acceptInvite: (token: string, password: string, confirmPassword: string) => Promise<void>;
   canAccessFeature: (feature: keyof SubscriptionInfoDto) => boolean;
@@ -29,6 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserInfoDto | null>(null);
   const [tenant, setTenant] = useState<TenantInfoDto | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionInfoDto | null>(null);
+  const [availableTenants, setAvailableTenants] = useState<TenantSummaryDto[]>([]);
   const [isSystemAdmin, setIsSystemAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -52,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(data.user);
       setTenant(data.tenant);
       setSubscription(data.subscription);
+      setAvailableTenants(data.availableTenants || []);
 
       // Extract isSystemAdmin from token
       const payload = parseJwt(token);
@@ -66,18 +71,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (email: string, password: string) => {
     const data = await authService.login({ email, password });
+
+    // Si requiere selección de tenant, NO guardamos el token aún
+    if (data.requiresTenantSelection) {
+      // Solo guardamos temporalmente los datos del usuario
+      setUser(data.user);
+      setAvailableTenants(data.availableTenants || []);
+
+      // Retornar para que LoginPage pueda redirigir al selector
+      return {
+        requiresTenantSelection: true,
+        availableTenants: data.availableTenants || []
+      };
+    }
+
+    // Login normal (un solo tenant o SystemAdmin)
     localStorage.setItem('auth_token', data.token);
     localStorage.setItem('refresh_token', data.refreshToken);
     setUser(data.user);
     setTenant(data.tenant);
     setSubscription(data.subscription);
+    setAvailableTenants(data.availableTenants || []);
+
+    // Extract isSystemAdmin from token
+    const payload = parseJwt(data.token);
+    setIsSystemAdmin(payload?.is_system_admin === 'true' || payload?.is_system_admin === 'True');
+
+    return { requiresTenantSelection: false };
+  };
+
+  // PAGLY: register function removed - users created only via Admin Panel
+
+  const selectTenant = async (tenantId: number) => {
+    const data = await authService.selectTenant({ tenantId });
+
+    // Guardar el nuevo token con el tenant seleccionado
+    localStorage.setItem('auth_token', data.token);
+    localStorage.setItem('refresh_token', data.refreshToken);
+    setUser(data.user);
+    setTenant(data.tenant);
+    setSubscription(data.subscription);
+    setAvailableTenants(data.availableTenants || []);
 
     // Extract isSystemAdmin from token
     const payload = parseJwt(data.token);
     setIsSystemAdmin(payload?.is_system_admin === 'true' || payload?.is_system_admin === 'True');
   };
-
-  // PAGLY: register function removed - users created only via Admin Panel
 
   const logout = () => {
     localStorage.removeItem('auth_token');
@@ -85,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setTenant(null);
     setSubscription(null);
+    setAvailableTenants([]);
     setIsSystemAdmin(false);
   };
 
@@ -112,10 +152,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     tenant,
     subscription,
+    availableTenants,
     isAuthenticated: !!user,
     isSystemAdmin,
     isLoading,
     login,
+    selectTenant,
     logout,
     acceptInvite,
     canAccessFeature,

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useToast } from '../components/ToastContext';
+import toast from 'react-hot-toast';
+import { api } from '../services/api';
 
 const PrestamosPage = () => {
-    const { showToast } = useToast();
 
     // State management
     const [prestamos, setPrestamos] = useState([]);
@@ -41,13 +41,10 @@ const PrestamosPage = () => {
             if (filterEmpleado) params.append('empleadoId', filterEmpleado);
             if (filterEstado) params.append('estado', filterEstado);
 
-            const response = await fetch(`/api/prestamos?${params.toString()}`);
-            if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
-
-            const data = await response.json();
+            const data = await api.get(`/api/prestamos?${params.toString()}`);
             setPrestamos(data);
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar préstamos: ${err.message}` });
+            toast.error(err.message || 'Error al cargar préstamos');
         } finally {
             setLoading(false);
         }
@@ -55,24 +52,20 @@ const PrestamosPage = () => {
 
     const fetchEmpleados = async () => {
         try {
-            const response = await fetch('/api/empleados');
-            if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
-            const data = await response.json();
+            const data = await api.get('/api/empleados');
             setEmpleados(data.filter(e => e.estaActivo));
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar empleados: ${err.message}` });
+            toast.error(err.message || 'Error al cargar empleados');
         }
     };
 
     const fetchPrestamoDetalle = async (id) => {
         try {
-            const response = await fetch(`/api/prestamos/${id}`);
-            if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
-            const data = await response.json();
+            const data = await api.get(`/api/prestamos/${id}`);
             setSelectedPrestamo(data);
             setShowDetailModal(true);
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar detalle: ${err.message}` });
+            toast.error(err.message || 'Error al cargar detalle');
         }
     };
 

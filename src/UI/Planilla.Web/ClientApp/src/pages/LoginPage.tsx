@@ -24,10 +24,19 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      const result = await login(email, password);
+
+      // Caso 1: Usuario tiene múltiples tenants - debe seleccionar
+      if (result.requiresTenantSelection) {
+        toast.success('Por favor selecciona tu empresa');
+        navigate('/select-tenant', { replace: true });
+        return;
+      }
+
+      // Caso 2 y 3: Login exitoso con un solo tenant o SystemAdmin
       toast.success('Inicio de sesión exitoso');
 
-      // Check if user is system admin after login
+      // Verificar si es SystemAdmin
       const token = localStorage.getItem('auth_token');
       if (token) {
         const { parseJwt } = await import('../utils/jwt');

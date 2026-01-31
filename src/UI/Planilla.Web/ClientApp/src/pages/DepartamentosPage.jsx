@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { api } from '../services/api';
 import ConfirmModal from '../components/ConfirmModal';
 
 const DepartamentosPage = () => {
@@ -27,12 +28,10 @@ const DepartamentosPage = () => {
     const fetchDepartamentos = async () => {
         try {
             setLoading(true);
-            const response = await fetch('/api/departamentos');
-            if (!response.ok) throw new Error('Error al cargar departamentos');
-            const data = await response.json();
+            const data = await api.get('/api/departamentos');
             setDepartamentos(data);
         } catch (error) {
-            toast.error('Error al cargar departamentos');
+            toast.error(error.message || 'Error al cargar departamentos');
         } finally {
             setLoading(false);
         }
@@ -40,9 +39,7 @@ const DepartamentosPage = () => {
 
     const fetchEmpleados = async () => {
         try {
-            const response = await fetch('/api/empleados');
-            if (!response.ok) throw new Error('Error al cargar empleados');
-            const data = await response.json();
+            const data = await api.get('/api/empleados');
             setEmpleados(data.filter(e => e.estaActivo));
         } catch (error) {
             console.error('Error al cargar empleados:', error);

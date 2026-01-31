@@ -312,10 +312,32 @@ app.UseTenantMiddleware();
 
 app.UseAuthorization();
 
+// ✅ CRITICAL FIX: Health endpoint for diagnostics (before controllers)
+app.MapGet("/api/health", () => Results.Ok(new
+{
+    status = "healthy",
+    timestamp = DateTime.UtcNow,
+    environment = app.Environment.EnvironmentName,
+    version = "1.0.0"
+})).AllowAnonymous();
+
 // API Controllers for React SPA
 app.MapControllers();
 
-// SPA fallback - serve React app for client-side routing
+// ✅ CRITICAL FIX: Capturar rutas /api/* no encontradas y retornar 404 JSON
+// Esto previene que MapFallbackToFile devuelva index.html para /api/* inexistentes
+app.MapFallback("/api/{**catch-all}", (HttpContext context) =>
+{
+    return Results.Json(new
+    {
+        error = "Not Found",
+        path = context.Request.Path.Value,
+        timestamp = DateTime.UtcNow
+    }, statusCode: 404);
+});
+
+// ✅ SPA fallback - SOLO para rutas UI que NO son /api/*
+// Solo rutas UI no coincidentes (como /empleados, /dashboard) sirven index.html
 app.MapFallbackToFile("index.html");
 
 // Inicia y ejecuta la aplicaci�n.

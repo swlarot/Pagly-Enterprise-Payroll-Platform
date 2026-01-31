@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useToast } from '../components/ToastContext';
+import toast from 'react-hot-toast';
+import { api } from '../services/api';
 
 const AnticiposPage = () => {
-    const { showToast } = useToast();
 
     // State management
     const [anticipos, setAnticipos] = useState([]);
@@ -36,13 +36,10 @@ const AnticiposPage = () => {
             if (filterEmpleado) params.append('empleadoId', filterEmpleado);
             if (filterEstado) params.append('estado', filterEstado);
 
-            const response = await fetch(`/api/anticipos?${params.toString()}`);
-            if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
-
-            const data = await response.json();
+            const data = await api.get(`/api/anticipos?${params.toString()}`);
             setAnticipos(data);
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar anticipos: ${err.message}` });
+            toast.error(`Error al cargar anticipos: ${err.message}`);
         } finally {
             setLoading(false);
         }
@@ -50,12 +47,10 @@ const AnticiposPage = () => {
 
     const fetchEmpleados = async () => {
         try {
-            const response = await fetch('/api/empleados');
-            if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
-            const data = await response.json();
+            const data = await api.get('/api/empleados');
             setEmpleados(data.filter(e => e.estaActivo));
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar empleados: ${err.message}` });
+            toast.error(`Error al cargar empleados: ${err.message}`);
         }
     };
 
@@ -119,15 +114,12 @@ const AnticiposPage = () => {
         const maxAnticipo = salario * 0.5;
 
         if (parseFloat(formData.monto) > maxAnticipo) {
-            showToast({
-                type: 'error',
-                message: `El anticipo no puede exceder el 50% del salario (${formatCurrency(maxAnticipo)})`
-            });
+            toast.error(`El anticipo no puede exceder el 50% del salario (${formatCurrency(maxAnticipo)})`);
             return;
         }
 
         if (formData.motivo.length < 10) {
-            showToast({ type: 'error', message: 'El motivo debe tener al menos 10 caracteres' });
+            toast.error('El motivo debe tener al menos 10 caracteres');
             return;
         }
 
@@ -139,22 +131,13 @@ const AnticiposPage = () => {
                 motivo: formData.motivo
             };
 
-            const response = await fetch('/api/anticipos', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Error ${response.status}: ${errorText}`);
-            }
+            await api.post('/api/anticipos', payload);
 
             await fetchAnticipos();
-            showToast({ type: 'success', message: 'Anticipo creado exitosamente' });
+            toast.success('Anticipo creado exitosamente');
             resetForm();
         } catch (err) {
-            showToast({ type: 'error', message: `Error al guardar anticipo: ${err.message}` });
+            toast.error(`Error al guardar anticipo: ${err.message}`);
         }
     };
 
@@ -162,40 +145,33 @@ const AnticiposPage = () => {
         if (!selectedAnticipo) return;
 
         try {
-            const response = await fetch(`/api/anticipos/${selectedAnticipo.id}/aprobar`, { method: 'POST' });
-            if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
+            await api.post(`/api/anticipos/${selectedAnticipo.id}/aprobar`, {});
 
             await fetchAnticipos();
-            showToast({ type: 'success', message: 'Anticipo aprobado exitosamente' });
+            toast.success('Anticipo aprobado exitosamente');
             setShowApprovalModal(false);
             setSelectedAnticipo(null);
         } catch (err) {
-            showToast({ type: 'error', message: `Error al aprobar anticipo: ${err.message}` });
+            toast.error(`Error al aprobar anticipo: ${err.message}`);
         }
     };
 
     const handleRechazar = async () => {
         if (!selectedAnticipo || !motivoRechazo.trim()) {
-            showToast({ type: 'error', message: 'Debe proporcionar un motivo para el rechazo' });
+            toast.error('Debe proporcionar un motivo para el rechazo');
             return;
         }
 
         try {
-            const response = await fetch(`/api/anticipos/${selectedAnticipo.id}/rechazar`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ motivo: motivoRechazo })
-            });
-
-            if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
+            await api.post(`/api/anticipos/${selectedAnticipo.id}/rechazar`, { motivo: motivoRechazo });
 
             await fetchAnticipos();
-            showToast({ type: 'success', message: 'Anticipo rechazado' });
+            toast.success('Anticipo rechazado');
             setShowRejectModal(false);
             setSelectedAnticipo(null);
             setMotivoRechazo('');
         } catch (err) {
-            showToast({ type: 'error', message: `Error al rechazar anticipo: ${err.message}` });
+            toast.error(`Error al rechazar anticipo: ${err.message}`);
         }
     };
 
@@ -203,15 +179,14 @@ const AnticiposPage = () => {
         if (!selectedAnticipo) return;
 
         try {
-            const response = await fetch(`/api/anticipos/${selectedAnticipo.id}/cancelar`, { method: 'DELETE' });
-            if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
+            await api.delete(`/api/anticipos/${selectedAnticipo.id}/cancelar`);
 
             await fetchAnticipos();
-            showToast({ type: 'success', message: 'Anticipo cancelado exitosamente' });
+            toast.success('Anticipo cancelado exitosamente');
             setShowCancelModal(false);
             setSelectedAnticipo(null);
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cancelar anticipo: ${err.message}` });
+            toast.error(`Error al cancelar anticipo: ${err.message}`);
         }
     };
 

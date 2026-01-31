@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useToast } from '../components/ToastContext';
+import toast from 'react-hot-toast';
+import { api } from '../services/api';
 
 const DeduccionesPage = () => {
-    const { showToast } = useToast();
 
     // State management
     const [deducciones, setDeducciones] = useState([]);
@@ -44,13 +44,10 @@ const DeduccionesPage = () => {
             if (filterTipo) params.append('tipo', filterTipo);
             if (filterActivas) params.append('activas', 'true');
 
-            const response = await fetch(`/api/deducciones?${params.toString()}`);
-            if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
-
-            const data = await response.json();
+            const data = await api.get(`/api/deducciones?${params.toString()}`);
             setDeducciones(data);
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar deducciones: ${err.message}` });
+            toast.error(`Error al cargar deducciones: ${err.message}`);
         } finally {
             setLoading(false);
         }
@@ -58,23 +55,19 @@ const DeduccionesPage = () => {
 
     const fetchEmpleados = async () => {
         try {
-            const response = await fetch('/api/empleados');
-            if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
-            const data = await response.json();
+            const data = await api.get('/api/empleados');
             setEmpleados(data.filter(e => e.estaActivo));
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar empleados: ${err.message}` });
+            toast.error(`Error al cargar empleados: ${err.message}`);
         }
     };
 
     const fetchTiposDeducciones = async () => {
         try {
-            const response = await fetch('/api/deducciones/tipos');
-            if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
-            const data = await response.json();
+            const data = await api.get('/api/deducciones/tipos');
             setTiposDeducciones(data);
         } catch (err) {
-            showToast({ type: 'error', message: `Error al cargar tipos de deducciones: ${err.message}` });
+            toast.error(`Error al cargar tipos de deducciones: ${err.message}`);
         }
     };
 
@@ -150,19 +143,18 @@ const DeduccionesPage = () => {
         // Validaciones
         if (formData.esPorcentaje) {
             if (parseFloat(formData.porcentaje) <= 0 || parseFloat(formData.porcentaje) > 100) {
-                showToast({ type: 'error', message: 'El porcentaje debe estar entre 0.01 y 100' });
+                toast.error('El porcentaje debe estar entre 0.01 y 100');
                 return;
             }
         } else {
             if (parseFloat(formData.monto) <= 0) {
-                showToast({ type: 'error', message: 'El monto debe ser mayor a 0' });
+                toast.error('El monto debe ser mayor a 0');
                 return;
             }
         }
 
         try {
             const url = editingId ? `/api/deducciones/${editingId}` : '/api/deducciones';
-            const method = editingId ? 'PUT' : 'POST';
 
             const payload = {
                 empleadoId: parseInt(formData.empleadoId),
@@ -178,25 +170,17 @@ const DeduccionesPage = () => {
                 observaciones: formData.observaciones || null
             };
 
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Error ${response.status}: ${errorText}`);
+            if (editingId) {
+                await api.put(url, payload);
+            } else {
+                await api.post(url, payload);
             }
 
             await fetchDeducciones();
-            showToast({
-                type: 'success',
-                message: editingId ? 'Deducción actualizada exitosamente' : 'Deducción creada exitosamente'
-            });
+            toast.success(editingId ? 'Deducción actualizada exitosamente' : 'Deducción creada exitosamente');
             resetForm();
         } catch (err) {
-            showToast({ type: 'error', message: `Error al guardar deducción: ${err.message}` });
+            toast.error(`Error al guardar deducción: ${err.message}`);
         }
     };
 
@@ -227,15 +211,14 @@ const DeduccionesPage = () => {
         if (!deduccionToDelete) return;
 
         try {
-            const response = await fetch(`/api/deducciones/${deduccionToDelete.id}`, { method: 'DELETE' });
-            if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
+            await api.delete(`/api/deducciones/${deduccionToDelete.id}`);
 
             await fetchDeducciones();
-            showToast({ type: 'success', message: 'Deducción desactivada exitosamente' });
+            toast.success('Deducción desactivada exitosamente');
             setShowConfirmDelete(false);
             setDeduccionToDelete(null);
         } catch (err) {
-            showToast({ type: 'error', message: `Error al desactivar deducción: ${err.message}` });
+            toast.error(`Error al desactivar deducción: ${err.message}`);
         }
     };
 
