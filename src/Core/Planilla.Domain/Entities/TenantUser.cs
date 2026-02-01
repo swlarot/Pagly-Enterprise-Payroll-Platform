@@ -23,9 +23,14 @@ public class TenantUser : BaseEntity, ITenantEntity
     public string UserId { get; set; } = string.Empty;
 
     /// <summary>
-    /// Rol del usuario dentro del tenant
+    /// Rol del usuario dentro del tenant (sistema legacy - mantener por compatibilidad)
     /// </summary>
     public TenantRole Role { get; set; } = TenantRole.Employee;
+
+    /// <summary>
+    /// ID del rol personalizado asignado al usuario (null si usa rol del sistema)
+    /// </summary>
+    public int? CustomTenantRoleId { get; set; }
 
     /// <summary>
     /// Fecha en que el usuario se unió al tenant
@@ -62,6 +67,7 @@ public class TenantUser : BaseEntity, ITenantEntity
     // Navegación
     public virtual Tenant Tenant { get; set; } = null!;
     public virtual AppUser? User { get; set; }
+    public virtual CustomTenantRole? CustomRole { get; set; }
 
     /// <summary>
     /// Verifica si el usuario tiene un rol de administrador o superior

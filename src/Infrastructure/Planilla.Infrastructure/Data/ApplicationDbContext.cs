@@ -33,6 +33,8 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     public DbSet<AuditLogEntry> AuditLogEntries { get; set; }
     public DbSet<StripeWebhookEvent> StripeWebhookEvents { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
+    public DbSet<CustomTenantRole> CustomTenantRoles { get; set; }
+    public DbSet<RolePermission> RolePermissions { get; set; }
 
     public DbSet<Empleado> Empleados { get; set; }
     public DbSet<ReciboDeSueldo> RecibosDeSueldo { get; set; }
@@ -658,6 +660,70 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .WithMany()
                 .HasForeignKey(rt => rt.TenantId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ====================================================================
+        // CUSTOM ROLES AND PERMISSIONS SYSTEM
+        // ====================================================================
+
+        // CustomTenantRole Configuration
+        modelBuilder.Entity<CustomTenantRole>(entity =>
+        {
+            // Índice único compuesto: nombre de rol único por tenant
+            entity.HasIndex(r => new { r.TenantId, r.Name })
+                .IsUnique()
+                .HasDatabaseName("IX_CustomTenantRole_TenantId_Name");
+
+            // Índice para búsquedas por tenant y sistema
+            entity.HasIndex(r => new { r.TenantId, r.IsSystem })
+                .HasDatabaseName("IX_CustomTenantRole_TenantId_IsSystem");
+
+            // Relación con Tenant
+            entity.HasOne(r => r.Tenant)
+                .WithMany()
+                .HasForeignKey(r => r.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Relación 1:N con Permissions
+            entity.HasMany(r => r.Permissions)
+                .WithOne(p => p.Role)
+                .HasForeignKey(p => p.CustomTenantRoleId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Relación 1:N con Users
+            entity.HasMany(r => r.Users)
+                .WithOne(u => u.CustomRole)
+                .HasForeignKey(u => u.CustomTenantRoleId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Query filter por TenantId aplicado automáticamente
+        });
+
+        // RolePermission Configuration
+        modelBuilder.Entity<RolePermission>(entity =>
+        {
+            // Índice compuesto para búsquedas por rol y permiso
+            entity.HasIndex(p => new { p.CustomTenantRoleId, p.Permission })
+                .HasDatabaseName("IX_RolePermission_RoleId_Permission");
+
+            // Índice por tenant
+            entity.HasIndex(p => p.TenantId)
+                .HasDatabaseName("IX_RolePermission_TenantId");
+
+            // Relación con Tenant
+            entity.HasOne(p => p.Tenant)
+                .WithMany()
+                .HasForeignKey(p => p.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Query filter por TenantId aplicado automáticamente
+        });
+
+        // TenantUser - Agregar relación con CustomTenantRole
+        modelBuilder.Entity<TenantUser>(entity =>
+        {
+            // Relación con CustomTenantRole (ya configurada en CustomTenantRole)
+            // Solo agregamos la navegación inversa si no existe
         });
     }
 

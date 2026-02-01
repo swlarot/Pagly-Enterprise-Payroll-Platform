@@ -14,4 +14,20 @@ public class AppUser : IdentityUser
     /// Los SuperAdmins pueden gestionar todos los tenants y crear empresas
     /// </summary>
     public bool IsSystemAdmin { get; set; } = false;
+
+    /// <summary>
+    /// Indica si el usuario ha sido eliminado del sistema (soft delete)
+    /// Los usuarios eliminados no pueden iniciar sesión ni acceder a ningún tenant
+    /// </summary>
+    public bool IsDeleted { get; set; } = false;
+
+    /// <summary>
+    /// Fecha en la que el usuario fue eliminado
+    /// </summary>
+    public DateTime? DeletedAt { get; set; }
+
+    /// <summary>
+    /// ID del SystemAdmin que eliminó este usuario
+    /// </summary>
+    public string? DeletedBy { get; set; }
 }

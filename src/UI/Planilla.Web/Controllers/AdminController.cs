@@ -799,8 +799,10 @@ public class AdminController : ControllerBase
             if (pageSize < 1) pageSize = 20;
             if (page < 1) page = 1;
 
-            // Query base de usuarios
-            var query = _context.Users.AsQueryable();
+            // Query base de usuarios - excluir eliminados
+            var query = _context.Users
+                .Where(u => !u.IsDeleted)
+                .AsQueryable();
 
             // Filtro de búsqueda (case-insensitive)
             if (!string.IsNullOrWhiteSpace(search))
@@ -940,6 +942,12 @@ public class AdminController : ControllerBase
             // 3. Buscar o crear usuario en Identity
             var user = await _userManager.FindByEmailAsync(request.Email);
 
+            // Verificar que el usuario no esté eliminado
+            if (user != null && user.IsDeleted)
+            {
+                return BadRequest(new { error = "El usuario con este email está eliminado. Debe reactivarlo primero." });
+            }
+
             if (user == null)
             {
                 // Crear nuevo usuario
@@ -1040,6 +1048,387 @@ public class AdminController : ControllerBase
             await transaction.RollbackAsync();
             _logger.LogError(ex, "Error inviting user to tenant {TenantId}", id);
             return StatusCode(500, new { error = "Error al invitar usuario al tenant" });
+        }
+    }
+
+    /// <summary>
+    /// DELETE /api/admin/users/{userId} - Elimina completamente un usuario del sistema (soft delete)
+    /// Requiere: IsSystemAdmin = true
+    /// Validaciones:
+    /// - No se puede eliminar el último SystemAdmin
+    /// - Marca usuario como eliminado (IsDeleted = true)
+    /// - Desactiva todas las asociaciones TenantUser del usuario
+    /// </summary>
+    [HttpDelete("users/{userId}")]
+    public async Task<IActionResult> DeleteUser(string userId)
+    {
+        try
+        {
+            // 1. Verificar que el usuario existe
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return NotFound(new { error = "Usuario no encontrado" });
+            }
+
+            // 2. Si ya está eliminado, retornar error
+            if (user.IsDeleted)
+            {
+                return BadRequest(new { error = "El usuario ya está eliminado" });
+            }
+
+            // 3. VALIDACIÓN CRÍTICA: No eliminar el último SystemAdmin
+            if (user.IsSystemAdmin)
+            {
+                var systemAdminsCount = await _userManager.Users
+                    .Where(u => u.IsSystemAdmin && !u.IsDeleted)
+                    .CountAsync();
+
+                if (systemAdminsCount <= 1)
+                {
+                    return BadRequest(new { error = "No se puede eliminar el último SystemAdmin del sistema" });
+                }
+            }
+
+            // 4. Obtener ID del admin actual
+            var currentAdminId = User.FindFirst("sub")?.Value;
+
+            // 5. Marcar usuario como eliminado (soft delete)
+            user.IsDeleted = true;
+            user.DeletedAt = DateTime.UtcNow;
+            user.DeletedBy = currentAdminId;
+
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                var errors = string.Join(", ", updateResult.Errors.Select(e => e.Description));
+                return BadRequest(new { error = "Error al eliminar usuario", details = errors });
+            }
+
+            // 6. Desactivar todas las asociaciones TenantUser
+            var tenantUsers = await _context.TenantUsers
+                .Where(tu => tu.UserId == userId)
+                .ToListAsync();
+
+            foreach (var tenantUser in tenantUsers)
+            {
+                tenantUser.IsActive = false;
+            }
+
+            await _context.SaveChangesAsync();
+
+            // 7. AUDIT LOG para cada tenant afectado
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var userAgent = HttpContext.Request.Headers["User-Agent"].ToString();
+
+            foreach (var tenantUser in tenantUsers)
+            {
+                var auditLog = new AuditLogEntry
+                {
+                    TenantId = tenantUser.TenantId,
+                    ActorUserId = currentAdminId ?? "system",
+                    ActorEmail = User.FindFirst("email")?.Value ?? "system@admin.com",
+                    Action = "UserDeleted",
+                    EntityType = "AppUser",
+                    EntityId = userId,
+                    IpAddress = ipAddress,
+                    UserAgent = userAgent,
+                    MetadataJson = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        UserEmail = user.Email,
+                        DeletedBy = currentAdminId,
+                        DeletedAt = user.DeletedAt
+                    }),
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.AuditLogEntries.Add(auditLog);
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogWarning("SystemAdmin {AdminId} deleted user {UserId} ({Email})",
+                currentAdminId, userId, user.Email);
+
+            return Ok(new { success = true, message = "Usuario eliminado exitosamente" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting user {UserId}", userId);
+            return StatusCode(500, new { error = "Error al eliminar el usuario" });
+        }
+    }
+
+    /// <summary>
+    /// DELETE /api/admin/tenants/{tenantId}/users/{userId} - Remueve un usuario de un tenant específico
+    /// Requiere: IsSystemAdmin = true
+    /// Validaciones:
+    /// - No se puede remover al último Owner de un tenant
+    /// - Marca TenantUser como inactivo (IsActive = false)
+    /// </summary>
+    [HttpDelete("tenants/{tenantId}/users/{userId}")]
+    public async Task<IActionResult> RemoveUserFromTenant(int tenantId, string userId)
+    {
+        try
+        {
+            // 1. Verificar que el tenant existe
+            var tenant = await _context.Tenants.FindAsync(tenantId);
+            if (tenant == null)
+            {
+                return NotFound(new { error = "Tenant no encontrado" });
+            }
+
+            // 2. Buscar la relación TenantUser
+            var tenantUser = await _context.TenantUsers
+                .FirstOrDefaultAsync(tu => tu.TenantId == tenantId && tu.UserId == userId);
+
+            if (tenantUser == null)
+            {
+                return NotFound(new { error = "El usuario no pertenece a este tenant" });
+            }
+
+            // 3. Si ya está inactivo, retornar error
+            if (!tenantUser.IsActive)
+            {
+                return BadRequest(new { error = "El usuario ya está inactivo en este tenant" });
+            }
+
+            // 4. VALIDACIÓN CRÍTICA: No remover al último Owner del tenant
+            if (tenantUser.Role == TenantRole.Owner)
+            {
+                var ownersCount = await _context.TenantUsers
+                    .Where(tu => tu.TenantId == tenantId
+                              && tu.Role == TenantRole.Owner
+                              && tu.IsActive)
+                    .CountAsync();
+
+                if (ownersCount <= 1)
+                {
+                    return BadRequest(new { error = "No se puede remover el último Owner del tenant" });
+                }
+            }
+
+            // 5. Marcar TenantUser como inactivo
+            tenantUser.IsActive = false;
+            _context.TenantUsers.Update(tenantUser);
+            await _context.SaveChangesAsync();
+
+            // 6. AUDIT LOG
+            var currentAdminId = User.FindFirst("sub")?.Value;
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var userAgent = HttpContext.Request.Headers["User-Agent"].ToString();
+
+            var user = await _userManager.FindByIdAsync(userId);
+
+            var auditLog = new AuditLogEntry
+            {
+                TenantId = tenantId,
+                ActorUserId = currentAdminId ?? "system",
+                ActorEmail = User.FindFirst("email")?.Value ?? "system@admin.com",
+                Action = "UserRemovedFromTenant",
+                EntityType = "TenantUser",
+                EntityId = tenantUser.Id.ToString(),
+                IpAddress = ipAddress,
+                UserAgent = userAgent,
+                MetadataJson = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    UserEmail = user?.Email,
+                    Role = tenantUser.Role.ToString(),
+                    RemovedBy = currentAdminId
+                }),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.AuditLogEntries.Add(auditLog);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "SystemAdmin {AdminId} removed user {UserId} from tenant {TenantId}",
+                currentAdminId, userId, tenantId);
+
+            return Ok(new { success = true, message = "Usuario removido del tenant exitosamente" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error removing user {UserId} from tenant {TenantId}", userId, tenantId);
+            return StatusCode(500, new { error = "Error al remover usuario del tenant" });
+        }
+    }
+
+    /// <summary>
+    /// POST /api/admin/users/{userId}/reactivate - Reactiva un usuario previamente eliminado
+    /// Requiere: IsSystemAdmin = true
+    /// </summary>
+    [HttpPost("users/{userId}/reactivate")]
+    public async Task<IActionResult> ReactivateUser(string userId)
+    {
+        try
+        {
+            // 1. Verificar que el usuario existe
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return NotFound(new { error = "Usuario no encontrado" });
+            }
+
+            // 2. Verificar que el usuario está eliminado
+            if (!user.IsDeleted)
+            {
+                return BadRequest(new { error = "El usuario no está eliminado" });
+            }
+
+            // 3. Reactivar usuario
+            user.IsDeleted = false;
+            user.DeletedAt = null;
+            user.DeletedBy = null;
+
+            var updateResult = await _userManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                var errors = string.Join(", ", updateResult.Errors.Select(e => e.Description));
+                return BadRequest(new { error = "Error al reactivar usuario", details = errors });
+            }
+
+            // 4. AUDIT LOG - registrar en todos los tenants donde el usuario tiene membresía
+            var currentAdminId = User.FindFirst("sub")?.Value;
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var userAgent = HttpContext.Request.Headers["User-Agent"].ToString();
+
+            var tenantUsers = await _context.TenantUsers
+                .Where(tu => tu.UserId == userId)
+                .ToListAsync();
+
+            foreach (var tenantUser in tenantUsers)
+            {
+                var auditLog = new AuditLogEntry
+                {
+                    TenantId = tenantUser.TenantId,
+                    ActorUserId = currentAdminId ?? "system",
+                    ActorEmail = User.FindFirst("email")?.Value ?? "system@admin.com",
+                    Action = "UserReactivated",
+                    EntityType = "AppUser",
+                    EntityId = userId,
+                    IpAddress = ipAddress,
+                    UserAgent = userAgent,
+                    MetadataJson = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        UserEmail = user.Email,
+                        ReactivatedBy = currentAdminId,
+                        ReactivatedAt = DateTime.UtcNow
+                    }),
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.AuditLogEntries.Add(auditLog);
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("SystemAdmin {AdminId} reactivated user {UserId} ({Email})",
+                currentAdminId, userId, user.Email);
+
+            return Ok(new { success = true, message = "Usuario reactivado exitosamente" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reactivating user {UserId}", userId);
+            return StatusCode(500, new { error = "Error al reactivar el usuario" });
+        }
+    }
+
+    /// <summary>
+    /// POST /api/admin/tenants/{tenantId}/users/{userId}/reactivate - Reactiva un usuario en un tenant específico
+    /// Requiere: IsSystemAdmin = true
+    /// </summary>
+    [HttpPost("tenants/{tenantId}/users/{userId}/reactivate")]
+    public async Task<IActionResult> ReactivateUserInTenant(int tenantId, string userId)
+    {
+        try
+        {
+            // 1. Verificar que el tenant existe
+            var tenant = await _context.Tenants
+                .Include(t => t.Subscription)
+                .FirstOrDefaultAsync(t => t.Id == tenantId);
+
+            if (tenant == null)
+            {
+                return NotFound(new { error = "Tenant no encontrado" });
+            }
+
+            // 2. Buscar la relación TenantUser
+            var tenantUser = await _context.TenantUsers
+                .FirstOrDefaultAsync(tu => tu.TenantId == tenantId && tu.UserId == userId);
+
+            if (tenantUser == null)
+            {
+                return NotFound(new { error = "El usuario no pertenece a este tenant" });
+            }
+
+            // 3. Verificar que el usuario está inactivo
+            if (tenantUser.IsActive)
+            {
+                return BadRequest(new { error = "El usuario ya está activo en este tenant" });
+            }
+
+            // 4. VALIDAR LÍMITES DEL PLAN antes de reactivar
+            var currentUserCount = await _context.TenantUsers
+                .CountAsync(tu => tu.TenantId == tenantId && tu.IsActive);
+
+            var maxUsers = GetMaxUsersForPlan(tenant.Subscription?.Plan ?? SubscriptionPlan.Free);
+
+            if (currentUserCount >= maxUsers)
+            {
+                return BadRequest(new
+                {
+                    error = $"El tenant ha alcanzado el límite de {maxUsers} usuarios activos para el plan {tenant.Subscription?.Plan}. " +
+                            $"Actualmente tiene {currentUserCount} usuarios activos."
+                });
+            }
+
+            // 5. Reactivar TenantUser
+            tenantUser.IsActive = true;
+            _context.TenantUsers.Update(tenantUser);
+            await _context.SaveChangesAsync();
+
+            // 6. AUDIT LOG
+            var currentAdminId = User.FindFirst("sub")?.Value;
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var userAgent = HttpContext.Request.Headers["User-Agent"].ToString();
+
+            var user = await _userManager.FindByIdAsync(userId);
+
+            var auditLog = new AuditLogEntry
+            {
+                TenantId = tenantId,
+                ActorUserId = currentAdminId ?? "system",
+                ActorEmail = User.FindFirst("email")?.Value ?? "system@admin.com",
+                Action = "UserReactivatedInTenant",
+                EntityType = "TenantUser",
+                EntityId = tenantUser.Id.ToString(),
+                IpAddress = ipAddress,
+                UserAgent = userAgent,
+                MetadataJson = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    UserEmail = user?.Email,
+                    Role = tenantUser.Role.ToString(),
+                    ReactivatedBy = currentAdminId
+                }),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.AuditLogEntries.Add(auditLog);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation(
+                "SystemAdmin {AdminId} reactivated user {UserId} in tenant {TenantId}",
+                currentAdminId, userId, tenantId);
+
+            return Ok(new { success = true, message = "Usuario reactivado en el tenant exitosamente" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error reactivating user {UserId} in tenant {TenantId}", userId, tenantId);
+            return StatusCode(500, new { error = "Error al reactivar usuario en el tenant" });
         }
     }
 
