@@ -24,6 +24,9 @@ interface AuthContextType {
   acceptInvite: (token: string, password: string, confirmPassword: string) => Promise<void>;
   canAccessFeature: (feature: keyof SubscriptionInfoDto) => boolean;
   hasRole: (...roles: TenantRole[]) => boolean;
+  canWrite: () => boolean;
+  canDelete: () => boolean;
+  isReadOnly: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -72,9 +75,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     const data = await authService.login({ email, password });
 
-    // Si requiere selección de tenant, NO guardamos el token aún
+    // Si requiere selección de tenant, guardamos el token TEMPORAL para que pueda autenticarse al seleccionar
     if (data.requiresTenantSelection) {
-      // Solo guardamos temporalmente los datos del usuario
+      // Guardar token temporal (necesario para autenticar la llamada a select-tenant)
+      localStorage.setItem('auth_token', data.token);
+      if (data.refreshToken) {
+        localStorage.setItem('refresh_token', data.refreshToken);
+      }
+
+      // Guardar temporalmente los datos del usuario
       setUser(data.user);
       setAvailableTenants(data.availableTenants || []);
 
@@ -144,8 +153,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const hasRole = (...roles: TenantRole[]): boolean => {
-    if (!user) return false;
+    // Retornar false si no hay usuario o si está cargando
+    if (!user || isLoading) return false;
     return roles.includes(user.role);
+  };
+
+  const canWrite = (): boolean => {
+    if (!user || isLoading) return false;
+    // Owner, Admin y Manager pueden escribir
+    return user.role === TenantRole.Owner
+        || user.role === TenantRole.Admin
+        || user.role === TenantRole.Manager;
+  };
+
+  const canDelete = (): boolean => {
+    if (!user || isLoading) return false;
+    // Solo Owner y Admin pueden eliminar
+    return user.role === TenantRole.Owner || user.role === TenantRole.Admin;
+  };
+
+  const isReadOnly = (): boolean => {
+    if (!user || isLoading) return true;
+    // Accountant y Employee son solo lectura
+    return user.role === TenantRole.Accountant || user.role === TenantRole.Employee;
   };
 
   const value: AuthContextType = {
@@ -162,6 +192,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     acceptInvite,
     canAccessFeature,
     hasRole,
+    canWrite,
+    canDelete,
+    isReadOnly,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
