@@ -5,7 +5,9 @@ using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
+using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Web.Extensions;
 using Vorluno.Planilla.Web.Filters;
 
 namespace Vorluno.Planilla.Web.Controllers
@@ -46,19 +48,43 @@ namespace Vorluno.Planilla.Web.Controllers
 
         /// <summary>
         /// Obtiene una lista de todos los empleados con su departamento y posición.
+        /// FILTRADO POR ROL: Employee solo ve su propia información.
         /// </summary>
         /// <returns>Una lista de empleados en formato DTO.</returns>
         [HttpGet]
-        [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+        [Authorize(Roles = "Owner,Admin,Manager,Accountant,Employee")]
         public async Task<IActionResult> GetAll()
         {
             var tenantId = _tenantContext.TenantId;
-            var empleados = await _context.Empleados
+            var role = this.GetCurrentTenantRole();
+
+            var query = _context.Empleados
                 .Where(e => e.TenantId == tenantId)
                 .Include(e => e.Departamento)
                 .Include(e => e.Posicion)
-                .AsNoTracking()
-                .ToListAsync();
+                .AsNoTracking();
+
+            // FILTRADO POR ROL: Employee solo ve su propia información
+            if (role == TenantRole.Employee)
+            {
+                var userId = this.GetCurrentUserId();
+                // Buscar el empleado vinculado al usuario actual
+                var empleadoUsuario = await _context.Empleados
+                    .Where(e => e.UserId == userId && e.TenantId == tenantId)
+                    .FirstOrDefaultAsync();
+
+                if (empleadoUsuario != null)
+                {
+                    query = query.Where(e => e.Id == empleadoUsuario.Id);
+                }
+                else
+                {
+                    // Si no tiene empleado vinculado, retornar lista vacía
+                    return Ok(Array.Empty<EmpleadoVerDto>());
+                }
+            }
+
+            var empleados = await query.ToListAsync();
             var empleadosDto = _mapper.Map<IEnumerable<EmpleadoVerDto>>(empleados);
             return Ok(empleadosDto);
         }
