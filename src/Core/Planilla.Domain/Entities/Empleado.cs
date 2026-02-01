@@ -39,6 +39,12 @@ public class Empleado : ITenantEntity
     public int TenantId { get; set; }
 
     /// <summary>
+    /// ID del usuario vinculado (para permitir que empleados accedan como usuarios)
+    /// </summary>
+    [StringLength(450)]
+    public string? UserId { get; set; }
+
+    /// <summary>
     /// Departamento al que pertenece el empleado (opcional)
     /// </summary>
     public int? DepartamentoId { get; set; }
