@@ -8,12 +8,32 @@ interface AuthLayoutProps {
 }
 
 export default function AuthLayout({ children }: AuthLayoutProps) {
-  const { user, tenant, logout, hasRole, isSystemAdmin } = useAuth();
+  const { user, tenant, logout, hasRole, isSystemAdmin, canWrite } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [orgMenuOpen, setOrgMenuOpen] = useState(true);
   const [conceptosMenuOpen, setConceptosMenuOpen] = useState(true);
   const [asistenciaMenuOpen, setAsistenciaMenuOpen] = useState(true);
+
+  // Matriz de permisos: qué roles pueden ver qué módulos
+  const canAccessModule = (module: string): boolean => {
+    if (!user) return false;
+
+    const role = user.role;
+
+    // Employee solo puede ver: Dashboard y su propia info
+    if (role === TenantRole.Employee) {
+      return ['dashboard', 'empleados', 'vacaciones', 'ausencias', 'horas-extra'].includes(module);
+    }
+
+    // Accountant puede ver todo excepto gestión de usuarios
+    if (role === TenantRole.Accountant) {
+      return module !== 'users' && module !== 'roles';
+    }
+
+    // Manager, Admin, Owner pueden ver todo
+    return true;
+  };
 
   const handleLogout = () => {
     logout();
@@ -35,6 +55,9 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       '/planillas': 'Gestión de Planillas',
       '/reportes': 'Reportes de Planilla',
       '/configuracion': 'Configuración del Sistema',
+      '/roles': 'Roles y Permisos',
+      '/users': 'Gestión de Usuarios',
+      '/audit': 'Registro de Auditoría',
     };
     return routes[location.pathname] || 'Dashboard';
   };
@@ -101,76 +124,19 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             <span>Dashboard</span>
           </NavLink>
 
-          {/* Organización Submenu */}
-          <div className="space-y-1">
-            <button
-              onClick={() => setOrgMenuOpen(!orgMenuOpen)}
-              className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
-                isOrgRouteActive
-                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                  : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-                  />
-                </svg>
-                <span>Organización</span>
-              </div>
-              <svg
-                className={`w-5 h-5 transition-transform duration-200 ${orgMenuOpen ? 'rotate-180' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+          {/* Organización Submenu - Todos pueden ver */}
+          {canAccessModule('empleados') && (
+            <div className="space-y-1">
+              <button
+                onClick={() => setOrgMenuOpen(!orgMenuOpen)}
+                className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  isOrgRouteActive
+                    ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
+                    : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                }`}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
-            </button>
-
-            {orgMenuOpen && (
-              <div className="ml-4 space-y-1 border-l-2 border-slate-700 pl-2">
-                <NavLink
-                  to="/empleados"
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
-                      isActive
-                        ? 'bg-slate-700 text-white'
-                        : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
-                    }`
-                  }
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                    />
-                  </svg>
-                  <span>Empleados</span>
-                </NavLink>
-
-                <NavLink
-                  to="/departamentos"
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
-                      isActive
-                        ? 'bg-slate-700 text-white'
-                        : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
-                    }`
-                  }
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="flex items-center gap-3">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -178,43 +144,109 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                       d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
                     />
                   </svg>
-                  <span>Departamentos</span>
-                </NavLink>
-
-                <NavLink
-                  to="/posiciones"
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
-                      isActive
-                        ? 'bg-slate-700 text-white'
-                        : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
-                    }`
-                  }
+                  <span>Organización</span>
+                </div>
+                <svg
+                  className={`w-5 h-5 transition-transform duration-200 ${orgMenuOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
                 >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-                    />
-                  </svg>
-                  <span>Posiciones</span>
-                </NavLink>
-              </div>
-            )}
-          </div>
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
+                </svg>
+              </button>
 
-          {/* Conceptos Submenu (Novedades) */}
-          <div className="space-y-1">
-            <button
-              onClick={() => setConceptosMenuOpen(!conceptosMenuOpen)}
-              className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
-                isConceptosRouteActive
-                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                  : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
-              }`}
-            >
+              {orgMenuOpen && (
+                <div className="ml-4 space-y-1 border-l-2 border-slate-700 pl-2">
+                  {canAccessModule('empleados') && (
+                    <NavLink
+                      to="/empleados"
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
+                          isActive
+                            ? 'bg-slate-700 text-white'
+                            : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                        }`
+                      }
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                        />
+                      </svg>
+                      <span>Empleados</span>
+                    </NavLink>
+                  )}
+
+                  {canAccessModule('departamentos') && (
+                    <NavLink
+                      to="/departamentos"
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
+                          isActive
+                            ? 'bg-slate-700 text-white'
+                            : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                        }`
+                      }
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
+                        />
+                      </svg>
+                      <span>Departamentos</span>
+                    </NavLink>
+                  )}
+
+                  {canAccessModule('posiciones') && (
+                    <NavLink
+                      to="/posiciones"
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
+                          isActive
+                            ? 'bg-slate-700 text-white'
+                            : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                        }`
+                      }
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 13.255A23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                        />
+                      </svg>
+                      <span>Posiciones</span>
+                    </NavLink>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Conceptos Submenu (Novedades) - Todos excepto Employee */}
+          {canAccessModule('anticipos') && (
+            <div className="space-y-1">
+              <button
+                onClick={() => setConceptosMenuOpen(!conceptosMenuOpen)}
+                className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  isConceptosRouteActive
+                    ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
+                    : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                }`}
+              >
               <div className="flex items-center gap-3">
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -307,10 +339,12 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                 </NavLink>
               </div>
             )}
-          </div>
+            </div>
+          )}
 
-          {/* Asistencia Submenu */}
-          <div className="space-y-1">
+          {/* Asistencia Submenu - Todos pueden ver */}
+          {canAccessModule('horas-extra') && (
+            <div className="space-y-1">
             <button
               onClick={() => setAsistenciaMenuOpen(!asistenciaMenuOpen)}
               className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
@@ -411,50 +445,80 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                 </NavLink>
               </div>
             )}
-          </div>
+            </div>
+          )}
 
-          {/* Rest of menu items... */}
-          <NavLink
-            to="/planillas"
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
-                isActive
-                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                  : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
-              }`
-            }
-          >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
-              />
-            </svg>
-            <span>Planillas</span>
-          </NavLink>
+          {/* Planillas - Todos pueden ver */}
+          {canAccessModule('planillas') && (
+            <NavLink
+              to="/planillas"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  isActive
+                    ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
+                    : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                }`
+              }
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"
+                />
+              </svg>
+              <span>Planillas</span>
+            </NavLink>
+          )}
 
-          <NavLink
-            to="/reportes"
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
-                isActive
-                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                  : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
-              }`
-            }
-          >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
-            <span>Reportes</span>
-          </NavLink>
+          {/* Reportes - Todos pueden ver */}
+          {canAccessModule('reportes') && (
+            <NavLink
+              to="/reportes"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  isActive
+                    ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
+                    : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                }`
+              }
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              <span>Reportes</span>
+            </NavLink>
+          )}
+
+          {/* Roles y Permisos - Solo Owner */}
+          {hasRole(TenantRole.Owner) && (
+            <NavLink
+              to="/roles"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  isActive
+                    ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
+                    : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                }`
+              }
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                />
+              </svg>
+              <span>Roles y Permisos</span>
+            </NavLink>
+          )}
 
           <NavLink
             to="/configuracion"
