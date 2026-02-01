@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 const DeduccionesPage = () => {
+    // Auth context - Solo Manager+ puede crear deducciones
+    const { canWrite, canDelete, isReadOnly } = useAuth();
 
     // State management
     const [deducciones, setDeducciones] = useState([]);

@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 const EmpleadosPage = () => {
+    // Auth context for permissions
+    const { canWrite, canDelete, isReadOnly } = useAuth();
+
     // State management
     const [empleados, setEmpleados] = useState([]);
     const [departamentos, setDepartamentos] = useState([]);
@@ -92,9 +96,6 @@ const EmpleadosPage = () => {
         e.preventDefault();
 
         try {
-            const url = editingId ? `/api/empleados/${editingId}` : '/api/empleados';
-            const method = editingId ? 'PUT' : 'POST';
-
             // Prepare payload
             const payload = {
                 nombre: formData.nombre,
@@ -108,28 +109,22 @@ const EmpleadosPage = () => {
                 })
             };
 
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Error ${response.status}: ${errorText}`);
+            if (editingId) {
+                await api.put(`/api/empleados/${editingId}`, payload);
+                toast.success('Empleado actualizado exitosamente');
+            } else {
+                await api.post('/api/empleados', payload);
+                toast.success('Empleado creado exitosamente');
             }
 
             // Refresh the list
             await fetchEmpleados();
 
-            // Show success message
-            toast.success(editingId ? 'Empleado actualizado exitosamente' : 'Empleado creado exitosamente');
-
             // Reset form and close modal
             resetForm();
 
         } catch (err) {
-            toast.error(`Error al guardar empleado: ${err.message}`);
+            toast.error(err.message || 'Error al guardar empleado');
         }
     };
 
@@ -158,16 +153,13 @@ const EmpleadosPage = () => {
         if (!empleadoToDelete) return;
 
         try {
-            const response = await fetch(`/api/empleados/${empleadoToDelete.id}`, { method: 'DELETE' });
-            if (!response.ok) {
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
-            }
+            await api.delete(`/api/empleados/${empleadoToDelete.id}`);
             await fetchEmpleados();
             toast.success('Empleado desactivado exitosamente');
             setShowConfirmDelete(false);
             setEmpleadoToDelete(null);
         } catch (err) {
-            toast.error(`Error al desactivar empleado: ${err.message}`);
+            toast.error(err.message || 'Error al desactivar empleado');
         }
     };
 
@@ -284,15 +276,17 @@ const EmpleadosPage = () => {
 
             {/* Action Bar */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <button
-                    onClick={openNewModal}
-                    className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
-                >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Agregar Empleado
-                </button>
+                {canWrite() && (
+                    <button
+                        onClick={openNewModal}
+                        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        Agregar Empleado
+                    </button>
+                )}
 
                 <div className="relative w-full sm:w-auto">
                     <input
@@ -375,28 +369,34 @@ const EmpleadosPage = () => {
                                         </span>
                                     </td>
                                     <td className="py-4 px-6">
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => handleEdit(empleado)}
-                                                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium text-sm"
-                                            >
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                                </svg>
-                                                Editar
-                                            </button>
-                                            {empleado.estaActivo && (
-                                                <button
-                                                    onClick={() => confirmDelete(empleado)}
-                                                    className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-medium text-sm"
-                                                >
-                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                    </svg>
-                                                    Desactivar
-                                                </button>
-                                            )}
-                                        </div>
+                                        {!isReadOnly() ? (
+                                            <div className="flex items-center gap-2">
+                                                {canWrite() && (
+                                                    <button
+                                                        onClick={() => handleEdit(empleado)}
+                                                        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium text-sm"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                        </svg>
+                                                        Editar
+                                                    </button>
+                                                )}
+                                                {empleado.estaActivo && canDelete() && (
+                                                    <button
+                                                        onClick={() => confirmDelete(empleado)}
+                                                        className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-medium text-sm"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                        Desactivar
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <span className="text-sm text-gray-400 italic">Solo lectura</span>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
