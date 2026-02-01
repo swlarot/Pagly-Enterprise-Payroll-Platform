@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { SkeletonCard, SkeletonTable } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
+import { api } from '../services/api';
 
 const PlanillasPage = () => {
     const [planillas, setPlanillas] = useState([]);
@@ -59,9 +60,7 @@ const PlanillasPage = () => {
             setLoading(true);
 
             // Fetch planillas
-            const planillasRes = await fetch('/api/payrollheaders');
-            if (!planillasRes.ok) throw new Error('Error al cargar planillas');
-            const planillasData = await planillasRes.json();
+            const planillasData = await api.get('/api/payrollheaders');
 
             // Enriquecer planillas con totales calculados
             const enrichedPlanillas = planillasData.map(enrichPlanillaWithTotals);
@@ -73,13 +72,11 @@ const PlanillasPage = () => {
             }
 
             // Fetch empleados count
-            const empleadosRes = await fetch('/api/empleados');
-            if (!empleadosRes.ok) throw new Error('Error al cargar empleados');
-            const empleadosData = await empleadosRes.json();
+            const empleadosData = await api.get('/api/empleados');
             setEmpleadosCount(empleadosData.filter(e => e.estaActivo).length);
 
         } catch (err) {
-            toast.error(err.message);
+            toast.error(err.message || 'Error al cargar datos');
         } finally {
             setLoading(false);
         }
@@ -146,22 +143,13 @@ const PlanillasPage = () => {
         }
 
         try {
-            const response = await fetch('/api/payrollheaders', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Error ${response.status}: ${errorText}`);
-            }
+            await api.post('/api/payrollheaders', formData);
 
             toast.success('Planilla creada exitosamente');
             setShowNewModal(false);
             await fetchData();
         } catch (err) {
-            toast.error(err.message);
+            toast.error(err.message || 'Error al crear planilla');
         }
     };
 
@@ -171,23 +159,14 @@ const PlanillasPage = () => {
         try {
             setProcessingAction('calculating');
 
-            const response = await fetch(`/api/payrollheaders/${selectedPlanilla.id}/calculate`, {
-                method: 'POST'
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Error al calcular: ${errorText}`);
-            }
-
-            const result = await response.json();
+            const result = await api.post(`/api/payrollheaders/${selectedPlanilla.id}/calculate`);
             const employeeCount = result.details?.length || empleadosCount;
 
             toast.success(`Planilla calculada: ${employeeCount} empleados procesados`);
 
             await fetchData();
         } catch (err) {
-            toast.error(err.message);
+            toast.error(err.message || 'Error al calcular planilla');
         } finally {
             setProcessingAction(null);
         }
@@ -199,19 +178,12 @@ const PlanillasPage = () => {
         try {
             setProcessingAction('approving');
 
-            const response = await fetch(`/api/payrollheaders/${selectedPlanilla.id}/approve`, {
-                method: 'POST'
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Error al aprobar: ${errorText}`);
-            }
+            await api.post(`/api/payrollheaders/${selectedPlanilla.id}/approve`);
 
             toast.success('Planilla aprobada exitosamente');
             await fetchData();
         } catch (err) {
-            toast.error(err.message);
+            toast.error(err.message || 'Error al aprobar planilla');
         } finally {
             setProcessingAction(null);
         }
@@ -219,14 +191,11 @@ const PlanillasPage = () => {
 
     const viewDetails = async (planilla) => {
         try {
-            const response = await fetch(`/api/payrollheaders/${planilla.id}`);
-            if (!response.ok) throw new Error('Error al cargar detalles');
-
-            const data = await response.json();
+            const data = await api.get(`/api/payrollheaders/${planilla.id}`);
             setPlanillaDetails(data);
             setShowDetailsModal(true);
         } catch (err) {
-            toast.error(err.message);
+            toast.error(err.message || 'Error al cargar detalles');
         }
     };
 
@@ -640,10 +609,10 @@ const PlanillasPage = () => {
                                         <tbody className="bg-white divide-y divide-gray-200">
                                             {planillaDetails.details.map((detail) => (
                                                 <tr key={detail.id} className="hover:bg-gray-50">
-                                                    <td className="py-3 px-4 text-sm text-gray-900">{detail.employee?.nombre} {detail.employee?.apellido}</td>
+                                                    <td className="py-3 px-4 text-sm text-gray-900">{detail.empleado?.nombre} {detail.empleado?.apellido}</td>
                                                     <td className="py-3 px-4 text-sm text-right text-gray-900">{formatCurrency(detail.grossPay)}</td>
-                                                    <td className="py-3 px-4 text-sm text-right text-gray-900">{formatCurrency(detail.employeeCss)}</td>
-                                                    <td className="py-3 px-4 text-sm text-right text-gray-900">{formatCurrency(detail.employeeSe)}</td>
+                                                    <td className="py-3 px-4 text-sm text-right text-gray-900">{formatCurrency(detail.cssEmployee)}</td>
+                                                    <td className="py-3 px-4 text-sm text-right text-gray-900">{formatCurrency(detail.educationalInsuranceEmployee)}</td>
                                                     <td className="py-3 px-4 text-sm text-right text-gray-900">{formatCurrency(detail.incomeTax)}</td>
                                                     <td className="py-3 px-4 text-sm text-right text-gray-900">{formatCurrency(detail.totalDeductions)}</td>
                                                     <td className="py-3 px-4 text-sm text-right font-medium text-gray-900">{formatCurrency(detail.netPay)}</td>
@@ -654,9 +623,9 @@ const PlanillasPage = () => {
                                             <tr>
                                                 <td className="py-3 px-4 text-sm font-bold text-gray-900">TOTALES</td>
                                                 <td className="py-3 px-4 text-sm text-right font-bold text-gray-900">{formatCurrency(planillaDetails.totalGrossPay)}</td>
-                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-900">{formatCurrency(planillaDetails.totalEmployeeCss)}</td>
-                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-900">{formatCurrency(planillaDetails.totalEmployeeSe)}</td>
-                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-900">{formatCurrency(planillaDetails.totalIncomeTax)}</td>
+                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-900">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.cssEmployee || 0), 0) || 0)}</td>
+                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-900">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.educationalInsuranceEmployee || 0), 0) || 0)}</td>
+                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-900">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.incomeTax || 0), 0) || 0)}</td>
                                                 <td className="py-3 px-4 text-sm text-right font-bold text-gray-900">{formatCurrency(planillaDetails.totalDeductions)}</td>
                                                 <td className="py-3 px-4 text-sm text-right font-bold text-gray-900">{formatCurrency(planillaDetails.totalNetPay)}</td>
                                             </tr>

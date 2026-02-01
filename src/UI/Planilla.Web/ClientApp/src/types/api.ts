@@ -378,6 +378,9 @@ export interface AdminTenantUserDto {
   fullName?: string;
   role: TenantRole;
   roleName: string;
+  customTenantRoleId?: number;
+  customRoleName?: string;
+  customRoleColor?: string;
   isActive: boolean;
   joinedAt: string;
   lastLoginAt?: string;
@@ -485,4 +488,46 @@ export interface FeatureAvailabilityDto {
   featureName: string;
   isAvailable: boolean;
   description: string;
+}
+
+// Custom Tenant Roles DTOs
+export interface CustomTenantRoleDto {
+  id: number;
+  tenantId: number;
+  name: string;
+  description: string;
+  isSystem: boolean;
+  color: string;
+  displayOrder: number;
+  permissionCount: number;
+  userCount: number;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CreateCustomTenantRoleDto {
+  name: string;
+  description: string;
+  color: string;
+}
+
+export interface UpdateCustomTenantRoleDto {
+  name: string;
+  description: string;
+  color?: string;
+}
+
+export interface PermissionDto {
+  key: string;
+  category: string;
+  name: string;
+  description: string;
+}
+
+export interface UpdateRolePermissionsDto {
+  permissions: string[];
+}
+
+export interface AssignRoleToUserDto {
+  roleId: number;
 }
