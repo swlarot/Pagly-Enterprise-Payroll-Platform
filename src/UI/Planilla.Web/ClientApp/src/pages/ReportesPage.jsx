@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
+import { api } from '../services/api';
 
 const ReportesPage = () => {
 
@@ -17,14 +18,12 @@ const ReportesPage = () => {
 
     const fetchPlanillas = async () => {
         try {
-            const response = await fetch('/api/payrollheaders');
-            if (!response.ok) throw new Error('Error al cargar planillas');
-            const data = await response.json();
+            const data = await api.get('/api/payrollheaders');
             // Filtrar planillas calculadas, aprobadas o pagadas (status >= 1)
             const planillasValidas = data.filter(p => p.status >= 1);
             setPlanillas(planillasValidas);
         } catch (error) {
-            toast.error(error.message);
+            toast.error(error.message || 'Error al cargar planillas');
         }
     };
 
@@ -35,20 +34,11 @@ const ReportesPage = () => {
         }
         setLoading(true);
         try {
-            const response = await fetch(`/api/reportes/${tipo}/${selectedPlanilla}/excel`);
-            if (!response.ok) throw new Error('Error al generar reporte');
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `Reporte_${tipo.toUpperCase()}_${selectedPlanilla}_${new Date().toISOString().slice(0,10)}.xlsx`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
+            const filename = `Reporte_${tipo.toUpperCase()}_${selectedPlanilla}_${new Date().toISOString().slice(0,10)}.xlsx`;
+            await api.download(`/api/reportes/${tipo}/${selectedPlanilla}/excel`, filename);
             toast.success('Excel descargado correctamente');
         } catch (error) {
-            toast.error(error.message);
+            toast.error(error.message || 'Error al descargar Excel');
         } finally {
             setLoading(false);
         }
@@ -61,20 +51,11 @@ const ReportesPage = () => {
         }
         setLoading(true);
         try {
-            const response = await fetch(`/api/reportes/${tipo}/${selectedPlanilla}/pdf`);
-            if (!response.ok) throw new Error('Error al generar reporte');
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `Reporte_${tipo.toUpperCase()}_${selectedPlanilla}_${new Date().toISOString().slice(0,10)}.pdf`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            window.URL.revokeObjectURL(url);
+            const filename = `Reporte_${tipo.toUpperCase()}_${selectedPlanilla}_${new Date().toISOString().slice(0,10)}.pdf`;
+            await api.download(`/api/reportes/${tipo}/${selectedPlanilla}/pdf`, filename);
             toast.success('PDF descargado correctamente');
         } catch (error) {
-            toast.error(error.message);
+            toast.error(error.message || 'Error al descargar PDF');
         } finally {
             setLoading(false);
         }
@@ -87,14 +68,12 @@ const ReportesPage = () => {
         }
         setLoading(true);
         try {
-            const response = await fetch(`/api/reportes/${tipo}/${selectedPlanilla}`);
-            if (!response.ok) throw new Error('Error al obtener reporte');
-            const data = await response.json();
+            const data = await api.get(`/api/reportes/${tipo}/${selectedPlanilla}`);
             setReporteData(data);
             setModalType(tipo);
             setModalOpen(true);
         } catch (error) {
-            toast.error(error.message);
+            toast.error(error.message || 'Error al obtener reporte');
         } finally {
             setLoading(false);
         }

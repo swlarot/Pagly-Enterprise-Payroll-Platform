@@ -46,6 +46,7 @@ export default function TenantDetailsPage() {
   const [users, setUsers] = useState<AdminTenantUserDto[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [availableRoles, setAvailableRoles] = useState<any[]>([]);
 
   // Audit log tab state
   const [auditLogs, setAuditLogs] = useState<AuditLogDto[]>([]);
@@ -78,6 +79,7 @@ export default function TenantDetailsPage() {
   useEffect(() => {
     if (id && activeTab === 'users') {
       loadUsers();
+      loadAvailableRoles();
     } else if (id && activeTab === 'audit') {
       loadAuditLogs();
     }
@@ -113,6 +115,32 @@ export default function TenantDetailsPage() {
       toast.error('Error al cargar usuarios');
     } finally {
       setIsLoadingUsers(false);
+    }
+  };
+
+  const loadAvailableRoles = async () => {
+    try {
+      // Importar roleService dinámicamente
+      const { roleService } = await import('../services/roleService');
+      const roles = await roleService.getRoles();
+      setAvailableRoles(roles);
+    } catch (error: any) {
+      console.error('Error loading roles:', error);
+    }
+  };
+
+  const handleChangeUserRole = async (userId: string, roleId: number) => {
+    if (!window.confirm('¿Estás seguro de que deseas cambiar el rol de este usuario?')) {
+      return;
+    }
+
+    try {
+      const { roleService } = await import('../services/roleService');
+      await roleService.assignRoleToUser(userId, roleId);
+      toast.success('Rol actualizado exitosamente');
+      await loadUsers();
+    } catch (error: any) {
+      toast.error(error.message || 'Error al cambiar rol');
     }
   };
 
@@ -557,7 +585,25 @@ export default function TenantDetailsPage() {
                             </div>
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
-                            <RoleBadge role={user.role} showIcon />
+                            {availableRoles.length > 0 ? (
+                              <select
+                                value={user.customTenantRoleId || ''}
+                                onChange={(e) => handleChangeUserRole(user.userId, parseInt(e.target.value))}
+                                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                style={{
+                                  borderLeftWidth: '4px',
+                                  borderLeftColor: user.customRoleColor || '#6b7280',
+                                }}
+                              >
+                                {availableRoles.map((role) => (
+                                  <option key={role.id} value={role.id}>
+                                    {role.name}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <RoleBadge role={user.role} showIcon />
+                            )}
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
                             <StatusBadge isActive={user.isActive} />

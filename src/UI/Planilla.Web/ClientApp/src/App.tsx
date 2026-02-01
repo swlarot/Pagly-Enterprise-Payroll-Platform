@@ -17,6 +17,7 @@ import TenantSelectorPage from './pages/TenantSelectorPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import UsersPage from './pages/UsersPage';
 import AuditLogPage from './pages/AuditLogPage';
+import RolesPage from './pages/RolesPage';
 
 // System Admin Pages
 import SystemAdminDashboardPage from './pages/SystemAdminDashboardPage';
@@ -148,6 +149,20 @@ function App() {
               >
                 <AuthLayout>
                   <AuditLogPage />
+                </AuthLayout>
+              </RoleGuard>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Roles & Permissions - Owner Only */}
+        <Route
+          path="/roles"
+          element={
+            <ProtectedRoute>
+              <RoleGuard allowedRoles={[TenantRole.Owner]}>
+                <AuthLayout>
+                  <RolesPage />
                 </AuthLayout>
               </RoleGuard>
             </ProtectedRoute>
