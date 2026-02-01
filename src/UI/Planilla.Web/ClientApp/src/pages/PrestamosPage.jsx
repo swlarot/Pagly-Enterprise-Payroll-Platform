@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 const PrestamosPage = () => {
+    // Auth context - Solo Manager+ puede crear/aprobar préstamos
+    const { canWrite, canDelete, isReadOnly } = useAuth();
 
     // State management
     const [prestamos, setPrestamos] = useState([]);
@@ -112,19 +115,16 @@ const PrestamosPage = () => {
 
         // Validaciones
         if (parseFloat(formData.cuotaMensual) <= 0) {
-            showToast({ type: 'error', message: 'La cuota mensual debe ser mayor a 0' });
+            toast.error('La cuota mensual debe ser mayor a 0');
             return;
         }
 
         if (parseInt(formData.numeroCuotas) <= 0) {
-            showToast({ type: 'error', message: 'El número de cuotas debe ser mayor a 0' });
+            toast.error('El número de cuotas debe ser mayor a 0');
             return;
         }
 
         try {
-            const url = editingId ? `/api/prestamos/${editingId}` : '/api/prestamos';
-            const method = editingId ? 'PUT' : 'POST';
-
             const payload = {
                 empleadoId: parseInt(formData.empleadoId),
                 descripcion: formData.descripcion,
@@ -137,25 +137,18 @@ const PrestamosPage = () => {
                 observaciones: formData.observaciones || null
             };
 
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Error ${response.status}: ${errorText}`);
+            if (editingId) {
+                await api.put(`/api/prestamos/${editingId}`, payload);
+                toast.success('Préstamo actualizado exitosamente');
+            } else {
+                await api.post('/api/prestamos', payload);
+                toast.success('Préstamo creado exitosamente');
             }
 
             await fetchPrestamos();
-            showToast({
-                type: 'success',
-                message: editingId ? 'Préstamo actualizado exitosamente' : 'Préstamo creado exitosamente'
-            });
             resetForm();
         } catch (err) {
-            showToast({ type: 'error', message: `Error al guardar préstamo: ${err.message}` });
+            toast.error(err.message || 'Error al guardar préstamo');
         }
     };
 
@@ -185,33 +178,27 @@ const PrestamosPage = () => {
         if (!selectedPrestamo || !confirmAction) return;
 
         try {
-            let url, method = 'POST';
-
             switch (confirmAction) {
                 case 'suspender':
-                    url = `/api/prestamos/${selectedPrestamo.id}/suspender`;
+                    await api.post(`/api/prestamos/${selectedPrestamo.id}/suspender`);
                     break;
                 case 'reactivar':
-                    url = `/api/prestamos/${selectedPrestamo.id}/reactivar`;
+                    await api.post(`/api/prestamos/${selectedPrestamo.id}/reactivar`);
                     break;
                 case 'cancelar':
-                    url = `/api/prestamos/${selectedPrestamo.id}/cancelar`;
-                    method = 'DELETE';
+                    await api.delete(`/api/prestamos/${selectedPrestamo.id}/cancelar`);
                     break;
                 default:
                     return;
             }
 
-            const response = await fetch(url, { method });
-            if (!response.ok) throw new Error(`Error ${response.status}: ${response.statusText}`);
-
             await fetchPrestamos();
-            showToast({ type: 'success', message: `Préstamo ${confirmAction} exitosamente` });
+            toast.success(`Préstamo ${confirmAction} exitosamente`);
             setShowConfirmModal(false);
             setSelectedPrestamo(null);
             setConfirmAction(null);
         } catch (err) {
-            showToast({ type: 'error', message: `Error: ${err.message}` });
+            toast.error(err.message || 'Error al procesar acción');
         }
     };
 

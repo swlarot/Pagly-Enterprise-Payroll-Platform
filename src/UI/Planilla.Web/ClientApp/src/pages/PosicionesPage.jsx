@@ -2,8 +2,14 @@ import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import ConfirmModal from '../components/ConfirmModal';
+import { useAuth } from '../contexts/AuthContext';
+import { TenantRole } from '../types/api';
 
 const PosicionesPage = () => {
+    // Auth context - Solo Admin+ puede gestionar posiciones
+    const { hasRole } = useAuth();
+    const canManagePositions = hasRole(TenantRole.Owner, TenantRole.Admin);
+
     const [posiciones, setPosiciones] = useState([]);
     const [departamentos, setDepartamentos] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -122,47 +128,31 @@ const PosicionesPage = () => {
         }
 
         try {
-            const url = editingPos
-                ? `/api/posiciones/${editingPos.id}`
-                : '/api/posiciones';
-            const method = editingPos ? 'PUT' : 'POST';
-
-            const response = await fetch(url, {
-                method,
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.message || 'Error al guardar');
+            if (editingPos) {
+                await api.put(`/api/posiciones/${editingPos.id}`, payload);
+                toast.success('Posición actualizada exitosamente');
+            } else {
+                await api.post('/api/posiciones', payload);
+                toast.success('Posición creada exitosamente');
             }
 
-            toast.success(editingPos ? 'Posición actualizada exitosamente' : 'Posición creada exitosamente');
             handleCloseModal();
             fetchPosiciones();
         } catch (error) {
-            toast.error(error.message);
+            toast.error(error.message || 'Error al guardar posición');
         }
     };
 
     const handleDeactivate = async () => {
         try {
-            const response = await fetch(`/api/posiciones/${posToDeactivate.id}`, {
-                method: 'DELETE'
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.message || 'Error al desactivar');
-            }
+            await api.delete(`/api/posiciones/${posToDeactivate.id}`);
 
             toast.success('Posición desactivada exitosamente');
             setShowConfirm(false);
             setPosToDeactivate(null);
             fetchPosiciones();
         } catch (error) {
-            toast.error(error.message);
+            toast.error(error.message || 'Error al desactivar posición');
         }
     };
 

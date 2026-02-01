@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 const HorasExtraPage = () => {
+    // Auth context for permissions
+    const { canWrite, canDelete, isReadOnly } = useAuth();
 
     // State management
     const [horasExtra, setHorasExtra] = useState([]);
