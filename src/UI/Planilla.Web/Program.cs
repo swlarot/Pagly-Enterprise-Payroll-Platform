@@ -147,6 +147,7 @@ builder.Services.AddScoped<ITenantManagementService, TenantManagementService>();
 builder.Services.AddScoped<IInvitationService, InvitationService>();
 builder.Services.AddScoped<global::Planilla.Application.Services.IEmailService, Vorluno.Planilla.Infrastructure.Services.EmailService>();
 builder.Services.AddScoped<global::Planilla.Application.Services.IPlanUsageService, Vorluno.Planilla.Infrastructure.Services.PlanUsageService>();
+builder.Services.AddScoped<ICustomTenantRoleService, CustomTenantRoleService>();
 
 // --- FIN DE NUESTRA CONFIGURACIÓN PRINCIPAL ---
 
@@ -272,6 +273,19 @@ if (!app.Environment.IsEnvironment("Testing"))
             catch (Exception adminSeedEx)
             {
                 logger.LogWarning(adminSeedEx, "⚠ Seed de administradores falló, pero la aplicación continuará.");
+            }
+
+            // Ejecutar seed de roles del sistema para todos los tenants
+            try
+            {
+                logger.LogInformation("Ejecutando seed de roles del sistema...");
+                var dbContextForRoles = services.GetRequiredService<ApplicationDbContext>();
+                await CustomRolesSeeder.SeedAsync(dbContextForRoles, logger);
+                logger.LogInformation("✓ Seed de roles del sistema completado exitosamente");
+            }
+            catch (Exception rolesSeedEx)
+            {
+                logger.LogWarning(rolesSeedEx, "⚠ Seed de roles falló, pero la aplicación continuará.");
             }
         }
         catch (Exception ex)

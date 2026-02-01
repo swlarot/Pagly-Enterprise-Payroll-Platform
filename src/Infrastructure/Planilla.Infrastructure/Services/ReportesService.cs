@@ -7,6 +7,7 @@
 
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs.Reportes;
+using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
 
@@ -18,10 +19,14 @@ namespace Vorluno.Planilla.Infrastructure.Services;
 public class ReportesService
 {
     private readonly ApplicationDbContext _context;
+    private readonly ITenantContext _tenantContext;
 
-    public ReportesService(ApplicationDbContext context)
+    public ReportesService(
+        ApplicationDbContext context,
+        ITenantContext tenantContext)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
+        _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
     }
 
     /// <summary>
@@ -29,26 +34,39 @@ public class ReportesService
     /// </summary>
     public async Task<ReporteCssDto> GenerarReporteCss(int planillaId)
     {
+        var tenantId = _tenantContext.TenantId;
+
+        // SEGURIDAD CRÍTICA: Filtrar por TenantId para aislar datos entre tenants
         var planilla = await _context.PayrollHeaders
+            .Where(p => p.Id == planillaId && p.TenantId == tenantId)
             .Include(p => p.Details)
                 .ThenInclude(d => d.Empleado)
-            .FirstOrDefaultAsync(p => p.Id == planillaId);
+            .FirstOrDefaultAsync();
 
         if (planilla == null)
-            throw new InvalidOperationException($"Planilla {planillaId} no encontrada");
+            throw new InvalidOperationException($"Planilla {planillaId} no encontrada o no autorizada");
+
+        // Obtener información del tenant para datos de la empresa
+        var tenant = await _tenantContext.GetCurrentTenantAsync();
 
         var empleados = planilla.Details
             .Where(d => d.Empleado != null)
-            .Select(d => new EmpleadoCssDto(
-                d.Empleado!.NumeroIdentificacion,
-                $"{d.Empleado.Nombre} {d.Empleado.Apellido}",
-                d.GrossPay,
-                Math.Min(d.GrossPay, 1500m), // Base CSS topeada
-                d.CssEmployee,
-                d.CssEmployer,
-                d.RiskContribution,
-                d.CssEmployee + d.CssEmployer + d.RiskContribution
-            ))
+            .Select(d => {
+                // Calcular base CSS real (reversa del cálculo de 9.75%)
+                // El orquestador ya aplicó los topes correctos según Ley 462
+                decimal baseCss = d.CssEmployee > 0 ? d.CssEmployee / 0.0975m : 0;
+
+                return new EmpleadoCssDto(
+                    d.Empleado!.NumeroIdentificacion,
+                    $"{d.Empleado.Nombre} {d.Empleado.Apellido}",
+                    d.GrossPay,
+                    baseCss, // Base CSS real con topes aplicados por el orquestador
+                    d.CssEmployee,
+                    d.CssEmployer,
+                    d.RiskContribution,
+                    d.CssEmployee + d.CssEmployer + d.RiskContribution
+                );
+            })
             .OrderBy(e => e.NombreCompleto)
             .ToList();
 
@@ -61,8 +79,10 @@ public class ReportesService
         );
 
         return new ReporteCssDto(
-            "Mi Empresa S.A.", // TODO: Obtener de configuración
-            "1234567-8-123456", // TODO: Obtener de configuración
+            tenant?.Name ?? "Sin nombre",
+            tenant != null && !string.IsNullOrEmpty(tenant.RUC) && !string.IsNullOrEmpty(tenant.DV)
+                ? $"{tenant.RUC}-{tenant.DV}"
+                : "Sin RUC",
             $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
             DateTime.Now,
             empleados,
@@ -75,13 +95,20 @@ public class ReportesService
     /// </summary>
     public async Task<ReporteSeDto> GenerarReporteSe(int planillaId)
     {
+        var tenantId = _tenantContext.TenantId;
+
+        // SEGURIDAD CRÍTICA: Filtrar por TenantId para aislar datos entre tenants
         var planilla = await _context.PayrollHeaders
+            .Where(p => p.Id == planillaId && p.TenantId == tenantId)
             .Include(p => p.Details)
                 .ThenInclude(d => d.Empleado)
-            .FirstOrDefaultAsync(p => p.Id == planillaId);
+            .FirstOrDefaultAsync();
 
         if (planilla == null)
-            throw new InvalidOperationException($"Planilla {planillaId} no encontrada");
+            throw new InvalidOperationException($"Planilla {planillaId} no encontrada o no autorizada");
+
+        // Obtener información del tenant para datos de la empresa
+        var tenant = await _tenantContext.GetCurrentTenantAsync();
 
         var empleados = planilla.Details
             .Where(d => d.Empleado != null)
@@ -104,8 +131,10 @@ public class ReportesService
         );
 
         return new ReporteSeDto(
-            "Mi Empresa S.A.", // TODO: Obtener de configuración
-            "1234567-8-123456", // TODO: Obtener de configuración
+            tenant?.Name ?? "Sin nombre",
+            tenant != null && !string.IsNullOrEmpty(tenant.RUC) && !string.IsNullOrEmpty(tenant.DV)
+                ? $"{tenant.RUC}-{tenant.DV}"
+                : "Sin RUC",
             $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
             DateTime.Now,
             empleados,
@@ -118,20 +147,27 @@ public class ReportesService
     /// </summary>
     public async Task<ReporteIsrDto> GenerarReporteIsr(int planillaId)
     {
+        var tenantId = _tenantContext.TenantId;
+
+        // SEGURIDAD CRÍTICA: Filtrar por TenantId para aislar datos entre tenants
         var planilla = await _context.PayrollHeaders
+            .Where(p => p.Id == planillaId && p.TenantId == tenantId)
             .Include(p => p.Details)
                 .ThenInclude(d => d.Empleado)
-            .FirstOrDefaultAsync(p => p.Id == planillaId);
+            .FirstOrDefaultAsync();
 
         if (planilla == null)
-            throw new InvalidOperationException($"Planilla {planillaId} no encontrada");
+            throw new InvalidOperationException($"Planilla {planillaId} no encontrada o no autorizada");
+
+        // Obtener información del tenant para datos de la empresa
+        var tenant = await _tenantContext.GetCurrentTenantAsync();
 
         var empleados = planilla.Details
             .Where(d => d.Empleado != null)
             .Select(d => {
                 // Proyección anual (asumiendo quincenal: 24 períodos)
                 decimal ingresoAnualProyectado = d.GrossPay * 24;
-                int dependientes = 0; // TODO: Obtener del empleado
+                int dependientes = d.Empleado!.Dependents; // Obtener dependientes reales del empleado
                 decimal deduccionDependientes = dependientes * 800m; // $800 por dependiente
 
                 return new EmpleadoIsrDto(
@@ -156,8 +192,10 @@ public class ReportesService
         );
 
         return new ReporteIsrDto(
-            "Mi Empresa S.A.", // TODO: Obtener de configuración
-            "1234567-8-123456", // TODO: Obtener de configuración
+            tenant?.Name ?? "Sin nombre",
+            tenant != null && !string.IsNullOrEmpty(tenant.RUC) && !string.IsNullOrEmpty(tenant.DV)
+                ? $"{tenant.RUC}-{tenant.DV}"
+                : "Sin RUC",
             $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
             planilla.PeriodStartDate.Year,
             DateTime.Now,
@@ -171,17 +209,24 @@ public class ReportesService
     /// </summary>
     public async Task<ReportePlanillaDetalladoDto> GenerarReportePlanillaDetallada(int planillaId)
     {
+        var tenantId = _tenantContext.TenantId;
+
+        // SEGURIDAD CRÍTICA: Filtrar por TenantId para aislar datos entre tenants
         var planilla = await _context.PayrollHeaders
+            .Where(p => p.Id == planillaId && p.TenantId == tenantId)
             .Include(p => p.Details)
                 .ThenInclude(d => d.Empleado)
                     .ThenInclude(e => e!.Departamento)
             .Include(p => p.Details)
                 .ThenInclude(d => d.Empleado)
                     .ThenInclude(e => e!.Posicion)
-            .FirstOrDefaultAsync(p => p.Id == planillaId);
+            .FirstOrDefaultAsync();
 
         if (planilla == null)
-            throw new InvalidOperationException($"Planilla {planillaId} no encontrada");
+            throw new InvalidOperationException($"Planilla {planillaId} no encontrada o no autorizada");
+
+        // Obtener información del tenant para datos de la empresa
+        var tenant = await _tenantContext.GetCurrentTenantAsync();
 
         var empleados = planilla.Details
             .Where(d => d.Empleado != null)
@@ -247,8 +292,10 @@ public class ReportesService
 
         return new ReportePlanillaDetalladoDto(
             // Encabezado
-            "Mi Empresa S.A.", // TODO: Obtener de configuración
-            "1234567-8-123456", // TODO: Obtener de configuración
+            tenant?.Name ?? "Sin nombre",
+            tenant != null && !string.IsNullOrEmpty(tenant.RUC) && !string.IsNullOrEmpty(tenant.DV)
+                ? $"{tenant.RUC}-{tenant.DV}"
+                : "Sin RUC",
             $"PL-{planilla.Id:D6}",
             $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
             planilla.PayDate,

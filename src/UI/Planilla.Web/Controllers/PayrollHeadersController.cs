@@ -59,6 +59,7 @@ public class PayrollHeadersController : ControllerBase
         var query = _context.PayrollHeaders
             .Where(p => p.TenantId == tenantId) // ✅ SEGURIDAD: Filtrado por tenant obligatorio
             .Include(p => p.Details)
+                .ThenInclude(d => d.Empleado) // ✅ CRÍTICO: Incluir empleado para cálculos en frontend
             .AsNoTracking()
             .AsQueryable();
 

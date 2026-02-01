@@ -282,4 +282,31 @@ public class TenantController : ControllerBase
 
         return Ok(result.Value);
     }
+
+    /// <summary>
+    /// PUT /api/tenant/users/{userId}/role - Asigna un rol (sistema o personalizado) a un usuario
+    /// Roles: Owner, Admin
+    /// </summary>
+    [HttpPut("users/{userId}/role")]
+    [Authorize(Policy = "TenantManageUsers")]
+    public async Task<IActionResult> AssignRoleToUser(
+        string userId,
+        [FromBody] Vorluno.Planilla.Application.DTOs.Roles.AssignRoleToUserDto dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        // Asegurar que el userId del path coincide con el del body
+        dto.UserId = userId;
+
+        var roleService = HttpContext.RequestServices
+            .GetRequiredService<ICustomTenantRoleService>();
+
+        var result = await roleService.AssignRoleToUserAsync(dto);
+
+        if (!result.Success)
+            return BadRequest(new { error = result.ErrorMessage });
+
+        return Ok(new { message = "Rol asignado exitosamente" });
+    }
 }

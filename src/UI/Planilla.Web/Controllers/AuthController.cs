@@ -243,6 +243,13 @@ public class AuthController : ControllerBase
                 return Unauthorized(new { message = "Credenciales inválidas" });
             }
 
+            // 1.1. Verificar que el usuario no esté eliminado (soft delete)
+            if (user.IsDeleted)
+            {
+                _logger.LogWarning("Intento de login de usuario eliminado: {Email}", dto.Email);
+                return Unauthorized(new { message = "Esta cuenta ha sido desactivada. Contacte al administrador." });
+            }
+
             // 2. Verificar contraseña
             var result = await _signInManager.CheckPasswordSignInAsync(user, dto.Password, lockoutOnFailure: true);
             if (!result.Succeeded)
@@ -302,12 +309,15 @@ public class AuthController : ControllerBase
                     Subdomain = tu.Tenant.Subdomain
                 }).ToList();
 
+                // Generar token temporal (5 min) que solo permite seleccionar tenant
+                var tempToken = GenerateTenantSelectionToken(user);
+
                 // Retornar respuesta con lista de tenants, sin seleccionar ninguno aún
                 var multiTenantResponse = new AuthResponseDto
                 {
-                    Token = string.Empty, // No generar token aún
+                    Token = tempToken.Token, // Token temporal para selección
                     RefreshToken = string.Empty,
-                    ExpiresAt = DateTime.MinValue,
+                    ExpiresAt = tempToken.ExpiresAt,
                     User = new UserInfoDto
                     {
                         UserId = user.Id,
@@ -546,6 +556,40 @@ public class AuthController : ControllerBase
             new Claim("tenant_role", tenantUser.Role.ToString()),
             new Claim("plan", tenant.Subscription.Plan.ToString()),
             new Claim("is_system_admin", user.IsSystemAdmin.ToString().ToLower())
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: jwtIssuer,
+            audience: jwtAudience,
+            claims: claims,
+            expires: expiresAt,
+            signingCredentials: credentials
+        );
+
+        return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
+    }
+
+    /// <summary>
+    /// Genera un JWT temporal (5 min) para permitir solo la selección de tenant
+    /// </summary>
+    private (string Token, DateTime ExpiresAt) GenerateTenantSelectionToken(AppUser user)
+    {
+        var jwtKey = _configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT Key not configured");
+        var jwtIssuer = _configuration["Jwt:Issuer"] ?? "Planilla";
+        var jwtAudience = _configuration["Jwt:Audience"] ?? "Planilla";
+
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
+        var expiresAt = DateTime.UtcNow.AddMinutes(5); // Solo 5 minutos para seleccionar
+
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id),
+            new Claim(JwtRegisteredClaimNames.Email, user.Email!),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim("requires_tenant_selection", "true"), // Marca especial
+            new Claim("is_system_admin", "false")
         };
 
         var token = new JwtSecurityToken(
