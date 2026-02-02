@@ -160,22 +160,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const canWrite = (): boolean => {
     if (!user || isLoading) return false;
-    // Owner, Admin y Manager pueden escribir
-    return user.role === TenantRole.Owner
-        || user.role === TenantRole.Admin
-        || user.role === TenantRole.Manager;
+    // Owner (0) y User (1) pueden escribir (User depende de permisos personalizados)
+    return user.role === 0 || user.role === 1;
   };
 
   const canDelete = (): boolean => {
     if (!user || isLoading) return false;
-    // Solo Owner y Admin pueden eliminar
-    return user.role === TenantRole.Owner || user.role === TenantRole.Admin;
+    // Solo Owner (0) puede eliminar por defecto
+    return user.role === 0;
   };
 
   const isReadOnly = (): boolean => {
-    if (!user || isLoading) return true;
-    // Accountant y Employee son solo lectura
-    return user.role === TenantRole.Accountant || user.role === TenantRole.Employee;
+    // Por ahora nadie es solo lectura - se manejan permisos personalizados
+    return false;
   };
 
   const value: AuthContextType = {

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Vorluno.Planilla.Infrastructure.Data;
@@ -11,9 +12,11 @@ using Vorluno.Planilla.Infrastructure.Data;
 namespace Vorluno.Planilla.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260201112239_SimplifyRolesAndExtendEntities")]
+    partial class SimplifyRolesAndExtendEntities
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -624,13 +627,6 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.Property<decimal>("CssRiskPercentage")
                         .HasColumnType("decimal(5, 2)");
 
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("DeletedBy")
-                        .HasMaxLength(450)
-                        .HasColumnType("character varying(450)");
-
                     b.Property<int?>("DepartamentoId")
                         .HasColumnType("integer");
 
@@ -646,9 +642,6 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
 
                     b.Property<DateTime>("FechaContratacion")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsSubjectToCss")
                         .HasColumnType("boolean");

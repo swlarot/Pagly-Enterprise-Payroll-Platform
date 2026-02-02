@@ -83,8 +83,8 @@ public static class ControllerExtensions
         {
             var role = controller.GetCurrentTenantRole();
             return role == TenantRole.Owner
-                || role == TenantRole.Admin
-                || role == TenantRole.Manager;
+                || role == TenantRole.Owner
+                || role == TenantRole.User;
         }
         catch
         {
@@ -100,7 +100,7 @@ public static class ControllerExtensions
         try
         {
             var role = controller.GetCurrentTenantRole();
-            return role == TenantRole.Owner || role == TenantRole.Admin;
+            return role == TenantRole.Owner || role == TenantRole.Owner;
         }
         catch
         {

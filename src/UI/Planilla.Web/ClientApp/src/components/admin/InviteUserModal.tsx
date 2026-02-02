@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, UserPlus, Users, Loader2 } from 'lucide-react';
-import { Input } from '../ui/Input';
+import { X, Search, Loader2 } from 'lucide-react';
 import { Select } from '../ui/Select';
 import { Button } from '../ui/Button';
 import { TenantRole, SystemUserDto } from '../../types/api';
@@ -14,11 +13,7 @@ interface InviteUserModalProps {
   onSuccess: () => void;
 }
 
-type Mode = 'select' | 'create';
-
 export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: InviteUserModalProps) {
-  // Estado de modo
-  const [mode, setMode] = useState<Mode>('select');
 
   // Estado de búsqueda de usuarios
   const [searchTerm, setSearchTerm] = useState('');
@@ -30,22 +25,16 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
 
   // Estado de usuario seleccionado
   const [selectedUser, setSelectedUser] = useState<SystemUserDto | null>(null);
+  const [selectedRole, setSelectedRole] = useState<TenantRole>(TenantRole.User);
 
-  // Estado del formulario
-  const [formData, setFormData] = useState({
-    email: '',
-    fullName: '',
-    password: '',
-    role: TenantRole.Manager,
-  });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Cargar usuarios del sistema cuando se abre el modal en modo selección
+  // Cargar usuarios del sistema cuando se abre el modal
   useEffect(() => {
-    if (isOpen && mode === 'select') {
+    if (isOpen) {
       loadSystemUsers();
     }
-  }, [isOpen, mode, searchTerm, page]);
+  }, [isOpen, searchTerm, page]);
 
   // Resetear estado cuando se cierra el modal
   useEffect(() => {
@@ -74,75 +63,49 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
   };
 
   const handleSelectUser = (user: SystemUserDto) => {
-    setSelectedUser(user);
-    setFormData({
-      ...formData,
-      email: user.email,
-      fullName: user.fullName,
-    });
-
     // Verificar si el usuario ya está en este tenant
     const alreadyInTenant = user.tenants.some((t) => t.tenantId === tenantId);
     if (alreadyInTenant) {
       toast.error(
-        `El usuario ${user.email} ya está en este tenant. Si fue removido, puede re-invitarlo.`
+        `El usuario ${user.email} ya está asignado a este tenant.`
       );
+      return;
     }
+
+    setSelectedUser(user);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validaciones
-    if (mode === 'select' && !selectedUser) {
+    if (!selectedUser) {
       toast.error('Debe seleccionar un usuario');
       return;
     }
 
-    if (mode === 'create') {
-      if (!formData.email || !formData.fullName || !formData.password) {
-        toast.error('Todos los campos son requeridos');
-        return;
-      }
-
-      if (formData.password.length < 6) {
-        toast.error('La contraseña debe tener al menos 6 caracteres');
-        return;
-      }
-    } else {
-      // En modo selección, no se requiere password
-      if (!formData.email || !formData.fullName) {
-        toast.error('Email y nombre completo son requeridos');
-        return;
-      }
-    }
-
     try {
       setIsSubmitting(true);
-      await systemAdminService.inviteUserToTenant(tenantId, formData);
-      toast.success('Usuario invitado exitosamente');
+      await systemAdminService.assignUserToTenant(tenantId, {
+        userEmail: selectedUser.email,
+        role: selectedRole,
+      });
+      toast.success('Usuario asignado exitosamente');
       onSuccess();
       onClose();
     } catch (error: any) {
-      toast.error(error.message || 'Error al invitar usuario');
+      toast.error(error.message || 'Error al asignar usuario');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const resetState = () => {
-    setMode('select');
     setSearchTerm('');
     setSystemUsers([]);
     setPage(1);
     setTotal(0);
     setSelectedUser(null);
-    setFormData({
-      email: '',
-      fullName: '',
-      password: '',
-      role: TenantRole.Manager,
-    });
+    setSelectedRole(TenantRole.User);
   };
 
   const handleClose = () => {
@@ -157,47 +120,21 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
       <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-          <h3 className="text-xl font-semibold text-gray-900">Invitar Usuario al Tenant</h3>
+          <div>
+            <h3 className="text-xl font-semibold text-gray-900">Asignar Usuario al Tenant</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Selecciona un usuario existente para asignar a este tenant
+            </p>
+          </div>
           <button onClick={handleClose} className="text-gray-400 hover:text-gray-600">
             <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Selector de Modo */}
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex gap-4">
-            <button
-              type="button"
-              onClick={() => setMode('select')}
-              className={`flex-1 px-4 py-3 rounded-lg flex items-center justify-center gap-2 transition-colors ${
-                mode === 'select'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <Users className="w-5 h-5" />
-              Seleccionar Usuario Existente
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode('create')}
-              className={`flex-1 px-4 py-3 rounded-lg flex items-center justify-center gap-2 transition-colors ${
-                mode === 'create'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              <UserPlus className="w-5 h-5" />
-              Crear Nuevo Usuario
-            </button>
-          </div>
-        </div>
-
         <div className="p-6">
-          {/* Modo Seleccionar Usuario Existente */}
-          {mode === 'select' ? (
-            <div>
-              {/* Búsqueda */}
+          {/* Búsqueda de Usuarios */}
+          <div>
+            {/* Búsqueda */}
               <div className="mb-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -298,93 +235,35 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
                 </div>
               )}
 
-              {/* Form de Rol (si hay usuario seleccionado) */}
-              {selectedUser && (
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <Select
-                    label="Rol en este Tenant"
-                    value={formData.role.toString()}
-                    onChange={(e) =>
-                      setFormData({ ...formData, role: parseInt(e.target.value) })
-                    }
-                    options={[
-                      {
-                        value: TenantRole.Admin.toString(),
-                        label: 'Admin - Gestión completa excepto billing',
-                      },
-                      {
-                        value: TenantRole.Manager.toString(),
-                        label: 'Manager - Planillas, empleados, reportes',
-                      },
-                      {
-                        value: TenantRole.Accountant.toString(),
-                        label: 'Contador - Solo reportes y consultas',
-                      },
-                      {
-                        value: TenantRole.Employee.toString(),
-                        label: 'Empleado - Solo ver su información',
-                      },
-                    ]}
-                  />
+            {/* Form de Rol (si hay usuario seleccionado) */}
+            {selectedUser && (
+              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="mb-3">
+                  <p className="text-sm font-medium text-gray-700">Usuario Seleccionado:</p>
+                  <p className="text-gray-900">{selectedUser.fullName}</p>
+                  <p className="text-sm text-gray-600">{selectedUser.email}</p>
                 </div>
-              )}
-            </div>
-          ) : (
-            /* Modo Crear Nuevo Usuario */
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <Input
-                label="Email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="usuario@empresa.com"
-                required
-              />
-
-              <Input
-                label="Nombre Completo"
-                type="text"
-                value={formData.fullName}
-                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                placeholder="Juan Pérez"
-                required
-              />
-
-              <Input
-                label="Contraseña Temporal"
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="Mínimo 6 caracteres"
-                required
-                helperText="El usuario podrá cambiarla después del primer login"
-              />
-
-              <Select
-                label="Rol"
-                value={formData.role.toString()}
-                onChange={(e) => setFormData({ ...formData, role: parseInt(e.target.value) })}
-                options={[
-                  {
-                    value: TenantRole.Admin.toString(),
-                    label: 'Admin - Gestión completa excepto billing',
-                  },
-                  {
-                    value: TenantRole.Manager.toString(),
-                    label: 'Manager - Planillas, empleados, reportes',
-                  },
-                  {
-                    value: TenantRole.Accountant.toString(),
-                    label: 'Contador - Solo reportes y consultas',
-                  },
-                  {
-                    value: TenantRole.Employee.toString(),
-                    label: 'Empleado - Solo ver su información',
-                  },
-                ]}
-              />
-            </form>
-          )}
+                <Select
+                  label="Rol en este Tenant"
+                  value={selectedRole.toString()}
+                  onChange={(e) => setSelectedRole(parseInt(e.target.value))}
+                  options={[
+                    {
+                      value: TenantRole.Owner.toString(),
+                      label: 'Owner - Propietario con acceso total',
+                    },
+                    {
+                      value: TenantRole.User.toString(),
+                      label: 'User - Usuario regular con permisos personalizados',
+                    },
+                  ]}
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  💡 Los permisos específicos para usuarios regulares se configuran mediante roles personalizados
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* Botones de Acción */}
           <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-200">
@@ -394,15 +273,10 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
             <Button
               type="button"
               onClick={handleSubmit}
-              disabled={
-                isSubmitting ||
-                (mode === 'select' && !selectedUser) ||
-                (mode === 'create' &&
-                  (!formData.email || !formData.fullName || !formData.password))
-              }
+              disabled={isSubmitting || !selectedUser}
               loading={isSubmitting}
             >
-              Invitar Usuario
+              Asignar Usuario
             </Button>
           </div>
         </div>

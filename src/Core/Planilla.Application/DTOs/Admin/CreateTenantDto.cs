@@ -3,65 +3,65 @@ using System.ComponentModel.DataAnnotations;
 namespace Vorluno.Planilla.Application.DTOs.Admin;
 
 /// <summary>
-/// DTO para crear un nuevo tenant desde el Admin Panel
+/// DTO para crear un nuevo tenant desde el Admin Panel (sin owner - se asigna después)
 /// </summary>
-public class CreateTenantDto
-{
+public record CreateTenantDto(
     /// <summary>
     /// Nombre de la empresa/tenant
     /// </summary>
     [Required(ErrorMessage = "El nombre de la empresa es requerido")]
     [StringLength(200, ErrorMessage = "El nombre no puede exceder 200 caracteres")]
-    public string Name { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Email del propietario/owner del tenant
-    /// </summary>
-    [Required(ErrorMessage = "El email del propietario es requerido")]
-    [EmailAddress(ErrorMessage = "Email inválido")]
-    public string OwnerEmail { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Contraseña para el usuario owner
-    /// </summary>
-    [Required(ErrorMessage = "La contraseña es requerida")]
-    [StringLength(100, MinimumLength = 6, ErrorMessage = "La contraseña debe tener entre 6 y 100 caracteres")]
-    public string OwnerPassword { get; set; } = string.Empty;
-
-    /// <summary>
-    /// Nombre completo del propietario
-    /// </summary>
-    [StringLength(200)]
-    public string? OwnerFullName { get; set; }
+    string Nombre,
 
     /// <summary>
     /// Registro Único de Contribuyente (RUC) de Panamá
     /// </summary>
-    [StringLength(20)]
-    public string? RUC { get; set; }
+    [Required(ErrorMessage = "El RUC es requerido")]
+    [StringLength(50, ErrorMessage = "El RUC no puede exceder 50 caracteres")]
+    string RUC,
 
     /// <summary>
     /// Dígito Verificador del RUC
     /// </summary>
-    [StringLength(10)]
-    public string? DV { get; set; }
+    [Required(ErrorMessage = "El DV es requerido")]
+    [StringLength(5, ErrorMessage = "El DV no puede exceder 5 caracteres")]
+    string DV,
+
+    /// <summary>
+    /// Tipo de contribuyente: "Natural" o "Juridico"
+    /// </summary>
+    [Required(ErrorMessage = "El tipo de contribuyente es requerido")]
+    [StringLength(20)]
+    string TipoContribuyente,
+
+    /// <summary>
+    /// Teléfono de contacto de la empresa
+    /// </summary>
+    [StringLength(20)]
+    string? Telefono,
+
+    /// <summary>
+    /// Email de contacto de la empresa
+    /// </summary>
+    [EmailAddress(ErrorMessage = "El formato del correo no es válido")]
+    [StringLength(256)]
+    string? Correo,
+
+    /// <summary>
+    /// País donde se ubica la empresa
+    /// </summary>
+    [StringLength(100)]
+    string? Pais,
 
     /// <summary>
     /// Dirección física de la empresa
     /// </summary>
     [StringLength(500)]
-    public string? Address { get; set; }
+    string? Direccion,
 
     /// <summary>
-    /// Teléfono de contacto
+    /// Sitio web de la empresa
     /// </summary>
-    [StringLength(20)]
-    public string? Phone { get; set; }
-
-    /// <summary>
-    /// Email de contacto de la empresa
-    /// </summary>
-    [EmailAddress]
-    [StringLength(200)]
-    public string? CompanyEmail { get; set; }
-}
+    [StringLength(256)]
+    string? SitioWeb
+);

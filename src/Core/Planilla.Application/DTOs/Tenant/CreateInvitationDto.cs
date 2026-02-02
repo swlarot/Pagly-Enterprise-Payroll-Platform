@@ -14,5 +14,5 @@ public class CreateInvitationDto
     public string Email { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "El rol es obligatorio")]
-    public TenantRole Role { get; set; } = TenantRole.Employee;
+    public TenantRole Role { get; set; } = TenantRole.User;
 }

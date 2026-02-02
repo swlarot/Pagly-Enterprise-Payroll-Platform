@@ -51,7 +51,7 @@ public class TenantContext : ITenantContext
             var claim = _httpContextAccessor.HttpContext?.User?.FindFirst("tenant_role");
             if (claim == null || string.IsNullOrWhiteSpace(claim.Value))
             {
-                return Domain.Enums.TenantRole.Employee;
+                return Domain.Enums.TenantRole.User;
             }
 
             // Intentar parsear como string (ej: "Admin")
@@ -68,7 +68,7 @@ public class TenantContext : ITenantContext
             }
 
             // Default a Employee si no se puede parsear
-            return Domain.Enums.TenantRole.Employee;
+            return Domain.Enums.TenantRole.User;
         }
     }
 
@@ -125,36 +125,20 @@ public class TenantContext : ITenantContext
         if (currentRole == Domain.Enums.TenantRole.Owner)
             return true;
 
-        // Admin tiene todos excepto Owner
-        if (currentRole == Domain.Enums.TenantRole.Admin && role != Domain.Enums.TenantRole.Owner)
-            return true;
-
-        // Manager tiene Manager, Accountant y Employee
-        if (currentRole == Domain.Enums.TenantRole.Manager &&
-            (role == Domain.Enums.TenantRole.Manager ||
-             role == Domain.Enums.TenantRole.Accountant ||
-             role == Domain.Enums.TenantRole.Employee))
-            return true;
-
-        // Accountant tiene Accountant y Employee
-        if (currentRole == Domain.Enums.TenantRole.Accountant &&
-            (role == Domain.Enums.TenantRole.Accountant ||
-             role == Domain.Enums.TenantRole.Employee))
-            return true;
-
-        // Employee solo tiene Employee
-        if (currentRole == Domain.Enums.TenantRole.Employee &&
-            role == Domain.Enums.TenantRole.Employee)
-            return true;
-
-        return false;
+        // Verificación exacta para otros roles
+        return currentRole == role;
     }
 
+    public bool IsOwner()
+    {
+        return TenantRole == Domain.Enums.TenantRole.Owner;
+    }
+
+    [Obsolete("Use IsOwner() instead")]
     public bool IsAdminOrOwner()
     {
-        var currentRole = TenantRole;
-        return currentRole == Domain.Enums.TenantRole.Owner ||
-               currentRole == Domain.Enums.TenantRole.Admin;
+        // Por compatibilidad, retorna IsOwner()
+        return IsOwner();
     }
 
     public void Clear()

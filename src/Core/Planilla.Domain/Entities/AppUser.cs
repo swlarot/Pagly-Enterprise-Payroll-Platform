@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Identity;
 
 namespace Vorluno.Planilla.Domain.Entities;
@@ -8,6 +9,12 @@ public class AppUser : IdentityUser
     // Aqu� puedes a�adir propiedades personalizadas a tus usuarios en el futuro.
     // Por ejemplo:
     public string? NombreCompleto { get; set; }
+
+    /// <summary>
+    /// Número de teléfono del usuario
+    /// </summary>
+    [StringLength(20)]
+    public string? Telefono { get; set; }
 
     /// <summary>
     /// Indica si el usuario es un administrador del sistema (SuperAdmin)

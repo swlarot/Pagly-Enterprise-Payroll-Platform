@@ -74,10 +74,7 @@ export interface SubscriptionInfoDto {
 
 export enum TenantRole {
   Owner = 0,
-  Admin = 1,
-  Manager = 2,
-  Accountant = 3,
-  Employee = 4
+  User = 1
 }
 
 export enum SubscriptionPlan {
@@ -388,11 +385,17 @@ export interface AdminTenantUserDto {
   invitationExpiresAt?: string;
 }
 
-// Invite User Request (system admin)
+// Invite User Request (system admin) - DEPRECATED: Use AssignUserToTenantDto instead
 export interface InviteUserRequest {
   email: string;
   fullName: string;
   password: string;
+  role: TenantRole;
+}
+
+// Assign User to Tenant (system admin) - NEW
+export interface AssignUserToTenantDto {
+  userEmail: string;
   role: TenantRole;
 }
 
@@ -530,4 +533,25 @@ export interface UpdateRolePermissionsDto {
 
 export interface AssignRoleToUserDto {
   roleId: number;
+}
+
+// Employee Deletion DTOs
+export interface DeletionBlocker {
+  reason: string;
+  entity: string;
+  count: number;
+  resolution: string;
+}
+
+export interface DeletionWarning {
+  message: string;
+  entity: string;
+  count: number;
+}
+
+export interface DeletionResult {
+  canDelete: boolean;
+  requiresConfirmation: boolean;
+  blockers: DeletionBlocker[];
+  warnings: DeletionWarning[];
 }

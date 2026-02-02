@@ -48,20 +48,24 @@ export function RoleCard({ role, onEditPermissions, onEdit, onDelete }: RoleCard
       </div>
 
       <div className="flex items-center gap-2 pt-4 border-t border-gray-200">
-        <Button
-          variant="outline"
-          size="sm"
-          icon={Key}
-          onClick={() => onEditPermissions(role)}
-          className="flex-1"
-        >
-          Permisos
-        </Button>
-        {!role.isSystem && (
+        {!role.isSystem ? (
           <>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={Key}
+              onClick={() => onEditPermissions(role)}
+              className="flex-1"
+            >
+              Editar Permisos
+            </Button>
             <Button variant="ghost" size="sm" icon={Edit} onClick={() => onEdit(role)} />
             <Button variant="ghost" size="sm" icon={Trash2} onClick={() => onDelete(role)} />
           </>
+        ) : (
+          <div className="flex-1 text-center text-sm text-gray-500 py-2">
+            Permisos predefinidos del sistema
+          </div>
         )}
       </div>
     </div>

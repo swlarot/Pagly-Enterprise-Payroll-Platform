@@ -7,6 +7,7 @@ import type {
   UpdateAdminTenantDto,
   UpdateTenantSubscriptionDto,
   InviteUserRequest,
+  AssignUserToTenantDto,
   AuditLogPagedResultDto,
   SystemUserPagedResultDto,
 } from '../types/api';
@@ -30,6 +31,13 @@ export const systemAdminService = {
     const url = `/api/admin/system/users${queryString ? `?${queryString}` : ''}`;
     return api.get<SystemUserPagedResultDto>(url);
   },
+
+  createUser: (data: {
+    nombre: string;
+    apellido: string;
+    correo: string;
+    telefono?: string;
+  }) => api.post('/api/admin/users', data),
 
   // Tenant management
   getAllTenants: (params?: {
@@ -63,6 +71,9 @@ export const systemAdminService = {
     api.get<AdminTenantUserDto[]>(`/api/admin/tenants/${tenantId}/users`),
 
   inviteUserToTenant: (tenantId: number, data: InviteUserRequest) =>
+    api.post<AdminTenantUserDto>(`/api/admin/tenants/${tenantId}/users`, data),
+
+  assignUserToTenant: (tenantId: number, data: AssignUserToTenantDto) =>
     api.post<AdminTenantUserDto>(`/api/admin/tenants/${tenantId}/users`, data),
 
   // Audit log

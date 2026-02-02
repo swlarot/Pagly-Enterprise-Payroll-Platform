@@ -23,9 +23,9 @@ public class TenantUser : BaseEntity, ITenantEntity
     public string UserId { get; set; } = string.Empty;
 
     /// <summary>
-    /// Rol del usuario dentro del tenant (sistema legacy - mantener por compatibilidad)
+    /// Rol del usuario dentro del tenant (Owner o User)
     /// </summary>
-    public TenantRole Role { get; set; } = TenantRole.Employee;
+    public TenantRole Role { get; set; } = TenantRole.User;
 
     /// <summary>
     /// ID del rol personalizado asignado al usuario (null si usa rol del sistema)
@@ -70,28 +70,30 @@ public class TenantUser : BaseEntity, ITenantEntity
     public virtual CustomTenantRole? CustomRole { get; set; }
 
     /// <summary>
-    /// Verifica si el usuario tiene un rol de administrador o superior
+    /// Verifica si el usuario es Owner del tenant
     /// </summary>
-    public bool IsAdminOrOwner()
+    public bool IsOwner()
     {
-        return Role == TenantRole.Owner || Role == TenantRole.Admin;
+        return Role == TenantRole.Owner;
     }
 
     /// <summary>
     /// Verifica si el usuario puede gestionar empleados
+    /// Los permisos específicos para User se determinan mediante CustomTenantRole
     /// </summary>
     public bool CanManageEmployees()
     {
-        return Role == TenantRole.Owner ||
-               Role == TenantRole.Admin ||
-               Role == TenantRole.Manager;
+        // Solo verificación básica - permisos granulares se verifican en controllers
+        return Role == TenantRole.Owner || CustomTenantRoleId.HasValue;
     }
 
     /// <summary>
     /// Verifica si el usuario puede ver reportes
+    /// Los permisos específicos para User se determinan mediante CustomTenantRole
     /// </summary>
     public bool CanViewReports()
     {
-        return Role != TenantRole.Employee;
+        // Solo verificación básica - permisos granulares se verifican en controllers
+        return Role == TenantRole.Owner || CustomTenantRoleId.HasValue;
     }
 }
