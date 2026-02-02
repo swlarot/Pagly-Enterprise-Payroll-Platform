@@ -430,12 +430,12 @@ public class CustomTenantRoleService : ICustomTenantRoleService
         {
             var tenantId = _tenantContext.TenantId;
 
-            // Verificar que el usuario actual es Owner o Admin
+            // Verificar que el usuario actual es Owner
             var currentUserRole = await GetCurrentUserRoleAsync();
-            if (currentUserRole != TenantRole.Owner && currentUserRole != TenantRole.Admin)
+            if (currentUserRole != TenantRole.Owner)
             {
                 return Result<bool>.Fail(
-                    "No tienes permisos para asignar roles a usuarios");
+                    "Solo el Owner puede asignar roles a usuarios");
             }
 
             var tenantUser = await _context.TenantUsers
@@ -458,7 +458,7 @@ public class CustomTenantRoleService : ICustomTenantRoleService
                     return Result<bool>.Fail("Rol personalizado no encontrado");
 
                 tenantUser.CustomTenantRoleId = dto.CustomRoleId.Value;
-                tenantUser.Role = TenantRole.Employee; // Valor por defecto cuando usa rol personalizado
+                tenantUser.Role = TenantRole.User; // Valor por defecto cuando usa rol personalizado
             }
             else if (dto.SystemRole.HasValue)
             {
@@ -593,6 +593,6 @@ public class CustomTenantRoleService : ICustomTenantRoleService
                                       tu.TenantId == tenantId &&
                                       tu.IsActive);
 
-        return tenantUser?.Role ?? TenantRole.Employee;
+        return tenantUser?.Role ?? TenantRole.User;
     }
 }

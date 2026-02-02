@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   LayoutDashboard,
   Building2,
+  Users,
   LogOut,
   ChevronDown,
 } from 'lucide-react';
@@ -21,6 +22,7 @@ export function SystemAdminLayout({ children }: SystemAdminLayoutProps) {
   const navigation = [
     { name: 'Dashboard', href: '/system-admin/dashboard', icon: LayoutDashboard },
     { name: 'Tenants', href: '/system-admin/tenants', icon: Building2 },
+    { name: 'Usuarios', href: '/system-admin/users', icon: Users },
   ];
 
   const handleLogout = () => {

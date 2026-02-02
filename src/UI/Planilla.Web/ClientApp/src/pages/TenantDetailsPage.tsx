@@ -120,10 +120,11 @@ export default function TenantDetailsPage() {
 
   const loadAvailableRoles = async () => {
     try {
-      // Importar roleService dinámicamente
-      const { roleService } = await import('../services/roleService');
-      const roles = await roleService.getRoles();
-      setAvailableRoles(roles);
+      // SystemAdmin no puede cargar roles personalizados porque no tiene tenant context
+      // Los roles personalizados solo están disponibles para usuarios dentro del tenant
+      // Por ahora, no cargar roles para evitar error 403
+      // Los usuarios se asignan con TenantRole (Owner/User), no con roles personalizados
+      setAvailableRoles([]);
     } catch (error: any) {
       console.error('Error loading roles:', error);
     }
@@ -585,22 +586,22 @@ export default function TenantDetailsPage() {
                             </div>
                           </td>
                           <td className="px-4 py-4 whitespace-nowrap">
-                            {availableRoles.length > 0 ? (
-                              <select
-                                value={user.customTenantRoleId || ''}
-                                onChange={(e) => handleChangeUserRole(user.userId, parseInt(e.target.value))}
-                                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                style={{
-                                  borderLeftWidth: '4px',
-                                  borderLeftColor: user.customRoleColor || '#6b7280',
-                                }}
-                              >
-                                {availableRoles.map((role) => (
-                                  <option key={role.id} value={role.id}>
-                                    {role.name}
-                                  </option>
-                                ))}
-                              </select>
+                            {user.customRoleName ? (
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border-2"
+                                  style={{
+                                    backgroundColor: `${user.customRoleColor}20`,
+                                    borderColor: user.customRoleColor || '#6b7280',
+                                    color: user.customRoleColor || '#374151',
+                                  }}
+                                >
+                                  {user.customRoleName}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  ({user.roleName})
+                                </span>
+                              </div>
                             ) : (
                               <RoleBadge role={user.role} showIcon />
                             )}

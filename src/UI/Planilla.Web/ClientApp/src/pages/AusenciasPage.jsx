@@ -253,7 +253,7 @@ const AusenciasPage = () => {
                         >
                             <option value="">Todos los tipos</option>
                             {tipos.map(tipo => (
-                                <option key={tipo.Id} value={tipo.Id}>
+                                <option key={`tipo-${tipo.Id}`} value={tipo.Id}>
                                     {tipo.Nombre}
                                 </option>
                             ))}

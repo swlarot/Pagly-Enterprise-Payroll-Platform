@@ -15,25 +15,10 @@ export function RoleBadge({ role, showIcon = false }: RoleBadgeProps) {
           color: 'bg-purple-100 text-purple-800',
           label: 'Owner',
         };
-      case TenantRole.Admin:
+      case TenantRole.User:
         return {
           color: 'bg-blue-100 text-blue-800',
-          label: 'Admin',
-        };
-      case TenantRole.Manager:
-        return {
-          color: 'bg-green-100 text-green-800',
-          label: 'Manager',
-        };
-      case TenantRole.Accountant:
-        return {
-          color: 'bg-amber-100 text-amber-800',
-          label: 'Contador',
-        };
-      case TenantRole.Employee:
-        return {
-          color: 'bg-gray-100 text-gray-800',
-          label: 'Empleado',
+          label: 'User',
         };
       default:
         return {

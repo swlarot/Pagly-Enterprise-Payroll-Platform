@@ -1,0 +1,112 @@
+Usando la configuración de inicio de C:\Planilla\src\UI\Planilla.Web\Properties\launchSettings.json...
+info: Program[0]
+      Aplicando migraciones pendientes...
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (53ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT "MigrationId", "ProductVersion"
+      FROM "__EFMigrationsHistory"
+      ORDER BY "MigrationId";
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (34ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      CREATE TABLE IF NOT EXISTS "__EFMigrationsHistory" (
+          "MigrationId" character varying(150) NOT NULL,
+          "ProductVersion" character varying(32) NOT NULL,
+          CONSTRAINT "PK___EFMigrationsHistory" PRIMARY KEY ("MigrationId")
+      );
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      LOCK TABLE "__EFMigrationsHistory" IN ACCESS EXCLUSIVE MODE
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (2ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT "MigrationId", "ProductVersion"
+      FROM "__EFMigrationsHistory"
+      ORDER BY "MigrationId";
+info: Microsoft.EntityFrameworkCore.Migrations[20405]
+      No migrations were applied. The database is already up to date.
+info: Program[0]
+      Migraciones aplicadas correctamente
+info: Program[0]
+      Ejecutando seed de configuración multi-tenant...
+info: Program[0]
+      Iniciando seed de configuración multi-tenant...
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (7ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT t."Id", t."Name"
+      FROM "Tenants" AS t
+      WHERE t."IsActive"
+info: Program[0]
+      Encontrados 1 tenants activos para seeding
+info: Program[0]
+      Procesando seed para Tenant 1 (Vorluno)...
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (14ms) [Parameters=[@__tenantId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT p."Id", p."CreatedAt", p."CssEmployeeRate", p."CssEmployerBaseRate", p."CssHighMinAvgSalary", p."CssHighMinYears", p."CssIntermediateMinAvgSalary", p."CssIntermediateMinYears", p."CssMaxContributionBaseHigh", p."CssMaxContributionBaseIntermediate", p."CssMaxContributionBaseStandard", p."CssRiskRateHigh", p."CssRiskRateLow", p."CssRiskRateMedium", p."DependentDeductionAmount", p."Description", p."EducationalInsuranceEmployeeRate", p."EducationalInsuranceEmployerRate", p."EffectiveEndDate", p."EffectiveStartDate", p."IsActive", p."MaxDependents", p."TenantId", p."UpdatedAt"
+      FROM "PayrollTaxConfigurations" AS p
+      WHERE p."TenantId" = @__tenantId_0 AND p."IsActive"
+      LIMIT 1
+info: Program[0]
+      Tenant 1 ya tiene configuración. Saltando.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (6ms) [Parameters=[@__tenantId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT count(*)::int
+      FROM "TaxBrackets" AS t
+      WHERE t."TenantId" = @__tenantId_0 AND t."Year" = 2026
+info: Program[0]
+      Tenant 1 ya tiene 3 tax brackets para 2026. Saltando.
+info: Program[0]
+      Seed multi-tenant completado exitosamente
+info: Program[0]
+      ✓ Seed de configuración completado exitosamente
+info: Program[0]
+      Ejecutando seed de administradores del sistema...
+info: Program[0]
+      Iniciando seed de administradores del sistema...
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (6ms) [Parameters=[@__normalizedEmail_0='?'], CommandType='Text', CommandTimeout='30']
+      SELECT a."Id", a."AccessFailedCount", a."ConcurrencyStamp", a."DeletedAt", a."DeletedBy", a."Email", a."EmailConfirmed", a."IsDeleted", a."IsSystemAdmin", a."LockoutEnabled", a."LockoutEnd", a."NombreCompleto", a."NormalizedEmail", a."NormalizedUserName", a."PasswordHash", a."PhoneNumber", a."PhoneNumberConfirmed", a."SecurityStamp", a."Telefono", a."TwoFactorEnabled", a."UserName"
+      FROM "AspNetUsers" AS a
+      WHERE a."NormalizedEmail" = @__normalizedEmail_0
+      LIMIT 2
+info: Program[0]
+      Usuario gjoseluisgonzalez507@gmail.com ya es SystemAdmin. Saltando.
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[@__normalizedEmail_0='?'], CommandType='Text', CommandTimeout='30']
+      SELECT a."Id", a."AccessFailedCount", a."ConcurrencyStamp", a."DeletedAt", a."DeletedBy", a."Email", a."EmailConfirmed", a."IsDeleted", a."IsSystemAdmin", a."LockoutEnabled", a."LockoutEnd", a."NombreCompleto", a."NormalizedEmail", a."NormalizedUserName", a."PasswordHash", a."PhoneNumber", a."PhoneNumberConfirmed", a."SecurityStamp", a."Telefono", a."TwoFactorEnabled", a."UserName"
+      FROM "AspNetUsers" AS a
+      WHERE a."NormalizedEmail" = @__normalizedEmail_0
+      LIMIT 2
+info: Program[0]
+      Usuario contacto@vorluno.dev ya es SystemAdmin. Saltando.
+info: Program[0]
+      ✓ Seed de administradores del sistema completado
+info: Program[0]
+      ✓ Seed de administradores completado exitosamente
+info: Program[0]
+      Ejecutando seed de roles del sistema...
+info: Program[0]
+      Iniciando seed de roles del sistema...
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (1ms) [Parameters=[], CommandType='Text', CommandTimeout='30']
+      SELECT t."Id", t."Address", t."CreatedAt", t."DV", t."Email", t."IsActive", t."LogoUrl", t."Name", t."Pais", t."Phone", t."RUC", t."Settings", t."SitioWeb", t."Subdomain", t."SubscriptionId", t."TipoContribuyente", t."UpdatedAt"
+      FROM "Tenants" AS t
+      WHERE t."IsActive"
+info: Program[0]
+      Encontrados 1 tenants activos
+info: Microsoft.EntityFrameworkCore.Database.Command[20101]
+      Executed DbCommand (7ms) [Parameters=[@__ef_filter__p_1='?' (DbType = Boolean), @__ef_filter__TenantId_0='?' (DbType = Int32), @__tenantId_0='?' (DbType = Int32)], CommandType='Text', CommandTimeout='30']
+      SELECT EXISTS (
+          SELECT 1
+          FROM "CustomTenantRoles" AS c
+          WHERE (@__ef_filter__p_1 OR c."TenantId" = @__ef_filter__TenantId_0) AND c."TenantId" = @__tenantId_0 AND c."IsSystem")
+info: Program[0]
+      ✓ Seed de roles del sistema completado
+info: Program[0]
+      ✓ Seed de roles del sistema completado exitosamente
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5039
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Planilla\src\UI\Planilla.Web

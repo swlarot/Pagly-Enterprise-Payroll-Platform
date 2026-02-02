@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { tenantService } from '../services/tenantService';
-import { useAuth } from '../contexts/AuthContext';
-import type { TenantUserDto, InvitationDto, TenantRole, UpdateTenantUserDto } from '../types/api';
+import { tenantService } from '../../services/tenantService';
+import { useAuth } from '../../contexts/AuthContext';
+import type { TenantUserDto, InvitationDto, TenantRole, UpdateTenantUserDto } from '../../types/api';
 import toast from 'react-hot-toast';
-import ConfirmModal from '../components/ConfirmModal';
+import ConfirmModal from '../ConfirmModal';
 
 interface CustomRole {
   id: number;
@@ -12,7 +12,7 @@ interface CustomRole {
   permissions: string[];
 }
 
-export default function UsersPage() {
+export function UsersManagementTab() {
   const { subscription } = useAuth();
   const [users, setUsers] = useState<TenantUserDto[]>([]);
   const [invitations, setInvitations] = useState<InvitationDto[]>([]);
@@ -256,11 +256,10 @@ export default function UsersPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header Section - sin título principal porque ya está en la página padre */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Gestión de Usuarios</h1>
-          <p className="text-gray-600 mt-2">Administra los usuarios de tu equipo</p>
+          <p className="text-gray-600">Administra los usuarios de tu equipo y sus roles</p>
         </div>
         <button
           onClick={() => setIsInviteModalOpen(true)}

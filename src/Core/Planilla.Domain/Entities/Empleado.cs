@@ -21,6 +21,13 @@ public class Empleado : ITenantEntity
     [StringLength(20, ErrorMessage = "El n�mero de identificaci�n no puede tener m�s de 20 caracteres.")]
     public string NumeroIdentificacion { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Email del empleado (para contacto y acceso al sistema si se crea usuario)
+    /// </summary>
+    [StringLength(256)]
+    [EmailAddress]
+    public string? Email { get; set; }
+
     [Column(TypeName = "decimal(18, 2)")]
     [Range(0, double.MaxValue, ErrorMessage = "El salario base no puede ser negativo.")]
     public decimal SalarioBase { get; set; }
@@ -28,6 +35,26 @@ public class Empleado : ITenantEntity
     public DateTime FechaContratacion { get; set; }
 
     public bool EstaActivo { get; set; } = true;
+
+    // ====================================================================
+    // Soft Delete - NUNCA hard delete (CSS requiere retención 5+ años)
+    // ====================================================================
+
+    /// <summary>
+    /// Indica si el empleado fue eliminado (soft delete)
+    /// </summary>
+    public bool IsDeleted { get; set; } = false;
+
+    /// <summary>
+    /// Fecha y hora en que el empleado fue eliminado
+    /// </summary>
+    public DateTime? DeletedAt { get; set; }
+
+    /// <summary>
+    /// ID del usuario que eliminó el empleado
+    /// </summary>
+    [StringLength(450)]
+    public string? DeletedBy { get; set; }
 
     // ====================================================================
     // Phase E: Campos para c�lculo de planilla
@@ -107,4 +134,7 @@ public class Empleado : ITenantEntity
 
     // Navigation property para Tenant
     public virtual Tenant? Tenant { get; set; }
+
+    // Navigation property para Usuario (si está vinculado)
+    public virtual AppUser? User { get; set; }
 }

@@ -72,14 +72,11 @@ public static class CustomRolesSeeder
 
         logger?.LogInformation("Creando roles del sistema para tenant {TenantId}...", tenantId);
 
-        // Definir los roles del sistema con sus colores
+        // Definir los roles del sistema con sus colores (simplificados a Owner y User)
         var systemRoles = new[]
         {
             new { Role = TenantRole.Owner, Name = "Owner", Description = "Propietario del tenant - Acceso total al sistema", Color = "#DC2626", DisplayOrder = 0 },
-            new { Role = TenantRole.Admin, Name = "Admin", Description = "Administrador - Gestión completa excepto billing", Color = "#EA580C", DisplayOrder = 1 },
-            new { Role = TenantRole.Manager, Name = "Manager", Description = "Gerente - Gestión de planillas, empleados y reportes", Color = "#CA8A04", DisplayOrder = 2 },
-            new { Role = TenantRole.Accountant, Name = "Accountant", Description = "Contador - Solo lectura de reportes y consultas", Color = "#16A34A", DisplayOrder = 3 },
-            new { Role = TenantRole.Employee, Name = "Employee", Description = "Empleado - Solo puede ver su propia información", Color = "#6B7280", DisplayOrder = 4 }
+            new { Role = TenantRole.User, Name = "User", Description = "Usuario regular - Permisos definidos por rol personalizado", Color = "#6B7280", DisplayOrder = 1 }
         };
 
         foreach (var roleInfo in systemRoles)

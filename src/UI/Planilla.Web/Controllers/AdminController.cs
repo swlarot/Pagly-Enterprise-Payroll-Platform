@@ -8,6 +8,7 @@ using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Domain.Models;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Infrastructure.Services;
 
 namespace Vorluno.Planilla.Web.Controllers;
 
@@ -24,15 +25,18 @@ public class AdminController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly UserManager<AppUser> _userManager;
     private readonly ILogger<AdminController> _logger;
+    private readonly IBrevoEmailService _brevoEmailService;
 
     public AdminController(
         ApplicationDbContext context,
         UserManager<AppUser> userManager,
-        ILogger<AdminController> logger)
+        ILogger<AdminController> logger,
+        IBrevoEmailService brevoEmailService)
     {
         _context = context;
         _userManager = userManager;
         _logger = logger;
+        _brevoEmailService = brevoEmailService;
     }
 
     /// <summary>
@@ -197,7 +201,68 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
-    /// POST /api/admin/tenants - Crea un nuevo tenant con usuario owner
+    /// POST /api/admin/users - Crea un nuevo usuario en el sistema (sin asignar a tenant)
+    /// Requiere: IsSystemAdmin = true
+    /// La contraseña predefinida "Planilla2024!Temp" se asigna automáticamente
+    /// </summary>
+    [HttpPost("users")]
+    public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var existingUser = await _userManager.FindByEmailAsync(dto.Correo);
+        if (existingUser != null)
+        {
+            return BadRequest(new { message = "Ya existe un usuario con ese correo" });
+        }
+
+        var user = new AppUser
+        {
+            UserName = dto.Correo,
+            Email = dto.Correo,
+            NombreCompleto = $"{dto.Nombre} {dto.Apellido}",
+            Telefono = dto.Telefono,
+            EmailConfirmed = true,  // Auto-confirmar
+            IsSystemAdmin = false
+        };
+
+        // Contraseña predefinida universal
+        var result = await _userManager.CreateAsync(user, "Planilla2024!Temp");
+
+        if (!result.Succeeded)
+        {
+            var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+            return BadRequest(new { message = "Error creando usuario", details = errors });
+        }
+
+        // Enviar email de bienvenida con Brevo
+        try
+        {
+            var loginLink = $"{Request.Scheme}://{Request.Host}/login";
+            await _brevoEmailService.SendInvitationEmailAsync(
+                dto.Correo,
+                $"{dto.Nombre} {dto.Apellido}",
+                loginLink,
+                "Planilla"
+            );
+            _logger.LogInformation("Welcome email sent to {Email}", dto.Correo);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to send welcome email to {Email}", dto.Correo);
+            // No fallar la creación si el email falla
+        }
+
+        _logger.LogInformation("SystemAdmin created user {UserId} ({Email})", user.Id, user.Email);
+
+        return Ok(new { userId = user.Id, email = user.Email, message = "Usuario creado exitosamente" });
+    }
+
+    /// <summary>
+    /// POST /api/admin/tenants - Crea un nuevo tenant (SIN owner - se asigna después)
     /// Requiere: IsSystemAdmin = true
     /// </summary>
     [HttpPost("tenants")]
@@ -208,47 +273,26 @@ public class AdminController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        // Verificar que el email no exista
-        var existingUser = await _userManager.FindByEmailAsync(dto.OwnerEmail);
-        if (existingUser != null)
-        {
-            return BadRequest(new { error = "El email del propietario ya está registrado en el sistema" });
-        }
-
         using var transaction = await _context.Database.BeginTransactionAsync();
 
         try
         {
-            // 1. Crear usuario owner en Identity
-            var user = new AppUser
-            {
-                UserName = dto.OwnerEmail,
-                Email = dto.OwnerEmail,
-                EmailConfirmed = true,
-                NombreCompleto = dto.OwnerFullName ?? dto.Name,
-                IsSystemAdmin = false
-            };
+            // 1. Generar subdomain único
+            var subdomain = GenerateUniqueSubdomain(dto.Nombre);
 
-            var createResult = await _userManager.CreateAsync(user, dto.OwnerPassword);
-            if (!createResult.Succeeded)
-            {
-                var errors = string.Join(", ", createResult.Errors.Select(e => e.Description));
-                return BadRequest(new { error = "Error al crear usuario", details = errors });
-            }
-
-            // 2. Generar subdomain único
-            var subdomain = GenerateUniqueSubdomain(dto.Name);
-
-            // 3. Crear Tenant
+            // 2. Crear Tenant (SIN owner)
             var tenant = new Tenant
             {
-                Name = dto.Name,
+                Name = dto.Nombre,
                 Subdomain = subdomain,
                 RUC = dto.RUC,
                 DV = dto.DV,
-                Address = dto.Address,
-                Phone = dto.Phone,
-                Email = dto.CompanyEmail,
+                TipoContribuyente = dto.TipoContribuyente,
+                Phone = dto.Telefono,
+                Email = dto.Correo,
+                Pais = dto.Pais ?? "Panamá",
+                Address = dto.Direccion,
+                SitioWeb = dto.SitioWeb,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
             };
@@ -256,17 +300,15 @@ public class AdminController : ControllerBase
             _context.Tenants.Add(tenant);
             await _context.SaveChangesAsync();
 
-            // 4. Crear Subscription (Professional con 14 días de prueba por defecto)
-            var trialEndsAt = DateTime.UtcNow.AddDays(14);
-            var limits = PlanFeatures.GetLimits(SubscriptionPlan.Professional);
+            // 3. Crear Subscription Free por defecto
+            var limits = PlanFeatures.GetLimits(SubscriptionPlan.Free);
 
             var subscription = new Subscription
             {
                 TenantId = tenant.Id,
-                Plan = SubscriptionPlan.Professional,
-                Status = SubscriptionStatus.Trialing,
+                Plan = SubscriptionPlan.Free,
+                Status = SubscriptionStatus.Active,
                 StartDate = DateTime.UtcNow,
-                TrialEndsAt = trialEndsAt,
                 MonthlyPrice = limits.PricePerMonth,
                 CreatedAt = DateTime.UtcNow
             };
@@ -279,72 +321,21 @@ public class AdminController : ControllerBase
             _context.Tenants.Update(tenant);
             await _context.SaveChangesAsync();
 
-            // 5. Crear TenantUser con rol Owner
-            var tenantUser = new TenantUser
-            {
-                TenantId = tenant.Id,
-                UserId = user.Id,
-                Role = TenantRole.Owner,
-                IsActive = true,
-                JoinedAt = DateTime.UtcNow,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.TenantUsers.Add(tenantUser);
-            await _context.SaveChangesAsync();
-
             await transaction.CommitAsync();
 
-            _logger.LogInformation("SystemAdmin {AdminId} created tenant {TenantId} ({TenantName}) with owner {OwnerId}",
-                User.FindFirst("sub")?.Value, tenant.Id, tenant.Name, user.Id);
+            _logger.LogInformation("SystemAdmin {AdminId} created tenant {TenantId} ({TenantName})",
+                User.FindFirst("sub")?.Value, tenant.Id, tenant.Name);
 
             // Construir respuesta
-            var response = new AdminTenantDto
+            var response = new
             {
-                Id = tenant.Id,
-                Name = tenant.Name,
-                Subdomain = tenant.Subdomain,
-                RUC = tenant.RUC,
-                DV = tenant.DV,
-                Address = tenant.Address,
-                Phone = tenant.Phone,
-                Email = tenant.Email,
-                CreatedAt = tenant.CreatedAt,
-                IsActive = tenant.IsActive,
-                Subscription = new SubscriptionInfoDto
-                {
-                    Plan = subscription.Plan,
-                    PlanName = subscription.Plan.ToString(),
-                    Status = subscription.Status,
-                    StatusName = subscription.Status.ToString(),
-                    TrialEndsAt = subscription.TrialEndsAt,
-                    MaxEmployees = subscription.GetEffectiveMaxEmployees(),
-                    MaxUsers = subscription.GetEffectiveMaxUsers(),
-                    MaxCompanies = limits.MaxCompanies,
-                    CanExportExcel = limits.CanExportExcel,
-                    CanExportPdf = limits.CanExportPdf,
-                    CanUseApi = limits.CanUseApi,
-                    MonthlyPrice = subscription.MonthlyPrice
-                },
-                Owner = new OwnerInfoDto
-                {
-                    UserId = user.Id,
-                    Email = user.Email!,
-                    FullName = user.NombreCompleto,
-                    JoinedAt = tenantUser.JoinedAt,
-                    LastLoginAt = null
-                },
-                Usage = new AdminTenantUsageDto
-                {
-                    TotalUsers = 1,
-                    ActiveUsers = 1,
-                    TotalEmployees = 0,
-                    ActiveEmployees = 0,
-                    TotalPayrolls = 0,
-                    PendingInvitations = 0,
-                    MaxUsers = subscription.GetEffectiveMaxUsers(),
-                    MaxEmployees = subscription.GetEffectiveMaxEmployees()
-                }
+                tenantId = tenant.Id,
+                name = tenant.Name,
+                subdomain = tenant.Subdomain,
+                ruc = tenant.RUC,
+                dv = tenant.DV,
+                tipoContribuyente = tenant.TipoContribuyente,
+                message = "Tenant creado exitosamente. Ahora asigna usuarios desde el módulo de Usuarios."
             };
 
             return CreatedAtAction(nameof(GetTenantById), new { id = tenant.Id }, response);
@@ -352,7 +343,7 @@ public class AdminController : ControllerBase
         catch (Exception ex)
         {
             await transaction.RollbackAsync();
-            _logger.LogError(ex, "Error creating tenant: {TenantName}", dto.Name);
+            _logger.LogError(ex, "Error creating tenant: {TenantName}", dto.Nombre);
             return StatusCode(500, new { error = "Error al crear el tenant. Por favor, intente nuevamente." });
         }
     }
@@ -381,23 +372,29 @@ public class AdminController : ControllerBase
             }
 
             // Actualizar solo los campos proporcionados
-            if (!string.IsNullOrEmpty(dto.Name))
-                tenant.Name = dto.Name;
+            if (!string.IsNullOrEmpty(dto.Nombre))
+                tenant.Name = dto.Nombre;
 
-            if (dto.RUC != null)
-                tenant.RUC = dto.RUC;
+            if (dto.TipoContribuyente != null)
+                tenant.TipoContribuyente = dto.TipoContribuyente;
 
-            if (dto.DV != null)
-                tenant.DV = dto.DV;
+            if (dto.Telefono != null)
+                tenant.Phone = dto.Telefono;
 
-            if (dto.Address != null)
-                tenant.Address = dto.Address;
+            if (dto.Correo != null)
+                tenant.Email = dto.Correo;
 
-            if (dto.Phone != null)
-                tenant.Phone = dto.Phone;
+            if (dto.Pais != null)
+                tenant.Pais = dto.Pais;
 
-            if (dto.Email != null)
-                tenant.Email = dto.Email;
+            if (dto.Direccion != null)
+                tenant.Address = dto.Direccion;
+
+            if (dto.SitioWeb != null)
+                tenant.SitioWeb = dto.SitioWeb;
+
+            if (dto.LogoUrl != null)
+                tenant.LogoUrl = dto.LogoUrl;
 
             if (dto.IsActive.HasValue)
                 tenant.IsActive = dto.IsActive.Value;
@@ -894,21 +891,15 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
-    /// POST /api/admin/tenants/{id}/users - Invita un usuario a un tenant
+    /// POST /api/admin/tenants/{id}/users - Asigna un usuario existente a un tenant
     /// Requiere: IsSystemAdmin = true
     /// </summary>
     [HttpPost("tenants/{id}/users")]
-    public async Task<IActionResult> InviteUserToTenant(int id, [FromBody] InviteUserRequest request)
+    public async Task<IActionResult> InviteUserToTenant(int id, [FromBody] AssignUserToTenantDto request)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
-        }
-
-        // No permitir crear Owner desde este endpoint
-        if (request.Role == TenantRole.Owner)
-        {
-            return BadRequest(new { error = "No se puede crear usuarios con rol Owner desde este endpoint" });
         }
 
         using var transaction = await _context.Database.BeginTransactionAsync();
@@ -939,33 +930,24 @@ public class AdminController : ControllerBase
                 });
             }
 
-            // 3. Buscar o crear usuario en Identity
-            var user = await _userManager.FindByEmailAsync(request.Email);
-
-            // Verificar que el usuario no esté eliminado
-            if (user != null && user.IsDeleted)
-            {
-                return BadRequest(new { error = "El usuario con este email está eliminado. Debe reactivarlo primero." });
-            }
+            // 3. Buscar usuario existente
+            var user = await _userManager.FindByEmailAsync(request.UserEmail);
 
             if (user == null)
             {
-                // Crear nuevo usuario
-                user = new AppUser
-                {
-                    UserName = request.Email,
-                    Email = request.Email,
-                    EmailConfirmed = true,
-                    NombreCompleto = request.FullName,
-                    IsSystemAdmin = false
-                };
+                return NotFound(new { error = $"No existe un usuario con el email {request.UserEmail}. Debe crear el usuario primero desde /system-admin/users" });
+            }
 
-                var createResult = await _userManager.CreateAsync(user, request.Password);
-                if (!createResult.Succeeded)
-                {
-                    var errors = string.Join(", ", createResult.Errors.Select(e => e.Description));
-                    return BadRequest(new { error = "Error al crear usuario", details = errors });
-                }
+            // Verificar que el usuario no esté eliminado
+            if (user.IsDeleted)
+            {
+                return BadRequest(new { error = "El usuario está eliminado. Debe reactivarlo primero." });
+            }
+
+            // Verificar que no sea SystemAdmin (los SystemAdmin no se asignan a tenants)
+            if (user.IsSystemAdmin)
+            {
+                return BadRequest(new { error = "No se puede asignar un usuario SystemAdmin a un tenant." });
             }
 
             // 4. Verificar si ya existe TenantUser
@@ -974,7 +956,7 @@ public class AdminController : ControllerBase
 
             if (existingTenantUser != null)
             {
-                return Conflict(new { error = "El usuario ya pertenece a este tenant" });
+                return Conflict(new { error = "El usuario ya está asignado a este tenant" });
             }
 
             // 5. Crear TenantUser
@@ -1002,7 +984,7 @@ public class AdminController : ControllerBase
                 TenantId = id,
                 ActorUserId = adminUserId,
                 ActorEmail = User.FindFirst("email")?.Value ?? "system@admin.com",
-                Action = "InviteUser",
+                Action = "AssignUserToTenant",
                 EntityType = "TenantUser",
                 EntityId = tenantUser.Id.ToString(),
                 IpAddress = ipAddress,
@@ -1011,7 +993,7 @@ public class AdminController : ControllerBase
                 {
                     UserEmail = user.Email,
                     Role = request.Role.ToString(),
-                    InvitedBy = adminUserId
+                    AssignedBy = adminUserId
                 }),
                 CreatedAt = DateTime.UtcNow
             };
@@ -1019,13 +1001,31 @@ public class AdminController : ControllerBase
             _context.AuditLogEntries.Add(auditLog);
             await _context.SaveChangesAsync();
 
+            // 7. Enviar email de invitación con Brevo
+            try
+            {
+                var loginLink = $"{Request.Scheme}://{Request.Host}/login";
+                await _brevoEmailService.SendInvitationEmailAsync(
+                    user.Email!,
+                    user.NombreCompleto,
+                    loginLink,
+                    tenant.Name
+                );
+                _logger.LogInformation("Invitation email sent to {Email} for tenant {TenantName}", user.Email, tenant.Name);
+            }
+            catch (Exception emailEx)
+            {
+                _logger.LogWarning(emailEx, "Failed to send invitation email to {Email}, but user was assigned successfully", user.Email);
+                // No fallar la transacción si el email falla
+            }
+
             await transaction.CommitAsync();
 
             _logger.LogInformation(
-                "SystemAdmin {AdminId} invited user {Email} to tenant {TenantId} with role {Role}",
+                "SystemAdmin {AdminId} assigned user {Email} to tenant {TenantId} with role {Role}",
                 adminUserId, user.Email, id, request.Role);
 
-            // 7. Retornar DTO
+            // 8. Retornar DTO
             var response = new AdminTenantUserDto
             {
                 Id = tenantUser.Id,
@@ -1046,8 +1046,8 @@ public class AdminController : ControllerBase
         catch (Exception ex)
         {
             await transaction.RollbackAsync();
-            _logger.LogError(ex, "Error inviting user to tenant {TenantId}", id);
-            return StatusCode(500, new { error = "Error al invitar usuario al tenant" });
+            _logger.LogError(ex, "Error assigning user to tenant {TenantId}", id);
+            return StatusCode(500, new { error = "Error al asignar usuario al tenant" });
         }
     }
 
@@ -1090,6 +1090,36 @@ public class AdminController : ControllerBase
                 }
             }
 
+            // 3b. VALIDACIÓN CRÍTICA: No eliminar el último Owner de ningún tenant
+            var ownerMemberships = await _context.TenantUsers
+                .Where(tu => tu.UserId == userId && tu.Role == TenantRole.Owner && tu.IsActive)
+                .Select(tu => new { tu.TenantId, tu.Tenant.Name })
+                .ToListAsync();
+
+            foreach (var ownership in ownerMemberships)
+            {
+                var ownersCount = await _context.TenantUsers
+                    .Where(tu => tu.TenantId == ownership.TenantId
+                              && tu.Role == TenantRole.Owner
+                              && tu.IsActive)
+                    .CountAsync();
+
+                if (ownersCount <= 1)
+                {
+                    return BadRequest(new
+                    {
+                        error = $"No se puede eliminar el último Owner del tenant '{ownership.Name}'. " +
+                                $"Debes asignar otro Owner antes de eliminar este usuario.",
+                        tenantId = ownership.TenantId,
+                        tenantName = ownership.Name
+                    });
+                }
+            }
+
+            // 3c. VERIFICAR: Empleado vinculado (warning, no blocker)
+            var linkedEmployee = await _context.Empleados
+                .FirstOrDefaultAsync(e => e.UserId == userId && e.EstaActivo);
+
             // 4. Obtener ID del admin actual
             var currentAdminId = User.FindFirst("sub")?.Value;
 
@@ -1115,6 +1145,13 @@ public class AdminController : ControllerBase
                 tenantUser.IsActive = false;
             }
 
+            // 6b. Desvincular empleado si existe
+            if (linkedEmployee != null)
+            {
+                linkedEmployee.UserId = null;
+                _context.Empleados.Update(linkedEmployee);
+            }
+
             await _context.SaveChangesAsync();
 
             // 7. AUDIT LOG para cada tenant afectado
@@ -1137,7 +1174,9 @@ public class AdminController : ControllerBase
                     {
                         UserEmail = user.Email,
                         DeletedBy = currentAdminId,
-                        DeletedAt = user.DeletedAt
+                        DeletedAt = user.DeletedAt,
+                        HadLinkedEmployee = linkedEmployee != null,
+                        LinkedEmployeeName = linkedEmployee != null ? $"{linkedEmployee.Nombre} {linkedEmployee.Apellido}" : null
                     }),
                     CreatedAt = DateTime.UtcNow
                 };
@@ -1495,5 +1534,128 @@ public class AdminController : ControllerBase
             SubscriptionPlan.Enterprise => int.MaxValue,
             _ => 1
         };
+    }
+
+    /// <summary>
+    /// GET /api/admin/cleanup/duplicate-users - Lista usuarios duplicados por email
+    /// Requiere: IsSystemAdmin = true
+    /// TEMPORAL: Para investigación y limpieza de duplicados
+    /// </summary>
+    [HttpGet("cleanup/duplicate-users")]
+    public async Task<IActionResult> GetDuplicateUsers()
+    {
+        try
+        {
+            // Encontrar emails duplicados
+            var duplicates = await _context.Users
+                .Where(u => !u.IsDeleted)
+                .GroupBy(u => u.Email!.ToLower())
+                .Where(g => g.Count() > 1)
+                .Select(g => new
+                {
+                    Email = g.Key,
+                    Count = g.Count(),
+                    Users = g.Select(u => new
+                    {
+                        u.Id,
+                        u.Email,
+                        u.UserName,
+                        u.NombreCompleto,
+                        u.EmailConfirmed,
+                        u.IsSystemAdmin,
+                        CreatedAt = u.LockoutEnd // Placeholder si no hay CreatedAt
+                    }).ToList()
+                })
+                .ToListAsync();
+
+            _logger.LogInformation("SystemAdmin {AdminId} retrieved duplicate users. Found {Count} duplicate email groups",
+                User.FindFirst("sub")?.Value, duplicates.Count);
+
+            return Ok(new { duplicates, total = duplicates.Count });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting duplicate users");
+            return StatusCode(500, new { error = "Error al obtener usuarios duplicados" });
+        }
+    }
+
+    /// <summary>
+    /// DELETE /api/admin/cleanup/user/{userId} - Elimina físicamente un usuario duplicado
+    /// Requiere: IsSystemAdmin = true
+    /// TEMPORAL: Para limpieza de usuarios duplicados
+    /// ADVERTENCIA: Esto hace un hard delete, usar con precaución
+    /// </summary>
+    [HttpDelete("cleanup/user/{userId}")]
+    public async Task<IActionResult> HardDeleteUser(string userId)
+    {
+        try
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return NotFound(new { error = "Usuario no encontrado" });
+            }
+
+            // Verificar que no tenga empleados vinculados
+            var linkedEmpleados = await _context.Empleados
+                .Where(e => e.UserId == userId)
+                .ToListAsync();
+
+            if (linkedEmpleados.Any())
+            {
+                return BadRequest(new
+                {
+                    error = "No se puede eliminar este usuario porque tiene empleados vinculados",
+                    empleados = linkedEmpleados.Select(e => new { e.Id, e.Nombre, e.Email }).ToList()
+                });
+            }
+
+            // Verificar que no sea SystemAdmin
+            if (user.IsSystemAdmin)
+            {
+                return BadRequest(new { error = "No se puede eliminar un SystemAdmin" });
+            }
+
+            // Verificar que no tenga membresías activas
+            var activeMemberships = await _context.TenantUsers
+                .Where(tu => tu.UserId == userId && tu.IsActive)
+                .ToListAsync();
+
+            if (activeMemberships.Any())
+            {
+                return BadRequest(new
+                {
+                    error = "No se puede eliminar este usuario porque tiene membresías activas en tenants",
+                    tenants = activeMemberships.Select(tu => new { tu.TenantId, tu.Role }).ToList()
+                });
+            }
+
+            // HARD DELETE: Eliminar membresías inactivas primero
+            var inactiveMemberships = await _context.TenantUsers
+                .Where(tu => tu.UserId == userId)
+                .ToListAsync();
+
+            _context.TenantUsers.RemoveRange(inactiveMemberships);
+            await _context.SaveChangesAsync();
+
+            // HARD DELETE: Eliminar usuario
+            var result = await _userManager.DeleteAsync(user);
+            if (!result.Succeeded)
+            {
+                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                return BadRequest(new { error = "Error al eliminar usuario", details = errors });
+            }
+
+            _logger.LogWarning("SystemAdmin {AdminId} performed HARD DELETE on user {UserId} ({Email})",
+                User.FindFirst("sub")?.Value, userId, user.Email);
+
+            return Ok(new { success = true, message = $"Usuario {user.Email} eliminado permanentemente" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error hard deleting user {UserId}", userId);
+            return StatusCode(500, new { error = "Error al eliminar el usuario" });
+        }
     }
 }

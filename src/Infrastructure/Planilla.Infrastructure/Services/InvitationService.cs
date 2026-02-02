@@ -498,7 +498,7 @@ public class InvitationService : IInvitationService
         var tenantUser = await _context.TenantUsers
             .FirstOrDefaultAsync(tu => tu.UserId == user.Id && tu.TenantId == tenant.Id);
 
-        var role = tenantUser?.Role ?? TenantRole.Employee;
+        var role = tenantUser?.Role ?? TenantRole.User;
         var plan = tenant.Subscription?.Plan.ToString() ?? "Free";
 
         return _jwtTokenService.GenerateToken(user.Id, user.Email!, tenant.Id, role, plan);

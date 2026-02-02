@@ -10,13 +10,16 @@ namespace Vorluno.Planilla.Application.DTOs
         string Nombre,
         string Apellido,
         string NumeroIdentificacion,
+        string? Email,
         decimal SalarioBase,
         DateTime FechaContratacion,
         bool EstaActivo,
         int? DepartamentoId,
         string? DepartamentoNombre,
         int? PosicionId,
-        string? PosicionNombre
+        string? PosicionNombre,
+        bool TieneAccesoSistema,
+        string? RolSistema
     );
 
     /// <summary>
@@ -34,6 +37,10 @@ namespace Vorluno.Planilla.Application.DTOs
         [Required]
         [StringLength(20)]
         string NumeroIdentificacion,
+
+        [EmailAddress]
+        [StringLength(256)]
+        string? Email,
 
         [Range(0.01, double.MaxValue)]
         decimal SalarioBase,
@@ -55,6 +62,10 @@ namespace Vorluno.Planilla.Application.DTOs
         [StringLength(100)]
         string Apellido,
 
+        [EmailAddress]
+        [StringLength(256)]
+        string? Email,
+
         [Range(0.01, double.MaxValue)]
         decimal SalarioBase,
 
@@ -63,5 +74,13 @@ namespace Vorluno.Planilla.Application.DTOs
         int? DepartamentoId,
 
         int? PosicionId
+    );
+
+    /// <summary>
+    /// DTO para vincular un empleado a un usuario existente.
+    /// </summary>
+    public record VincularUsuarioDto(
+        [Required(ErrorMessage = "El ID del usuario es requerido")]
+        string UserId
     );
 }

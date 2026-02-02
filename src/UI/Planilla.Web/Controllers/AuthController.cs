@@ -554,6 +554,7 @@ public class AuthController : ControllerBase
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new Claim("tenant_id", tenant.Id.ToString()),
             new Claim("tenant_role", tenantUser.Role.ToString()),
+            new Claim(ClaimTypes.Role, tenantUser.Role.ToString()), // ✅ CRITICAL: Para [Authorize(Roles = "Owner,Admin")]
             new Claim("plan", tenant.Subscription.Plan.ToString()),
             new Claim("is_system_admin", user.IsSystemAdmin.ToString().ToLower())
         };

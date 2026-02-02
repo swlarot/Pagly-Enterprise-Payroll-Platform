@@ -149,35 +149,11 @@ public static class SystemPermission
     {
         return role switch
         {
+            // Owner tiene todos los permisos
             TenantRole.Owner => GetAllPermissions().Select(p => p.Key).ToList(),
 
-            TenantRole.Admin => new List<string>
-            {
-                EmployeesRead, EmployeesCreate, EmployeesUpdate, EmployeesDelete,
-                DepartmentsManage, PositionsManage,
-                PayrollView, PayrollCalculate, PayrollApprove, PayrollDelete,
-                LoansManage, DeductionsManage, OvertimeManage, AbsencesManage, VacationsManage, AdvancesManage,
-                ReportsView, ReportsExport,
-                SettingsTaxes, SettingsUsers,
-                AuditView
-            },
-
-            TenantRole.Manager => new List<string>
-            {
-                EmployeesRead, EmployeesCreate, EmployeesUpdate,
-                PayrollView, PayrollCalculate,
-                LoansManage, DeductionsManage, OvertimeManage, AbsencesManage, VacationsManage, AdvancesManage,
-                ReportsView, ReportsExport
-            },
-
-            TenantRole.Accountant => new List<string>
-            {
-                EmployeesRead,
-                PayrollView,
-                ReportsView, ReportsExport
-            },
-
-            TenantRole.Employee => new List<string>(),
+            // User no tiene permisos predeterminados - se asignan mediante CustomTenantRole
+            TenantRole.User => new List<string>(),
 
             _ => new List<string>()
         };

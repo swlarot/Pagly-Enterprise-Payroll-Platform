@@ -14,7 +14,6 @@ const ConfiguracionPage = () => {
     const allTabs = [
         { id: 'tasas', label: 'Tasas CSS/SE', icon: 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z', visible: true },
         { id: 'isr', label: 'Tabla ISR', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', visible: true },
-        { id: 'usuarios', label: 'Usuarios', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', visible: hasRole ? hasRole(TenantRole.Owner, TenantRole.Admin) : false },
         { id: 'audit', label: 'Audit Log', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', visible: hasRole ? hasRole(TenantRole.Owner, TenantRole.Admin, TenantRole.Manager, TenantRole.Accountant) : false },
         { id: 'plan', label: 'Uso del Plan', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', visible: true },
         { id: 'soporte', label: 'Soporte', icon: 'M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z', visible: true }
@@ -206,36 +205,6 @@ const ConfiguracionPage = () => {
                                         <li>Aportes jubilatorios voluntarios</li>
                                     </ul>
                                 </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Tab: Gestión de Usuarios */}
-                    {activeTab === 'usuarios' && hasRole(TenantRole.Owner, TenantRole.Admin) && (
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Gestión de Usuarios</h3>
-                            <p className="text-sm text-gray-600 mb-6">
-                                Administra los usuarios que tienen acceso a esta empresa. Invita nuevos miembros del equipo y gestiona sus permisos.
-                            </p>
-
-                            <Link
-                                to="/users"
-                                className="inline-flex items-center px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors"
-                            >
-                                <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                </svg>
-                                Ir a Gestión de Usuarios
-                            </Link>
-
-                            <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                                <h4 className="text-sm font-semibold text-blue-900 mb-2">Funciones Disponibles:</h4>
-                                <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
-                                    <li>Invitar nuevos usuarios por correo electrónico</li>
-                                    <li>Asignar roles: Propietario, Admin, Gerente, Contador, Empleado</li>
-                                    <li>Activar o desactivar acceso de usuarios</li>
-                                    <li>Ver última actividad de cada usuario</li>
-                                </ul>
                             </div>
                         </div>
                     )}

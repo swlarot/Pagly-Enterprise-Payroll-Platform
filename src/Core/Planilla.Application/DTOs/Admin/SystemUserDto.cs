@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Vorluno.Planilla.Application.DTOs.Admin;
 
 /// <summary>
@@ -41,6 +43,7 @@ public class SystemUserDto
     /// Lista de tenants a los que pertenece el usuario
     /// Puede estar vacío si el usuario aún no ha sido asignado a ningún tenant
     /// </summary>
+    [JsonPropertyName("tenants")]
     public List<UserTenantMembershipDto> Tenants { get; set; } = new();
 }
 
@@ -88,6 +91,7 @@ public class SystemUserPagedResultDto
     /// <summary>
     /// Lista de usuarios en la página actual
     /// </summary>
+    [JsonPropertyName("data")]
     public List<SystemUserDto> Data { get; set; } = new();
 
     /// <summary>

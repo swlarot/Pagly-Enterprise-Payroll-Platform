@@ -140,6 +140,9 @@ if (stripeOptions != null)
 builder.Services.AddScoped<IStripeBillingService, StripeBillingService>();
 builder.Services.AddScoped<IPlanLimitService, PlanLimitService>();
 
+// 11.1. REGISTRAR SERVICIO DE EMAIL (BREVO)
+builder.Services.AddScoped<IBrevoEmailService, BrevoEmailService>();
+
 // 12. PHASE 3: REGISTRAR SERVICIOS DE TENANT MANAGEMENT
 builder.Services.AddScoped<IJwtTokenService, Vorluno.Planilla.Web.Services.JwtTokenService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();

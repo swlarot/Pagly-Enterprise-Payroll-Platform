@@ -15,15 +15,15 @@ import TenantSelectorPage from './pages/TenantSelectorPage';
 
 // Admin Pages (Tenant)
 import AdminDashboardPage from './pages/AdminDashboardPage';
-import UsersPage from './pages/UsersPage';
 import AuditLogPage from './pages/AuditLogPage';
-import RolesPage from './pages/RolesPage';
+import RolesAndPermissionsPage from './pages/RolesAndPermissionsPage';
 
 // System Admin Pages
 import SystemAdminDashboardPage from './pages/SystemAdminDashboardPage';
 import TenantsManagementPage from './pages/TenantsManagementPage';
 import CreateTenantPage from './pages/CreateTenantPage';
 import TenantDetailsPage from './pages/TenantDetailsPage';
+import SystemUsersPage from './pages/SystemUsersPage';
 
 // Existing Pages
 import EmpleadosPage from './pages/EmpleadosPage';
@@ -107,6 +107,14 @@ function App() {
             </SystemAdminRoute>
           }
         />
+        <Route
+          path="/system-admin/users"
+          element={
+            <SystemAdminRoute>
+              <SystemUsersPage />
+            </SystemAdminRoute>
+          }
+        />
 
         {/* Protected Routes */}
         <Route
@@ -120,21 +128,7 @@ function App() {
           }
         />
 
-        {/* Admin Routes - Owner/Admin Only */}
-        <Route
-          path="/users"
-          element={
-            <ProtectedRoute>
-              <RoleGuard allowedRoles={[TenantRole.Owner, TenantRole.Admin]}>
-                <AuthLayout>
-                  <UsersPage />
-                </AuthLayout>
-              </RoleGuard>
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Audit Log - Owner/Admin/Manager/Accountant */}
+        {/* Audit Log - Owner and User */}
         <Route
           path="/audit"
           element={
@@ -142,9 +136,7 @@ function App() {
               <RoleGuard
                 allowedRoles={[
                   TenantRole.Owner,
-                  TenantRole.Admin,
-                  TenantRole.Manager,
-                  TenantRole.Accountant,
+                  TenantRole.User,
                 ]}
               >
                 <AuthLayout>
@@ -155,14 +147,14 @@ function App() {
           }
         />
 
-        {/* Roles & Permissions - Owner Only */}
+        {/* Roles & Permissions (includes Users Management) - Owner Only */}
         <Route
           path="/roles"
           element={
             <ProtectedRoute>
               <RoleGuard allowedRoles={[TenantRole.Owner]}>
                 <AuthLayout>
-                  <RolesPage />
+                  <RolesAndPermissionsPage />
                 </AuthLayout>
               </RoleGuard>
             </ProtectedRoute>

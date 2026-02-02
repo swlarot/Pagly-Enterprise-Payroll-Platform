@@ -36,6 +36,31 @@ public class Tenant : BaseEntity
     public string? DV { get; set; }
 
     /// <summary>
+    /// Tipo de contribuyente: "Natural" o "Juridico"
+    /// </summary>
+    [Required]
+    [StringLength(20)]
+    public string TipoContribuyente { get; set; } = "Juridico";
+
+    /// <summary>
+    /// País donde se ubica la empresa
+    /// </summary>
+    [StringLength(100)]
+    public string? Pais { get; set; } = "Panamá";
+
+    /// <summary>
+    /// Sitio web de la empresa
+    /// </summary>
+    [StringLength(256)]
+    public string? SitioWeb { get; set; }
+
+    /// <summary>
+    /// URL del logo de la empresa
+    /// </summary>
+    [StringLength(512)]
+    public string? LogoUrl { get; set; }
+
+    /// <summary>
     /// Dirección física de la empresa
     /// </summary>
     [StringLength(500)]

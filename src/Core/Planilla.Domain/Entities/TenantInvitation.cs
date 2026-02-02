@@ -24,9 +24,9 @@ public class TenantInvitation : BaseEntity, ITenantEntity
     public string Email { get; set; } = string.Empty;
 
     /// <summary>
-    /// Rol que se le asignará al usuario cuando acepte la invitación
+    /// Rol que se le asignará al usuario cuando acepte la invitación (Owner o User)
     /// </summary>
-    public TenantRole Role { get; set; } = TenantRole.Employee;
+    public TenantRole Role { get; set; } = TenantRole.User;
 
     /// <summary>
     /// Token único de la invitación (GUID)

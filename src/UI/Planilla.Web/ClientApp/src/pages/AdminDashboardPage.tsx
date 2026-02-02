@@ -34,12 +34,22 @@ export default function AdminDashboardPage() {
 
       // Cargar empleados
       const empleadosRes = await api.get('/api/empleados');
-      const empleados = empleadosRes.data;
+      // La respuesta puede ser un array directo o un objeto con propiedad data
+      const empleados = Array.isArray(empleadosRes)
+        ? empleadosRes
+        : Array.isArray(empleadosRes?.data)
+          ? empleadosRes.data
+          : [];
       const activos = empleados.filter((e: any) => e.estaActivo).length;
 
       // Cargar planillas
       const planillasRes = await api.get('/api/payrollheaders');
-      const planillas = planillasRes.data;
+      // La respuesta puede ser un array directo o un objeto con propiedad data
+      const planillas = Array.isArray(planillasRes)
+        ? planillasRes
+        : Array.isArray(planillasRes?.data)
+          ? planillasRes.data
+          : [];
 
       // Última planilla (la más reciente)
       const ultimaPlanilla = planillas.length > 0 ? planillas[0] : null;

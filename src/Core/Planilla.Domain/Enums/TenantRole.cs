@@ -1,32 +1,18 @@
 namespace Vorluno.Planilla.Domain.Enums;
 
 /// <summary>
-/// Roles de usuario dentro de un tenant
+/// Roles de usuario dentro de un tenant (simplificados)
+/// Los permisos específicos se definen mediante CustomTenantRole
 /// </summary>
 public enum TenantRole
 {
     /// <summary>
-    /// Propietario del tenant - acceso total, puede eliminar tenant
+    /// Propietario del tenant - acceso total, puede eliminar tenant y gestionar suscripción
     /// </summary>
     Owner = 0,
 
     /// <summary>
-    /// Administrador - gestión completa excepto billing y eliminación de tenant
+    /// Usuario regular - permisos definidos por CustomTenantRole asignado
     /// </summary>
-    Admin = 1,
-
-    /// <summary>
-    /// Gerente - puede gestionar planillas, empleados y reportes
-    /// </summary>
-    Manager = 2,
-
-    /// <summary>
-    /// Contador - acceso de solo lectura a reportes y consultas
-    /// </summary>
-    Accountant = 3,
-
-    /// <summary>
-    /// Empleado - solo puede ver su propia información
-    /// </summary>
-    Employee = 4
+    User = 1
 }
