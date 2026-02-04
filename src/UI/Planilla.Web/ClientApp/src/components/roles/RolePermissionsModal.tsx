@@ -89,14 +89,15 @@ export function RolePermissionsModal({ role, isOpen, onClose, onSuccess }: RoleP
     {} as Record<string, PermissionDto[]>
   );
 
+  // Backend devuelve category en minúsculas: employees, structure, payroll, payroll-concepts, reports, settings, audit
   const categoryDisplayNames: Record<string, string> = {
-    Employees: 'Empleados',
-    Structure: 'Estructura Organizacional',
-    Payroll: 'Planilla',
-    PayrollConcepts: 'Conceptos de Nómina',
-    Reports: 'Reportes',
-    Configuration: 'Configuración',
-    Audit: 'Auditoría',
+    employees: 'Empleados',
+    structure: 'Estructura Organizacional',
+    payroll: 'Planilla',
+    'payroll-concepts': 'Conceptos de Nómina',
+    reports: 'Reportes',
+    settings: 'Configuración',
+    audit: 'Auditoría',
   };
 
   return (

@@ -99,6 +99,7 @@ export interface TenantUserDto {
   email: string;
   role: TenantRole;
   roleName: string;
+  customRoleName?: string | null;
   isActive: boolean;
   joinedAt: string;
   lastLoginAt?: string;
@@ -137,7 +138,7 @@ export interface UpdateTenantUserDto {
 
 export interface AuditLogDto {
   id: number;
-  tenantId: number;
+  tenantId?: number;
   actorUserId?: string;
   actorEmail?: string;
   action: string;
@@ -145,7 +146,10 @@ export interface AuditLogDto {
   entityId?: string;
   details?: string;
   ipAddress?: string;
-  timestamp: string;
+  userAgent?: string;
+  metadataJson?: string;
+  timestamp?: string;
+  createdAt?: string;
 }
 
 export interface PagedResultDto<T> {
@@ -399,19 +403,7 @@ export interface AssignUserToTenantDto {
   role: TenantRole;
 }
 
-// Audit Log DTOs
-export interface AuditLogDto {
-  id: number;
-  action: string;
-  entityType: string;
-  entityId?: string;
-  actorEmail: string;
-  ipAddress?: string;
-  userAgent?: string;
-  metadataJson?: string;
-  createdAt: string;
-}
-
+// Audit log paged result (system admin)
 export interface AuditLogPagedResultDto {
   total: number;
   page: number;
@@ -504,6 +496,7 @@ export interface CustomTenantRoleDto {
   displayOrder: number;
   permissionCount: number;
   userCount: number;
+  permissions?: string[];
   createdAt: string;
   updatedAt?: string;
 }
@@ -532,7 +525,10 @@ export interface UpdateRolePermissionsDto {
 }
 
 export interface AssignRoleToUserDto {
-  roleId: number;
+  /** ID del rol personalizado a asignar (opcional) */
+  customRoleId?: number;
+  /** Rol del sistema: 0 = Owner, 1 = User. Usar cuando no se asigna rol personalizado. */
+  systemRole?: number;
 }
 
 // Employee Deletion DTOs

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Shield, Users, Key, Edit, Trash2 } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
@@ -18,15 +17,15 @@ export function RoleCard({ role, onEditPermissions, onEdit, onDelete }: RoleCard
         <div className="flex items-center gap-3">
           <div
             className="w-10 h-10 rounded-full flex items-center justify-center"
-            style={{ backgroundColor: role.color + '20' }}
+            style={{ backgroundColor: (role.color || '#6B7280') + '20' }}
           >
-            <Shield className="w-5 h-5" style={{ color: role.color }} />
+            <Shield className="w-5 h-5" style={{ color: role.color || '#6B7280' }} />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-semibold text-gray-900">{role.name}</h3>
               {role.isSystem && (
-                <Badge variant="default" size="sm">
+                <Badge variant="default">
                   Sistema
                 </Badge>
               )}
@@ -39,7 +38,7 @@ export function RoleCard({ role, onEditPermissions, onEdit, onDelete }: RoleCard
       <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
         <div className="flex items-center gap-1">
           <Key className="w-4 h-4" />
-          <span>{role.permissionCount} permisos</span>
+          <span>{role.permissionCount ?? role.permissions?.length ?? 0} permisos</span>
         </div>
         <div className="flex items-center gap-1">
           <Users className="w-4 h-4" />
@@ -59,8 +58,12 @@ export function RoleCard({ role, onEditPermissions, onEdit, onDelete }: RoleCard
             >
               Editar Permisos
             </Button>
-            <Button variant="ghost" size="sm" icon={Edit} onClick={() => onEdit(role)} />
-            <Button variant="ghost" size="sm" icon={Trash2} onClick={() => onDelete(role)} />
+            <Button variant="ghost" size="sm" icon={Edit} onClick={() => onEdit(role)} aria-label="Editar rol">
+              {''}
+            </Button>
+            <Button variant="ghost" size="sm" icon={Trash2} onClick={() => onDelete(role)} aria-label="Eliminar rol">
+              {''}
+            </Button>
           </>
         ) : (
           <div className="flex-1 text-center text-sm text-gray-500 py-2">

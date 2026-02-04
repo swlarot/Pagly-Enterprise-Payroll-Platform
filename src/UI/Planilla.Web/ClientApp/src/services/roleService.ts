@@ -77,10 +77,11 @@ export const roleService = {
   },
 
   /**
-   * Asignar un rol a un usuario
+   * Asignar un rol a un usuario (rol del sistema User o un rol personalizado).
+   * - systemRole: 1 = User sin rol personalizado
+   * - customRoleId: ID del CustomTenantRole a asignar
    */
-  async assignRoleToUser(userId: string, roleId: number): Promise<void> {
-    const dto: AssignRoleToUserDto = { roleId };
+  async assignRoleToUser(userId: string, dto: AssignRoleToUserDto): Promise<void> {
     return api.put<void>(`/api/tenant/users/${userId}/role`, dto);
   },
 };

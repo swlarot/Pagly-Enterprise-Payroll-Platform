@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { SystemAdminLayout } from '../components/layout/SystemAdminLayout';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
@@ -12,7 +12,7 @@ import { InviteUserModal } from '../components/admin/InviteUserModal';
 import { RoleBadge } from '../components/admin/RoleBadge';
 import { StatusBadge } from '../components/admin/StatusBadge';
 import { ActionBadge } from '../components/admin/ActionBadge';
-import type { AdminTenantDto, AdminTenantUserDto, AuditLogDto, AuditLogPagedResultDto } from '../types/api';
+import type { AdminTenantDto, AdminTenantUserDto, AuditLogDto } from '../types/api';
 import { SubscriptionPlan, SubscriptionStatus } from '../types/api';
 import {
   ArrowLeft,
@@ -46,7 +46,6 @@ export default function TenantDetailsPage() {
   const [users, setUsers] = useState<AdminTenantUserDto[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [availableRoles, setAvailableRoles] = useState<any[]>([]);
 
   // Audit log tab state
   const [auditLogs, setAuditLogs] = useState<AuditLogDto[]>([]);
@@ -79,7 +78,6 @@ export default function TenantDetailsPage() {
   useEffect(() => {
     if (id && activeTab === 'users') {
       loadUsers();
-      loadAvailableRoles();
     } else if (id && activeTab === 'audit') {
       loadAuditLogs();
     }
@@ -115,33 +113,6 @@ export default function TenantDetailsPage() {
       toast.error('Error al cargar usuarios');
     } finally {
       setIsLoadingUsers(false);
-    }
-  };
-
-  const loadAvailableRoles = async () => {
-    try {
-      // SystemAdmin no puede cargar roles personalizados porque no tiene tenant context
-      // Los roles personalizados solo están disponibles para usuarios dentro del tenant
-      // Por ahora, no cargar roles para evitar error 403
-      // Los usuarios se asignan con TenantRole (Owner/User), no con roles personalizados
-      setAvailableRoles([]);
-    } catch (error: any) {
-      console.error('Error loading roles:', error);
-    }
-  };
-
-  const handleChangeUserRole = async (userId: string, roleId: number) => {
-    if (!window.confirm('¿Estás seguro de que deseas cambiar el rol de este usuario?')) {
-      return;
-    }
-
-    try {
-      const { roleService } = await import('../services/roleService');
-      await roleService.assignRoleToUser(userId, roleId);
-      toast.success('Rol actualizado exitosamente');
-      await loadUsers();
-    } catch (error: any) {
-      toast.error(error.message || 'Error al cambiar rol');
     }
   };
 

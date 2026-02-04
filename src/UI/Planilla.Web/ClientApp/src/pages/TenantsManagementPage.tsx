@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { SystemAdminLayout } from '../components/layout/SystemAdminLayout';
 import { Card, CardBody } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -323,7 +323,9 @@ export default function TenantsManagementPage() {
                   icon={ChevronLeft}
                   onClick={() => setPage(page - 1)}
                   disabled={page === 1}
-                />
+                >
+                  {''}
+                </Button>
                 <span className="text-sm text-gray-700">
                   Página {page} de {totalPages}
                 </span>
@@ -333,7 +335,9 @@ export default function TenantsManagementPage() {
                   icon={ChevronRight}
                   onClick={() => setPage(page + 1)}
                   disabled={page === totalPages}
-                />
+                >
+                  {''}
+                </Button>
               </div>
             </div>
           )}
