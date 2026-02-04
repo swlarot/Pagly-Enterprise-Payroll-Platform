@@ -89,6 +89,7 @@ src/
 ### Documentation
 
 - [Política de eliminación de datos](docs/POLITICA-ELIMINACION.md) — Eliminación física (hard delete), comportamiento por área y excepciones.
+- [Changelog de commits y cambios](docs/CHANGELOG-COMMITS.md) — Resumen de commits recientes y detalle de cambios sin documentación específica (backend, frontend, .gitignore, config).
 
 ---
 
