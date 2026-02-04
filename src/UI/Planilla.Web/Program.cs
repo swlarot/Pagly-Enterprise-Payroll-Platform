@@ -94,17 +94,16 @@ builder.Services.AddAuthentication(options =>
 });
 
 // 6. CONFIGURAR AUTHORIZATION POLICIES MULTI-TENANT
+// Estrategia: solo dos roles a nivel sistema (Owner, User). El resto se controla por permisos (CustomTenantRole).
 builder.Services.AddAuthorizationBuilder()
     .AddPolicy("RequireOwner", p => p.RequireRole("Owner"))
-    .AddPolicy("RequireAdmin", p => p.RequireRole("Owner", "Admin"))
-    .AddPolicy("RequireManager", p => p.RequireRole("Owner", "Admin", "Manager"))
-    .AddPolicy("RequireAccountant", p => p.RequireRole("Owner", "Admin", "Manager", "Accountant"))
-    // Phase 3: Granular policies for tenant management
-    .AddPolicy("TenantManageUsers", p => p.RequireRole("Owner", "Admin"))
-    .AddPolicy("TenantInvite", p => p.RequireRole("Owner", "Admin"))
-    .AddPolicy("PayrollManage", p => p.RequireRole("Owner", "Admin", "Manager"))
-    .AddPolicy("ReportsRead", p => p.RequireRole("Owner", "Admin", "Manager", "Accountant"))
-    // Phase 4: System Admin policy - verifica el claim is_system_admin
+    .AddPolicy("RequireAdmin", p => p.RequireRole("Owner")) // Ya no existe Admin; mismo que Owner para compatibilidad
+    .AddPolicy("RequireManager", p => p.RequireRole("Owner")) // Acceso por permisos en cada controller
+    .AddPolicy("RequireAccountant", p => p.RequireRole("Owner"))
+    .AddPolicy("TenantManageUsers", p => p.RequireRole("Owner")) // Solo Owner invita y asigna roles
+    .AddPolicy("TenantInvite", p => p.RequireRole("Owner"))
+    .AddPolicy("PayrollManage", p => p.RequireRole("Owner"))
+    .AddPolicy("ReportsRead", p => p.RequireRole("Owner"))
     .AddPolicy("RequireSystemAdmin", p => p.Requirements.Add(new Vorluno.Planilla.Web.Authorization.SystemAdminRequirement()));
 
 // Registrar el handler de autorización para SystemAdmin
@@ -129,10 +128,9 @@ if (stripeOptions != null)
         builder.Services.Configure<StripeOptions>(builder.Configuration.GetSection(StripeOptions.SectionName));
         StripeConfiguration.ApiKey = stripeOptions.SecretKey;
     }
-    catch (InvalidOperationException ex)
+    catch (InvalidOperationException)
     {
-        var logger = builder.Services.BuildServiceProvider().GetRequiredService<ILogger<Program>>();
-        logger.LogWarning(ex, "Stripe no está configurado correctamente. Los endpoints de billing no funcionarán.");
+        // Stripe no configurado; los endpoints de billing no funcionarán. No usar BuildServiceProvider aquí.
     }
 }
 
@@ -151,6 +149,7 @@ builder.Services.AddScoped<IInvitationService, InvitationService>();
 builder.Services.AddScoped<global::Planilla.Application.Services.IEmailService, Vorluno.Planilla.Infrastructure.Services.EmailService>();
 builder.Services.AddScoped<global::Planilla.Application.Services.IPlanUsageService, Vorluno.Planilla.Infrastructure.Services.PlanUsageService>();
 builder.Services.AddScoped<ICustomTenantRoleService, CustomTenantRoleService>();
+builder.Services.AddScoped<IEmployeeDeletionValidationService, EmployeeDeletionValidationService>();
 
 // --- FIN DE NUESTRA CONFIGURACIÓN PRINCIPAL ---
 
