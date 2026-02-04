@@ -1,4 +1,3 @@
-import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
@@ -25,19 +24,19 @@ import CreateTenantPage from './pages/CreateTenantPage';
 import TenantDetailsPage from './pages/TenantDetailsPage';
 import SystemUsersPage from './pages/SystemUsersPage';
 
-// Existing Pages
-import EmpleadosPage from './pages/EmpleadosPage';
-import DepartamentosPage from './pages/DepartamentosPage';
-import PosicionesPage from './pages/PosicionesPage';
-import PrestamosPage from './pages/PrestamosPage';
-import DeduccionesPage from './pages/DeduccionesPage';
-import AnticiposPage from './pages/AnticiposPage';
-import HorasExtraPage from './pages/HorasExtraPage';
-import AusenciasPage from './pages/AusenciasPage';
-import VacacionesPage from './pages/VacacionesPage';
-import PlanillasPage from './pages/PlanillasPage';
-import ConfiguracionPage from './pages/ConfiguracionPage';
-import ReportesPage from './pages/ReportesPage';
+// Existing Pages (.jsx)
+import EmpleadosPage from './pages/EmpleadosPage.jsx';
+import DepartamentosPage from './pages/DepartamentosPage.jsx';
+import PosicionesPage from './pages/PosicionesPage.jsx';
+import PrestamosPage from './pages/PrestamosPage.jsx';
+import DeduccionesPage from './pages/DeduccionesPage.jsx';
+import AnticiposPage from './pages/AnticiposPage.jsx';
+import HorasExtraPage from './pages/HorasExtraPage.jsx';
+import AusenciasPage from './pages/AusenciasPage.jsx';
+import VacacionesPage from './pages/VacacionesPage.jsx';
+import PlanillasPage from './pages/PlanillasPage.jsx';
+import ConfiguracionPage from './pages/ConfiguracionPage.jsx';
+import ReportesPage from './pages/ReportesPage.jsx';
 
 function App() {
   return (

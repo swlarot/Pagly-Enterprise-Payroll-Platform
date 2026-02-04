@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardBody, CardHeader } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { RoleCard } from './RoleCard';
 import { RoleFormModal } from './RoleFormModal';
 import { RolePermissionsModal } from './RolePermissionsModal';
-import ConfirmModal from '../ConfirmModal';
+import ConfirmModal from '../ConfirmModal.tsx';
 import { roleService } from '../../services/roleService';
 import toast from 'react-hot-toast';
 import { Plus, Loader2, Shield, AlertCircle } from 'lucide-react';
@@ -57,9 +57,8 @@ export function RolesTab() {
     }
   };
 
-  // Separar roles del sistema y personalizados
-  const systemRoles = roles.filter((r) => r.isSystem);
-  const customRoles = roles.filter((r) => !r.isSystem);
+  // Una sola lista: todos los roles son creados por el Owner
+  const editableRoles = roles.filter((r) => !r.isSystem);
 
   if (isLoading) {
     return (
@@ -71,74 +70,41 @@ export function RolesTab() {
 
   return (
     <div className="space-y-6">
-      {/* Header Actions */}
       <div className="flex items-center justify-end">
         <Button icon={Plus} onClick={() => setShowCreateModal(true)}>
-          Crear Rol Personalizado
+          Crear Rol
         </Button>
       </div>
 
-      {/* Info Banner */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
         <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
         <div className="flex-1">
-          <h3 className="font-medium text-blue-900 mb-1">Sobre los roles</h3>
           <p className="text-sm text-blue-800">
-            Los roles del sistema no pueden ser editados o eliminados. Puedes crear roles personalizados
-            con combinaciones específicas de permisos para adaptarse a tu estructura organizacional.
+            Crea roles, asígnales permisos y luego asígnalos a los usuarios desde la pestaña Usuarios.
           </p>
         </div>
       </div>
 
-      {/* Roles del Sistema */}
-      <Card>
-        <CardHeader>
-          <h2 className="text-lg font-semibold text-gray-900">Roles del Sistema</h2>
-        </CardHeader>
-        <CardBody>
-          {systemRoles.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">No hay roles del sistema</div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {systemRoles.map((role) => (
-                <RoleCard
-                  key={role.id}
-                  role={role}
-                  onEditPermissions={setPermissionsRole}
-                  onEdit={setEditingRole}
-                  onDelete={setDeletingRole}
-                />
-              ))}
-            </div>
-          )}
-        </CardBody>
-      </Card>
-
-      {/* Roles Personalizados */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Roles Personalizados</h2>
-            <span className="text-sm text-gray-600">{customRoles.length} roles</span>
+            <h2 className="text-lg font-semibold text-gray-900">Roles de la empresa</h2>
+            <span className="text-sm text-gray-600">{editableRoles.length} roles</span>
           </div>
         </CardHeader>
         <CardBody>
-          {customRoles.length === 0 ? (
+          {editableRoles.length === 0 ? (
             <div className="text-center py-12">
               <Shield className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No hay roles personalizados
-              </h3>
-              <p className="text-gray-600 mb-4">
-                Crea roles personalizados con permisos específicos para tu organización
-              </p>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No hay roles creados</h3>
+              <p className="text-gray-600 mb-4">Crea el primer rol y asígnale permisos.</p>
               <Button icon={Plus} onClick={() => setShowCreateModal(true)}>
-                Crear Primer Rol
+                Crear primer rol
               </Button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {customRoles.map((role) => (
+              {editableRoles.map((role) => (
                 <RoleCard
                   key={role.id}
                   role={role}

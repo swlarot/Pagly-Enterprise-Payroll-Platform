@@ -1,16 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { tenantService } from '../../services/tenantService';
+import { roleService } from '../../services/roleService';
 import { useAuth } from '../../contexts/AuthContext';
-import type { TenantUserDto, InvitationDto, TenantRole, UpdateTenantUserDto } from '../../types/api';
+import type { TenantUserDto, InvitationDto, TenantRole, UpdateTenantUserDto, CustomTenantRoleDto } from '../../types/api';
 import toast from 'react-hot-toast';
-import ConfirmModal from '../ConfirmModal';
-
-interface CustomRole {
-  id: number;
-  name: string;
-  description: string;
-  permissions: string[];
-}
+import ConfirmModal from '../ConfirmModal.tsx';
 
 export function UsersManagementTab() {
   const { subscription } = useAuth();
@@ -18,20 +12,20 @@ export function UsersManagementTab() {
   const [invitations, setInvitations] = useState<InvitationDto[]>([]);
   const [usage, setUsage] = useState<{ usersCount: number; maxUsers: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
+  const [customRoles, setCustomRoles] = useState<CustomTenantRoleDto[]>([]);
   const [isLoadingRoles, setIsLoadingRoles] = useState(false);
 
   // Invite modal state
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<TenantRole>(2); // Manager by default
+  const [inviteRole, setInviteRole] = useState<TenantRole>(1); // User: sin permisos hasta que el Owner asigne un rol
   const [isInviting, setIsInviting] = useState(false);
   const [generatedInviteUrl, setGeneratedInviteUrl] = useState('');
 
-  // Role change modal state
+  // Role change modal state: 0 = Usuario (sin rol), >0 = custom role id
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<TenantUserDto | null>(null);
-  const [newRole, setNewRole] = useState<TenantRole>(2);
+  const [newRole, setNewRole] = useState<number>(0);
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
 
   // Confirm modal state
@@ -76,13 +70,11 @@ export function UsersManagementTab() {
   const loadCustomRoles = async () => {
     try {
       setIsLoadingRoles(true);
-      const response = await fetch('/api/tenants/roles');
-      if (!response.ok) throw new Error('Error al cargar roles');
-      const data = await response.json();
-      setCustomRoles(data || []);
+      const data = await roleService.getRoles();
+      // Solo roles personalizados (no sistema) para invitar/asignar
+      setCustomRoles(Array.isArray(data) ? data.filter((r: CustomTenantRoleDto) => !r.isSystem) : []);
     } catch (error: any) {
       console.error('Error loading custom roles:', error);
-      // Si falla la carga de roles custom, usar roles predeterminados
       setCustomRoles([]);
     } finally {
       setIsLoadingRoles(false);
@@ -125,7 +117,7 @@ export function UsersManagementTab() {
 
       // Reset form but keep modal open to show URL
       setInviteEmail('');
-      setInviteRole(2);
+      setInviteRole(1);
     } catch (error: any) {
       toast.error(error.message || 'Error al enviar invitación');
     } finally {
@@ -142,12 +134,12 @@ export function UsersManagementTab() {
     setIsInviteModalOpen(false);
     setGeneratedInviteUrl('');
     setInviteEmail('');
-    setInviteRole(2);
+    setInviteRole(1);
   };
 
   const handleOpenRoleModal = (user: TenantUserDto) => {
     setSelectedUser(user);
-    setNewRole(user.role);
+    setNewRole(0); // Por defecto "Usuario (sin rol)"; si el backend devolviera customRoleId podríamos setearlo
     setIsRoleModalOpen(true);
   };
 
@@ -157,8 +149,11 @@ export function UsersManagementTab() {
     setIsUpdatingRole(true);
 
     try {
-      const dto: UpdateTenantUserDto = { role: newRole };
-      await tenantService.updateUser(selectedUser.id, dto);
+      if (newRole === 0) {
+        await roleService.assignRoleToUser(selectedUser.userId, { systemRole: 1 });
+      } else {
+        await roleService.assignRoleToUser(selectedUser.userId, { customRoleId: newRole });
+      }
       toast.success(`Rol de ${selectedUser.email} actualizado exitosamente`);
       setIsRoleModalOpen(false);
       setSelectedUser(null);
@@ -245,13 +240,10 @@ export function UsersManagementTab() {
 
   const getRoleDescription = (role: TenantRole) => {
     const descriptions: Record<number, string> = {
-      0: 'Acceso total - gestiona suscripción, facturación y puede eliminar tenant',
-      1: 'Administrador - gestión completa excepto facturación',
-      2: 'Gerente - gestión de planillas, empleados, reportes',
-      3: 'Contador - solo reportes y consultas',
-      4: 'Empleado - solo ver su información personal',
+      0: 'Propietario - acceso total (solo uno por tenant)',
+      1: 'Usuario - sin permisos hasta que el Owner le asigne un rol desde Roles',
     };
-    return descriptions[role] || '';
+    return descriptions[role] ?? 'Usuario';
   };
 
   return (
@@ -409,7 +401,7 @@ export function UsersManagementTab() {
                 users.map((user) => (
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm text-gray-900">{user.email}</td>
-                    <td className="px-6 py-4">{getRoleBadge(user.roleName)}</td>
+                    <td className="px-6 py-4">{getRoleBadge(user.customRoleName ?? user.roleName)}</td>
                     <td className="px-6 py-4">
                       {user.isActive ? (
                         <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -531,7 +523,7 @@ export function UsersManagementTab() {
 
                   <div>
                     <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
-                      Rol {customRoles.length > 0 && <span className="text-blue-600">(Personalizado)</span>}
+                      Rol
                     </label>
                     <select
                       id="role"
@@ -540,27 +532,10 @@ export function UsersManagementTab() {
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       disabled={isInviting || isLoadingRoles}
                     >
-                      {customRoles.length > 0 ? (
-                        <>
-                          {customRoles.map((role) => (
-                            <option key={role.id} value={role.id}>
-                              {role.name}
-                            </option>
-                          ))}
-                        </>
-                      ) : (
-                        <>
-                          <option value={1}>Admin</option>
-                          <option value={2}>Manager</option>
-                          <option value={3}>Accountant</option>
-                          <option value={4}>Employee</option>
-                        </>
-                      )}
+                      <option value={1}>Usuario (sin permisos hasta asignar rol)</option>
                     </select>
                     <p className="mt-2 text-xs text-gray-500">
-                      {customRoles.length > 0
-                        ? customRoles.find((r) => r.id === inviteRole)?.description || ''
-                        : getRoleDescription(inviteRole)}
+                      {getRoleDescription(inviteRole)}
                     </p>
                   </div>
 
@@ -692,36 +667,26 @@ export function UsersManagementTab() {
 
               <div>
                 <label htmlFor="newRole" className="block text-sm font-medium text-gray-700 mb-2">
-                  Nuevo Rol {customRoles.length > 0 && <span className="text-blue-600">(Personalizado)</span>}
+                  Asignar rol
                 </label>
                 <select
                   id="newRole"
                   value={newRole}
-                  onChange={(e) => setNewRole(Number(e.target.value) as TenantRole)}
+                  onChange={(e) => setNewRole(Number(e.target.value))}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   disabled={isUpdatingRole || isLoadingRoles}
                 >
-                  {customRoles.length > 0 ? (
-                    <>
-                      {customRoles.map((role) => (
-                        <option key={role.id} value={role.id}>
-                          {role.name}
-                        </option>
-                      ))}
-                    </>
-                  ) : (
-                    <>
-                      <option value={1}>Admin</option>
-                      <option value={2}>Manager</option>
-                      <option value={3}>Accountant</option>
-                      <option value={4}>Employee</option>
-                    </>
-                  )}
+                  <option value={0}>Usuario (sin rol asignado)</option>
+                  {customRoles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
                 </select>
                 <p className="mt-2 text-xs text-gray-500">
-                  {customRoles.length > 0
-                    ? customRoles.find((r) => r.id === newRole)?.description || ''
-                    : getRoleDescription(newRole)}
+                  {newRole === 0
+                    ? 'El usuario no tendrá permisos hasta que le asignes un rol con permisos.'
+                    : customRoles.find((r) => r.id === newRole)?.description || ''}
                 </p>
               </div>
 
@@ -738,7 +703,7 @@ export function UsersManagementTab() {
                   type="button"
                   onClick={handleChangeRole}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                  disabled={isUpdatingRole || newRole === selectedUser.role}
+                  disabled={isUpdatingRole}
                 >
                   {isUpdatingRole ? (
                     <>

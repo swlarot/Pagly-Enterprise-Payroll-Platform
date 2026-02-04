@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
-import { Building2, ChevronRight, Shield, User, Users, Calculator, Clock } from 'lucide-react';
-import type { TenantRole } from '../types/api';
+import { Building2, ChevronRight, Shield, User, Clock } from 'lucide-react';
+import { TenantRole } from '../types/api';
 
 const TENANT_SELECTION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos
 const LAST_TENANT_KEY = 'pagly_last_tenant_id';
@@ -71,14 +71,10 @@ export default function TenantSelectorPage() {
 
   const getRoleIcon = (role: TenantRole) => {
     switch (role) {
-      case 0: // Owner
+      case TenantRole.Owner:
         return <Shield className="w-5 h-5 text-emerald-600" />;
-      case 1: // Admin
-        return <Users className="w-5 h-5 text-blue-600" />;
-      case 2: // Manager
-        return <User className="w-5 h-5 text-purple-600" />;
-      case 3: // Accountant
-        return <Calculator className="w-5 h-5 text-orange-600" />;
+      case TenantRole.User:
+        return <User className="w-5 h-5 text-blue-600" />;
       default:
         return <User className="w-5 h-5 text-gray-600" />;
     }
@@ -86,14 +82,10 @@ export default function TenantSelectorPage() {
 
   const getRoleBadgeColor = (role: TenantRole) => {
     switch (role) {
-      case 0: // Owner
+      case TenantRole.Owner:
         return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-      case 1: // Admin
+      case TenantRole.User:
         return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 2: // Manager
-        return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 3: // Accountant
-        return 'bg-orange-100 text-orange-800 border-orange-200';
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200';
     }
