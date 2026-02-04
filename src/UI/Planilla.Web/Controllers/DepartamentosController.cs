@@ -229,11 +229,15 @@ public class DepartamentosController : ControllerBase
             return BadRequest(new { message = "No se puede eliminar el departamento porque tiene posiciones activas. Desactive primero las posiciones." });
         }
 
-        // Soft delete
-        departamento.EstaActivo = false;
-        departamento.UpdatedAt = DateTime.UtcNow;
+        // Desasignar posiciones de este departamento (DepartamentoId = null) para poder borrar
+        foreach (var pos in departamento.Posiciones)
+        {
+            pos.DepartamentoId = null;
+            _unitOfWork.Repository<Posicion>().Update(pos);
+        }
 
-        _unitOfWork.Repository<Departamento>().Update(departamento);
+        // Hard delete
+        _unitOfWork.Repository<Departamento>().Remove(departamento);
         await _unitOfWork.CompleteAsync();
 
         return NoContent();

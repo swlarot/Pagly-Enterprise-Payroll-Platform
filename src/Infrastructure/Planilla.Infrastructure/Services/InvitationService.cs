@@ -426,18 +426,17 @@ public class InvitationService : IInvitationService
                 return Result<bool>.Fail("No se puede revocar una invitación que ya fue aceptada");
             }
 
-            invitation.IsRevoked = true;
-            invitation.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
-
-            // Audit log
+            // Audit log antes de eliminar
             await _auditLogService.LogAsync("InviteRevoked", "TenantInvitation", invitationId.ToString(), new Dictionary<string, string>
             {
                 ["InvitedEmail"] = invitation.Email,
                 ["Role"] = invitation.Role.ToString()
             });
 
-            _logger.LogInformation("Invitation {InvitationId} revoked by user {UserId}", invitationId, _tenantContext.UserId);
+            _context.TenantInvitations.Remove(invitation);
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Invitation {InvitationId} revoked (deleted) by user {UserId}", invitationId, _tenantContext.UserId);
 
             return Result<bool>.Ok(true);
         }

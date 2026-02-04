@@ -66,7 +66,7 @@ public class PlanLimitService : IPlanLimitService
                 var freeLimits = PlanFeatures.GetLimits(SubscriptionPlan.Free);
 
                 var employeeCount = await _context.Empleados
-                    .CountAsync(e => e.TenantId == tenantId && e.EstaActivo);
+                    .CountAsync(e => e.TenantId == tenantId && e.EstaActivo && !e.IsDeleted);
 
                 if (employeeCount >= freeLimits.MaxEmployees)
                 {
@@ -94,7 +94,7 @@ public class PlanLimitService : IPlanLimitService
 
             // 4. Count current active employees
             var currentCount = await _context.Empleados
-                .CountAsync(e => e.TenantId == tenantId && e.EstaActivo);
+                .CountAsync(e => e.TenantId == tenantId && e.EstaActivo && !e.IsDeleted);
 
             // 5. Check limit
             if (currentCount >= limits.MaxEmployees)

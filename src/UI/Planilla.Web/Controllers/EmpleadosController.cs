@@ -8,6 +8,7 @@ using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Web.Authorization;
 using Vorluno.Planilla.Web.Extensions;
 using Vorluno.Planilla.Web.Filters;
 
@@ -29,18 +30,11 @@ namespace Vorluno.Planilla.Web.Controllers
         private readonly IAuditLogService _auditLogService;
         private readonly UserManager<AppUser> _userManager;
         private readonly ILogger<EmpleadosController> _logger;
+        private readonly IEmployeeDeletionValidationService _employeeDeletionValidationService;
 
         /// <summary>
         /// Inicializa una nueva instancia de la clase <see cref="EmpleadosController"/>.
         /// </summary>
-        /// <param name="unitOfWork">La unidad de trabajo para el acceso a datos.</param>
-        /// <param name="mapper">El servicio de mapeo de objetos (AutoMapper).</param>
-        /// <param name="context">El contexto de la base de datos para consultas complejas.</param>
-        /// <param name="tenantContext">El contexto del tenant actual.</param>
-        /// <param name="planLimitService">Servicio de verificación de límites del plan.</param>
-        /// <param name="auditLogService">Servicio de auditoría para registrar acciones.</param>
-        /// <param name="userManager">Gestor de usuarios de Identity.</param>
-        /// <param name="logger">Logger para registrar eventos.</param>
         public EmpleadosController(
             IUnitOfWork unitOfWork,
             IMapper mapper,
@@ -49,7 +43,8 @@ namespace Vorluno.Planilla.Web.Controllers
             IPlanLimitService planLimitService,
             IAuditLogService auditLogService,
             UserManager<AppUser> userManager,
-            ILogger<EmpleadosController> logger)
+            ILogger<EmpleadosController> logger,
+            IEmployeeDeletionValidationService employeeDeletionValidationService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -59,6 +54,7 @@ namespace Vorluno.Planilla.Web.Controllers
             _auditLogService = auditLogService;
             _userManager = userManager;
             _logger = logger;
+            _employeeDeletionValidationService = employeeDeletionValidationService;
         }
 
         /// <summary>
@@ -67,14 +63,14 @@ namespace Vorluno.Planilla.Web.Controllers
         /// </summary>
         /// <returns>Una lista de empleados en formato DTO.</returns>
         [HttpGet]
-        [Authorize(Roles = "Owner,Admin,Manager,Accountant,Employee")]
+        [RequirePermission(SystemPermission.EmployeesRead)]
         public async Task<IActionResult> GetAll()
         {
             var tenantId = _tenantContext.TenantId;
             var role = this.GetCurrentTenantRole();
 
             var query = _context.Empleados
-                .Where(e => e.TenantId == tenantId)
+                .Where(e => e.TenantId == tenantId && !e.IsDeleted)
                 .Include(e => e.Departamento)
                 .Include(e => e.Posicion)
                 .AsNoTracking();
@@ -85,7 +81,7 @@ namespace Vorluno.Planilla.Web.Controllers
                 var userId = this.GetCurrentUserId();
                 // Buscar el empleado vinculado al usuario actual
                 var empleadoUsuario = await _context.Empleados
-                    .Where(e => e.UserId == userId && e.TenantId == tenantId)
+                    .Where(e => e.UserId == userId && e.TenantId == tenantId && !e.IsDeleted)
                     .FirstOrDefaultAsync();
 
                 if (empleadoUsuario != null)
@@ -126,7 +122,8 @@ namespace Vorluno.Planilla.Web.Controllers
                 e.Empleado.PosicionId,
                 e.Empleado.Posicion?.Nombre,
                 !string.IsNullOrEmpty(e.Empleado.UserId),
-                e.RolSistema
+                e.RolSistema,
+                e.Empleado.IsDeleted
             )).ToList();
 
             return Ok(empleadosDto);
@@ -138,12 +135,12 @@ namespace Vorluno.Planilla.Web.Controllers
         /// <param name="id">El ID del empleado.</param>
         /// <returns>El empleado encontrado o un error 404 si no existe.</returns>
         [HttpGet("{id}")]
-        [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+        [RequirePermission(SystemPermission.EmployeesRead)]
         public async Task<IActionResult> GetById(int id)
         {
             var tenantId = _tenantContext.TenantId;
             var result = await _context.Empleados
-                .Where(e => e.Id == id && e.TenantId == tenantId)
+                .Where(e => e.Id == id && e.TenantId == tenantId && !e.IsDeleted)
                 .Include(e => e.Departamento)
                 .Include(e => e.Posicion)
                 .AsNoTracking()
@@ -178,7 +175,8 @@ namespace Vorluno.Planilla.Web.Controllers
                 result.Empleado.PosicionId,
                 result.Empleado.Posicion?.Nombre,
                 !string.IsNullOrEmpty(result.Empleado.UserId),
-                result.RolSistema
+                result.RolSistema,
+                result.Empleado.IsDeleted
             );
 
             return Ok(empleadoDto);
@@ -190,7 +188,7 @@ namespace Vorluno.Planilla.Web.Controllers
         /// <param name="empleadoDto">Los datos del nuevo empleado.</param>
         /// <returns>El nuevo empleado creado.</returns>
         [HttpPost]
-        [Authorize(Roles = "Owner,Admin,Manager")]
+        [RequirePermission(SystemPermission.EmployeesCreate)]
         [PlanLimits(PlanLimitType.CreateEmployee)] // ✅ PLAN LIMITS: Verifica automáticamente límite de empleados
         public async Task<IActionResult> Create(EmpleadoCrearDto empleadoDto)
         {
@@ -250,7 +248,8 @@ namespace Vorluno.Planilla.Web.Controllers
                 empleado.PosicionId,
                 empleado.Posicion?.Nombre,
                 !string.IsNullOrEmpty(empleado.UserId),
-                result.RolSistema
+                result.RolSistema,
+                false
             );
 
             // ✅ AUDIT LOG: Registrar creación de empleado
@@ -285,7 +284,7 @@ namespace Vorluno.Planilla.Web.Controllers
         /// <param name="empleadoDto">Los datos actualizados del empleado.</param>
         /// <returns>NoContent si la actualización fue exitosa, NotFound si no existe.</returns>
         [HttpPut("{id}")]
-        [Authorize(Roles = "Owner,Admin,Manager")]
+        [RequirePermission(SystemPermission.EmployeesUpdate)]
         public async Task<IActionResult> Update(int id, EmpleadoActualizarDto empleadoDto)
         {
             var tenantId = _tenantContext.TenantId;
@@ -326,29 +325,53 @@ namespace Vorluno.Planilla.Web.Controllers
         }
 
         /// <summary>
-        /// Elimina un empleado (soft delete usando EstaActivo = false).
+        /// Valida si un empleado puede ser eliminado. No elimina; devuelve bloqueadores y advertencias.
+        /// El frontend usa este resultado para mostrar el modal y luego llama a force-delete si el usuario confirma.
         /// </summary>
-        /// <param name="id">El ID del empleado a eliminar.</param>
-        /// <returns>NoContent si la eliminación fue exitosa, NotFound si no existe.</returns>
+        /// <param name="id">El ID del empleado a validar.</param>
+        /// <returns>200 OK con DeletionResult (canDelete, requiresConfirmation, blockers, warnings).</returns>
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Owner,Admin")]
+        [RequirePermission(SystemPermission.EmployeesDelete)]
         public async Task<IActionResult> Delete(int id)
         {
+            var result = await _employeeDeletionValidationService.ValidateEmployeeDeletionAsync(id);
+            return Ok(result);
+        }
+
+        /// <summary>
+        /// Eliminación efectiva (soft delete): marca el empleado como IsDeleted. Desaparece de las listas por el filtro !IsDeleted.
+        /// Solo debe llamarse después de que el usuario confirme en el modal (tras DELETE que devuelve validación).
+        /// Hard delete no se usa por FKs Restrict (planilla, préstamos, deducciones, etc.).
+        /// </summary>
+        /// <param name="id">ID del empleado.</param>
+        /// <param name="body">Debe incluir confirmed: true.</param>
+        [HttpPost("{id}/force-delete")]
+        [RequirePermission(SystemPermission.EmployeesDelete)]
+        public async Task<IActionResult> ForceDelete(int id, [FromBody] ForceDeleteRequest? body)
+        {
+            if (body?.Confirmed != true)
+            {
+                return BadRequest(new { error = "Debe confirmar la eliminación enviando { \"confirmed\": true }" });
+            }
+
             var tenantId = _tenantContext.TenantId;
+            var currentUserId = this.GetCurrentUserId();
             var empleado = await _context.Empleados
                 .FirstOrDefaultAsync(e => e.Id == id && e.TenantId == tenantId);
 
             if (empleado == null)
-            {
-                return NotFound(); // Retorna un 404 Not Found si no existe o no pertenece al tenant
-            }
+                return NotFound(new { error = "Empleado no encontrado" });
 
-            // Implementa soft delete usando EstaActivo = false; no hard delete de la base de datos
+            if (empleado.IsDeleted)
+                return BadRequest(new { error = "El empleado ya está eliminado" });
+
+            empleado.IsDeleted = true;
+            empleado.DeletedAt = DateTime.UtcNow;
+            empleado.DeletedBy = currentUserId;
             empleado.EstaActivo = false;
             _unitOfWork.Empleados.Update(empleado);
             await _unitOfWork.CompleteAsync();
 
-            // ✅ AUDIT LOG: Registrar eliminación de empleado
             try
             {
                 await _auditLogService.LogAsync(
@@ -358,15 +381,56 @@ namespace Vorluno.Planilla.Web.Controllers
                     new Dictionary<string, string>
                     {
                         ["EmployeeName"] = $"{empleado.Nombre} {empleado.Apellido}",
+                        ["IdentificationNumber"] = empleado.NumeroIdentificacion ?? "N/A",
+                        ["DeletedBy"] = currentUserId
+                    });
+            }
+            catch (Exception) { /* no bloquear */ }
+
+            _logger.LogInformation("Employee {EmpleadoId} soft-deleted by user {UserId} in tenant {TenantId}", id, currentUserId, tenantId);
+            return NoContent();
+        }
+
+        /// <summary>
+        /// Reactiva un empleado previamente eliminado (soft delete).
+        /// </summary>
+        [HttpPost("{id}/reactivate")]
+        [RequirePermission(SystemPermission.EmployeesUpdate)]
+        public async Task<IActionResult> Reactivate(int id)
+        {
+            var tenantId = _tenantContext.TenantId;
+            var empleado = await _context.Empleados
+                .FirstOrDefaultAsync(e => e.Id == id && e.TenantId == tenantId);
+
+            if (empleado == null)
+                return NotFound(new { error = "Empleado no encontrado" });
+
+            if (!empleado.IsDeleted)
+                return BadRequest(new { error = "El empleado no está eliminado" });
+
+            empleado.IsDeleted = false;
+            empleado.DeletedAt = null;
+            empleado.DeletedBy = null;
+            empleado.EstaActivo = true;
+            _unitOfWork.Empleados.Update(empleado);
+            await _unitOfWork.CompleteAsync();
+
+            try
+            {
+                await _auditLogService.LogAsync(
+                    "EmployeeReactivated",
+                    "Employee",
+                    id.ToString(),
+                    new Dictionary<string, string>
+                    {
+                        ["EmployeeName"] = $"{empleado.Nombre} {empleado.Apellido}",
                         ["IdentificationNumber"] = empleado.NumeroIdentificacion ?? "N/A"
                     });
             }
-            catch (Exception)
-            {
-                // No bloqueamos la operación si falla el audit log
-            }
+            catch (Exception) { /* no bloquear */ }
 
-            return NoContent(); // Retorna un 204 No Content para indicar éxito
+            _logger.LogInformation("Employee {EmpleadoId} reactivated in tenant {TenantId}", id, tenantId);
+            return NoContent();
         }
 
         /// <summary>
@@ -442,7 +506,7 @@ namespace Vorluno.Planilla.Web.Controllers
         /// Requiere: Owner o Admin
         /// </summary>
         [HttpPost("{empleadoId}/vincular-usuario")]
-        [Authorize(Roles = "Owner,Admin")]
+        [RequirePermission(SystemPermission.EmployeesUpdate)]
         public async Task<ActionResult> VincularUsuario(int empleadoId, [FromBody] VincularUsuarioDto dto)
         {
             var tenantId = _tenantContext.TenantId;
@@ -494,8 +558,8 @@ namespace Vorluno.Planilla.Web.Controllers
                     usuarioVinculado = new
                     {
                         id = tenantUser.UserId,
-                        email = tenantUser.User.Email,
-                        nombreCompleto = tenantUser.User.NombreCompleto
+                        email = tenantUser.User?.Email ?? "",
+                        nombreCompleto = tenantUser.User?.NombreCompleto
                     }
                 }
             });
@@ -506,7 +570,7 @@ namespace Vorluno.Planilla.Web.Controllers
         /// Requiere: Owner o Admin
         /// </summary>
         [HttpPost("{empleadoId}/desvincular-usuario")]
-        [Authorize(Roles = "Owner,Admin")]
+        [RequirePermission(SystemPermission.EmployeesUpdate)]
         public async Task<ActionResult> DesvincularUsuario(int empleadoId)
         {
             var tenantId = _tenantContext.TenantId;
@@ -546,7 +610,7 @@ namespace Vorluno.Planilla.Web.Controllers
         /// Devuelve usuarios del tenant que no están vinculados a ningún empleado, con sugerencia si el email coincide
         /// </summary>
         [HttpGet("{empleadoId}/sugerencias-usuarios")]
-        [Authorize(Roles = "Owner,Admin")]
+        [RequirePermission(SystemPermission.EmployeesUpdate)]
         public async Task<ActionResult> GetSugerenciasUsuarios(int empleadoId)
         {
             try
@@ -646,5 +710,13 @@ namespace Vorluno.Planilla.Web.Controllers
         {
             return $"Temp{Guid.NewGuid().ToString("N")[..8]}!1Aa";
         }
+    }
+
+    /// <summary>
+    /// Cuerpo para confirmar eliminación forzada de un empleado.
+    /// </summary>
+    public class ForceDeleteRequest
+    {
+        public bool Confirmed { get; set; }
     }
 }

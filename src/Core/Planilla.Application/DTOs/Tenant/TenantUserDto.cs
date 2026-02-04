@@ -14,6 +14,8 @@ public class TenantUserDto
     public string? FullName { get; set; }
     public TenantRole Role { get; set; }
     public string RoleName { get; set; } = string.Empty;
+    /// <summary>Nombre del rol personalizado cuando CustomTenantRoleId está asignado.</summary>
+    public string? CustomRoleName { get; set; }
     public bool IsActive { get; set; }
     public DateTime JoinedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }

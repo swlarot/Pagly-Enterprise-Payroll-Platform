@@ -19,7 +19,8 @@ namespace Vorluno.Planilla.Application.DTOs
         int? PosicionId,
         string? PosicionNombre,
         bool TieneAccesoSistema,
-        string? RolSistema
+        string? RolSistema,
+        bool IsDeleted = false
     );
 
     /// <summary>

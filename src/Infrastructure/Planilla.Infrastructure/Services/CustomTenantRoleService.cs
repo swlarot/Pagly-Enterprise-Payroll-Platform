@@ -55,7 +55,8 @@ public class CustomTenantRoleService : ICustomTenantRoleService
                     UpdatedAt = r.UpdatedAt,
                     IsActive = r.IsActive,
                     Permissions = r.Permissions.Select(p => p.Permission).ToList(),
-                    UserCount = r.Users.Count(u => u.IsActive)
+                    UserCount = r.Users.Count(u => u.IsActive),
+                    PermissionCount = r.Permissions.Count(p => p.IsActive)
                 })
                 .ToListAsync();
 
@@ -90,7 +91,8 @@ public class CustomTenantRoleService : ICustomTenantRoleService
                     UpdatedAt = r.UpdatedAt,
                     IsActive = r.IsActive,
                     Permissions = r.Permissions.Select(p => p.Permission).ToList(),
-                    UserCount = r.Users.Count(u => u.IsActive)
+                    UserCount = r.Users.Count(u => u.IsActive),
+                    PermissionCount = r.Permissions.Count(p => p.IsActive)
                 })
                 .FirstOrDefaultAsync();
 
@@ -112,7 +114,7 @@ public class CustomTenantRoleService : ICustomTenantRoleService
         {
             var tenantId = _tenantContext.TenantId;
 
-            // Verificar que el usuario actual es Owner
+            // Solo el Owner del tenant puede crear roles personalizados
             var currentUserRole = await GetCurrentUserRoleAsync();
             if (currentUserRole != TenantRole.Owner)
             {
@@ -198,7 +200,7 @@ public class CustomTenantRoleService : ICustomTenantRoleService
         {
             var tenantId = _tenantContext.TenantId;
 
-            // Verificar que el usuario actual es Owner
+            // Solo el Owner puede modificar roles
             var currentUserRole = await GetCurrentUserRoleAsync();
             if (currentUserRole != TenantRole.Owner)
             {
@@ -260,7 +262,7 @@ public class CustomTenantRoleService : ICustomTenantRoleService
         {
             var tenantId = _tenantContext.TenantId;
 
-            // Verificar que el usuario actual es Owner
+            // Solo el Owner puede eliminar roles
             var currentUserRole = await GetCurrentUserRoleAsync();
             if (currentUserRole != TenantRole.Owner)
             {
@@ -282,7 +284,7 @@ public class CustomTenantRoleService : ICustomTenantRoleService
                     "No se pueden eliminar los roles del sistema");
             }
 
-            // No permitir eliminar si hay usuarios con este rol
+            // No permitir eliminar si hay usuarios activos con este rol
             var activeUsers = role.Users.Count(u => u.IsActive);
             if (activeUsers > 0)
             {
@@ -291,24 +293,29 @@ public class CustomTenantRoleService : ICustomTenantRoleService
                     "Reasigne los usuarios a otro rol antes de eliminar.");
             }
 
-            // Soft delete del rol y sus permisos
-            role.IsActive = false;
-            role.UpdatedAt = DateTime.UtcNow;
+            var roleName = role.Name;
 
+            // Desasignar el rol de cualquier TenantUser que lo tenga (activos o inactivos)
+            var usersWithRole = await _context.TenantUsers
+                .Where(tu => tu.TenantId == tenantId && tu.CustomTenantRoleId == roleId)
+                .ToListAsync();
+            foreach (var tu in usersWithRole)
+            {
+                tu.CustomTenantRoleId = null;
+                _context.TenantUsers.Update(tu);
+            }
+
+            // Hard delete: eliminar permisos del rol y luego el rol
             var permissions = await _context.Set<RolePermission>()
                 .Where(p => p.CustomTenantRoleId == roleId)
                 .ToListAsync();
-
-            foreach (var permission in permissions)
-            {
-                permission.IsActive = false;
-            }
-
+            _context.Set<RolePermission>().RemoveRange(permissions);
+            _context.Set<CustomTenantRole>().Remove(role);
             await _context.SaveChangesAsync();
 
             _logger.LogInformation(
                 "Rol personalizado '{RoleName}' eliminado en tenant {TenantId}",
-                role.Name, tenantId);
+                roleName, tenantId);
 
             return Result<bool>.Ok(true);
         }
@@ -347,7 +354,7 @@ public class CustomTenantRoleService : ICustomTenantRoleService
         {
             var tenantId = _tenantContext.TenantId;
 
-            // Verificar que el usuario actual es Owner
+            // Solo el Owner puede modificar permisos de un rol
             var currentUserRole = await GetCurrentUserRoleAsync();
             if (currentUserRole != TenantRole.Owner)
             {
@@ -426,11 +433,18 @@ public class CustomTenantRoleService : ICustomTenantRoleService
 
     public async Task<Result<bool>> AssignRoleToUserAsync(AssignRoleToUserDto dto)
     {
+        const string userIdRequired = "El ID del usuario es requerido";
+        if (dto == null)
+            return Result<bool>.Fail(userIdRequired);
+        if (string.IsNullOrWhiteSpace(dto.UserId))
+            return Result<bool>.Fail(userIdRequired);
+
         try
         {
             var tenantId = _tenantContext.TenantId;
+            var targetUserId = dto.UserId;
 
-            // Verificar que el usuario actual es Owner
+            // Solo el Owner puede asignar roles a usuarios
             var currentUserRole = await GetCurrentUserRoleAsync();
             if (currentUserRole != TenantRole.Owner)
             {
@@ -439,7 +453,7 @@ public class CustomTenantRoleService : ICustomTenantRoleService
             }
 
             var tenantUser = await _context.TenantUsers
-                .FirstOrDefaultAsync(tu => tu.UserId == dto.UserId &&
+                .FirstOrDefaultAsync(tu => tu.UserId == targetUserId &&
                                           tu.TenantId == tenantId &&
                                           tu.IsActive);
 
@@ -523,9 +537,9 @@ public class CustomTenantRoleService : ICustomTenantRoleService
             var permissions = await GetCurrentUserPermissionsAsync();
 
             if (!permissions.Success)
-                return Result<bool>.Fail(permissions.ErrorMessage);
+                return Result<bool>.Fail(permissions.ErrorMessage ?? "Error al obtener permisos");
 
-            var hasPermission = permissions.Value.Contains(permission);
+            var hasPermission = permissions.Value?.Contains(permission) ?? false;
             return Result<bool>.Ok(hasPermission);
         }
         catch (Exception ex)

@@ -248,17 +248,14 @@ public class PosicionesController : ControllerBase
             return NotFound();
         }
 
-        // Verificar si tiene empleados asignados
-        if (posicion.Empleados.Any(e => e.EstaActivo))
+        // Verificar si tiene empleados activos asignados (no eliminados)
+        if (posicion.Empleados.Any(e => e.EstaActivo && !e.IsDeleted))
         {
             return BadRequest(new { message = "No se puede eliminar la posición porque tiene empleados asignados. Reasigne primero los empleados." });
         }
 
-        // Soft delete
-        posicion.EstaActivo = false;
-        posicion.UpdatedAt = DateTime.UtcNow;
-
-        _unitOfWork.Repository<Posicion>().Update(posicion);
+        // Hard delete: el empleado queda con PosicionId = null (DeleteBehavior.SetNull)
+        _unitOfWork.Repository<Posicion>().Remove(posicion);
         await _unitOfWork.CompleteAsync();
 
         return NoContent();

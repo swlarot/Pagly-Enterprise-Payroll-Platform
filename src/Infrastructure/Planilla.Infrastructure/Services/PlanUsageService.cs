@@ -40,7 +40,7 @@ namespace Vorluno.Planilla.Infrastructure.Services
 
                 // Contar uso actual
                 var activeEmployees = await _context.Empleados
-                    .Where(e => e.TenantId == tenantId && e.EstaActivo)
+                    .Where(e => e.TenantId == tenantId && e.EstaActivo && !e.IsDeleted)
                     .CountAsync();
 
                 var activeUsers = await _context.TenantUsers

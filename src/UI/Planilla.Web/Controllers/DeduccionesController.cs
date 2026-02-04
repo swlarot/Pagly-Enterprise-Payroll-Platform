@@ -277,7 +277,7 @@ public class DeduccionesController : ControllerBase
     }
 
     /// <summary>
-    /// Desactiva una deducción (soft delete).
+    /// Elimina físicamente una deducción fija de la base de datos.
     /// </summary>
     /// <param name="id">ID de la deducción.</param>
     /// <returns>NoContent si fue exitoso.</returns>
@@ -294,9 +294,7 @@ public class DeduccionesController : ControllerBase
             return NotFound();
         }
 
-        deduccion.EstaActivo = false;
-        deduccion.UpdatedAt = DateTime.UtcNow;
-
+        _context.DeduccionesFijas.Remove(deduccion);
         await _unitOfWork.CompleteAsync();
         return NoContent();
     }
