@@ -17,9 +17,8 @@ quick-restart.ps1
 restart-all.ps1
 restart-services.ps1
 
-# Documentación (no subir al repo)
-*.md
-!README.md
+# Documentación: se suben todos los .md y la carpeta docs/
+# (no se ignora nada de documentación aquí)
 
 # Build outputs
 bin/
@@ -38,7 +37,6 @@ obj/
 *.sln.docstates
 nul
 
-# Carpetas de configuración
+# Carpetas de configuración (docs/ se sube al repo)
 .claude/
-docs/
 scripts/
