@@ -353,18 +353,22 @@ public class AuthController : ControllerBase
             var refreshToken = await _jwtTokenService.GenerateRefreshTokenAsync(user.Id, tenantUser.TenantId, ipAddress);
 
             // 8. Obtener límites del plan
-            var limits = PlanFeatures.GetLimits(tenantUser.Tenant.Subscription.Plan);
+            var subscription = tenantUser.Tenant?.Subscription;
+            if (subscription == null)
+                return StatusCode(500, new { message = "Suscripción del tenant no encontrada" });
+            var limits = PlanFeatures.GetLimits(subscription.Plan);
 
             // 9. Construir respuesta (con un solo tenant seleccionado)
+            var tenant = tenantUser.Tenant!;
             var singleTenantList = new List<TenantSummaryDto>
             {
                 new TenantSummaryDto
                 {
                     Id = tenantUser.TenantId,
-                    Name = tenantUser.Tenant.Name,
+                    Name = tenant.Name,
                     Role = tenantUser.Role,
                     RoleName = tenantUser.Role.ToString(),
-                    Subdomain = tenantUser.Tenant.Subdomain
+                    Subdomain = tenant.Subdomain
                 }
             };
 
@@ -382,26 +386,26 @@ public class AuthController : ControllerBase
                 },
                 Tenant = new TenantInfoDto
                 {
-                    Id = tenantUser.Tenant.Id,
-                    Name = tenantUser.Tenant.Name,
-                    Subdomain = tenantUser.Tenant.Subdomain,
-                    RUC = tenantUser.Tenant.RUC,
-                    DV = tenantUser.Tenant.DV
+                    Id = tenant.Id,
+                    Name = tenant.Name,
+                    Subdomain = tenant.Subdomain,
+                    RUC = tenant.RUC,
+                    DV = tenant.DV
                 },
                 Subscription = new SubscriptionInfoDto
                 {
-                    Plan = tenantUser.Tenant.Subscription.Plan,
-                    PlanName = tenantUser.Tenant.Subscription.Plan.ToString(),
-                    Status = tenantUser.Tenant.Subscription.Status,
-                    StatusName = tenantUser.Tenant.Subscription.Status.ToString(),
-                    TrialEndsAt = tenantUser.Tenant.Subscription.TrialEndsAt,
-                    MaxEmployees = tenantUser.Tenant.Subscription.GetEffectiveMaxEmployees(),
-                    MaxUsers = tenantUser.Tenant.Subscription.GetEffectiveMaxUsers(),
+                    Plan = subscription.Plan,
+                    PlanName = subscription.Plan.ToString(),
+                    Status = subscription.Status,
+                    StatusName = subscription.Status.ToString(),
+                    TrialEndsAt = subscription.TrialEndsAt,
+                    MaxEmployees = subscription.GetEffectiveMaxEmployees(),
+                    MaxUsers = subscription.GetEffectiveMaxUsers(),
                     MaxCompanies = limits.MaxCompanies,
                     CanExportExcel = limits.CanExportExcel,
                     CanExportPdf = limits.CanExportPdf,
                     CanUseApi = limits.CanUseApi,
-                    MonthlyPrice = tenantUser.Tenant.Subscription.MonthlyPrice
+                    MonthlyPrice = subscription.MonthlyPrice
                 },
                 AvailableTenants = singleTenantList,
                 RequiresTenantSelection = false // Solo un tenant, no requiere selección
@@ -483,7 +487,10 @@ public class AuthController : ControllerBase
                 return NotFound(new { message = "Acceso al tenant no encontrado" });
             }
 
-            var limits = PlanFeatures.GetLimits(tenantUser.Tenant.Subscription.Plan);
+            var subscriptionMe = tenantUser.Tenant?.Subscription;
+            if (subscriptionMe == null)
+                return StatusCode(500, new { message = "Suscripción del tenant no encontrada" });
+            var limits = PlanFeatures.GetLimits(subscriptionMe.Plan);
 
             var response = new AuthResponseDto
             {
@@ -499,7 +506,7 @@ public class AuthController : ControllerBase
                 },
                 Tenant = new TenantInfoDto
                 {
-                    Id = tenantUser.Tenant.Id,
+                    Id = tenantUser.Tenant!.Id,
                     Name = tenantUser.Tenant.Name,
                     Subdomain = tenantUser.Tenant.Subdomain,
                     RUC = tenantUser.Tenant.RUC,
@@ -507,18 +514,18 @@ public class AuthController : ControllerBase
                 },
                 Subscription = new SubscriptionInfoDto
                 {
-                    Plan = tenantUser.Tenant.Subscription.Plan,
-                    PlanName = tenantUser.Tenant.Subscription.Plan.ToString(),
-                    Status = tenantUser.Tenant.Subscription.Status,
-                    StatusName = tenantUser.Tenant.Subscription.Status.ToString(),
-                    TrialEndsAt = tenantUser.Tenant.Subscription.TrialEndsAt,
-                    MaxEmployees = tenantUser.Tenant.Subscription.GetEffectiveMaxEmployees(),
-                    MaxUsers = tenantUser.Tenant.Subscription.GetEffectiveMaxUsers(),
+                    Plan = subscriptionMe.Plan,
+                    PlanName = subscriptionMe.Plan.ToString(),
+                    Status = subscriptionMe.Status,
+                    StatusName = subscriptionMe.Status.ToString(),
+                    TrialEndsAt = subscriptionMe.TrialEndsAt,
+                    MaxEmployees = subscriptionMe.GetEffectiveMaxEmployees(),
+                    MaxUsers = subscriptionMe.GetEffectiveMaxUsers(),
                     MaxCompanies = limits.MaxCompanies,
                     CanExportExcel = limits.CanExportExcel,
                     CanExportPdf = limits.CanExportPdf,
                     CanUseApi = limits.CanUseApi,
-                    MonthlyPrice = tenantUser.Tenant.Subscription.MonthlyPrice
+                    MonthlyPrice = subscriptionMe.MonthlyPrice
                 }
             };
 
@@ -547,6 +554,9 @@ public class AuthController : ControllerBase
 
         var expiresAt = DateTime.UtcNow.AddHours(jwtExpireHours);
 
+        // Solo los tokens de SystemAdmin (generados en GenerateSystemAdminJwtToken) llevan is_system_admin = true.
+        // Los usuarios de tenant (Owner, User) siempre reciben false; no se usa user.IsSystemAdmin aquí
+        // para evitar que un mismo usuario con acceso sistema y tenant redirija al admin del sistema al entrar.
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id),
@@ -555,8 +565,8 @@ public class AuthController : ControllerBase
             new Claim("tenant_id", tenant.Id.ToString()),
             new Claim("tenant_role", tenantUser.Role.ToString()),
             new Claim(ClaimTypes.Role, tenantUser.Role.ToString()), // ✅ CRITICAL: Para [Authorize(Roles = "Owner,Admin")]
-            new Claim("plan", tenant.Subscription.Plan.ToString()),
-            new Claim("is_system_admin", user.IsSystemAdmin.ToString().ToLower())
+            new Claim("plan", (tenant.Subscription?.Plan ?? Vorluno.Planilla.Domain.Enums.SubscriptionPlan.Free).ToString()),
+            new Claim("is_system_admin", "false")
         };
 
         var token = new JwtSecurityToken(
@@ -800,7 +810,10 @@ public class AuthController : ControllerBase
             await _jwtTokenService.RevokeRefreshTokenAsync(dto.RefreshToken, "token_rotated", newRefreshToken.Id);
 
             // 6. Obtener límites del plan
-            var limits = PlanFeatures.GetLimits(tenantUser.Tenant.Subscription.Plan);
+            var subscriptionRefresh = tenantUser.Tenant?.Subscription;
+            if (subscriptionRefresh == null)
+                return StatusCode(500, new { message = "Suscripción del tenant no encontrada" });
+            var limits = PlanFeatures.GetLimits(subscriptionRefresh.Plan);
 
             // 7. Construir respuesta
             var response = new AuthResponseDto
@@ -817,7 +830,7 @@ public class AuthController : ControllerBase
                 },
                 Tenant = new TenantInfoDto
                 {
-                    Id = tenantUser.Tenant.Id,
+                    Id = tenantUser.Tenant!.Id,
                     Name = tenantUser.Tenant.Name,
                     Subdomain = tenantUser.Tenant.Subdomain,
                     RUC = tenantUser.Tenant.RUC,
@@ -825,18 +838,18 @@ public class AuthController : ControllerBase
                 },
                 Subscription = new SubscriptionInfoDto
                 {
-                    Plan = tenantUser.Tenant.Subscription.Plan,
-                    PlanName = tenantUser.Tenant.Subscription.Plan.ToString(),
-                    Status = tenantUser.Tenant.Subscription.Status,
-                    StatusName = tenantUser.Tenant.Subscription.Status.ToString(),
-                    TrialEndsAt = tenantUser.Tenant.Subscription.TrialEndsAt,
-                    MaxEmployees = tenantUser.Tenant.Subscription.GetEffectiveMaxEmployees(),
-                    MaxUsers = tenantUser.Tenant.Subscription.GetEffectiveMaxUsers(),
+                    Plan = subscriptionRefresh.Plan,
+                    PlanName = subscriptionRefresh.Plan.ToString(),
+                    Status = subscriptionRefresh.Status,
+                    StatusName = subscriptionRefresh.Status.ToString(),
+                    TrialEndsAt = subscriptionRefresh.TrialEndsAt,
+                    MaxEmployees = subscriptionRefresh.GetEffectiveMaxEmployees(),
+                    MaxUsers = subscriptionRefresh.GetEffectiveMaxUsers(),
                     MaxCompanies = limits.MaxCompanies,
                     CanExportExcel = limits.CanExportExcel,
                     CanExportPdf = limits.CanExportPdf,
                     CanUseApi = limits.CanUseApi,
-                    MonthlyPrice = tenantUser.Tenant.Subscription.MonthlyPrice
+                    MonthlyPrice = subscriptionRefresh.MonthlyPrice
                 }
             };
 
@@ -940,7 +953,10 @@ public class AuthController : ControllerBase
             var refreshToken = await _jwtTokenService.GenerateRefreshTokenAsync(user.Id, tenantUser.TenantId, ipAddress);
 
             // 7. Obtener límites del plan
-            var limits = PlanFeatures.GetLimits(tenantUser.Tenant.Subscription.Plan);
+            var subscriptionSelect = tenantUser.Tenant?.Subscription;
+            if (subscriptionSelect == null)
+                return StatusCode(500, new { message = "Suscripción del tenant no encontrada" });
+            var limits = PlanFeatures.GetLimits(subscriptionSelect.Plan);
 
             // 8. Obtener lista de todos los tenants del usuario (para mantener disponibilidad)
             var allUserTenants = await _context.TenantUsers
@@ -973,7 +989,7 @@ public class AuthController : ControllerBase
                 },
                 Tenant = new TenantInfoDto
                 {
-                    Id = tenantUser.Tenant.Id,
+                    Id = tenantUser.Tenant!.Id,
                     Name = tenantUser.Tenant.Name,
                     Subdomain = tenantUser.Tenant.Subdomain,
                     RUC = tenantUser.Tenant.RUC,
@@ -981,18 +997,18 @@ public class AuthController : ControllerBase
                 },
                 Subscription = new SubscriptionInfoDto
                 {
-                    Plan = tenantUser.Tenant.Subscription.Plan,
-                    PlanName = tenantUser.Tenant.Subscription.Plan.ToString(),
-                    Status = tenantUser.Tenant.Subscription.Status,
-                    StatusName = tenantUser.Tenant.Subscription.Status.ToString(),
-                    TrialEndsAt = tenantUser.Tenant.Subscription.TrialEndsAt,
-                    MaxEmployees = tenantUser.Tenant.Subscription.GetEffectiveMaxEmployees(),
-                    MaxUsers = tenantUser.Tenant.Subscription.GetEffectiveMaxUsers(),
+                    Plan = subscriptionSelect.Plan,
+                    PlanName = subscriptionSelect.Plan.ToString(),
+                    Status = subscriptionSelect.Status,
+                    StatusName = subscriptionSelect.Status.ToString(),
+                    TrialEndsAt = subscriptionSelect.TrialEndsAt,
+                    MaxEmployees = subscriptionSelect.GetEffectiveMaxEmployees(),
+                    MaxUsers = subscriptionSelect.GetEffectiveMaxUsers(),
                     MaxCompanies = limits.MaxCompanies,
                     CanExportExcel = limits.CanExportExcel,
                     CanExportPdf = limits.CanExportPdf,
                     CanUseApi = limits.CanUseApi,
-                    MonthlyPrice = tenantUser.Tenant.Subscription.MonthlyPrice
+                    MonthlyPrice = subscriptionSelect.MonthlyPrice
                 },
                 AvailableTenants = availableTenants,
                 RequiresTenantSelection = false // Ya seleccionó

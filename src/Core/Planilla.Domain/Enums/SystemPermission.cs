@@ -143,18 +143,15 @@ public static class SystemPermission
     }
 
     /// <summary>
-    /// Retorna los permisos predeterminados para un rol del sistema
+    /// Retorna los permisos predeterminados para un rol del sistema (solo hay Owner y User).
+    /// Owner = todos los permisos. User = ninguno (hasta que el Owner le asigne un CustomTenantRole).
     /// </summary>
     public static List<string> GetDefaultPermissionsForSystemRole(TenantRole role)
     {
         return role switch
         {
-            // Owner tiene todos los permisos
             TenantRole.Owner => GetAllPermissions().Select(p => p.Key).ToList(),
-
-            // User no tiene permisos predeterminados - se asignan mediante CustomTenantRole
             TenantRole.User => new List<string>(),
-
             _ => new List<string>()
         };
     }

@@ -293,10 +293,11 @@ public class TenantController : ControllerBase
         string userId,
         [FromBody] Vorluno.Planilla.Application.DTOs.Roles.AssignRoleToUserDto dto)
     {
+        if (string.IsNullOrWhiteSpace(userId))
+            return BadRequest(new { error = "El ID del usuario es requerido" });
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        // Asegurar que el userId del path coincide con el del body
         dto.UserId = userId;
 
         var roleService = HttpContext.RequestServices

@@ -1,3 +1,5 @@
+
+
 namespace Vorluno.Planilla.Domain.Models;
 
 /// <summary>

@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Vorluno.Planilla.Application.DTOs;
 
 /// <summary>
@@ -81,6 +83,12 @@ public class DeletionWarningDto
     /// Mensaje adicional o consecuencia de continuar
     /// </summary>
     public string Impact { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Mensaje para el frontend (Reason + Impact). Compatible con tipo DeletionWarning en TypeScript.
+    /// </summary>
+    [JsonPropertyName("message")]
+    public string Message => string.IsNullOrEmpty(Impact) ? Reason : $"{Reason} {Impact}";
 }
 
 /// <summary>

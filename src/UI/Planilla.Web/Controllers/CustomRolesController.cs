@@ -71,10 +71,14 @@ public class CustomRolesController : ControllerBase
         if (!result.Success)
             return BadRequest(new { error = result.ErrorMessage });
 
+        var created = result.Value;
+        if (created == null)
+            return StatusCode(500, new { error = "Error al crear el rol" });
+
         return CreatedAtAction(
             nameof(GetRoleById),
-            new { roleId = result.Value.Id },
-            result.Value);
+            new { roleId = created.Id },
+            created);
     }
 
     /// <summary>

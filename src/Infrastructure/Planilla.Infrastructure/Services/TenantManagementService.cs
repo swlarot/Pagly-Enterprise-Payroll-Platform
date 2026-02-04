@@ -308,7 +308,8 @@ public class TenantManagementService : ITenantManagementService
 
             var tenantUsers = await _context.TenantUsers
                 .Include(tu => tu.User)
-                .Where(tu => tu.TenantId == tenantId)
+                .Include(tu => tu.CustomRole)
+                .Where(tu => tu.TenantId == tenantId && tu.IsActive)
                 .AsNoTracking()
                 .Select(tu => new TenantUserDto
                 {
@@ -318,7 +319,8 @@ public class TenantManagementService : ITenantManagementService
                     Email = tu.User != null ? tu.User.Email! : tu.InvitedEmail ?? "unknown",
                     FullName = tu.User != null ? tu.User.NombreCompleto : null,
                     Role = tu.Role,
-                    RoleName = tu.Role.ToString(),
+                    RoleName = tu.CustomRole != null ? tu.CustomRole.Name : tu.Role.ToString(),
+                    CustomRoleName = tu.CustomRole != null ? tu.CustomRole.Name : null,
                     IsActive = tu.IsActive,
                     JoinedAt = tu.JoinedAt,
                     LastLoginAt = tu.LastLoginAt,
@@ -423,6 +425,7 @@ public class TenantManagementService : ITenantManagementService
             // Devolver usuario actualizado
             var result = await _context.TenantUsers
                 .Include(tu => tu.User)
+                .Include(tu => tu.CustomRole)
                 .Where(tu => tu.Id == tenantUserId)
                 .Select(tu => new TenantUserDto
                 {
@@ -432,7 +435,8 @@ public class TenantManagementService : ITenantManagementService
                     Email = tu.User != null ? tu.User.Email! : tu.InvitedEmail ?? "unknown",
                     FullName = tu.User != null ? tu.User.NombreCompleto : null,
                     Role = tu.Role,
-                    RoleName = tu.Role.ToString(),
+                    RoleName = tu.CustomRole != null ? tu.CustomRole.Name : tu.Role.ToString(),
+                    CustomRoleName = tu.CustomRole != null ? tu.CustomRole.Name : null,
                     IsActive = tu.IsActive,
                     JoinedAt = tu.JoinedAt,
                     LastLoginAt = tu.LastLoginAt,
@@ -450,8 +454,8 @@ public class TenantManagementService : ITenantManagementService
     }
 
     /// <summary>
-    /// Elimina (soft delete) un usuario del tenant
-    /// VALIDACIÓN: Owner no puede eliminarse a sí mismo si es el único Owner
+    /// Elimina un usuario del tenant (hard delete). Desvincula antes a cualquier empleado que tuviera este usuario asignado (UserId = null).
+    /// VALIDACIÓN: Owner no puede eliminarse a sí mismo si es el único Owner.
     /// </summary>
     public async Task<Result<bool>> RemoveTenantUserAsync(int tenantUserId)
     {
@@ -489,17 +493,31 @@ public class TenantManagementService : ITenantManagementService
                 }
             }
 
-            // Soft delete
-            tenantUser.IsActive = false;
-            tenantUser.UpdatedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+            var removedUserEmail = tenantUser.User?.Email ?? tenantUser.InvitedEmail ?? "unknown";
+            var removedUserId = tenantUser.UserId;
 
-            // Audit log
+            // Desvincular empleados: los que tenían este usuario asignado quedan como empleado sin usuario
+            var empleadosVinculados = await _context.Empleados
+                .Where(e => e.TenantId == tenantId && e.UserId == removedUserId)
+                .ToListAsync();
+            foreach (var emp in empleadosVinculados)
+            {
+                emp.UserId = null;
+                _context.Empleados.Update(emp);
+            }
+            if (empleadosVinculados.Count > 0)
+                _logger.LogInformation("Desvinculados {Count} empleado(s) del usuario {UserId} en tenant {TenantId}", empleadosVinculados.Count, removedUserId, tenantId);
+
+            // Audit log antes de borrar
             await _auditLogService.LogAsync("UserRemovedFromTenant", "TenantUser", tenantUserId.ToString(), new Dictionary<string, string>
             {
-                ["RemovedUserEmail"] = tenantUser.User?.Email ?? tenantUser.InvitedEmail ?? "unknown",
+                ["RemovedUserEmail"] = removedUserEmail,
                 ["RemovedUserRole"] = tenantUser.Role.ToString()
             });
+
+            // Hard delete: eliminar el registro del tenant
+            _context.TenantUsers.Remove(tenantUser);
+            await _context.SaveChangesAsync();
 
             _logger.LogInformation("TenantUser {TenantUserId} removed from tenant {TenantId} by user {UserId}",
                 tenantUserId, tenantId, _tenantContext.UserId);

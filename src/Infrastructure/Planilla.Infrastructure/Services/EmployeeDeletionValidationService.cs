@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
 using Vorluno.Planilla.Application.Interfaces;
+using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+
 
 namespace Vorluno.Planilla.Infrastructure.Services;
 
@@ -89,18 +91,31 @@ public class EmployeeDeletionValidationService : IEmployeeDeletionValidationServ
             });
         }
 
-        // 2. DEDUCCIONES JUDICIALES ACTIVAS (si existe la entidad)
-        // Nota: DeduccionJudicial no está implementada aún, preparado para futuro
-        // var deduccionesActivas = await _context.DeduccionesJudiciales
-        //     .Where(d => d.EmpleadoId == empleadoId && d.TenantId == tenantId && d.EsActiva)
-        //     .CountAsync();
-        // if (deduccionesActivas > 0) { ... }
+        // 2. DEDUCCIONES JUDICIALES ACTIVAS (pensión alimenticia, embargo)
+        var deduccionesJudicialesActivas = await _context.DeduccionesFijas
+            .Where(d => d.EmpleadoId == empleadoId &&
+                       d.TenantId == tenantId &&
+                       d.EstaActivo &&
+                       (d.TipoDeduccion == TipoDeduccion.PensionAlimenticia || d.TipoDeduccion == TipoDeduccion.Embargo))
+            .CountAsync();
 
-        // 3. ANTICIPOS APROBADOS NO DESCONTADOS COMPLETAMENTE
+        if (deduccionesJudicialesActivas > 0)
+        {
+            result.Blockers.Add(new DeletionBlockerDto
+            {
+                Reason = "Empleado tiene deducciones judiciales activas (pensión alimenticia o embargo)",
+                Entity = "Deducciones judiciales",
+                Count = deduccionesJudicialesActivas,
+                Resolution = "Desactive o finalice las deducciones judiciales antes de eliminar el empleado"
+            });
+        }
+
+        // 3. ANTICIPOS APROBADOS NO DESCONTADOS (aún no tienen PlanillaId)
         var anticiposPendientes = await _context.Anticipos
             .Where(a => a.EmpleadoId == empleadoId &&
                        a.TenantId == tenantId &&
-                       a.Estado == EstadoAnticipo.Aprobado)
+                       a.Estado == EstadoAnticipo.Aprobado &&
+                       a.PlanillaId == null)
             .CountAsync();
 
         if (anticiposPendientes > 0)
@@ -119,7 +134,7 @@ public class EmployeeDeletionValidationService : IEmployeeDeletionValidationServ
         // ===================================================================
 
         // 1. HORAS EXTRA APROBADAS PENDIENTES DE PAGO
-        var horasExtraPendientes = await _context.HorasExtras
+        var horasExtraPendientes = await _context.HorasExtra
             .Where(h => h.EmpleadoId == empleadoId &&
                        h.TenantId == tenantId &&
                        h.EstaAprobada &&
@@ -138,11 +153,12 @@ public class EmployeeDeletionValidationService : IEmployeeDeletionValidationServ
         }
 
         // 2. APARECE EN PLANILLAS DRAFT
-        var planillasDraft = await _context.PlanillaDetails
-            .Include(pd => pd.PlanillaHeader)
+        var planillasDraft = await _context.PayrollDetails
+            .Include(pd => pd.PayrollHeader)
             .Where(pd => pd.EmpleadoId == empleadoId &&
-                        pd.PlanillaHeader.TenantId == tenantId &&
-                        pd.PlanillaHeader.Status == EstadoPlanilla.Draft)
+                        pd.PayrollHeader != null &&
+                        pd.PayrollHeader.TenantId == tenantId &&
+                        pd.PayrollHeader.Status == PayrollStatus.Draft)
             .CountAsync();
 
         if (planillasDraft > 0)

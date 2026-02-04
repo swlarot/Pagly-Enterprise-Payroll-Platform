@@ -1,16 +1,14 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace Vorluno.Planilla.Application.DTOs.Roles;
 
 /// <summary>
-/// DTO para asignar un rol a un usuario del tenant
+/// DTO para asignar un rol a un usuario del tenant.
+/// El UserId se toma del path de la petición (PUT /api/tenant/users/{userId}/role) y se asigna en el controlador.
 /// </summary>
 public class AssignRoleToUserDto
 {
     /// <summary>
-    /// ID del usuario a quien se asignará el rol
+    /// ID del usuario a quien se asignará el rol (asignado por el controlador desde el path).
     /// </summary>
-    [Required(ErrorMessage = "El ID del usuario es requerido")]
     public string UserId { get; set; } = string.Empty;
 
     /// <summary>

@@ -95,8 +95,8 @@ public class AdminController : ControllerBase
                     {
                         TotalUsers = t.Users.Count,
                         ActiveUsers = t.Users.Count(u => u.IsActive),
-                        TotalEmployees = t.Empleados.Count,
-                        ActiveEmployees = t.Empleados.Count(e => e.EstaActivo),
+                        TotalEmployees = t.Empleados.Count(e => !e.IsDeleted),
+                        ActiveEmployees = t.Empleados.Count(e => e.EstaActivo && !e.IsDeleted),
                         TotalPayrolls = t.PayrollHeaders.Count,
                         PendingInvitations = t.Users.Count(u => u.IsPendingInvitation),
                         MaxUsers = t.Subscription != null ? t.Subscription.GetEffectiveMaxUsers() : 0,
@@ -179,8 +179,8 @@ public class AdminController : ControllerBase
                 {
                     TotalUsers = tenant.Users.Count,
                     ActiveUsers = tenant.Users.Count(u => u.IsActive),
-                    TotalEmployees = await _context.Empleados.CountAsync(e => e.TenantId == id),
-                    ActiveEmployees = await _context.Empleados.CountAsync(e => e.TenantId == id && e.EstaActivo),
+                    TotalEmployees = await _context.Empleados.CountAsync(e => e.TenantId == id && !e.IsDeleted),
+                    ActiveEmployees = await _context.Empleados.CountAsync(e => e.TenantId == id && e.EstaActivo && !e.IsDeleted),
                     TotalPayrolls = await _context.PayrollHeaders.CountAsync(p => p.TenantId == id),
                     PendingInvitations = tenant.Users.Count(u => u.IsPendingInvitation),
                     MaxUsers = tenant.Subscription?.GetEffectiveMaxUsers() ?? 0,
@@ -449,8 +449,8 @@ public class AdminController : ControllerBase
                 {
                     TotalUsers = await _context.TenantUsers.CountAsync(u => u.TenantId == id),
                     ActiveUsers = await _context.TenantUsers.CountAsync(u => u.TenantId == id && u.IsActive),
-                    TotalEmployees = await _context.Empleados.CountAsync(e => e.TenantId == id),
-                    ActiveEmployees = await _context.Empleados.CountAsync(e => e.TenantId == id && e.EstaActivo),
+                    TotalEmployees = await _context.Empleados.CountAsync(e => e.TenantId == id && !e.IsDeleted),
+                    ActiveEmployees = await _context.Empleados.CountAsync(e => e.TenantId == id && e.EstaActivo && !e.IsDeleted),
                     TotalPayrolls = await _context.PayrollHeaders.CountAsync(p => p.TenantId == id),
                     PendingInvitations = await _context.TenantUsers.CountAsync(u => u.TenantId == id && u.IsPendingInvitation),
                     MaxUsers = tenant.Subscription?.GetEffectiveMaxUsers() ?? 0,
@@ -517,7 +517,7 @@ public class AdminController : ControllerBase
             var activeTenants = await _context.Tenants.CountAsync(t => t.IsActive);
 
             var totalUsers = await _context.TenantUsers.CountAsync();
-            var totalEmployees = await _context.Empleados.CountAsync();
+            var totalEmployees = await _context.Empleados.CountAsync(e => !e.IsDeleted);
 
             // Distribución por plan
             var planCounts = await _context.Subscriptions
@@ -1007,7 +1007,7 @@ public class AdminController : ControllerBase
                 var loginLink = $"{Request.Scheme}://{Request.Host}/login";
                 await _brevoEmailService.SendInvitationEmailAsync(
                     user.Email!,
-                    user.NombreCompleto,
+                    user.NombreCompleto ?? user.Email ?? "Usuario",
                     loginLink,
                     tenant.Name
                 );
@@ -1062,6 +1062,8 @@ public class AdminController : ControllerBase
     [HttpDelete("users/{userId}")]
     public async Task<IActionResult> DeleteUser(string userId)
     {
+        if (string.IsNullOrWhiteSpace(userId))
+            return BadRequest(new { error = "El ID del usuario es requerido" });
         try
         {
             // 1. Verificar que el usuario existe
@@ -1208,6 +1210,8 @@ public class AdminController : ControllerBase
     [HttpDelete("tenants/{tenantId}/users/{userId}")]
     public async Task<IActionResult> RemoveUserFromTenant(int tenantId, string userId)
     {
+        if (string.IsNullOrWhiteSpace(userId))
+            return BadRequest(new { error = "El ID del usuario es requerido" });
         try
         {
             // 1. Verificar que el tenant existe
@@ -1301,6 +1305,8 @@ public class AdminController : ControllerBase
     [HttpPost("users/{userId}/reactivate")]
     public async Task<IActionResult> ReactivateUser(string userId)
     {
+        if (string.IsNullOrWhiteSpace(userId))
+            return BadRequest(new { error = "El ID del usuario es requerido" });
         try
         {
             // 1. Verificar que el usuario existe
@@ -1382,6 +1388,8 @@ public class AdminController : ControllerBase
     [HttpPost("tenants/{tenantId}/users/{userId}/reactivate")]
     public async Task<IActionResult> ReactivateUserInTenant(int tenantId, string userId)
     {
+        if (string.IsNullOrWhiteSpace(userId))
+            return BadRequest(new { error = "El ID del usuario es requerido" });
         try
         {
             // 1. Verificar que el tenant existe
@@ -1589,6 +1597,8 @@ public class AdminController : ControllerBase
     [HttpDelete("cleanup/user/{userId}")]
     public async Task<IActionResult> HardDeleteUser(string userId)
     {
+        if (string.IsNullOrWhiteSpace(userId))
+            return BadRequest(new { error = "El ID del usuario es requerido" });
         try
         {
             var user = await _userManager.FindByIdAsync(userId);

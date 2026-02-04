@@ -25,4 +25,9 @@ public class CustomTenantRoleDto
     /// Cantidad de usuarios con este rol asignado
     /// </summary>
     public int UserCount { get; set; }
+
+    /// <summary>
+    /// Cantidad de permisos asignados (para UI)
+    /// </summary>
+    public int PermissionCount { get; set; }
 }
