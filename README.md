@@ -86,6 +86,10 @@ src/
 | **Infrastructure** | Data access, EF Core, external service implementations |
 | **Web** | REST API, configuration, SPA hosting |
 
+### Documentation
+
+- [Política de eliminación de datos](docs/POLITICA-ELIMINACION.md) — Eliminación física (hard delete), comportamiento por área y excepciones.
+
 ---
 
 ## 🛠️ Tech Stack
