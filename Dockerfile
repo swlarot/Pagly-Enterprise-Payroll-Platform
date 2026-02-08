@@ -1,5 +1,5 @@
 # =============================================================================
-# Vorluno Planilla - Multi-stage Dockerfile for CapRover
+# Pagly - Multi-stage Dockerfile for CapRover
 # Build: docker build -t planilla-test --build-arg VITE_API_URL= .
 # Run:   docker run -p 8080:80 -e ConnectionStrings__DefaultConnection="..." planilla-test
 # =============================================================================
@@ -17,7 +17,7 @@ ARG VITE_API_URL=
 ENV VITE_API_URL=${VITE_API_URL}
 
 COPY src/UI/Planilla.Web/ClientApp/package.json src/UI/Planilla.Web/ClientApp/package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 COPY src/UI/Planilla.Web/ClientApp/ ./
 RUN npm run build
