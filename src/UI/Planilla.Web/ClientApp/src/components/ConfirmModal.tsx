@@ -14,8 +14,8 @@ export interface ConfirmModalProps {
 
 const variantConfig = {
   danger: {
-    bgIcon: 'bg-red-100',
-    iconColor: 'text-red-600',
+    bgIcon: 'bg-red-500/15',
+    iconColor: 'text-red-400',
     btnBg: 'bg-red-600 hover:bg-red-700',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -24,9 +24,9 @@ const variantConfig = {
     ),
   },
   warning: {
-    bgIcon: 'bg-yellow-100',
-    iconColor: 'text-yellow-600',
-    btnBg: 'bg-yellow-600 hover:bg-yellow-700',
+    bgIcon: 'bg-amber-500/15',
+    iconColor: 'text-amber-400',
+    btnBg: 'bg-amber-600 hover:bg-amber-700',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -34,8 +34,8 @@ const variantConfig = {
     ),
   },
   info: {
-    bgIcon: 'bg-blue-100',
-    iconColor: 'text-blue-600',
+    bgIcon: 'bg-blue-500/15',
+    iconColor: 'text-blue-400',
     btnBg: 'bg-blue-600 hover:bg-blue-700',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -61,8 +61,8 @@ export default function ConfirmModal({
   const style = variantConfig[variant] ?? variantConfig.danger;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+      <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-2xl max-w-md w-full">
         <div className="p-6">
           <div className={`w-12 h-12 ${style.bgIcon} rounded-full flex items-center justify-center mx-auto mb-4`}>
             <div className={style.iconColor}>
@@ -71,13 +71,13 @@ export default function ConfirmModal({
           </div>
 
           {title && (
-            <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+            <h3 className="text-lg font-semibold text-gray-100 text-center mb-2">
               {title}
             </h3>
           )}
 
           {message && (
-            <p className="text-gray-600 text-center mb-6">
+            <p className="text-gray-400 text-center mb-6">
               {message}
             </p>
           )}
@@ -87,7 +87,7 @@ export default function ConfirmModal({
               type="button"
               onClick={onClose}
               disabled={isLoading}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-4 py-2 border border-navy-600 rounded-lg text-gray-300 hover:bg-navy-800 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {cancelText}
             </button>

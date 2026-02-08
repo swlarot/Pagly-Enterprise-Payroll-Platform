@@ -117,16 +117,16 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-navy-900 border border-navy-700 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+        <div className="p-6 border-b border-navy-700 flex justify-between items-center">
           <div>
-            <h3 className="text-xl font-semibold text-gray-900">Asignar Usuario al Tenant</h3>
-            <p className="text-sm text-gray-600 mt-1">
+            <h3 className="text-xl font-semibold text-gray-100">Asignar Usuario al Tenant</h3>
+            <p className="text-sm text-gray-400 mt-1">
               Selecciona un usuario existente para asignar a este tenant
             </p>
           </div>
-          <button onClick={handleClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={handleClose} className="text-gray-400 hover:text-gray-300">
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -146,7 +146,7 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
                       setSearchTerm(e.target.value);
                       setPage(1); // Resetear a página 1 en búsqueda
                     }}
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-2 border border-navy-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100 placeholder-gray-500"
                   />
                 </div>
               </div>
@@ -155,10 +155,10 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
               <div className="space-y-2 mb-4 max-h-96 overflow-y-auto">
                 {isLoadingUsers ? (
                   <div className="flex items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                    <Loader2 className="w-8 h-8 animate-spin text-primary-400" />
                   </div>
                 ) : systemUsers.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
+                  <div className="text-center py-12 text-gray-400">
                     No se encontraron usuarios
                   </div>
                 ) : (
@@ -168,14 +168,14 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
                       onClick={() => handleSelectUser(user)}
                       className={`p-4 border rounded-lg cursor-pointer transition-colors ${
                         selectedUser?.userId === user.userId
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:bg-blue-50 hover:border-blue-300'
+                          ? 'border-primary-500 bg-primary-500/10'
+                          : 'border-navy-600 hover:bg-navy-800 hover:border-navy-500'
                       }`}
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <div className="font-semibold text-gray-900">{user.email}</div>
-                          <div className="text-sm text-gray-600">{user.fullName}</div>
+                          <div className="font-semibold text-gray-100">{user.email}</div>
+                          <div className="text-sm text-gray-400">{user.fullName}</div>
                           {user.tenants.length > 0 && (
                             <div className="mt-2">
                               <div className="text-xs text-gray-500 mb-1">Ya está en:</div>
@@ -186,7 +186,7 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
                                     className={`px-2 py-1 text-xs rounded ${
                                       t.tenantId === tenantId
                                         ? 'bg-red-100 text-red-700'
-                                        : 'bg-gray-100 text-gray-700'
+                                        : 'bg-navy-700 text-gray-300'
                                     }`}
                                   >
                                     {t.tenantName} ({t.role})
@@ -197,7 +197,7 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
                           )}
                         </div>
                         {selectedUser?.userId === user.userId && (
-                          <div className="text-blue-600 font-medium ml-2">✓ Seleccionado</div>
+                          <div className="text-primary-400 font-medium ml-2">✓ Seleccionado</div>
                         )}
                       </div>
                     </div>
@@ -207,8 +207,8 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
 
               {/* Paginación */}
               {total > 10 && (
-                <div className="flex justify-between items-center mb-4 pt-4 border-t border-gray-200">
-                  <div className="text-sm text-gray-600">
+                <div className="flex justify-between items-center mb-4 pt-4 border-t border-navy-700">
+                  <div className="text-sm text-gray-400">
                     Mostrando {(page - 1) * 10 + 1} - {Math.min(page * 10, total)} de {total}
                   </div>
                   <div className="flex gap-2">
@@ -216,18 +216,18 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
                       type="button"
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={page === 1}
-                      className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-3 py-1 border border-navy-600 rounded hover:bg-navy-800 disabled:opacity-50 disabled:cursor-not-allowed text-gray-300"
                     >
                       Anterior
                     </button>
-                    <span className="px-3 py-1 text-sm text-gray-600">
+                    <span className="px-3 py-1 text-sm text-gray-400">
                       Página {page} de {totalPages}
                     </span>
                     <button
                       type="button"
                       onClick={() => setPage((p) => p + 1)}
                       disabled={page >= totalPages}
-                      className="px-3 py-1 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-3 py-1 border border-navy-600 rounded hover:bg-navy-800 disabled:opacity-50 disabled:cursor-not-allowed text-gray-300"
                     >
                       Siguiente
                     </button>
@@ -237,11 +237,11 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
 
             {/* Form de Rol (si hay usuario seleccionado) */}
             {selectedUser && (
-              <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <div className="mt-6 p-4 bg-primary-500/10 rounded-lg border border-primary-500/30">
                 <div className="mb-3">
-                  <p className="text-sm font-medium text-gray-700">Usuario Seleccionado:</p>
-                  <p className="text-gray-900">{selectedUser.fullName}</p>
-                  <p className="text-sm text-gray-600">{selectedUser.email}</p>
+                  <p className="text-sm font-medium text-gray-300">Usuario Seleccionado:</p>
+                  <p className="text-gray-100">{selectedUser.fullName}</p>
+                  <p className="text-sm text-gray-400">{selectedUser.email}</p>
                 </div>
                 <Select
                   label="Rol en este Tenant"
@@ -266,7 +266,7 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
           </div>
 
           {/* Botones de Acción */}
-          <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-navy-700">
             <Button type="button" variant="outline" onClick={handleClose} disabled={isSubmitting}>
               Cancelar
             </Button>

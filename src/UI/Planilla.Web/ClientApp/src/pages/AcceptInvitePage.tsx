@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { authService } from '../services/authService';
 import type { ValidateInviteResponseDto } from '../types/api';
+import { PaglyLogo } from '../components/ui/PaglyLogo';
 import toast from 'react-hot-toast';
 
 export default function AcceptInvitePage() {
@@ -83,7 +84,7 @@ export default function AcceptInvitePage() {
 
     try {
       await acceptInvite(token, password, confirmPassword);
-      toast.success('Invitación aceptada. Bienvenido a Planilla');
+      toast.success('Invitación aceptada. Bienvenido a Pagly');
       navigate('/dashboard', { replace: true });
     } catch (error: any) {
       toast.error(error.message || 'Error al aceptar la invitación');
@@ -94,10 +95,10 @@ export default function AcceptInvitePage() {
 
   if (isValidating) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Validando invitación...</p>
+      <div className="min-h-screen bg-navy-950 flex items-center justify-center p-4">
+        <div className="bg-navy-900 border border-navy-700 rounded-2xl shadow-2xl shadow-black/30 p-8 max-w-md w-full text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Validando invitación...</p>
         </div>
       </div>
     );
@@ -105,11 +106,11 @@ export default function AcceptInvitePage() {
 
   if (!inviteInfo || !inviteInfo.isValid) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mb-4">
+      <div className="min-h-screen bg-navy-950 flex items-center justify-center p-4">
+        <div className="bg-navy-900 border border-navy-700 rounded-2xl shadow-2xl shadow-black/30 p-8 max-w-md w-full text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-red-500/15 rounded-full mb-4">
             <svg
-              className="w-8 h-8 text-red-600"
+              className="w-8 h-8 text-red-400"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -122,13 +123,13 @@ export default function AcceptInvitePage() {
               />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Invitación No Válida</h2>
-          <p className="text-gray-600 mb-6">
+          <h2 className="text-2xl font-bold text-gray-100 mb-2">Invitación No Válida</h2>
+          <p className="text-gray-400 mb-6">
             Esta invitación no es válida, ha expirado o ya ha sido utilizada.
           </p>
           <button
             onClick={() => navigate('/login')}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
           >
             Ir a Inicio de Sesión
           </button>
@@ -139,40 +140,30 @@ export default function AcceptInvitePage() {
 
   const getRoleBadgeColor = (roleName: string) => {
     const colors: Record<string, string> = {
-      Owner: 'bg-purple-100 text-purple-800',
-      Admin: 'bg-blue-100 text-blue-800',
-      Manager: 'bg-green-100 text-green-800',
-      Accountant: 'bg-yellow-100 text-yellow-800',
-      Employee: 'bg-gray-100 text-gray-800',
+      Owner: 'bg-purple-500/15 text-purple-400',
+      User: 'bg-blue-500/15 text-blue-400',
     };
-    return colors[roleName] || 'bg-gray-100 text-gray-800';
+    return colors[roleName] || 'bg-navy-700 text-gray-300';
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-navy-950 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-xl shadow-lg mb-4">
-            <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-              />
-            </svg>
+          <div className="flex justify-center mb-4">
+            <PaglyLogo variant="icon" theme="dark" size="lg" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Planilla</h1>
-          <p className="text-gray-600 mt-2">Sistema de Gestión de Nómina</p>
+          <h1 className="text-3xl font-bold text-gray-100 font-display">Pagly</h1>
+          <p className="text-gray-400 mt-2">Planilla Inteligente</p>
         </div>
 
         {/* Accept Invite Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
+        <div className="bg-navy-900 border border-navy-700 rounded-2xl shadow-2xl shadow-black/30 p-8">
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-4">
+            <div className="inline-flex items-center justify-center w-12 h-12 bg-green-500/15 rounded-full mb-4">
               <svg
-                className="w-6 h-6 text-green-600"
+                className="w-6 h-6 text-green-400"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -185,33 +176,33 @@ export default function AcceptInvitePage() {
                 />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Aceptar Invitación</h2>
-            <p className="text-gray-600 mb-4">
-              Has sido invitado a unirte a <strong>{inviteInfo.tenantName}</strong>
+            <h2 className="text-2xl font-bold text-gray-100 mb-2">Aceptar Invitación</h2>
+            <p className="text-gray-400 mb-4">
+              Has sido invitado a unirte a <strong className="text-gray-200">{inviteInfo.tenantName}</strong>
             </p>
 
             {/* Invitation Info Card */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+            <div className="bg-primary-500/10 border border-primary-500/20 rounded-lg p-4 mb-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">Email:</span>
-                <span className="text-sm font-medium text-gray-900">{inviteInfo.email}</span>
+                <span className="text-sm text-gray-400">Email:</span>
+                <span className="text-sm font-medium text-gray-100">{inviteInfo.email}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Rol:</span>
+                <span className="text-sm text-gray-400">Rol:</span>
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(inviteInfo.roleName)}`}>
                   {inviteInfo.roleName}
                 </span>
               </div>
             </div>
 
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-400">
               Crea tu contraseña para completar el registro
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
                 Contraseña
               </label>
               <input
@@ -219,12 +210,12 @@ export default function AcceptInvitePage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition placeholder-gray-500"
                 placeholder="Mínimo 8 caracteres"
                 disabled={isLoading}
               />
               {password && password.length < 8 && (
-                <p className="text-xs text-red-600 mt-1">
+                <p className="text-xs text-red-400 mt-1">
                   La contraseña debe tener al menos 8 caracteres
                 </p>
               )}
@@ -233,7 +224,7 @@ export default function AcceptInvitePage() {
             <div>
               <label
                 htmlFor="confirmPassword"
-                className="block text-sm font-medium text-gray-700 mb-2"
+                className="block text-sm font-medium text-gray-300 mb-2"
               >
                 Confirmar Contraseña
               </label>
@@ -242,12 +233,12 @@ export default function AcceptInvitePage() {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition placeholder-gray-500"
                 placeholder="Repite tu contraseña"
                 disabled={isLoading}
               />
               {confirmPassword && password !== confirmPassword && (
-                <p className="text-xs text-red-600 mt-1">
+                <p className="text-xs text-red-400 mt-1">
                   Las contraseñas no coinciden
                 </p>
               )}
@@ -256,7 +247,7 @@ export default function AcceptInvitePage() {
             <button
               type="submit"
               disabled={isLoading || password.length < 8 || password !== confirmPassword}
-              className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>
@@ -272,7 +263,7 @@ export default function AcceptInvitePage() {
 
         {/* Footer */}
         <p className="text-center text-gray-500 text-sm mt-8">
-          © {new Date().getFullYear()} Planilla. Todos los derechos reservados.
+          © {new Date().getFullYear()} Pagly. Todos los derechos reservados.
         </p>
       </div>
     </div>

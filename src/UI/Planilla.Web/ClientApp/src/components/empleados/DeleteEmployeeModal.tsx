@@ -185,7 +185,7 @@ export function DeleteEmployeeModal({
             </div>
 
             {/* Confirmation Checkbox */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div className="bg-navy-800 border border-navy-700 rounded-lg p-4">
               <label className="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"

@@ -109,7 +109,7 @@ export function RolePermissionsModal({ role, isOpen, onClose, onSuccess }: RoleP
     >
       {isLoading ? (
         <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-primary-400" />
         </div>
       ) : (
         <>
@@ -126,8 +126,8 @@ export function RolePermissionsModal({ role, isOpen, onClose, onSuccess }: RoleP
             ))}
           </div>
 
-          <div className="flex items-center justify-between pt-6 border-t border-gray-200 mt-6">
-            <div className="text-sm text-gray-600">
+          <div className="flex items-center justify-between pt-6 border-t border-navy-700 mt-6">
+            <div className="text-sm text-gray-400">
               {selectedPermissions.length} de {allPermissions.length} permisos seleccionados
             </div>
             <div className="flex items-center gap-3">

@@ -2,12 +2,12 @@ import React from 'react';
 import { Loader2, LucideIcon } from 'lucide-react';
 
 const variants = {
-  primary: 'bg-blue-600 hover:bg-blue-700 text-white',
-  secondary: 'bg-gray-100 hover:bg-gray-200 text-gray-900',
+  primary: 'bg-primary-600 hover:bg-primary-700 text-white',
+  secondary: 'bg-navy-800 hover:bg-navy-700 text-gray-200 border border-navy-600',
   danger: 'bg-red-600 hover:bg-red-700 text-white',
   success: 'bg-green-600 hover:bg-green-700 text-white',
-  outline: 'border border-gray-300 hover:bg-gray-50 text-gray-700',
-  ghost: 'hover:bg-gray-100 text-gray-700',
+  outline: 'border border-navy-600 hover:bg-navy-800 text-gray-300',
+  ghost: 'hover:bg-navy-800 text-gray-300',
 };
 
 const sizes = {

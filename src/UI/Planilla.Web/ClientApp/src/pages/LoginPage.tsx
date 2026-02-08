@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { PaglyLogo } from '../components/ui/PaglyLogo';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login, isSystemAdmin } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -36,20 +37,41 @@ export default function LoginPage() {
       // Caso 2 y 3: Login exitoso con un solo tenant o SystemAdmin
       toast.success('Inicio de sesión exitoso');
 
-      // Verificar si es SystemAdmin
+      let shouldRedirectToAdmin = false;
+
+      await new Promise(resolve => setTimeout(resolve, 50));
+
       const token = localStorage.getItem('auth_token');
       if (token) {
-        const { parseJwt } = await import('../utils/jwt');
-        const payload = parseJwt(token);
-        const isAdmin = payload?.is_system_admin === 'true' || payload?.is_system_admin === 'True';
+        try {
+          const { parseJwt } = await import('../utils/jwt');
+          const payload = parseJwt(token);
+          const adminClaim = payload?.is_system_admin;
+          shouldRedirectToAdmin =
+            adminClaim === 'true' ||
+            adminClaim === 'True' ||
+            adminClaim === true ||
+            adminClaim === '1';
 
-        if (isAdmin) {
-          navigate('/system-admin/dashboard', { replace: true });
-        } else {
-          navigate(from, { replace: true });
+          const tenantId = payload?.tenant_id;
+          if (tenantId && tenantId !== '0' && tenantId !== 0 && tenantId !== 'null') {
+            shouldRedirectToAdmin = false;
+          }
+        } catch (error) {
+          console.error('[LoginPage] Error parsing token:', error);
+          shouldRedirectToAdmin = false;
         }
+      }
+
+      if (!shouldRedirectToAdmin) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+
+      if (shouldRedirectToAdmin) {
+        navigate('/system-admin/dashboard', { replace: true });
       } else {
-        navigate(from, { replace: true });
+        const targetPath = from.startsWith('/system-admin') ? '/dashboard' : from;
+        navigate(targetPath, { replace: true });
       }
     } catch (error: any) {
       toast.error(error.message || 'Error al iniciar sesión');
@@ -59,31 +81,24 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-navy-950 flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-600 rounded-xl shadow-lg mb-4">
-            <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
+          <div className="flex justify-center mb-4">
+            <PaglyLogo variant="icon" theme="dark" size="lg" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Pagly</h1>
-          <p className="text-gray-600 mt-2">Sistema de Gestión de Nómina</p>
+          <h1 className="text-3xl font-bold text-gray-100 font-display">Pagly</h1>
+          <p className="text-gray-400 mt-2">Planilla Inteligente</p>
         </div>
 
         {/* Login Card */}
-        <div className="bg-white rounded-2xl shadow-xl p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Iniciar Sesión</h2>
+        <div className="bg-navy-900 border border-navy-700 rounded-2xl shadow-2xl p-8">
+          <h2 className="text-2xl font-bold text-gray-100 mb-6 font-display">Iniciar Sesión</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                 Correo Electrónico
               </label>
               <input
@@ -91,14 +106,14 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition placeholder-gray-500"
                 placeholder="usuario@empresa.com"
                 disabled={isLoading}
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
                 Contraseña
               </label>
               <input
@@ -106,7 +121,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition"
+                className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition placeholder-gray-500"
                 placeholder="••••••••"
                 disabled={isLoading}
               />
@@ -115,7 +130,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full bg-emerald-600 text-white py-3 rounded-lg font-medium hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full bg-primary-600 text-white py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <>

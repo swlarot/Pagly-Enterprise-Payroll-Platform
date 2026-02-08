@@ -13,8 +13,8 @@ export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
 
   if (!hasRole(...allowedRoles)) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
-        <div className="max-w-md p-8 bg-white rounded-xl shadow-lg text-center">
+      <div className="flex items-center justify-center h-screen bg-navy-950">
+        <div className="max-w-md p-8 bg-navy-900 border border-navy-700 rounded-xl shadow-lg text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg
               className="w-8 h-8 text-red-600"
@@ -30,13 +30,13 @@ export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
               />
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Acceso Denegado</h2>
-          <p className="text-gray-600 mb-6">
+          <h2 className="text-2xl font-bold text-gray-100 mb-2">Acceso Denegado</h2>
+          <p className="text-gray-400 mb-6">
             No tienes los permisos necesarios para acceder a este recurso.
           </p>
           <Link
             to="/dashboard"
-            className="inline-block px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            className="inline-block px-6 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors"
           >
             Volver al Dashboard
           </Link>

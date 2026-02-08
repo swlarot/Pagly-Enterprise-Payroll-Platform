@@ -31,20 +31,20 @@ export function SystemAdminLayout({ children }: SystemAdminLayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-navy-950">
       {/* Top Navigation Bar */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
+      <header className="bg-navy-900 border-b border-navy-700 sticky top-0 z-40">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Logo and Title */}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-primary-700 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-xl">P</span>
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900">Planilla Admin</h1>
-                  <p className="text-xs text-gray-500">System Administration</p>
+                  <h1 className="text-xl font-bold text-gray-100">Pagly Admin</h1>
+                  <p className="text-xs text-gray-400">System Administration</p>
                 </div>
               </div>
 
@@ -61,8 +61,8 @@ export function SystemAdminLayout({ children }: SystemAdminLayoutProps) {
                         text-sm font-medium transition-colors
                         ${
                           isActive
-                            ? 'bg-blue-50 text-blue-700'
-                            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                            ? 'bg-primary-500/15 text-primary-400'
+                            : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
                         }
                       `}
                     >
@@ -78,18 +78,18 @@ export function SystemAdminLayout({ children }: SystemAdminLayoutProps) {
             <div className="relative">
               <button
                 onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-navy-800 transition-colors"
               >
-                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                <div className="w-8 h-8 bg-primary-600 rounded-full flex items-center justify-center">
                   <span className="text-white text-sm font-medium">
                     {user?.email.charAt(0).toUpperCase()}
                   </span>
                 </div>
                 <div className="hidden md:block text-left">
-                  <p className="text-sm font-medium text-gray-900">{user?.email}</p>
-                  <p className="text-xs text-blue-600">System Admin</p>
+                  <p className="text-sm font-medium text-gray-200">{user?.email}</p>
+                  <p className="text-xs text-primary-400">System Admin</p>
                 </div>
-                <ChevronDown className="w-4 h-4 text-gray-500" />
+                <ChevronDown className="w-4 h-4 text-gray-400" />
               </button>
 
               {showUserMenu && (
@@ -98,15 +98,15 @@ export function SystemAdminLayout({ children }: SystemAdminLayoutProps) {
                     className="fixed inset-0 z-10"
                     onClick={() => setShowUserMenu(false)}
                   />
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
-                    <div className="px-4 py-3 border-b border-gray-200">
-                      <p className="text-sm font-medium text-gray-900">{user?.email}</p>
-                      <p className="text-xs text-gray-500 mt-1">System Administrator</p>
+                  <div className="absolute right-0 mt-2 w-56 bg-navy-900 rounded-lg shadow-xl shadow-black/25 border border-navy-700 py-1 z-20">
+                    <div className="px-4 py-3 border-b border-navy-700">
+                      <p className="text-sm font-medium text-gray-200">{user?.email}</p>
+                      <p className="text-xs text-gray-400 mt-1">System Administrator</p>
                     </div>
                     {tenant && (
                       <button
                         onClick={() => navigate('/dashboard')}
-                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-navy-800 transition-colors"
                       >
                         <Building2 className="w-4 h-4" />
                         Ir a Mi Tenant
@@ -114,7 +114,7 @@ export function SystemAdminLayout({ children }: SystemAdminLayoutProps) {
                     )}
                     <button
                       onClick={handleLogout}
-                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                      className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-navy-800 transition-colors"
                     >
                       <LogOut className="w-4 h-4" />
                       Cerrar Sesión

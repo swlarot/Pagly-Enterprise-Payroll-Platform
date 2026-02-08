@@ -16,6 +16,7 @@ import TenantSelectorPage from './pages/TenantSelectorPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import AuditLogPage from './pages/AuditLogPage';
 import RolesAndPermissionsPage from './pages/RolesAndPermissionsPage';
+import MiPerfilPage from './pages/MiPerfilPage';
 
 // System Admin Pages
 import SystemAdminDashboardPage from './pages/SystemAdminDashboardPage';
@@ -46,9 +47,10 @@ function App() {
         toastOptions={{
           duration: 4000,
           style: {
-            background: '#fff',
-            color: '#363636',
+            background: '#102a43',
+            color: '#f3f4f6',
             fontSize: '14px',
+            border: '1px solid #334e68',
           },
           success: {
             duration: 3000,
@@ -122,6 +124,18 @@ function App() {
             <ProtectedRoute>
               <AuthLayout>
                 <AdminDashboardPage />
+              </AuthLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Mi Perfil - Employee Self-Service */}
+        <Route
+          path="/mi-perfil"
+          element={
+            <ProtectedRoute>
+              <AuthLayout>
+                <MiPerfilPage />
               </AuthLayout>
             </ProtectedRoute>
           }

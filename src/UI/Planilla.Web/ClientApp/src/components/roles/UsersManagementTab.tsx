@@ -224,15 +224,15 @@ export function UsersManagementTab() {
 
   const getRoleBadge = (roleName: string) => {
     const colors: Record<string, string> = {
-      Owner: 'bg-purple-100 text-purple-800',
-      Admin: 'bg-blue-100 text-blue-800',
-      Manager: 'bg-green-100 text-green-800',
-      Accountant: 'bg-yellow-100 text-yellow-800',
-      Employee: 'bg-gray-100 text-gray-800',
+      Owner: 'bg-amber-500/15 text-amber-400',
+      Admin: 'bg-blue-500/15 text-blue-400',
+      Manager: 'bg-green-500/15 text-green-400',
+      Accountant: 'bg-amber-500/15 text-amber-400',
+      Employee: 'bg-blue-500/15 text-blue-400',
     };
 
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[roleName] || 'bg-gray-100 text-gray-800'}`}>
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[roleName] || 'bg-navy-700 text-gray-300'}`}>
         {roleName}
       </span>
     );
@@ -251,11 +251,11 @@ export function UsersManagementTab() {
       {/* Header Section - sin título principal porque ya está en la página padre */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-gray-600">Administra los usuarios de tu equipo y sus roles</p>
+          <p className="text-gray-400">Administra los usuarios de tu equipo y sus roles</p>
         </div>
         <button
           onClick={() => setIsInviteModalOpen(true)}
-          className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+          className="bg-primary-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-primary-700 transition-colors flex items-center gap-2"
         >
           <svg
             className="w-5 h-5"
@@ -276,30 +276,30 @@ export function UsersManagementTab() {
 
       {/* Usage Card */}
       {usage && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Usuarios Activos</p>
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-sm text-gray-400">Usuarios Activos</p>
+              <p className="text-2xl font-bold text-gray-100">
                 {usage.usersCount} <span className="text-lg text-gray-500">/ {usage.maxUsers}</span>
               </p>
             </div>
             <div className="text-right">
-              <p className="text-sm text-gray-600">Plan Actual</p>
-              <p className="text-lg font-semibold text-blue-600">{subscription?.planName}</p>
+              <p className="text-sm text-gray-400">Plan Actual</p>
+              <p className="text-lg font-semibold text-primary-400">{subscription?.planName}</p>
             </div>
           </div>
 
           {/* Usage bar */}
           <div className="mt-3">
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-navy-800 rounded-full h-2">
               <div
                 className={`h-2 rounded-full transition-all ${
                   usage.usersCount >= usage.maxUsers
-                    ? 'bg-red-600'
+                    ? 'bg-red-500'
                     : usage.usersCount >= usage.maxUsers * 0.8
-                    ? 'bg-yellow-600'
-                    : 'bg-blue-600'
+                    ? 'bg-amber-500'
+                    : 'bg-primary-500'
                 }`}
                 style={{ width: `${Math.min((usage.usersCount / usage.maxUsers) * 100, 100)}%` }}
               />
@@ -310,36 +310,36 @@ export function UsersManagementTab() {
 
       {/* Pending Invitations */}
       {invitations.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Invitaciones Pendientes</h2>
+        <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700">
+          <div className="px-6 py-4 border-b border-navy-700">
+            <h2 className="text-lg font-semibold text-gray-100">Invitaciones Pendientes</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Email</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Rol</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Fecha de Envío</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Expira</th>
-                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">Acciones</th>
+                <tr className="border-b border-navy-700 bg-navy-950">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Email</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Rol</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Fecha de Envío</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Expira</th>
+                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-300">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-navy-800">
                 {invitations.map((invitation) => (
-                  <tr key={invitation.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">{invitation.email}</td>
+                  <tr key={invitation.id} className="hover:bg-navy-800">
+                    <td className="px-6 py-4 text-sm text-gray-100">{invitation.email}</td>
                     <td className="px-6 py-4">{getRoleBadge(invitation.roleName)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="px-6 py-4 text-sm text-gray-400">
                       {new Date(invitation.createdAt).toLocaleDateString('es-PA')}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="px-6 py-4 text-sm text-gray-400">
                       {new Date(invitation.expiresAt).toLocaleDateString('es-PA')}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button
                         onClick={() => handleRevokeInvitation(invitation)}
-                        className="text-red-600 hover:text-red-700 font-medium text-sm"
+                        className="text-red-400 hover:text-red-300 font-medium text-sm"
                       >
                         Revocar
                       </button>
@@ -353,40 +353,40 @@ export function UsersManagementTab() {
       )}
 
       {/* Users Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Usuarios del Equipo</h2>
+      <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700">
+        <div className="px-6 py-4 border-b border-navy-700">
+          <h2 className="text-lg font-semibold text-gray-100">Usuarios del Equipo</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+              <tr className="border-b border-navy-700 bg-navy-950">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
                   Email
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
                   Rol
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
                   Estado
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
                   Fecha de Ingreso
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
                   Último Acceso
                 </th>
-                <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">
+                <th className="px-6 py-4 text-right text-sm font-semibold text-gray-300">
                   Acciones
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-navy-800">
               {isLoading ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                     <div className="flex items-center justify-center gap-2">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-500"></div>
                       Cargando usuarios...
                     </div>
                   </td>
@@ -399,24 +399,24 @@ export function UsersManagementTab() {
                 </tr>
               ) : (
                 users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">{user.email}</td>
+                  <tr key={user.id} className="hover:bg-navy-800">
+                    <td className="px-6 py-4 text-sm text-gray-100">{user.email}</td>
                     <td className="px-6 py-4">{getRoleBadge(user.customRoleName ?? user.roleName)}</td>
                     <td className="px-6 py-4">
                       {user.isActive ? (
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-500/15 text-green-400">
                           Activo
                         </span>
                       ) : (
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-navy-700 text-gray-400">
                           Inactivo
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="px-6 py-4 text-sm text-gray-400">
                       {new Date(user.joinedAt).toLocaleDateString('es-PA')}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="px-6 py-4 text-sm text-gray-400">
                       {user.lastLoginAt
                         ? new Date(user.lastLoginAt).toLocaleDateString('es-PA')
                         : 'Nunca'}
@@ -425,7 +425,7 @@ export function UsersManagementTab() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => handleOpenRoleModal(user)}
-                          className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                          className="text-primary-400 hover:text-primary-300 font-medium text-sm"
                           title="Cambiar rol"
                         >
                           Cambiar Rol
@@ -434,8 +434,8 @@ export function UsersManagementTab() {
                           onClick={() => handleToggleActive(user)}
                           className={`font-medium text-sm ${
                             user.isActive
-                              ? 'text-yellow-600 hover:text-yellow-700'
-                              : 'text-green-600 hover:text-green-700'
+                              ? 'text-primary-400 hover:text-primary-300'
+                              : 'text-green-400 hover:text-green-300'
                           }`}
                           title={user.isActive ? 'Desactivar' : 'Activar'}
                         >
@@ -444,7 +444,7 @@ export function UsersManagementTab() {
                         {user.roleName !== 'Owner' && (
                           <button
                             onClick={() => handleRemoveUser(user)}
-                            className="text-red-600 hover:text-red-700 font-medium text-sm"
+                            className="text-red-400 hover:text-red-300 font-medium text-sm"
                             title="Remover usuario"
                           >
                             Remover
@@ -463,12 +463,12 @@ export function UsersManagementTab() {
       {/* Invite Modal */}
       {isInviteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Invitar Usuario</h3>
+          <div className="bg-navy-900 rounded-xl shadow-xl border border-navy-700 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-navy-700">
+              <h3 className="text-lg font-semibold text-gray-100">Invitar Usuario</h3>
               <button
                 onClick={handleCloseInviteModal}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-500 hover:text-gray-300"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -486,17 +486,17 @@ export function UsersManagementTab() {
               {usage && (
                 <div className={`p-3 rounded-lg ${
                   usage.usersCount >= usage.maxUsers
-                    ? 'bg-red-50 border border-red-200'
+                    ? 'bg-red-500/10 border border-red-500/20'
                     : usage.usersCount >= usage.maxUsers * 0.8
-                    ? 'bg-yellow-50 border border-yellow-200'
-                    : 'bg-blue-50 border border-blue-200'
+                    ? 'bg-amber-500/10 border border-amber-500/20'
+                    : 'bg-blue-500/10 border border-blue-500/20'
                 }`}>
                   <p className={`text-sm font-medium ${
                     usage.usersCount >= usage.maxUsers
-                      ? 'text-red-800'
+                      ? 'text-red-400'
                       : usage.usersCount >= usage.maxUsers * 0.8
-                      ? 'text-yellow-800'
-                      : 'text-blue-800'
+                      ? 'text-amber-400'
+                      : 'text-blue-300'
                   }`}>
                     Usuarios: {usage.usersCount} / {usage.maxUsers}
                   </p>
@@ -506,7 +506,7 @@ export function UsersManagementTab() {
               {!generatedInviteUrl ? (
                 <>
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                       Correo Electrónico
                     </label>
                     <input
@@ -514,7 +514,7 @@ export function UsersManagementTab() {
                       type="email"
                       value={inviteEmail}
                       onChange={(e) => setInviteEmail(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent placeholder-gray-600"
                       placeholder="usuario@empresa.com"
                       disabled={isInviting}
                       required
@@ -522,14 +522,14 @@ export function UsersManagementTab() {
                   </div>
 
                   <div>
-                    <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="role" className="block text-sm font-medium text-gray-300 mb-2">
                       Rol
                     </label>
                     <select
                       id="role"
                       value={inviteRole}
                       onChange={(e) => setInviteRole(Number(e.target.value) as TenantRole)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       disabled={isInviting || isLoadingRoles}
                     >
                       <option value={1}>Usuario (sin permisos hasta asignar rol)</option>
@@ -543,14 +543,14 @@ export function UsersManagementTab() {
                     <button
                       type="button"
                       onClick={handleCloseInviteModal}
-                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      className="flex-1 px-4 py-2 border border-navy-600 text-gray-300 rounded-lg hover:bg-navy-800 transition-colors"
                       disabled={isInviting}
                     >
                       Cancelar
                     </button>
                     <button
                       type="submit"
-                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                      className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                       disabled={isInviting || (usage ? usage.usersCount >= usage.maxUsers : false)}
                     >
                       {isInviting ? (
@@ -567,9 +567,9 @@ export function UsersManagementTab() {
               ) : (
                 <>
                   <div className="text-center py-4">
-                    <div className="inline-flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-4">
+                    <div className="inline-flex items-center justify-center w-12 h-12 bg-green-500/15 rounded-full mb-4">
                       <svg
-                        className="w-6 h-6 text-green-600"
+                        className="w-6 h-6 text-green-400"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -582,27 +582,27 @@ export function UsersManagementTab() {
                         />
                       </svg>
                     </div>
-                    <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                    <h4 className="text-lg font-semibold text-gray-100 mb-2">
                       Invitación Enviada
                     </h4>
-                    <p className="text-sm text-gray-600 mb-4">
+                    <p className="text-sm text-gray-400 mb-4">
                       Comparte este link con el usuario invitado
                     </p>
                   </div>
 
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-2 font-medium">Link de Invitación:</p>
+                  <div className="bg-navy-800 p-4 rounded-lg border border-navy-700">
+                    <p className="text-xs text-gray-400 mb-2 font-medium">Link de Invitación:</p>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         value={generatedInviteUrl}
                         readOnly
-                        className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm"
+                        className="flex-1 px-3 py-2 bg-navy-900 border border-navy-600 text-gray-300 rounded-lg text-sm"
                       />
                       <button
                         type="button"
                         onClick={handleCopyInviteUrl}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                        className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
                       >
                         <svg
                           className="w-4 h-4"
@@ -626,7 +626,7 @@ export function UsersManagementTab() {
                     <button
                       type="button"
                       onClick={handleCloseInviteModal}
-                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
                     >
                       Cerrar
                     </button>
@@ -641,12 +641,12 @@ export function UsersManagementTab() {
       {/* Role Change Modal */}
       {isRoleModalOpen && selectedUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Cambiar Rol de Usuario</h3>
+          <div className="bg-navy-900 rounded-xl shadow-xl border border-navy-700 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-navy-700">
+              <h3 className="text-lg font-semibold text-gray-100">Cambiar Rol de Usuario</h3>
               <button
                 onClick={() => setIsRoleModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600"
+                className="text-gray-500 hover:text-gray-300"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
@@ -661,19 +661,19 @@ export function UsersManagementTab() {
 
             <div className="p-6 space-y-4">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Usuario:</p>
-                <p className="font-medium text-gray-900">{selectedUser.email}</p>
+                <p className="text-sm text-gray-400 mb-1">Usuario:</p>
+                <p className="font-medium text-gray-100">{selectedUser.email}</p>
               </div>
 
               <div>
-                <label htmlFor="newRole" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="newRole" className="block text-sm font-medium text-gray-300 mb-2">
                   Asignar rol
                 </label>
                 <select
                   id="newRole"
                   value={newRole}
                   onChange={(e) => setNewRole(Number(e.target.value))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   disabled={isUpdatingRole || isLoadingRoles}
                 >
                   <option value={0}>Usuario (sin rol asignado)</option>
@@ -694,7 +694,7 @@ export function UsersManagementTab() {
                 <button
                   type="button"
                   onClick={() => setIsRoleModalOpen(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-4 py-2 border border-navy-600 text-gray-300 rounded-lg hover:bg-navy-800 transition-colors"
                   disabled={isUpdatingRole}
                 >
                   Cancelar
@@ -702,7 +702,7 @@ export function UsersManagementTab() {
                 <button
                   type="button"
                   onClick={handleChangeRole}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                   disabled={isUpdatingRole}
                 >
                   {isUpdatingRole ? (

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { SystemAdminLayout } from '../components/layout/SystemAdminLayout';
-import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { systemAdminService } from '../services/systemAdminService';
@@ -22,6 +21,7 @@ export default function SystemUsersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     nombre: '',
     apellido: '',
@@ -93,11 +93,39 @@ export default function SystemUsersPage() {
     setFormData({ nombre: '', apellido: '', correo: '', telefono: '' });
   };
 
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!confirm(`¿Estás seguro de eliminar permanentemente al usuario "${userName}"?\n\nEsta acción no se puede deshacer.`)) {
+      return;
+    }
+
+    try {
+      setDeletingUserId(userId);
+      await systemAdminService.deleteUser(userId);
+      toast.success('Usuario eliminado permanentemente');
+      loadUsers();
+    } catch (error: any) {
+      // Manejar errores específicos del backend
+      if (error.statusCode === 400 && error.details?.activeTenants) {
+        const tenantsList = error.details.activeTenants
+          .map((t: any) => `${t.tenantName} (${t.role})`)
+          .join(', ');
+        toast.error(
+          `No se puede eliminar el usuario porque tiene membresías activas en: ${tenantsList}. Debes removerlo primero de cada tenant.`,
+          { duration: 8000 }
+        );
+      } else {
+        toast.error(error.message || 'Error al eliminar usuario');
+      }
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
+
   if (isLoading) {
     return (
       <SystemAdminLayout>
         <div className="flex items-center justify-center h-[calc(100vh-80px)]">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-primary-400" />
         </div>
       </SystemAdminLayout>
     );
@@ -105,11 +133,11 @@ export default function SystemUsersPage() {
 
   return (
     <SystemAdminLayout>
-      <div className="space-y-6">
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Usuarios del Sistema</h1>
-            <p className="text-gray-600 mt-1">Gestiona todos los usuarios de Planilla</p>
+            <h1 className="text-3xl font-bold text-gray-100">Usuarios del Sistema</h1>
+            <p className="text-gray-400 mt-1">Gestiona todos los usuarios del sistema</p>
           </div>
           <Button onClick={() => setShowModal(true)} className="flex items-center gap-2">
             <UserPlus className="w-4 h-4" />
@@ -117,23 +145,23 @@ export default function SystemUsersPage() {
           </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <h2 className="text-lg font-semibold">Todos los Usuarios</h2>
-          </CardHeader>
-          <CardBody>
+        <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-lg shadow-black/20">
+          <div className="px-6 py-4 border-b border-navy-700 bg-navy-800 rounded-t-xl">
+            <h2 className="text-lg font-semibold text-gray-100">Todos los Usuarios</h2>
+          </div>
+          <div className="px-6 py-4">
             {users.length === 0 ? (
               <div className="text-center py-12">
-                <UserPlus className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">No hay usuarios en el sistema</p>
+                <UserPlus className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                <p className="text-gray-400">No hay usuarios en el sistema</p>
                 <Button onClick={() => setShowModal(true)} className="mt-4">
                   Crear primer usuario
                 </Button>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                <table className="min-w-full divide-y divide-navy-700">
+                  <thead className="bg-navy-800 rounded-lg">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Usuario
@@ -152,16 +180,16 @@ export default function SystemUsersPage() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="divide-y divide-navy-700">
                     {users.map((user) => (
-                      <tr key={user.id} className="hover:bg-gray-50">
+                      <tr key={user.id} className="hover:bg-navy-800 transition-colors">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <div>
-                              <div className="text-sm font-medium text-gray-900">
+                              <div className="text-sm font-medium text-gray-100">
                                 {user.nombreCompleto}
                               </div>
-                              <div className="text-sm text-gray-500 flex items-center gap-1">
+                              <div className="text-sm text-gray-400 flex items-center gap-1">
                                 <Mail className="w-3 h-3" />
                                 {user.email}
                               </div>
@@ -169,14 +197,14 @@ export default function SystemUsersPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900 flex items-center gap-1">
+                          <div className="text-sm text-gray-300 flex items-center gap-1">
                             {user.telefono ? (
                               <>
-                                <Phone className="w-3 h-3 text-gray-400" />
+                                <Phone className="w-3 h-3 text-gray-500" />
                                 {user.telefono}
                               </>
                             ) : (
-                              <span className="text-gray-400">N/A</span>
+                              <span className="text-gray-500">N/A</span>
                             )}
                           </div>
                         </td>
@@ -186,48 +214,49 @@ export default function SystemUsersPage() {
                               user.tenantAssignments.map((ta, idx) => (
                                 <span
                                   key={idx}
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400"
                                 >
                                   <Building2 className="w-3 h-3" />
                                   {ta.tenantName} ({ta.role})
                                 </span>
                               ))
                             ) : (
-                              <span className="text-xs text-gray-400">Sin asignar</span>
+                              <span className="text-xs text-gray-500">Sin asignar</span>
                             )}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex flex-col gap-1">
                             {user.isSystemAdmin && (
-                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-500/15 text-red-400">
                                 System Admin
                               </span>
                             )}
                             {user.emailConfirmed ? (
-                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-500/15 text-green-400">
                                 Verificado
                               </span>
                             ) : (
-                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-500/15 text-amber-400">
                                 Pendiente
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                           {!user.isSystemAdmin && (
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() => {
-                                if (confirm('¿Estás seguro de eliminar este usuario?')) {
-                                  toast.error('Funcionalidad no implementada');
-                                }
-                              }}
+                            <button
+                              onClick={() => handleDeleteUser(user.id, user.nombreCompleto)}
+                              disabled={deletingUserId === user.id}
+                              className="inline-flex items-center justify-center p-2 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Eliminar usuario"
                             >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
+                              {deletingUserId === user.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </button>
                           )}
                         </td>
                       </tr>
@@ -236,15 +265,15 @@ export default function SystemUsersPage() {
                 </table>
               </div>
             )}
-          </CardBody>
-        </Card>
+          </div>
+        </div>
       </div>
 
       {/* Modal de creación */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Crear Nuevo Usuario</h2>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-xl shadow-black/25 p-6 w-full max-w-md">
+            <h2 className="text-xl font-bold text-gray-100 mb-4">Crear Nuevo Usuario</h2>
 
             <form onSubmit={handleCreate} className="space-y-4">
               <Input
@@ -279,10 +308,10 @@ export default function SystemUsersPage() {
                 placeholder="+507 6000-0000"
               />
 
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                <p className="text-xs text-blue-800">
-                  ℹ️ Se enviará un email con la contraseña temporal:{' '}
-                  <code className="bg-white px-2 py-1 rounded text-blue-900 font-mono">
+              <div className="bg-primary-500/15 border border-primary-500/25 rounded-lg p-3">
+                <p className="text-xs text-primary-300">
+                  Se enviará un email con la contraseña temporal:{' '}
+                  <code className="bg-navy-800 px-2 py-1 rounded text-primary-200 font-mono">
                     Planilla2024!Temp
                   </code>
                 </p>

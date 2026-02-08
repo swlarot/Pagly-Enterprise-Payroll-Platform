@@ -1,0 +1,15 @@
+<svg viewBox="0 0 240 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="6" width="48" height="48" rx="12" fill="url(#paglyGradLight)"/>
+  <path d="M15 30 L22 23 L32 33 L22 37 Z" fill="white" opacity="0.9"/>
+  <path d="M22 23 L32 20 L32 33 L22 23 Z" fill="white" opacity="0.6"/>
+  <circle cx="32" cy="27" r="3.5" fill="white" opacity="0.4"/>
+  
+  <text x="58" y="42" font-family="'Space Grotesk', sans-serif" font-weight="700" font-size="36" fill="#102a43" letter-spacing="-0.5">Pagly</text>
+  
+  <defs>
+    <linearGradient id="paglyGradLight" x1="0" y1="6" x2="48" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#0d9488"/>
+    </linearGradient>
+  </defs>
+</svg>

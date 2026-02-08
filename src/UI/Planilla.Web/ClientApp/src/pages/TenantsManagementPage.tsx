@@ -1,10 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SystemAdminLayout } from '../components/layout/SystemAdminLayout';
-import { Card, CardBody } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
-import { Select } from '../components/ui/Select';
 import { Badge } from '../components/ui/Badge';
 import { systemAdminService } from '../services/systemAdminService';
 import type { AdminTenantDto } from '../types/api';
@@ -137,8 +134,8 @@ export default function TenantsManagementPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Gestión de Tenants</h1>
-            <p className="text-gray-600 mt-2">
+            <h1 className="text-3xl font-bold text-gray-100">Gestión de Tenants</h1>
+            <p className="text-gray-400 mt-2">
               {totalCount} {totalCount === 1 ? 'empresa registrada' : 'empresas registradas'}
             </p>
           </div>
@@ -151,67 +148,66 @@ export default function TenantsManagementPage() {
         </div>
 
         {/* Filters */}
-        <Card className="mb-6">
-          <CardBody>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Input
-                placeholder="Buscar por nombre, RUC..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setPage(1);
-                }}
-                className="w-full"
-              />
-              <Select
-                value={planFilter}
-                onChange={(e) => {
-                  setPlanFilter(e.target.value);
-                  setPage(1);
-                }}
-                options={[
-                  { value: '', label: 'Todos los planes' },
-                  { value: SubscriptionPlan.Free.toString(), label: 'Free' },
-                  { value: SubscriptionPlan.Starter.toString(), label: 'Starter' },
-                  { value: SubscriptionPlan.Professional.toString(), label: 'Professional' },
-                  { value: SubscriptionPlan.Enterprise.toString(), label: 'Enterprise' },
-                ]}
-              />
-              <Select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setPage(1);
-                }}
-                options={[
-                  { value: '', label: 'Todos los estados' },
-                  { value: SubscriptionStatus.Active.toString(), label: 'Activo' },
-                  { value: SubscriptionStatus.Trialing.toString(), label: 'Trial' },
-                  { value: SubscriptionStatus.PastDue.toString(), label: 'Vencido' },
-                  { value: SubscriptionStatus.Canceled.toString(), label: 'Cancelado' },
-                ]}
-              />
-              <Select
-                value={activeFilter}
-                onChange={(e) => {
-                  setActiveFilter(e.target.value);
-                  setPage(1);
-                }}
-                options={[
-                  { value: '', label: 'Todos' },
-                  { value: 'true', label: 'Activos' },
-                  { value: 'false', label: 'Inactivos' },
-                ]}
-              />
-            </div>
-          </CardBody>
-        </Card>
+        <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-lg shadow-black/20 mb-6 px-6 py-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <input
+              type="text"
+              placeholder="Buscar por nombre, RUC..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPage(1);
+              }}
+              className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            />
+            <select
+              value={planFilter}
+              onChange={(e) => {
+                setPlanFilter(e.target.value);
+                setPage(1);
+              }}
+              className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option value="">Todos los planes</option>
+              <option value={SubscriptionPlan.Free.toString()}>Free</option>
+              <option value={SubscriptionPlan.Starter.toString()}>Starter</option>
+              <option value={SubscriptionPlan.Professional.toString()}>Professional</option>
+              <option value={SubscriptionPlan.Enterprise.toString()}>Enterprise</option>
+            </select>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPage(1);
+              }}
+              className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option value="">Todos los estados</option>
+              <option value={SubscriptionStatus.Active.toString()}>Activo</option>
+              <option value={SubscriptionStatus.Trialing.toString()}>Trial</option>
+              <option value={SubscriptionStatus.PastDue.toString()}>Vencido</option>
+              <option value={SubscriptionStatus.Canceled.toString()}>Cancelado</option>
+            </select>
+            <select
+              value={activeFilter}
+              onChange={(e) => {
+                setActiveFilter(e.target.value);
+                setPage(1);
+              }}
+              className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            >
+              <option value="">Todos</option>
+              <option value="true">Activos</option>
+              <option value="false">Inactivos</option>
+            </select>
+          </div>
+        </div>
 
         {/* Tenants Table */}
-        <Card>
+        <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-lg shadow-black/20">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-navy-800 border-b border-navy-700">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Empresa
@@ -239,30 +235,30 @@ export default function TenantsManagementPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-navy-700">
                 {isLoading ? (
                   <tr>
                     <td colSpan={8} className="px-6 py-12 text-center">
-                      <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto" />
+                      <Loader2 className="w-8 h-8 animate-spin text-primary-400 mx-auto" />
                     </td>
                   </tr>
                 ) : paginatedTenants.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-6 py-12 text-center">
-                      <Search className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                      <p className="text-gray-600">No se encontraron tenants</p>
+                      <Search className="w-12 h-12 text-gray-500 mx-auto mb-3" />
+                      <p className="text-gray-400">No se encontraron tenants</p>
                     </td>
                   </tr>
                 ) : (
                   paginatedTenants.map((tenant) => (
-                    <tr key={tenant.id} className="hover:bg-gray-50">
+                    <tr key={tenant.id} className="hover:bg-navy-800 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="font-medium text-gray-900">{tenant.name}</div>
-                          <div className="text-sm text-gray-500">{tenant.owner?.email || 'Sin propietario'}</div>
+                          <div className="font-medium text-gray-100">{tenant.name}</div>
+                          <div className="text-sm text-gray-400">{tenant.owner?.email || 'Sin propietario'}</div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                         {tenant.ruc && tenant.dv ? `${tenant.ruc}-${tenant.dv}` : 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -283,13 +279,13 @@ export default function TenantsManagementPage() {
                           <Badge variant="default">Inactivo</Badge>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                         {tenant.usage.totalEmployees}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                         {tenant.usage.totalUsers}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
                         {new Date(tenant.createdAt).toLocaleDateString('es-PA')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -311,8 +307,8 @@ export default function TenantsManagementPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-              <div className="text-sm text-gray-700">
+            <div className="px-6 py-4 border-t border-navy-700 flex items-center justify-between">
+              <div className="text-sm text-gray-400">
                 Mostrando {(page - 1) * pageSize + 1} a{' '}
                 {Math.min(page * pageSize, totalCount)} de {totalCount} resultados
               </div>
@@ -326,7 +322,7 @@ export default function TenantsManagementPage() {
                 >
                   {''}
                 </Button>
-                <span className="text-sm text-gray-700">
+                <span className="text-sm text-gray-400">
                   Página {page} de {totalPages}
                 </span>
                 <Button
@@ -341,7 +337,7 @@ export default function TenantsManagementPage() {
               </div>
             </div>
           )}
-        </Card>
+        </div>
       </div>
     </SystemAdminLayout>
   );

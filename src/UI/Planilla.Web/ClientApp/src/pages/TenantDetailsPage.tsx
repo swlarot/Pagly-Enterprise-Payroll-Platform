@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { SystemAdminLayout } from '../components/layout/SystemAdminLayout';
-import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Modal } from '../components/ui/Modal';
@@ -28,8 +27,10 @@ import {
   UserPlus,
   FileText,
   Info,
+  Trash2,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { TenantRole } from '../types/api';
 
 type TabType = 'info' | 'users' | 'audit';
 
@@ -46,6 +47,7 @@ export default function TenantDetailsPage() {
   const [users, setUsers] = useState<AdminTenantUserDto[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   // Audit log tab state
   const [auditLogs, setAuditLogs] = useState<AuditLogDto[]>([]);
@@ -113,6 +115,48 @@ export default function TenantDetailsPage() {
       toast.error('Error al cargar usuarios');
     } finally {
       setIsLoadingUsers(false);
+    }
+  };
+
+  const handleRemoveUser = async (userId: string, userEmail: string, userRole: TenantRole) => {
+    // Verificar si es el último Owner
+    const ownersCount = users.filter(
+      (u) => u.role === TenantRole.Owner && u.isActive && u.userId !== userId
+    ).length;
+    const isOwner = userRole === TenantRole.Owner;
+
+    if (isOwner && ownersCount === 0) {
+      toast.error('No se puede eliminar el último Owner del tenant');
+      return;
+    }
+
+    if (
+      !confirm(
+        `¿Estás seguro de eliminar al usuario "${userEmail}" del tenant?\n\n${
+          isOwner
+            ? 'ADVERTENCIA: Este usuario es Owner. Asegúrate de que haya otro Owner antes de continuar.'
+            : ''
+        }`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setDeletingUserId(userId);
+      await systemAdminService.removeTenantUser(parseInt(id!), userId);
+      toast.success('Usuario eliminado del tenant exitosamente');
+      await loadUsers();
+      await loadTenant(); // Recargar para actualizar estadísticas
+    } catch (error: any) {
+      console.error('Error removing user:', error);
+      if (error.statusCode === 400 && error.message?.includes('último Owner')) {
+        toast.error('No se puede eliminar el último Owner del tenant');
+      } else {
+        toast.error(error.message || 'Error al eliminar usuario del tenant');
+      }
+    } finally {
+      setDeletingUserId(null);
     }
   };
 
@@ -216,7 +260,7 @@ export default function TenantDetailsPage() {
     return (
       <SystemAdminLayout>
         <div className="flex items-center justify-center h-[calc(100vh-80px)]">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-primary-400" />
         </div>
       </SystemAdminLayout>
     );
@@ -229,15 +273,15 @@ export default function TenantDetailsPage() {
         <div className="mb-8">
           <button
             onClick={() => navigate('/system-admin/tenants')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
+            className="flex items-center gap-2 text-gray-400 hover:text-gray-100 mb-4 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Volver a Tenants
           </button>
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">{tenant.name}</h1>
-              <p className="text-gray-600 mt-2">
+              <h1 className="text-3xl font-bold text-gray-100">{tenant.name}</h1>
+              <p className="text-gray-400 mt-2">
                 {tenant.ruc && tenant.dv ? `RUC: ${tenant.ruc}-${tenant.dv} • ` : ''}
                 Creado el {new Date(tenant.createdAt).toLocaleDateString('es-PA')}
               </p>
@@ -254,56 +298,50 @@ export default function TenantDetailsPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardBody className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <UserCheck className="w-6 h-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Empleados</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {tenant.usage.totalEmployees}/{tenant.subscription?.maxEmployees || 0}
-                </p>
-              </div>
-            </CardBody>
-          </Card>
+          <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-lg shadow-black/20 px-6 py-5 flex items-center gap-4">
+            <div className="w-12 h-12 bg-primary-500/15 rounded-lg flex items-center justify-center">
+              <UserCheck className="w-6 h-6 text-primary-400" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Empleados</p>
+              <p className="text-2xl font-bold text-gray-100">
+                {tenant.usage.totalEmployees}/{tenant.subscription?.maxEmployees || 0}
+              </p>
+            </div>
+          </div>
 
-          <Card>
-            <CardBody className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Users className="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Usuarios</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {tenant.usage.totalUsers}/{tenant.subscription?.maxUsers || 0}
-                </p>
-              </div>
-            </CardBody>
-          </Card>
+          <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-lg shadow-black/20 px-6 py-5 flex items-center gap-4">
+            <div className="w-12 h-12 bg-green-500/15 rounded-lg flex items-center justify-center">
+              <Users className="w-6 h-6 text-green-400" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Usuarios</p>
+              <p className="text-2xl font-bold text-gray-100">
+                {tenant.usage.totalUsers}/{tenant.subscription?.maxUsers || 0}
+              </p>
+            </div>
+          </div>
 
-          <Card>
-            <CardBody className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Building2 className="w-6 h-6 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-600">Planillas</p>
-                <p className="text-2xl font-bold text-gray-900">{tenant.usage.totalPayrolls}</p>
-              </div>
-            </CardBody>
-          </Card>
+          <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-lg shadow-black/20 px-6 py-5 flex items-center gap-4">
+            <div className="w-12 h-12 bg-purple-500/15 rounded-lg flex items-center justify-center">
+              <Building2 className="w-6 h-6 text-purple-400" />
+            </div>
+            <div>
+              <p className="text-sm text-gray-400">Planillas</p>
+              <p className="text-2xl font-bold text-gray-100">{tenant.usage.totalPayrolls}</p>
+            </div>
+          </div>
         </div>
 
         {/* Tabs */}
-        <div className="border-b border-gray-200 mb-6">
+        <div className="border-b border-navy-700 mb-6">
           <div className="flex gap-4">
             <button
               onClick={() => setActiveTab('info')}
               className={`flex items-center gap-2 px-4 py-2 border-b-2 font-medium transition-colors ${
                 activeTab === 'info'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                  ? 'border-primary-500 text-primary-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-navy-600'
               }`}
             >
               <Info className="w-4 h-4" />
@@ -313,8 +351,8 @@ export default function TenantDetailsPage() {
               onClick={() => setActiveTab('users')}
               className={`flex items-center gap-2 px-4 py-2 border-b-2 font-medium transition-colors ${
                 activeTab === 'users'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                  ? 'border-primary-500 text-primary-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-navy-600'
               }`}
             >
               <Users className="w-4 h-4" />
@@ -324,8 +362,8 @@ export default function TenantDetailsPage() {
               onClick={() => setActiveTab('audit')}
               className={`flex items-center gap-2 px-4 py-2 border-b-2 font-medium transition-colors ${
                 activeTab === 'audit'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                  ? 'border-primary-500 text-primary-400'
+                  : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-navy-600'
               }`}
             >
               <FileText className="w-4 h-4" />
@@ -339,49 +377,47 @@ export default function TenantDetailsPage() {
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Subscription Info */}
-              <Card>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900">Información de Suscripción</h3>
-                    <Button variant="ghost" size="sm" icon={Edit} onClick={() => setShowChangePlanModal(true)}>
-                      Cambiar
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardBody className="space-y-4">
+              <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-lg shadow-black/20">
+                <div className="px-6 py-4 border-b border-navy-700 flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-100">Información de Suscripción</h3>
+                  <Button variant="ghost" size="sm" icon={Edit} onClick={() => setShowChangePlanModal(true)}>
+                    Cambiar
+                  </Button>
+                </div>
+                <div className="px-6 py-4 space-y-4">
                   {tenant.subscription ? (
                     <>
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Plan Actual</span>
+                        <span className="text-sm text-gray-400">Plan Actual</span>
                         <Badge variant={getPlanBadgeVariant(tenant.subscription.plan)}>
                           {tenant.subscription.planName}
                         </Badge>
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Estado</span>
+                        <span className="text-sm text-gray-400">Estado</span>
                         <Badge variant={getStatusBadgeVariant(tenant.subscription.status)}>
                           {tenant.subscription.statusName}
                         </Badge>
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-600">Precio Mensual</span>
-                        <span className="font-medium text-gray-900">
+                        <span className="text-sm text-gray-400">Precio Mensual</span>
+                        <span className="font-medium text-gray-100">
                           ${tenant.subscription.monthlyPrice.toFixed(2)}
                         </span>
                       </div>
 
                       {tenant.subscription.trialEndsAt && (
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600">Trial Expira</span>
+                          <span className="text-sm text-gray-400">Trial Expira</span>
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-gray-900">
+                            <span className="font-medium text-gray-100">
                               {new Date(tenant.subscription.trialEndsAt).toLocaleDateString('es-PA')}
                             </span>
                             <button
                               onClick={() => setShowExtendTrialModal(true)}
-                              className="text-xs text-blue-600 hover:text-blue-700"
+                              className="text-xs text-primary-400 hover:text-primary-300 transition-colors"
                             >
                               Extender
                             </button>
@@ -390,17 +426,17 @@ export default function TenantDetailsPage() {
                       )}
 
                       {/* Usage Progress Bars */}
-                      <div className="pt-4 border-t border-gray-200 space-y-3">
+                      <div className="pt-4 border-t border-navy-700 space-y-3">
                         <div>
                           <div className="flex justify-between text-sm mb-1">
-                            <span className="text-gray-600">Uso de Empleados</span>
-                            <span className="font-medium text-gray-900">
+                            <span className="text-gray-400">Uso de Empleados</span>
+                            <span className="font-medium text-gray-100">
                               {Math.round((tenant.usage.totalEmployees / (tenant.subscription.maxEmployees || 1)) * 100)}%
                             </span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="w-full bg-navy-700 rounded-full h-2">
                             <div
-                              className="bg-blue-600 h-2 rounded-full"
+                              className="bg-primary-500 h-2 rounded-full"
                               style={{
                                 width: `${Math.min((tenant.usage.totalEmployees / (tenant.subscription.maxEmployees || 1)) * 100, 100)}%`,
                               }}
@@ -410,14 +446,14 @@ export default function TenantDetailsPage() {
 
                         <div>
                           <div className="flex justify-between text-sm mb-1">
-                            <span className="text-gray-600">Uso de Usuarios</span>
-                            <span className="font-medium text-gray-900">
+                            <span className="text-gray-400">Uso de Usuarios</span>
+                            <span className="font-medium text-gray-100">
                               {Math.round((tenant.usage.totalUsers / (tenant.subscription.maxUsers || 1)) * 100)}%
                             </span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="w-full bg-navy-700 rounded-full h-2">
                             <div
-                              className="bg-green-600 h-2 rounded-full"
+                              className="bg-green-500 h-2 rounded-full"
                               style={{
                                 width: `${Math.min((tenant.usage.totalUsers / (tenant.subscription.maxUsers || 1)) * 100, 100)}%`,
                               }}
@@ -427,49 +463,49 @@ export default function TenantDetailsPage() {
                       </div>
                     </>
                   ) : (
-                    <div className="text-center py-4 text-gray-500">
+                    <div className="text-center py-4 text-gray-400">
                       Este tenant no tiene una suscripción activa
                     </div>
                   )}
-                </CardBody>
-              </Card>
+                </div>
+              </div>
 
               {/* Owner Info */}
-              <Card>
-                <CardHeader>
-                  <h3 className="font-semibold text-gray-900">Propietario del Tenant</h3>
-                </CardHeader>
-                <CardBody className="space-y-4">
+              <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-lg shadow-black/20">
+                <div className="px-6 py-4 border-b border-navy-700">
+                  <h3 className="font-semibold text-gray-100">Propietario del Tenant</h3>
+                </div>
+                <div className="px-6 py-4 space-y-4">
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Email</p>
-                    <p className="font-medium text-gray-900">{tenant.owner?.email}</p>
+                    <p className="text-sm text-gray-400 mb-1">Email</p>
+                    <p className="font-medium text-gray-100">{tenant.owner?.email}</p>
                   </div>
 
                   <div>
-                    <p className="text-sm text-gray-600 mb-1">Usuario desde</p>
-                    <p className="font-medium text-gray-900">
+                    <p className="text-sm text-gray-400 mb-1">Usuario desde</p>
+                    <p className="font-medium text-gray-100">
                       {tenant.owner?.joinedAt && new Date(tenant.owner.joinedAt).toLocaleDateString('es-PA')}
                     </p>
                   </div>
 
                   {tenant.owner?.lastLoginAt && (
                     <div>
-                      <p className="text-sm text-gray-600 mb-1">Último acceso</p>
-                      <p className="font-medium text-gray-900">
+                      <p className="text-sm text-gray-400 mb-1">Último acceso</p>
+                      <p className="font-medium text-gray-100">
                         {new Date(tenant.owner.lastLoginAt).toLocaleDateString('es-PA')}
                       </p>
                     </div>
                   )}
-                </CardBody>
-              </Card>
+                </div>
+              </div>
             </div>
 
             {/* Actions */}
-            <Card>
-              <CardHeader>
-                <h3 className="font-semibold text-gray-900">Acciones Administrativas</h3>
-              </CardHeader>
-              <CardBody>
+            <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-lg shadow-black/20">
+              <div className="px-6 py-4 border-b border-navy-700">
+                <h3 className="font-semibold text-gray-100">Acciones Administrativas</h3>
+              </div>
+              <div className="px-6 py-4">
                 <div className="flex gap-3">
                   <Button variant="outline" icon={Edit} onClick={() => setShowChangePlanModal(true)}>
                     Cambiar Plan
@@ -487,39 +523,37 @@ export default function TenantDetailsPage() {
                     {tenant.isActive ? 'Desactivar' : 'Reactivar'} Tenant
                   </Button>
                 </div>
-              </CardBody>
-            </Card>
+              </div>
+            </div>
           </div>
         )}
 
         {activeTab === 'users' && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Users className="w-5 h-5 text-gray-600" />
-                  <h3 className="font-semibold text-gray-900">
-                    Usuarios del Tenant ({users.length}/{tenant.usage.maxUsers})
-                  </h3>
-                </div>
-                <Button icon={UserPlus} onClick={() => setShowInviteModal(true)}>
-                  Invitar Usuario
-                </Button>
+          <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-lg shadow-black/20">
+            <div className="px-6 py-4 border-b border-navy-700 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Users className="w-5 h-5 text-gray-400" />
+                <h3 className="font-semibold text-gray-100">
+                  Usuarios del Tenant ({users.length}/{tenant.usage.maxUsers})
+                </h3>
               </div>
-            </CardHeader>
-            <CardBody>
+              <Button icon={UserPlus} onClick={() => setShowInviteModal(true)}>
+                Invitar Usuario
+              </Button>
+            </div>
+            <div className="px-6 py-4">
               {isLoadingUsers ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                  <Loader2 className="w-6 h-6 animate-spin text-primary-400" />
                 </div>
               ) : users.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-gray-400">
                   No hay usuarios registrados en este tenant
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-navy-800">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Usuario
@@ -536,78 +570,106 @@ export default function TenantDetailsPage() {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Último Acceso
                         </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Acciones
+                        </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {users.map((user) => (
-                        <tr key={user.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
-                                <span className="text-white text-xs font-bold">
-                                  {user.email.substring(0, 2).toUpperCase()}
-                                </span>
+                    <tbody className="divide-y divide-navy-700">
+                      {users.map((user) => {
+                        const ownersCount = users.filter(
+                          (u) => u.role === TenantRole.Owner && u.isActive && u.userId !== user.userId
+                        ).length;
+                        const isLastOwner = user.role === TenantRole.Owner && ownersCount === 0;
+
+                        return (
+                          <tr key={user.id} className="hover:bg-navy-800 transition-colors">
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center">
+                                  <span className="text-white text-xs font-bold">
+                                    {user.email.substring(0, 2).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium text-gray-100">{user.email}</p>
+                                  {user.fullName && (
+                                    <p className="text-xs text-gray-400">{user.fullName}</p>
+                                  )}
+                                </div>
                               </div>
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">{user.email}</p>
-                                {user.fullName && (
-                                  <p className="text-xs text-gray-500">{user.fullName}</p>
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            {user.customRoleName ? (
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border-2"
-                                  style={{
-                                    backgroundColor: `${user.customRoleColor}20`,
-                                    borderColor: user.customRoleColor || '#6b7280',
-                                    color: user.customRoleColor || '#374151',
-                                  }}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              {user.customRoleName ? (
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border-2"
+                                    style={{
+                                      backgroundColor: `${user.customRoleColor}20`,
+                                      borderColor: user.customRoleColor || '#6b7280',
+                                      color: user.customRoleColor || '#374151',
+                                    }}
+                                  >
+                                    {user.customRoleName}
+                                  </span>
+                                  <span className="text-xs text-gray-400">
+                                    ({user.roleName})
+                                  </span>
+                                </div>
+                              ) : (
+                                <RoleBadge role={user.role} showIcon />
+                              )}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap">
+                              <StatusBadge isActive={user.isActive} />
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-400">
+                              {new Date(user.joinedAt).toLocaleDateString('es-PA')}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-400">
+                              {user.lastLoginAt
+                                ? new Date(user.lastLoginAt).toLocaleDateString('es-PA')
+                                : '-'}
+                            </td>
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-400">
+                              {user.isActive && (
+                                <Button
+                                  variant="danger"
+                                  size="sm"
+                                  icon={deletingUserId === user.userId ? Loader2 : Trash2}
+                                  onClick={() =>
+                                    handleRemoveUser(user.userId, user.email, user.role)
+                                  }
+                                  disabled={deletingUserId === user.userId || isLastOwner}
+                                  title={
+                                    isLastOwner
+                                      ? 'No se puede eliminar el último Owner del tenant'
+                                      : 'Eliminar usuario del tenant'
+                                  }
                                 >
-                                  {user.customRoleName}
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  ({user.roleName})
-                                </span>
-                              </div>
-                            ) : (
-                              <RoleBadge role={user.role} showIcon />
-                            )}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <StatusBadge isActive={user.isActive} />
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {new Date(user.joinedAt).toLocaleDateString('es-PA')}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {user.lastLoginAt
-                              ? new Date(user.lastLoginAt).toLocaleDateString('es-PA')
-                              : '-'}
-                          </td>
-                        </tr>
-                      ))}
+                                  {deletingUserId === user.userId ? 'Eliminando...' : 'Eliminar'}
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
-            </CardBody>
-          </Card>
+            </div>
+          </div>
         )}
 
         {activeTab === 'audit' && (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-gray-900">
-                  Audit Log ({auditTotal} eventos)
-                </h3>
-              </div>
-            </CardHeader>
-            <CardBody>
+          <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-lg shadow-black/20">
+            <div className="px-6 py-4 border-b border-navy-700 flex items-center justify-between">
+              <h3 className="font-semibold text-gray-100">
+                Audit Log ({auditTotal} eventos)
+              </h3>
+            </div>
+            <div className="px-6 py-4">
               {/* Filters */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <Input
@@ -633,17 +695,17 @@ export default function TenantDetailsPage() {
 
               {isLoadingAudit ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                  <Loader2 className="w-6 h-6 animate-spin text-primary-400" />
                 </div>
               ) : auditLogs.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-gray-400">
                   No hay eventos de auditoría registrados
                 </div>
               ) : (
                 <>
                   <div className="overflow-x-auto">
                     <table className="w-full">
-                      <thead className="bg-gray-50">
+                      <thead className="bg-navy-800">
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Fecha
@@ -662,23 +724,25 @@ export default function TenantDetailsPage() {
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
+                      <tbody className="divide-y divide-navy-700">
                         {auditLogs.map((log) => (
-                          <tr key={log.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
-                              {new Date(log.createdAt).toLocaleString('es-PA')}
+                          <tr key={log.id} className="hover:bg-navy-800 transition-colors">
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-400">
+                              {log.createdAt
+                                ? new Date(log.createdAt).toLocaleString('es-PA')
+                                : '-'}
                             </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-100">
                               {log.actorEmail}
                             </td>
                             <td className="px-4 py-4 whitespace-nowrap">
                               <ActionBadge action={log.action} />
                             </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600">
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-400">
                               {log.entityType}
-                              {log.entityId && <span className="text-xs text-gray-400"> (#{log.entityId})</span>}
+                              {log.entityId && <span className="text-xs text-gray-500"> (#{log.entityId})</span>}
                             </td>
-                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-400">
                               {log.ipAddress || '-'}
                             </td>
                           </tr>
@@ -690,7 +754,7 @@ export default function TenantDetailsPage() {
                   {/* Pagination */}
                   {auditTotal > auditFilters.pageSize && (
                     <div className="mt-4 flex items-center justify-between">
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm text-gray-400">
                         Mostrando {(auditFilters.page - 1) * auditFilters.pageSize + 1} -{' '}
                         {Math.min(auditFilters.page * auditFilters.pageSize, auditTotal)} de {auditTotal}
                       </div>
@@ -716,8 +780,8 @@ export default function TenantDetailsPage() {
                   )}
                 </>
               )}
-            </CardBody>
-          </Card>
+            </div>
+          </div>
         )}
 
         {/* Modals */}
@@ -795,14 +859,14 @@ export default function TenantDetailsPage() {
         >
           <div className="space-y-4">
             <div className="flex items-start gap-3">
-              <AlertCircle className="w-6 h-6 text-amber-600 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-gray-900 font-medium mb-2">
+                <p className="text-gray-100 font-medium mb-2">
                   {tenant.isActive
                     ? '¿Estás seguro de que deseas desactivar este tenant?'
                     : '¿Estás seguro de que deseas reactivar este tenant?'}
                 </p>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-gray-400">
                   {tenant.isActive
                     ? 'Los usuarios no podrán acceder al sistema hasta que sea reactivado.'
                     : 'Los usuarios podrán acceder nuevamente al sistema.'}
