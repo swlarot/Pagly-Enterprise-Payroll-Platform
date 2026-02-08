@@ -1,0 +1,70 @@
+{
+  "brackets": [
+    {
+      "companyId": 1,
+      "year": 2025,
+      "order": 1,
+      "description": "Tramo exento",
+      "minIncome": 0.00,
+      "maxIncome": 11000.00,
+      "rate": 0.00,
+      "fixedAmount": 0.00,
+      "isActive": true
+    },
+    {
+      "companyId": 1,
+      "year": 2025,
+      "order": 2,
+      "description": "Tramo 15%",
+      "minIncome": 11000.01,
+      "maxIncome": 50000.00,
+      "rate": 15.00,
+      "fixedAmount": 0.00,
+      "isActive": true
+    },
+    {
+      "companyId": 1,
+      "year": 2025,
+      "order": 3,
+      "description": "Tramo 25%",
+      "minIncome": 50000.01,
+      "maxIncome": null,
+      "rate": 25.00,
+      "fixedAmount": 5850.00,
+      "isActive": true
+    },
+    {
+      "companyId": 1,
+      "year": 2026,
+      "order": 1,
+      "description": "Tramo exento",
+      "minIncome": 0.00,
+      "maxIncome": 11000.00,
+      "rate": 0.00,
+      "fixedAmount": 0.00,
+      "isActive": true
+    },
+    {
+      "companyId": 1,
+      "year": 2026,
+      "order": 2,
+      "description": "Tramo 15%",
+      "minIncome": 11000.01,
+      "maxIncome": 50000.00,
+      "rate": 15.00,
+      "fixedAmount": 0.00,
+      "isActive": true
+    },
+    {
+      "companyId": 1,
+      "year": 2026,
+      "order": 3,
+      "description": "Tramo 25%",
+      "minIncome": 50000.01,
+      "maxIncome": null,
+      "rate": 25.00,
+      "fixedAmount": 5850.00,
+      "isActive": true
+    }
+  ]
+}

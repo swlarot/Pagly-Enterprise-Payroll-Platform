@@ -153,6 +153,14 @@ dotnet run
 | Frontend | `http://localhost:5173` |
 | Swagger | `https://localhost:7105/swagger` |
 
+### Deployment (CapRover / Docker)
+
+Para desplegar en CapRover (p. ej. droplet DigitalOcean):
+
+- **Build local:** `docker build -t planilla-test --build-arg VITE_API_URL= .`
+- **Ejecutar:** `docker run -p 8080:80 -e ConnectionStrings__DefaultConnection="..." planilla-test`
+- **Guía completa:** [DEPLOY-CAPROVER.md](DEPLOY-CAPROVER.md) (variables de entorno, deploy, health check, rollback, troubleshooting).
+
 ---
 
 ## 🇵🇦 Panama Compliance
