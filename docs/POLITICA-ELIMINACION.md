@@ -18,6 +18,7 @@ Este documento describe la política de **eliminación física** (hard delete) a
 
 | Área | Comportamiento | Ubicación |
 |------|----------------|-----------|
+| Usuario del sistema (admin) | Hard delete (solo si no tiene membresías activas) | `AdminController.DeleteUser` |
 | Remover usuario del tenant | Hard delete + desvincular empleados | `TenantManagementService.RemoveTenantUserAsync` |
 | Empleados (lista) | Filtro `!IsDeleted`; eliminados no se listan | `EmpleadosController.GetAll`, `GetById` |
 | Empleados (ForceDelete) | **Soft delete** (FKs complejas) | `EmpleadosController.ForceDelete` |
@@ -31,7 +32,25 @@ Este documento describe la política de **eliminación física** (hard delete) a
 
 ## 3. Detalle por área
 
-### 3.1 Remover usuario del tenant
+### 3.1 Usuario del sistema (Admin del sistema)
+
+- **Controlador:** `Planilla.Web/Controllers/AdminController.cs` → acción `DeleteUser` (ruta `DELETE /api/admin/users/{userId}`).
+- **Comportamiento:**
+  1. **Validaciones críticas:**
+     - No eliminar si tiene membresías activas en cualquier tenant → retorna error con lista de tenants activos.
+     - No eliminar el último SystemAdmin del sistema.
+     - No eliminar si es el último Owner de algún tenant.
+  2. **Acciones antes de eliminar:**
+     - Desvincular empleados: `Empleado.UserId = null` para todos los empleados vinculados (en todos los tenants).
+     - Eliminar RefreshTokens relacionados: `_context.RefreshTokens.RemoveRange(refreshTokens)`.
+     - Eliminar TenantUsers relacionados (inactivos): `_context.TenantUsers.RemoveRange(tenantUsers)`.
+     - Eliminar TenantInvitations no aceptadas creadas por el usuario.
+     - Registrar audit log "UserHardDeleted" en todos los tenants afectados.
+  3. **Eliminación física:** `await _userManager.DeleteAsync(user)` elimina el registro `AppUser` de la base de datos.
+- **Nota:** Los AuditLogEntries se mantienen (histórico) con `ActorUserId` como string, por lo que no hay problema de integridad referencial.
+- **Flujo:** Si el usuario tiene membresías activas, primero debe removerse de cada tenant desde la gestión de usuarios del tenant, y luego puede eliminarse desde el admin del sistema.
+
+### 3.2 Remover usuario del tenant
 
 - **Servicio:** `Planilla.Infrastructure/Services/TenantManagementService.cs` → `RemoveTenantUserAsync`.
 - **Comportamiento:**
@@ -48,12 +67,12 @@ Este documento describe la política de **eliminación física** (hard delete) a
 - **Recuentos:** En `PlanUsageService`, `PlanLimitService` y recuentos de admin se cuentan solo empleados con `!e.IsDeleted`.
 - **ForceDelete:** Sigue siendo **soft delete** (`IsDeleted = true`) por dependencias de claves foráneas (planillas, detalles, historial). La eliminación física requeriría definir cascadas o limpieza de datos históricos; por eso se mantiene esta excepción documentada en código.
 
-### 3.3 Rol personalizado
+### 3.4 Rol personalizado
 
 - **Controlador:** `Planilla.Web/Controllers/CustomRolesController.cs` → acción `Delete`.
 - **Comportamiento:** Eliminación física del rol (entidad correspondiente en el contexto). Los permisos asociados se gestionan según la configuración del DbContext (cascada o eliminación explícita según el diseño actual).
 
-### 3.4 Departamento
+### 3.5 Departamento
 
 - **Controlador:** `Planilla.Web/Controllers/DepartamentosController.cs` → acción `Delete`.
 - **Comportamiento:**
@@ -68,7 +87,7 @@ Este documento describe la política de **eliminación física** (hard delete) a
   1. Se desasignan los empleados que tenían esta posición (`Empleado.PosicionId = null`).
   2. Se elimina físicamente la `Posicion`.
 
-### 3.6 Deducción fija
+### 3.7 Deducción fija
 
 - **Controlador:** `Planilla.Web/Controllers/DeduccionesController.cs` → acción `Desactivar` (ruta `DELETE /api/deducciones/{id}`).
 - **Comportamiento:** Eliminación física del registro en `DeduccionesFijas`. No hay FK desde otras tablas; `PayrollDetail.DeduccionesFijas` es un monto calculado, no una relación.
@@ -87,6 +106,7 @@ Este documento describe la política de **eliminación física** (hard delete) a
 ## 4. Excepciones a la eliminación física
 
 - **Empleados (ForceDelete):** Se mantiene soft delete por las muchas FKs (planillas, detalles, reportes, etc.). La eliminación física implicaría políticas de cascada o borrado de historial; por ahora solo se ocultan con `!IsDeleted` en listas y recuentos.
+- **Usuarios con membresías activas:** No se pueden eliminar desde el admin del sistema si tienen membresías activas en cualquier tenant. Deben removerse primero desde cada tenant individualmente.
 
 Cualquier otra excepción futura debe documentarse aquí y en el código.
 
@@ -102,6 +122,7 @@ Donde aplica, el **audit log** se registra **antes** de la eliminación física,
 
 | Archivo | Responsabilidad |
 |---------|-----------------|
+| `Web/Controllers/AdminController.cs` | Eliminar usuario del sistema (hard delete), validaciones de membresías activas |
 | `Infrastructure/Services/TenantManagementService.cs` | Remover usuario del tenant, desvincular empleados, hard delete TenantUser |
 | `Infrastructure/Services/InvitationService.cs` | Revocar invitación, hard delete TenantInvitation |
 | `Web/Controllers/EmpleadosController.cs` | Lista/GetById con `!IsDeleted`, ForceDelete (soft) |

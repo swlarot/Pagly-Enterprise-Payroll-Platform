@@ -1,0 +1,27 @@
+{
+  "configurations": [
+    {
+      "companyId": 1,
+      "effectiveStartDate": "2025-01-01T00:00:00Z",
+      "effectiveEndDate": null,
+      "description": "Configuración Panamá 2025",
+      "cssEmployeeRate": 9.75,
+      "cssEmployerBaseRate": 13.25,
+      "cssRiskRateLow": 0.56,
+      "cssRiskRateMedium": 2.50,
+      "cssRiskRateHigh": 5.39,
+      "cssMaxContributionBaseStandard": 1500.00,
+      "cssMaxContributionBaseIntermediate": 2000.00,
+      "cssMaxContributionBaseHigh": 2500.00,
+      "cssIntermediateMinYears": 25,
+      "cssIntermediateMinAvgSalary": 2000.00,
+      "cssHighMinYears": 30,
+      "cssHighMinAvgSalary": 2500.00,
+      "educationalInsuranceEmployeeRate": 1.25,
+      "educationalInsuranceEmployerRate": 1.50,
+      "dependentDeductionAmount": 800.00,
+      "maxDependents": 3,
+      "isActive": true
+    }
+  ]
+}
