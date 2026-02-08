@@ -17,17 +17,17 @@ export default function RolesAndPermissionsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-          <Shield className="w-8 h-8 text-blue-600" />
+        <h1 className="text-3xl font-bold text-gray-100 flex items-center gap-3">
+          <Shield className="w-8 h-8 text-primary-400" />
           Roles y Permisos
         </h1>
-        <p className="text-gray-600 mt-2">
+        <p className="text-gray-400 mt-2">
           Gestiona los roles, permisos y usuarios de tu organización
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
+      <div className="bg-navy-900 border-b border-navy-700">
         <nav className="-mb-px flex space-x-8" aria-label="Tabs">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -41,8 +41,8 @@ export default function RolesAndPermissionsPage() {
                   transition-colors duration-200
                   ${
                     isActive
-                      ? 'border-blue-600 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-primary-500 text-primary-400'
+                      : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600'
                   }
                 `}
               >

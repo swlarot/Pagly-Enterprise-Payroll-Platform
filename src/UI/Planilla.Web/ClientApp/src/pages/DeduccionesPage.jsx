@@ -116,15 +116,15 @@ const DeduccionesPage = () => {
     // Tipo badge color
     const getTipoBadgeColor = (tipo) => {
         const colors = {
-            'SeguridadSocial': 'bg-blue-100 text-blue-800',
-            'SeguroEducativo': 'bg-green-100 text-green-800',
-            'ImpuestoRenta': 'bg-purple-100 text-purple-800',
-            'Prestamo': 'bg-yellow-100 text-yellow-800',
-            'Embargo': 'bg-red-100 text-red-800',
-            'Descuento': 'bg-gray-100 text-gray-800',
-            'Otro': 'bg-gray-100 text-gray-800'
+            'SeguridadSocial': 'bg-blue-500/15 text-blue-400',
+            'SeguroEducativo': 'bg-green-500/15 text-green-400',
+            'ImpuestoRenta': 'bg-purple-500/15 text-purple-400',
+            'Prestamo': 'bg-amber-500/15 text-amber-400',
+            'Embargo': 'bg-red-500/15 text-red-400',
+            'Descuento': 'bg-navy-700 text-gray-300',
+            'Otro': 'bg-navy-700 text-gray-300'
         };
-        return colors[tipo] || 'bg-gray-100 text-gray-800';
+        return colors[tipo] || 'bg-navy-700 text-gray-300';
     };
 
     const getTipoNombre = (tipo) => {
@@ -247,8 +247,8 @@ const DeduccionesPage = () => {
         return (
             <div className="flex items-center justify-center min-h-96">
                 <div className="text-center">
-                    <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-gray-600">Cargando deducciones...</p>
+                    <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-400">Cargando deducciones...</p>
                 </div>
             </div>
         );
@@ -258,14 +258,14 @@ const DeduccionesPage = () => {
         <div className="space-y-6">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Deducciones Activas</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">{deduccionesActivas.length}</p>
+                            <p className="text-sm font-medium text-gray-400">Deducciones Activas</p>
+                            <p className="text-3xl font-bold text-gray-100 mt-2">{deduccionesActivas.length}</p>
                         </div>
-                        <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="w-12 h-12 bg-primary-500/15 rounded-lg flex items-center justify-center">
+                            <svg className="w-6 h-6 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
@@ -275,14 +275,14 @@ const DeduccionesPage = () => {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Total Mensual Est.</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">{formatCurrency(totalMensual)}</p>
+                            <p className="text-sm font-medium text-gray-400">Total Mensual Est.</p>
+                            <p className="text-3xl font-bold font-mono text-gray-100 mt-2">{formatCurrency(totalMensual)}</p>
                         </div>
-                        <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="w-12 h-12 bg-green-500/15 rounded-lg flex items-center justify-center">
+                            <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
@@ -292,20 +292,20 @@ const DeduccionesPage = () => {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Por Tipo</p>
+                            <p className="text-sm font-medium text-gray-400">Por Tipo</p>
                             <div className="mt-2 flex flex-wrap gap-1">
-                                {Object.entries(countsporTipo).slice(0, 3).map(([tipo, count]) => (
-                                    <span key={tipo} className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getTipoBadgeColor(tipo)}`}>
+                                {Object.entries(countsporTipo).slice(0, 3).map(([tipo, count], index) => (
+                                    <span key={tipo || `tipo-${index}`} className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getTipoBadgeColor(tipo)}`}>
                                         {count}
                                     </span>
                                 ))}
                             </div>
                         </div>
-                        <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-6 h-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="w-12 h-12 bg-amber-500/15 rounded-lg flex items-center justify-center">
+                            <svg className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                             </svg>
                         </div>
@@ -315,14 +315,14 @@ const DeduccionesPage = () => {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Empleados Afectados</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">{empleadosAfectados}</p>
+                            <p className="text-sm font-medium text-gray-400">Empleados Afectados</p>
+                            <p className="text-3xl font-bold text-gray-100 mt-2">{empleadosAfectados}</p>
                         </div>
-                        <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="w-12 h-12 bg-purple-500/15 rounded-lg flex items-center justify-center">
+                            <svg className="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
                         </div>
@@ -337,7 +337,7 @@ const DeduccionesPage = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <button
                     onClick={() => setShowModal(true)}
-                    className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
+                    className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
                 >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -349,7 +349,7 @@ const DeduccionesPage = () => {
                     <select
                         value={filterEmpleado}
                         onChange={(e) => setFilterEmpleado(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="px-3 py-2 bg-navy-900 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     >
                         <option value="">Todos los empleados</option>
                         {empleados.map(emp => (
@@ -362,7 +362,7 @@ const DeduccionesPage = () => {
                     <select
                         value={filterTipo}
                         onChange={(e) => setFilterTipo(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="px-3 py-2 bg-navy-900 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     >
                         <option value="">Todos los tipos</option>
                         {tiposDeducciones.map(tipo => (
@@ -372,22 +372,22 @@ const DeduccionesPage = () => {
                         ))}
                     </select>
 
-                    <label className="inline-flex items-center px-3 py-2 bg-white border border-gray-300 rounded-lg cursor-pointer">
+                    <label className="inline-flex items-center px-3 py-2 bg-navy-900 border border-navy-600 rounded-lg cursor-pointer">
                         <input
                             type="checkbox"
                             checked={filterActivas}
                             onChange={(e) => setFilterActivas(e.target.checked)}
                             className="mr-2"
                         />
-                        <span className="text-sm font-medium text-gray-700">Solo activas</span>
+                        <span className="text-sm font-medium text-gray-300">Solo activas</span>
                     </label>
                 </div>
             </div>
 
             {/* Deducciones Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900">
+            <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 overflow-hidden">
+                <div className="px-6 py-4 border-b border-navy-700">
+                    <h3 className="text-lg font-semibold text-gray-100">
                         Lista de Deducciones
                         <span className="ml-2 text-sm font-normal text-gray-500">
                             ({deducciones.length} {deducciones.length === 1 ? 'deducción' : 'deducciones'})
@@ -397,7 +397,7 @@ const DeduccionesPage = () => {
 
                 <div className="overflow-x-auto">
                     <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
+                        <thead className="bg-navy-950 border-b border-navy-700">
                             <tr>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Empleado</th>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
@@ -409,10 +409,10 @@ const DeduccionesPage = () => {
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-navy-900 divide-y divide-navy-700">
                             {deducciones.map((deduccion) => (
-                                <tr key={deduccion.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="py-4 px-6 text-sm font-medium text-gray-900">
+                                <tr key={deduccion.id} className="hover:bg-navy-800 transition-colors">
+                                    <td className="py-4 px-6 text-sm font-medium text-gray-100">
                                         {deduccion.empleadoNombre || 'N/A'}
                                     </td>
                                     <td className="py-4 px-6">
@@ -420,14 +420,14 @@ const DeduccionesPage = () => {
                                             {getTipoNombre(deduccion.tipoDeduccion)}
                                         </span>
                                     </td>
-                                    <td className="py-4 px-6 text-sm text-gray-900">{deduccion.descripcion}</td>
-                                    <td className="py-4 px-6 text-sm font-medium text-gray-900">
+                                    <td className="py-4 px-6 text-sm text-gray-100">{deduccion.descripcion}</td>
+                                    <td className="py-4 px-6 text-sm font-medium font-mono text-gray-100">
                                         {deduccion.esPorcentaje
                                             ? `${deduccion.porcentaje}%`
                                             : formatCurrency(deduccion.monto)
                                         }
                                     </td>
-                                    <td className="py-4 px-6 text-sm text-gray-600">
+                                    <td className="py-4 px-6 text-sm text-gray-400">
                                         {new Date(deduccion.fechaInicio).toLocaleDateString('es-PA')}
                                         {' - '}
                                         {deduccion.fechaFin
@@ -435,14 +435,14 @@ const DeduccionesPage = () => {
                                             : 'Indefinida'
                                         }
                                     </td>
-                                    <td className="py-4 px-6 text-sm text-gray-900">{deduccion.prioridad}</td>
+                                    <td className="py-4 px-6 text-sm text-gray-100">{deduccion.prioridad}</td>
                                     <td className="py-4 px-6">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                             deduccion.estaActivo
-                                                ? 'bg-green-100 text-green-800'
-                                                : 'bg-gray-100 text-gray-800'
+                                                ? 'bg-green-500/15 text-green-400'
+                                                : 'bg-navy-700 text-gray-300'
                                         }`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${deduccion.estaActivo ? 'bg-green-600' : 'bg-gray-600'}`}></span>
+                                            <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${deduccion.estaActivo ? 'bg-green-400' : 'bg-gray-400'}`}></span>
                                             {deduccion.estaActivo ? 'Activo' : 'Inactivo'}
                                         </span>
                                     </td>
@@ -450,7 +450,7 @@ const DeduccionesPage = () => {
                                         <div className="flex items-center gap-2">
                                             <button
                                                 onClick={() => handleEdit(deduccion)}
-                                                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium text-sm"
+                                                className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300 font-medium text-sm"
                                             >
                                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -460,7 +460,7 @@ const DeduccionesPage = () => {
                                             {deduccion.estaActivo && (
                                                 <button
                                                     onClick={() => confirmDelete(deduccion)}
-                                                    className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-medium text-sm"
+                                                    className="inline-flex items-center gap-1 text-red-400 hover:text-red-300 font-medium text-sm"
                                                 >
                                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -481,7 +481,7 @@ const DeduccionesPage = () => {
                             <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <h3 className="text-lg font-medium text-gray-900 mb-1">No hay deducciones registradas</h3>
+                            <h3 className="text-lg font-medium text-gray-100 mb-1">No hay deducciones registradas</h3>
                             <p className="text-gray-500">Comienza agregando la primera deducción</p>
                         </div>
                     )}
@@ -491,12 +491,12 @@ const DeduccionesPage = () => {
             {/* Create/Edit Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
-                            <h3 className="text-xl font-semibold text-gray-900">
+                    <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="px-6 py-4 border-b border-navy-700 flex items-center justify-between sticky top-0 bg-navy-900">
+                            <h3 className="text-xl font-semibold text-gray-100">
                                 {editingId ? 'Editar Deducción' : 'Nueva Deducción'}
                             </h3>
-                            <button onClick={resetForm} className="text-gray-400 hover:text-gray-600">
+                            <button onClick={resetForm} className="text-gray-400 hover:text-gray-200">
                                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
@@ -506,14 +506,14 @@ const DeduccionesPage = () => {
                         <form onSubmit={handleSubmit} className="p-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Empleado <span className="text-red-500">*</span>
                                     </label>
                                     <select
                                         required
                                         value={formData.empleadoId}
                                         onChange={(e) => setFormData({ ...formData, empleadoId: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     >
                                         <option value="">Seleccionar empleado...</option>
                                         {empleados.map(emp => (
@@ -525,26 +525,26 @@ const DeduccionesPage = () => {
                                 </div>
 
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Tipo de Deducción <span className="text-red-500">*</span>
                                     </label>
                                     <select
                                         required
                                         value={formData.tipoDeduccion}
                                         onChange={(e) => setFormData({ ...formData, tipoDeduccion: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     >
                                         <option value="">Seleccionar tipo...</option>
-                                        {tiposDeducciones.map(tipo => (
-                                            <option key={tipo.id || tipo} value={tipo.id || tipo}>
-                                                {tipo.nombre || getTipoNombre(tipo)}
+                                        {tiposDeducciones.map((tipo, index) => (
+                                            <option key={tipo?.id || tipo || `tipo-${index}`} value={tipo?.id || tipo}>
+                                                {tipo?.nombre || getTipoNombre(tipo)}
                                             </option>
                                         ))}
                                     </select>
                                 </div>
 
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Descripción <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -552,13 +552,13 @@ const DeduccionesPage = () => {
                                         required
                                         value={formData.descripcion}
                                         onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                         placeholder="Descripción de la deducción"
                                     />
                                 </div>
 
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Tipo de Cálculo <span className="text-red-500">*</span>
                                     </label>
                                     <div className="flex gap-4">
@@ -569,7 +569,7 @@ const DeduccionesPage = () => {
                                                 onChange={() => setFormData({ ...formData, esPorcentaje: false })}
                                                 className="mr-2"
                                             />
-                                            <span className="text-sm text-gray-700">Monto Fijo</span>
+                                            <span className="text-sm text-gray-300">Monto Fijo</span>
                                         </label>
                                         <label className="inline-flex items-center">
                                             <input
@@ -578,14 +578,14 @@ const DeduccionesPage = () => {
                                                 onChange={() => setFormData({ ...formData, esPorcentaje: true })}
                                                 className="mr-2"
                                             />
-                                            <span className="text-sm text-gray-700">Porcentaje sobre salario</span>
+                                            <span className="text-sm text-gray-300">Porcentaje sobre salario</span>
                                         </label>
                                     </div>
                                 </div>
 
                                 {!formData.esPorcentaje && (
                                     <div className="md:col-span-2">
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-gray-300 mb-2">
                                             Monto <span className="text-red-500">*</span>
                                         </label>
                                         <div className="relative">
@@ -597,7 +597,7 @@ const DeduccionesPage = () => {
                                                 required={!formData.esPorcentaje}
                                                 value={formData.monto}
                                                 onChange={(e) => setFormData({ ...formData, monto: e.target.value })}
-                                                className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-full pl-8 pr-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 font-mono rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                                 placeholder="150.00"
                                             />
                                         </div>
@@ -606,7 +606,7 @@ const DeduccionesPage = () => {
 
                                 {formData.esPorcentaje && (
                                     <div className="md:col-span-2">
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-gray-300 mb-2">
                                             Porcentaje <span className="text-red-500">*</span>
                                         </label>
                                         <div className="relative">
@@ -618,7 +618,7 @@ const DeduccionesPage = () => {
                                                 required={formData.esPorcentaje}
                                                 value={formData.porcentaje}
                                                 onChange={(e) => setFormData({ ...formData, porcentaje: e.target.value })}
-                                                className="w-full pr-10 pl-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                className="w-full pr-10 pl-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 font-mono rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                                 placeholder="5.00"
                                             />
                                             <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500">%</span>
@@ -627,7 +627,7 @@ const DeduccionesPage = () => {
                                 )}
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Fecha de Inicio <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -635,25 +635,25 @@ const DeduccionesPage = () => {
                                         required
                                         value={formData.fechaInicio}
                                         onChange={(e) => setFormData({ ...formData, fechaInicio: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Fecha de Fin
                                     </label>
                                     <input
                                         type="date"
                                         value={formData.fechaFin}
                                         onChange={(e) => setFormData({ ...formData, fechaFin: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     />
                                     <p className="text-xs text-gray-500 mt-1">Dejar vacío para deducción indefinida</p>
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Prioridad
                                     </label>
                                     <input
@@ -662,49 +662,49 @@ const DeduccionesPage = () => {
                                         max="99"
                                         value={formData.prioridad}
                                         onChange={(e) => setFormData({ ...formData, prioridad: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     />
                                     <p className="text-xs text-gray-500 mt-1">Orden de aplicación (menor = mayor prioridad)</p>
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Referencia
                                     </label>
                                     <input
                                         type="text"
                                         value={formData.referencia}
                                         onChange={(e) => setFormData({ ...formData, referencia: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                         placeholder="Número de referencia"
                                     />
                                 </div>
 
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Observaciones
                                     </label>
                                     <textarea
                                         rows="3"
                                         value={formData.observaciones}
                                         onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                         placeholder="Notas adicionales..."
                                     ></textarea>
                                 </div>
                             </div>
 
-                            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                            <div className="flex justify-end gap-3 pt-4 border-t border-navy-700">
                                 <button
                                     type="button"
                                     onClick={resetForm}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+                                    className="px-4 py-2 border border-navy-600 rounded-lg text-gray-300 hover:bg-navy-800 font-medium"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
+                                    className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium"
                                 >
                                     {editingId ? 'Actualizar Deducción' : 'Crear Deducción'}
                                 </button>
@@ -717,17 +717,17 @@ const DeduccionesPage = () => {
             {/* Confirmation Delete Modal */}
             {showConfirmDelete && deduccionToDelete && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+                    <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-md w-full">
                         <div className="p-6">
-                            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <div className="w-12 h-12 bg-red-500/15 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                 </svg>
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+                            <h3 className="text-lg font-semibold text-gray-100 text-center mb-2">
                                 Desactivar Deducción
                             </h3>
-                            <p className="text-gray-600 text-center mb-6">
+                            <p className="text-gray-400 text-center mb-6">
                                 ¿Está seguro de que desea desactivar esta deducción? Esta acción marcará la deducción como inactiva.
                             </p>
                             <div className="flex gap-3">
@@ -736,7 +736,7 @@ const DeduccionesPage = () => {
                                         setShowConfirmDelete(false);
                                         setDeduccionToDelete(null);
                                     }}
-                                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+                                    className="flex-1 px-4 py-2 border border-navy-600 rounded-lg text-gray-300 hover:bg-navy-800 font-medium"
                                 >
                                     Cancelar
                                 </button>

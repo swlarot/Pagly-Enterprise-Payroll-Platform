@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SystemAdminLayout } from '../components/layout/SystemAdminLayout';
-import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { systemAdminService } from '../services/systemAdminService';
@@ -82,37 +81,37 @@ export default function CreateTenantPage() {
     return (
       <SystemAdminLayout>
         <div className="max-w-2xl mx-auto px-6 py-8">
-          <Card>
-            <CardBody className="text-center py-12">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckCircle2 className="w-10 h-10 text-green-600" />
+          <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-lg shadow-black/20">
+            <div className="px-6 py-12 text-center">
+              <div className="w-16 h-16 bg-green-500/15 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle2 className="w-10 h-10 text-green-400" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Tenant Creado Exitosamente</h2>
-              <p className="text-gray-600 mb-4">
+              <h2 className="text-2xl font-bold text-gray-100 mb-2">Tenant Creado Exitosamente</h2>
+              <p className="text-gray-400 mb-4">
                 El tenant ha sido creado con plan Free.
               </p>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
-                <p className="text-sm text-blue-800 font-medium">
-                  💡 Ahora asigna usuarios a este tenant desde el módulo de Usuarios
+              <div className="bg-primary-500/15 border border-primary-500/25 rounded-lg p-4 mb-8">
+                <p className="text-sm text-primary-300 font-medium">
+                  Ahora asigna usuarios a este tenant desde el módulo de Usuarios
                 </p>
               </div>
 
-              <div className="bg-gray-50 rounded-lg p-6 text-left mb-8 space-y-3">
+              <div className="bg-navy-800 rounded-lg p-6 text-left mb-8 space-y-3">
                 <div>
-                  <p className="text-sm text-gray-500">Empresa:</p>
-                  <p className="font-medium text-gray-900">{createdTenant.name || formData.nombre}</p>
+                  <p className="text-sm text-gray-400">Empresa:</p>
+                  <p className="font-medium text-gray-100">{createdTenant.name || formData.nombre}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">RUC:</p>
-                  <p className="font-medium text-gray-900">{createdTenant.ruc || formData.ruc}-{createdTenant.dv || formData.dv}</p>
+                  <p className="text-sm text-gray-400">RUC:</p>
+                  <p className="font-medium text-gray-100">{createdTenant.ruc || formData.ruc}-{createdTenant.dv || formData.dv}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Tipo:</p>
-                  <p className="font-medium text-gray-900">{createdTenant.tipoContribuyente || formData.tipoContribuyente}</p>
+                  <p className="text-sm text-gray-400">Tipo:</p>
+                  <p className="font-medium text-gray-100">{createdTenant.tipoContribuyente || formData.tipoContribuyente}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Plan:</p>
-                  <p className="font-medium text-gray-900">Free</p>
+                  <p className="text-sm text-gray-400">Plan:</p>
+                  <p className="font-medium text-gray-100">Free</p>
                 </div>
               </div>
 
@@ -124,8 +123,8 @@ export default function CreateTenantPage() {
                   Asignar Usuarios
                 </Button>
               </div>
-            </CardBody>
-          </Card>
+            </div>
+          </div>
         </div>
       </SystemAdminLayout>
     );
@@ -138,25 +137,25 @@ export default function CreateTenantPage() {
         <div className="mb-8">
           <button
             onClick={() => navigate('/system-admin/tenants')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
+            className="flex items-center gap-2 text-gray-400 hover:text-gray-100 mb-4 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Volver
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">Crear Nuevo Tenant</h1>
-          <p className="text-gray-600 mt-2">
+          <h1 className="text-3xl font-bold text-gray-100">Crear Nuevo Tenant</h1>
+          <p className="text-gray-400 mt-2">
             Crea un nuevo tenant. Los usuarios se asignan después desde el módulo de Usuarios.
           </p>
         </div>
 
-        <Card>
-          <CardBody>
+        <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-lg shadow-black/20">
+          <div className="px-6 py-6">
             <form onSubmit={handleSubmit} className="space-y-8">
               {/* Información de la Empresa */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <Building2 className="w-5 h-5 text-gray-700" />
-                  <h2 className="text-lg font-semibold text-gray-900">Información de la Empresa</h2>
+                  <Building2 className="w-5 h-5 text-gray-300" />
+                  <h2 className="text-lg font-semibold text-gray-100">Información de la Empresa</h2>
                 </div>
 
                 <div className="space-y-4">
@@ -190,8 +189,8 @@ export default function CreateTenantPage() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Tipo de Contribuyente <span className="text-red-500">*</span>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Tipo de Contribuyente <span className="text-red-400">*</span>
                     </label>
                     <div className="flex gap-6">
                       <label className="flex items-center gap-2 cursor-pointer">
@@ -201,9 +200,9 @@ export default function CreateTenantPage() {
                           value="Natural"
                           checked={formData.tipoContribuyente === 'Natural'}
                           onChange={(e) => handleInputChange('tipoContribuyente', e.target.value)}
-                          className="w-4 h-4 text-blue-600"
+                          className="w-4 h-4 text-primary-500"
                         />
-                        <span className="text-sm text-gray-700">Persona Natural</span>
+                        <span className="text-sm text-gray-300">Persona Natural</span>
                       </label>
                       <label className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -212,9 +211,9 @@ export default function CreateTenantPage() {
                           value="Juridico"
                           checked={formData.tipoContribuyente === 'Juridico'}
                           onChange={(e) => handleInputChange('tipoContribuyente', e.target.value)}
-                          className="w-4 h-4 text-blue-600"
+                          className="w-4 h-4 text-primary-500"
                         />
-                        <span className="text-sm text-gray-700">Persona Jurídica</span>
+                        <span className="text-sm text-gray-300">Persona Jurídica</span>
                       </label>
                     </div>
                   </div>
@@ -224,8 +223,8 @@ export default function CreateTenantPage() {
               {/* Información de Contacto */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <Globe className="w-5 h-5 text-gray-700" />
-                  <h2 className="text-lg font-semibold text-gray-900">Información de Contacto</h2>
+                  <Globe className="w-5 h-5 text-gray-300" />
+                  <h2 className="text-lg font-semibold text-gray-100">Información de Contacto</h2>
                 </div>
 
                 <div className="space-y-4">
@@ -250,8 +249,8 @@ export default function CreateTenantPage() {
               {/* Ubicación */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <MapPin className="w-5 h-5 text-gray-700" />
-                  <h2 className="text-lg font-semibold text-gray-900">Ubicación</h2>
+                  <MapPin className="w-5 h-5 text-gray-300" />
+                  <h2 className="text-lg font-semibold text-gray-100">Ubicación</h2>
                 </div>
 
                 <div className="space-y-4">
@@ -273,7 +272,7 @@ export default function CreateTenantPage() {
 
               {/* Información Adicional */}
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Información Adicional</h2>
+                <h2 className="text-lg font-semibold text-gray-100 mb-4">Información Adicional</h2>
                 <div className="space-y-4">
                   <Input
                     label="Sitio Web"
@@ -286,8 +285,8 @@ export default function CreateTenantPage() {
               </div>
 
               {/* Note */}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-sm text-yellow-800">
+              <div className="bg-amber-500/15 border border-amber-500/25 rounded-lg p-4">
+                <p className="text-sm text-amber-300">
                   <strong>Nota:</strong> El tenant se creará con plan <strong>Free</strong> por defecto.
                   No se creará ningún usuario automáticamente. Deberás asignar usuarios desde el módulo de Usuarios.
                 </p>
@@ -309,8 +308,8 @@ export default function CreateTenantPage() {
                 </Button>
               </div>
             </form>
-          </CardBody>
-        </Card>
+          </div>
+        </div>
       </div>
     </SystemAdminLayout>
   );

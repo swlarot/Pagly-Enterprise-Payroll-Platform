@@ -92,11 +92,11 @@ const PlanillasPage = () => {
 
     const getStatusBadge = (status) => {
         const statuses = {
-            0: { label: 'Draft', bg: 'bg-yellow-100', text: 'text-yellow-800', dot: 'bg-yellow-600' },
-            1: { label: 'Calculated', bg: 'bg-blue-100', text: 'text-blue-800', dot: 'bg-blue-600' },
-            2: { label: 'Approved', bg: 'bg-green-100', text: 'text-green-800', dot: 'bg-green-600' },
-            3: { label: 'Paid', bg: 'bg-emerald-100', text: 'text-emerald-800', dot: 'bg-emerald-600' },
-            4: { label: 'Cancelled', bg: 'bg-red-100', text: 'text-red-800', dot: 'bg-red-600' }
+            0: { label: 'Draft', bg: 'bg-amber-500/15', text: 'text-amber-400', dot: 'bg-amber-600' },
+            1: { label: 'Calculated', bg: 'bg-blue-500/15', text: 'text-blue-400', dot: 'bg-blue-600' },
+            2: { label: 'Approved', bg: 'bg-green-500/15', text: 'text-green-400', dot: 'bg-green-600' },
+            3: { label: 'Paid', bg: 'bg-emerald-500/15', text: 'text-emerald-400', dot: 'bg-emerald-600' },
+            4: { label: 'Cancelled', bg: 'bg-red-500/15', text: 'text-red-400', dot: 'bg-red-600' }
         };
         const s = statuses[status] || statuses[0];
         return (
@@ -219,7 +219,7 @@ const PlanillasPage = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <button
                     onClick={openNewModal}
-                    className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
+                    className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
                 >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -235,7 +235,7 @@ const PlanillasPage = () => {
                                 const planilla = planillas.find(p => p.id === parseInt(e.target.value));
                                 setSelectedPlanilla(planilla); // Ya viene enriquecida del fetchData
                             }}
-                            className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full px-3 py-2.5 bg-navy-900 border border-navy-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         >
                             {planillas.map(p => (
                                 <option key={p.id} value={p.id}>
@@ -250,32 +250,32 @@ const PlanillasPage = () => {
             {/* Summary Cards */}
             {selectedPlanilla ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <h3 className="text-sm font-medium text-gray-600 mb-2">Salarios Brutos</h3>
-                        <p className="text-3xl font-bold text-gray-900">{formatCurrency(selectedPlanilla.totalGrossPay)}</p>
-                        <p className="text-sm text-blue-600 mt-2">{empleadosCount} empleados</p>
+                    <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
+                        <h3 className="text-sm font-medium text-gray-400 mb-2">Salarios Brutos</h3>
+                        <p className="text-3xl font-bold text-gray-100 font-mono">{formatCurrency(selectedPlanilla.totalGrossPay)}</p>
+                        <p className="text-sm text-primary-400 mt-2">{empleadosCount} empleados</p>
                     </div>
 
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <h3 className="text-sm font-medium text-gray-600 mb-2">Aportes CSS</h3>
-                        <p className="text-3xl font-bold text-gray-900">{formatCurrency(selectedPlanilla.totalEmployeeCss + selectedPlanilla.totalEmployerCss)}</p>
-                        <p className="text-sm text-yellow-600 mt-2">Empleado + Patrono</p>
+                    <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
+                        <h3 className="text-sm font-medium text-gray-400 mb-2">Aportes CSS</h3>
+                        <p className="text-3xl font-bold text-gray-100 font-mono">{formatCurrency(selectedPlanilla.totalEmployeeCss + selectedPlanilla.totalEmployerCss)}</p>
+                        <p className="text-sm text-amber-400 mt-2">Empleado + Patrono</p>
                     </div>
 
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <h3 className="text-sm font-medium text-gray-600 mb-2">Seguro Educativo</h3>
-                        <p className="text-3xl font-bold text-gray-900">{formatCurrency(selectedPlanilla.totalEmployeeSe + selectedPlanilla.totalEmployerSe)}</p>
-                        <p className="text-sm text-purple-600 mt-2">Empleado + Patrono</p>
+                    <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
+                        <h3 className="text-sm font-medium text-gray-400 mb-2">Seguro Educativo</h3>
+                        <p className="text-3xl font-bold text-gray-100 font-mono">{formatCurrency(selectedPlanilla.totalEmployeeSe + selectedPlanilla.totalEmployerSe)}</p>
+                        <p className="text-sm text-purple-400 mt-2">Empleado + Patrono</p>
                     </div>
 
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                        <h3 className="text-sm font-medium text-gray-600 mb-2">ISR Retenido</h3>
-                        <p className="text-3xl font-bold text-gray-900">{formatCurrency(selectedPlanilla.totalIncomeTax)}</p>
-                        <p className="text-sm text-red-600 mt-2">Según tabla DGI</p>
+                    <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
+                        <h3 className="text-sm font-medium text-gray-400 mb-2">ISR Retenido</h3>
+                        <p className="text-3xl font-bold text-gray-100 font-mono">{formatCurrency(selectedPlanilla.totalIncomeTax)}</p>
+                        <p className="text-sm text-red-400 mt-2">Según tabla DGI</p>
                     </div>
                 </div>
             ) : (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
                     <EmptyState
                         icon={
                             <svg className="w-16 h-16 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -295,7 +295,7 @@ const PlanillasPage = () => {
                         <button
                             onClick={handleCalculate}
                             disabled={processingAction === 'calculating'}
-                            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {processingAction === 'calculating' ? (
                                 <>
@@ -318,7 +318,7 @@ const PlanillasPage = () => {
                             <button
                                 onClick={handleApprove}
                                 disabled={processingAction === 'approving'}
-                                className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {processingAction === 'approving' ? (
                                     <>
@@ -337,7 +337,7 @@ const PlanillasPage = () => {
                             <button
                                 onClick={handleCalculate}
                                 disabled={processingAction === 'calculating'}
-                                className="inline-flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="inline-flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -350,7 +350,7 @@ const PlanillasPage = () => {
                     {selectedPlanilla.status === 2 && (
                         <button
                             disabled
-                            className="inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-lg font-medium shadow-sm opacity-50 cursor-not-allowed"
+                            className="inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-lg font-medium shadow-lg shadow-black/20 opacity-50 cursor-not-allowed"
                             title="Próximamente"
                         >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -363,7 +363,7 @@ const PlanillasPage = () => {
                     {(selectedPlanilla.status === 3 || selectedPlanilla.status === 4) && (
                         <button
                             onClick={() => viewDetails(selectedPlanilla)}
-                            className="inline-flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
+                            className="inline-flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
                         >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -376,9 +376,9 @@ const PlanillasPage = () => {
             )}
 
             {/* History Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900">
+            <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 overflow-hidden">
+                <div className="px-6 py-4 border-b border-navy-700">
+                    <h3 className="text-lg font-semibold text-gray-100">
                         Historial de Planillas
                         <span className="ml-2 text-sm font-normal text-gray-500">
                             ({planillas.length} {planillas.length === 1 ? 'planilla' : 'planillas'})
@@ -410,7 +410,7 @@ const PlanillasPage = () => {
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full">
-                            <thead className="bg-gray-50 border-b border-gray-200">
+                            <thead className="bg-navy-950 border-b border-navy-700">
                                 <tr>
                                     <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">#Planilla</th>
                                     <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Período</th>
@@ -422,24 +422,24 @@ const PlanillasPage = () => {
                                     <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody className="bg-navy-900 divide-y divide-navy-700">
                                 {planillas.map((planilla) => (
-                                    <tr key={planilla.id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="py-4 px-6 text-sm font-medium text-gray-900">{planilla.payrollNumber}</td>
+                                    <tr key={planilla.id} className="hover:bg-navy-800 transition-colors">
+                                        <td className="py-4 px-6 text-sm font-medium text-gray-100">{planilla.payrollNumber}</td>
                                         <td className="py-4 px-6 text-sm text-gray-500">
                                             {new Date(planilla.periodStartDate).toLocaleDateString('es-PA', { day: '2-digit', month: 'short' })}
                                             {' - '}
                                             {new Date(planilla.periodEndDate).toLocaleDateString('es-PA', { day: '2-digit', month: 'short', year: 'numeric' })}
                                         </td>
-                                        <td className="py-4 px-6 text-sm text-gray-900">{planilla.employeeCount || empleadosCount}</td>
-                                        <td className="py-4 px-6 text-sm font-medium text-gray-900">{formatCurrency(planilla.totalGrossPay)}</td>
-                                        <td className="py-4 px-6 text-sm text-gray-900">{formatCurrency(planilla.totalDeductions)}</td>
-                                        <td className="py-4 px-6 text-sm font-medium text-gray-900">{formatCurrency(planilla.totalNetPay)}</td>
+                                        <td className="py-4 px-6 text-sm text-gray-100">{planilla.employeeCount || empleadosCount}</td>
+                                        <td className="py-4 px-6 text-sm font-medium text-gray-100 font-mono">{formatCurrency(planilla.totalGrossPay)}</td>
+                                        <td className="py-4 px-6 text-sm text-gray-100 font-mono">{formatCurrency(planilla.totalDeductions)}</td>
+                                        <td className="py-4 px-6 text-sm font-medium text-gray-100 font-mono">{formatCurrency(planilla.totalNetPay)}</td>
                                         <td className="py-4 px-6">{getStatusBadge(planilla.status)}</td>
                                         <td className="py-4 px-6">
                                             <button
                                                 onClick={() => viewDetails(planilla)}
-                                                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium text-sm"
+                                                className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300 font-medium text-sm"
                                             >
                                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -459,12 +459,12 @@ const PlanillasPage = () => {
             {/* New Planilla Modal */}
             {showNewModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
-                            <h3 className="text-xl font-semibold text-gray-900">Nueva Planilla</h3>
+                    <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="px-6 py-4 border-b border-navy-700 flex items-center justify-between sticky top-0 bg-navy-900">
+                            <h3 className="text-xl font-semibold text-gray-100">Nueva Planilla</h3>
                             <button
                                 onClick={() => setShowNewModal(false)}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                                className="text-gray-400 hover:text-gray-400 transition-colors"
                             >
                                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -475,7 +475,7 @@ const PlanillasPage = () => {
                         <form onSubmit={handleCreatePlanilla} className="p-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Número de Planilla <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -483,13 +483,13 @@ const PlanillasPage = () => {
                                         required
                                         value={formData.payrollNumber}
                                         onChange={(e) => setFormData({ ...formData, payrollNumber: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
                                         placeholder="2025-001"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Fecha Inicio Período <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -497,12 +497,12 @@ const PlanillasPage = () => {
                                         required
                                         value={formData.periodStartDate}
                                         onChange={(e) => setFormData({ ...formData, periodStartDate: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Fecha Fin Período <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -510,12 +510,12 @@ const PlanillasPage = () => {
                                         required
                                         value={formData.periodEndDate}
                                         onChange={(e) => setFormData({ ...formData, periodEndDate: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
                                     />
                                 </div>
 
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Fecha de Pago <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -523,22 +523,22 @@ const PlanillasPage = () => {
                                         required
                                         value={formData.payDate}
                                         onChange={(e) => setFormData({ ...formData, payDate: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
                                     />
                                 </div>
                             </div>
 
-                            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                            <div className="flex justify-end gap-3 pt-4 border-t border-navy-700">
                                 <button
                                     type="button"
                                     onClick={() => setShowNewModal(false)}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+                                    className="px-4 py-2 border border-navy-600 rounded-lg text-gray-300 hover:bg-navy-800 font-medium transition-colors"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors shadow-sm"
+                                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
                                 >
                                     Crear Planilla
                                 </button>
@@ -551,12 +551,12 @@ const PlanillasPage = () => {
             {/* Details Modal */}
             {showDetailsModal && planillaDetails && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
-                            <h3 className="text-xl font-semibold text-gray-900">Detalles de Planilla - {planillaDetails.payrollNumber}</h3>
+                    <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="px-6 py-4 border-b border-navy-700 flex items-center justify-between sticky top-0 bg-navy-900">
+                            <h3 className="text-xl font-semibold text-gray-100">Detalles de Planilla - {planillaDetails.payrollNumber}</h3>
                             <button
                                 onClick={() => setShowDetailsModal(false)}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                                className="text-gray-400 hover:text-gray-400 transition-colors"
                             >
                                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -568,26 +568,26 @@ const PlanillasPage = () => {
                             {/* Header Info */}
                             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                                 <div>
-                                    <p className="text-sm text-gray-600">Período</p>
-                                    <p className="font-medium text-gray-900">
+                                    <p className="text-sm text-gray-400">Período</p>
+                                    <p className="font-medium text-gray-100">
                                         {new Date(planillaDetails.periodStartDate).toLocaleDateString('es-PA')}
                                         {' - '}
                                         {new Date(planillaDetails.periodEndDate).toLocaleDateString('es-PA')}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-gray-600">Fecha de Pago</p>
-                                    <p className="font-medium text-gray-900">
+                                    <p className="text-sm text-gray-400">Fecha de Pago</p>
+                                    <p className="font-medium text-gray-100">
                                         {new Date(planillaDetails.payDate).toLocaleDateString('es-PA')}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-gray-600">Estado</p>
+                                    <p className="text-sm text-gray-400">Estado</p>
                                     <div className="mt-1">{getStatusBadge(planillaDetails.status)}</div>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-gray-600">Total Neto</p>
-                                    <p className="font-bold text-lg text-gray-900">{formatCurrency(planillaDetails.totalNetPay)}</p>
+                                    <p className="text-sm text-gray-400">Total Neto</p>
+                                    <p className="font-bold text-lg text-gray-100 font-mono">{formatCurrency(planillaDetails.totalNetPay)}</p>
                                 </div>
                             </div>
 
@@ -595,7 +595,7 @@ const PlanillasPage = () => {
                             {planillaDetails.details && planillaDetails.details.length > 0 ? (
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
-                                        <thead className="bg-gray-50 border-b border-gray-200">
+                                        <thead className="bg-navy-950 border-b border-navy-700">
                                             <tr>
                                                 <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Empleado</th>
                                                 <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">Bruto</th>
@@ -606,28 +606,28 @@ const PlanillasPage = () => {
                                                 <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">Neto</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="bg-white divide-y divide-gray-200">
+                                        <tbody className="bg-navy-900 divide-y divide-navy-700">
                                             {planillaDetails.details.map((detail) => (
-                                                <tr key={detail.id} className="hover:bg-gray-50">
-                                                    <td className="py-3 px-4 text-sm text-gray-900">{detail.empleado?.nombre} {detail.empleado?.apellido}</td>
-                                                    <td className="py-3 px-4 text-sm text-right text-gray-900">{formatCurrency(detail.grossPay)}</td>
-                                                    <td className="py-3 px-4 text-sm text-right text-gray-900">{formatCurrency(detail.cssEmployee)}</td>
-                                                    <td className="py-3 px-4 text-sm text-right text-gray-900">{formatCurrency(detail.educationalInsuranceEmployee)}</td>
-                                                    <td className="py-3 px-4 text-sm text-right text-gray-900">{formatCurrency(detail.incomeTax)}</td>
-                                                    <td className="py-3 px-4 text-sm text-right text-gray-900">{formatCurrency(detail.totalDeductions)}</td>
-                                                    <td className="py-3 px-4 text-sm text-right font-medium text-gray-900">{formatCurrency(detail.netPay)}</td>
+                                                <tr key={detail.id} className="hover:bg-navy-800">
+                                                    <td className="py-3 px-4 text-sm text-gray-100">{detail.empleado?.nombre} {detail.empleado?.apellido}</td>
+                                                    <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.grossPay)}</td>
+                                                    <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.cssEmployee)}</td>
+                                                    <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.educationalInsuranceEmployee)}</td>
+                                                    <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.incomeTax)}</td>
+                                                    <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.totalDeductions)}</td>
+                                                    <td className="py-3 px-4 text-sm text-right font-medium text-gray-100 font-mono">{formatCurrency(detail.netPay)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
-                                        <tfoot className="bg-gray-50 border-t-2 border-gray-300">
+                                        <tfoot className="bg-navy-950 border-t-2 border-navy-600">
                                             <tr>
-                                                <td className="py-3 px-4 text-sm font-bold text-gray-900">TOTALES</td>
-                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-900">{formatCurrency(planillaDetails.totalGrossPay)}</td>
-                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-900">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.cssEmployee || 0), 0) || 0)}</td>
-                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-900">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.educationalInsuranceEmployee || 0), 0) || 0)}</td>
-                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-900">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.incomeTax || 0), 0) || 0)}</td>
-                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-900">{formatCurrency(planillaDetails.totalDeductions)}</td>
-                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-900">{formatCurrency(planillaDetails.totalNetPay)}</td>
+                                                <td className="py-3 px-4 text-sm font-bold text-gray-100">TOTALES</td>
+                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalGrossPay)}</td>
+                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.cssEmployee || 0), 0) || 0)}</td>
+                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.educationalInsuranceEmployee || 0), 0) || 0)}</td>
+                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.incomeTax || 0), 0) || 0)}</td>
+                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalDeductions)}</td>
+                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalNetPay)}</td>
                                             </tr>
                                         </tfoot>
                                     </table>

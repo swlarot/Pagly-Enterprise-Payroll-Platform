@@ -100,13 +100,13 @@ const AnticiposPage = () => {
     // Estado badge color
     const getEstadoBadgeColor = (estado) => {
         const colors = {
-            'Pendiente': 'bg-yellow-100 text-yellow-800',
-            'Aprobado': 'bg-green-100 text-green-800',
-            'Descontado': 'bg-blue-100 text-blue-800',
-            'Rechazado': 'bg-red-100 text-red-800',
-            'Cancelado': 'bg-gray-100 text-gray-800'
+            'Pendiente': 'bg-amber-500/15 text-amber-400',
+            'Aprobado': 'bg-green-500/15 text-green-400',
+            'Descontado': 'bg-blue-500/15 text-blue-400',
+            'Rechazado': 'bg-red-500/15 text-red-400',
+            'Cancelado': 'bg-navy-700 text-gray-300'
         };
-        return colors[estado] || 'bg-gray-100 text-gray-800';
+        return colors[estado] || 'bg-navy-700 text-gray-300';
     };
 
     const handleSubmit = async (e) => {
@@ -222,8 +222,8 @@ const AnticiposPage = () => {
         return (
             <div className="flex items-center justify-center min-h-96">
                 <div className="text-center">
-                    <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-gray-600">Cargando anticipos...</p>
+                    <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-400">Cargando anticipos...</p>
                 </div>
             </div>
         );
@@ -233,14 +233,14 @@ const AnticiposPage = () => {
         <div className="space-y-6">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Pendientes de Aprobar</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">{pendientesAprobar}</p>
+                            <p className="text-sm font-medium text-gray-400">Pendientes de Aprobar</p>
+                            <p className="text-3xl font-bold text-gray-100 mt-2">{pendientesAprobar}</p>
                         </div>
-                        <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center relative">
-                            <svg className="w-6 h-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="w-12 h-12 bg-amber-500/15 rounded-lg flex items-center justify-center relative">
+                            <svg className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             {pendientesAprobar > 0 && (
@@ -251,18 +251,18 @@ const AnticiposPage = () => {
                         </div>
                     </div>
                     <div className="mt-4 flex items-center text-sm">
-                        <span className="text-yellow-600 font-medium">Requieren acción</span>
+                        <span className="text-amber-400 font-medium">Requieren acción</span>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Aprobados este Mes</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">{aprobadosEsteMes}</p>
+                            <p className="text-sm font-medium text-gray-400">Aprobados este Mes</p>
+                            <p className="text-3xl font-bold text-gray-100 mt-2">{aprobadosEsteMes}</p>
                         </div>
-                        <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="w-12 h-12 bg-green-500/15 rounded-lg flex items-center justify-center">
+                            <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
@@ -272,14 +272,14 @@ const AnticiposPage = () => {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Total Anticipado</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">{formatCurrency(totalAnticipado)}</p>
+                            <p className="text-sm font-medium text-gray-400">Total Anticipado</p>
+                            <p className="text-3xl font-bold font-mono text-gray-100 mt-2">{formatCurrency(totalAnticipado)}</p>
                         </div>
-                        <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="w-12 h-12 bg-blue-500/15 rounded-lg flex items-center justify-center">
+                            <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
@@ -289,14 +289,14 @@ const AnticiposPage = () => {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Descontados</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">{descontados}</p>
+                            <p className="text-sm font-medium text-gray-400">Descontados</p>
+                            <p className="text-3xl font-bold text-gray-100 mt-2">{descontados}</p>
                         </div>
-                        <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-6 h-6 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="w-12 h-12 bg-navy-800 rounded-lg flex items-center justify-center">
+                            <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                         </div>
@@ -311,7 +311,7 @@ const AnticiposPage = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <button
                     onClick={() => setShowModal(true)}
-                    className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
+                    className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
                 >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -323,7 +323,7 @@ const AnticiposPage = () => {
                     <select
                         value={filterEmpleado}
                         onChange={(e) => setFilterEmpleado(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="px-3 py-2 border border-navy-600 bg-navy-900 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     >
                         <option value="">Todos los empleados</option>
                         {empleados.map(emp => (
@@ -336,7 +336,7 @@ const AnticiposPage = () => {
                     <select
                         value={filterEstado}
                         onChange={(e) => setFilterEstado(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="px-3 py-2 border border-navy-600 bg-navy-900 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                     >
                         <option value="">Todos los estados</option>
                         <option value="Pendiente">Pendiente</option>
@@ -349,19 +349,19 @@ const AnticiposPage = () => {
             </div>
 
             {/* Tabs */}
-            <div className="border-b border-gray-200">
+            <div className="border-b border-navy-700">
                 <nav className="-mb-px flex space-x-8">
                     <button
                         onClick={() => setActiveTab('pendientes')}
                         className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                             activeTab === 'pendientes'
-                                ? 'border-blue-500 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ? 'border-primary-500 text-primary-400'
+                                : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-navy-600'
                         }`}
                     >
                         Pendientes
                         {pendientesAprobar > 0 && (
-                            <span className="ml-2 bg-yellow-100 text-yellow-800 py-0.5 px-2 rounded-full text-xs font-semibold">
+                            <span className="ml-2 bg-amber-500/15 text-amber-400 py-0.5 px-2 rounded-full text-xs font-semibold">
                                 {pendientesAprobar}
                             </span>
                         )}
@@ -370,8 +370,8 @@ const AnticiposPage = () => {
                         onClick={() => setActiveTab('todos')}
                         className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
                             activeTab === 'todos'
-                                ? 'border-blue-500 text-blue-600'
-                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                ? 'border-primary-500 text-primary-400'
+                                : 'border-transparent text-gray-500 hover:text-gray-300 hover:border-navy-600'
                         }`}
                     >
                         Todos
@@ -380,9 +380,9 @@ const AnticiposPage = () => {
             </div>
 
             {/* Anticipos Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900">
+            <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 overflow-hidden">
+                <div className="px-6 py-4 border-b border-navy-700">
+                    <h3 className="text-lg font-semibold text-gray-100">
                         {activeTab === 'pendientes' ? 'Anticipos Pendientes' : 'Historial de Anticipos'}
                         <span className="ml-2 text-sm font-normal text-gray-500">
                             ({anticiposMostrar.length} {anticiposMostrar.length === 1 ? 'anticipo' : 'anticipos'})
@@ -392,7 +392,7 @@ const AnticiposPage = () => {
 
                 <div className="overflow-x-auto">
                     <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
+                        <thead className="bg-navy-800 border-b border-navy-700">
                             <tr>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Empleado</th>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
@@ -403,23 +403,23 @@ const AnticiposPage = () => {
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-navy-900 divide-y divide-navy-700">
                             {anticiposMostrar.map((anticipo) => (
-                                <tr key={anticipo.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="py-4 px-6 text-sm font-medium text-gray-900">
+                                <tr key={anticipo.id} className="hover:bg-navy-800 transition-colors">
+                                    <td className="py-4 px-6 text-sm font-medium text-gray-100">
                                         {anticipo.empleadoNombre || 'N/A'}
                                     </td>
-                                    <td className="py-4 px-6 text-sm font-medium text-gray-900">
+                                    <td className="py-4 px-6 text-sm font-medium font-mono text-gray-100">
                                         {formatCurrency(anticipo.monto)}
                                     </td>
-                                    <td className="py-4 px-6 text-sm text-gray-600">
+                                    <td className="py-4 px-6 text-sm text-gray-400">
                                         {new Date(anticipo.fechaSolicitud).toLocaleDateString('es-PA', {
                                             day: '2-digit',
                                             month: 'short',
                                             year: 'numeric'
                                         })}
                                     </td>
-                                    <td className="py-4 px-6 text-sm text-gray-600">
+                                    <td className="py-4 px-6 text-sm text-gray-400">
                                         {anticipo.fechaDescuento
                                             ? new Date(anticipo.fechaDescuento).toLocaleDateString('es-PA', {
                                                 day: '2-digit',
@@ -429,7 +429,7 @@ const AnticiposPage = () => {
                                             : '-'
                                         }
                                     </td>
-                                    <td className="py-4 px-6 text-sm text-gray-900 max-w-xs truncate" title={anticipo.motivo}>
+                                    <td className="py-4 px-6 text-sm text-gray-100 max-w-xs truncate" title={anticipo.motivo}>
                                         {anticipo.motivo}
                                     </td>
                                     <td className="py-4 px-6">
@@ -443,7 +443,7 @@ const AnticiposPage = () => {
                                                 <>
                                                     <button
                                                         onClick={() => openApprovalModal(anticipo)}
-                                                        className="inline-flex items-center gap-1 text-green-600 hover:text-green-800 font-medium text-sm"
+                                                        className="inline-flex items-center gap-1 text-green-400 hover:text-green-300 font-medium text-sm"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -452,7 +452,7 @@ const AnticiposPage = () => {
                                                     </button>
                                                     <button
                                                         onClick={() => openRejectModal(anticipo)}
-                                                        className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-medium text-sm"
+                                                        className="inline-flex items-center gap-1 text-red-400 hover:text-red-300 font-medium text-sm"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -464,7 +464,7 @@ const AnticiposPage = () => {
                                             {anticipo.estado === 'Aprobado' && (
                                                 <button
                                                     onClick={() => openCancelModal(anticipo)}
-                                                    className="inline-flex items-center gap-1 text-yellow-600 hover:text-yellow-800 font-medium text-sm"
+                                                    className="inline-flex items-center gap-1 text-amber-400 hover:text-amber-300 font-medium text-sm"
                                                 >
                                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -485,10 +485,10 @@ const AnticiposPage = () => {
                     {/* Empty State */}
                     {anticiposMostrar.length === 0 && (
                         <div className="text-center py-12">
-                            <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg className="w-16 h-16 text-navy-700 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <h3 className="text-lg font-medium text-gray-900 mb-1">
+                            <h3 className="text-lg font-medium text-gray-100 mb-1">
                                 {activeTab === 'pendientes' ? 'No hay anticipos pendientes' : 'No hay anticipos registrados'}
                             </h3>
                             <p className="text-gray-500">
@@ -505,10 +505,10 @@ const AnticiposPage = () => {
             {/* Create Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
-                            <h3 className="text-xl font-semibold text-gray-900">Solicitar Anticipo</h3>
-                            <button onClick={resetForm} className="text-gray-400 hover:text-gray-600">
+                    <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="px-6 py-4 border-b border-navy-700 flex items-center justify-between sticky top-0 bg-navy-900">
+                            <h3 className="text-xl font-semibold text-gray-100">Solicitar Anticipo</h3>
+                            <button onClick={resetForm} className="text-gray-400 hover:text-gray-200">
                                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
@@ -518,14 +518,14 @@ const AnticiposPage = () => {
                         <form onSubmit={handleSubmit} className="p-6">
                             <div className="space-y-4 mb-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Empleado <span className="text-red-500">*</span>
                                     </label>
                                     <select
                                         required
                                         value={formData.empleadoId}
                                         onChange={(e) => setFormData({ ...formData, empleadoId: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     >
                                         <option value="">Seleccionar empleado...</option>
                                         {empleados.map(emp => (
@@ -537,7 +537,7 @@ const AnticiposPage = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Monto <span className="text-red-500">*</span>
                                     </label>
                                     <div className="relative">
@@ -549,12 +549,12 @@ const AnticiposPage = () => {
                                             required
                                             value={formData.monto}
                                             onChange={(e) => setFormData({ ...formData, monto: e.target.value })}
-                                            className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            className="w-full pl-8 pr-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                             placeholder="500.00"
                                         />
                                     </div>
                                     {formData.empleadoId && (
-                                        <p className="text-xs text-blue-600 mt-1">
+                                        <p className="text-xs text-primary-400 mt-1">
                                             Salario del empleado: {formatCurrency(getEmpleadoSalary(formData.empleadoId))}
                                             {' - '}
                                             Máximo permitido (50%): {formatCurrency(getEmpleadoSalary(formData.empleadoId) * 0.5)}
@@ -563,7 +563,7 @@ const AnticiposPage = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Fecha de Descuento <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -572,13 +572,13 @@ const AnticiposPage = () => {
                                         value={formData.fechaDescuento}
                                         onChange={(e) => setFormData({ ...formData, fechaDescuento: e.target.value })}
                                         min={new Date().toISOString().split('T')[0]}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     />
                                     <p className="text-xs text-gray-500 mt-1">Fecha en que se descontará de la planilla</p>
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Motivo <span className="text-red-500">*</span>
                                     </label>
                                     <textarea
@@ -587,7 +587,7 @@ const AnticiposPage = () => {
                                         minLength="10"
                                         value={formData.motivo}
                                         onChange={(e) => setFormData({ ...formData, motivo: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                         placeholder="Explique detalladamente el motivo del anticipo (mínimo 10 caracteres)..."
                                     ></textarea>
                                     <p className="text-xs text-gray-500 mt-1">
@@ -596,17 +596,17 @@ const AnticiposPage = () => {
                                 </div>
                             </div>
 
-                            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                            <div className="flex justify-end gap-3 pt-4 border-t border-navy-700">
                                 <button
                                     type="button"
                                     onClick={resetForm}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+                                    className="px-4 py-2 border border-navy-600 rounded-lg text-gray-300 hover:bg-navy-800 font-medium"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
+                                    className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium"
                                 >
                                     Solicitar Anticipo
                                 </button>
@@ -619,25 +619,25 @@ const AnticiposPage = () => {
             {/* Approval Modal */}
             {showApprovalModal && selectedAnticipo && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+                    <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-md w-full">
                         <div className="p-6">
-                            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <div className="w-12 h-12 bg-green-500/15 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                 </svg>
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+                            <h3 className="text-lg font-semibold text-gray-100 text-center mb-2">
                                 Aprobar Anticipo
                             </h3>
-                            <p className="text-gray-600 text-center mb-6">
+                            <p className="text-gray-400 text-center mb-6">
                                 ¿Está seguro de que desea aprobar este anticipo de{' '}
-                                <strong>{formatCurrency(selectedAnticipo.monto)}</strong> para{' '}
+                                <strong className="font-mono">{formatCurrency(selectedAnticipo.monto)}</strong> para{' '}
                                 <strong>{selectedAnticipo.empleadoNombre}</strong>?
                             </p>
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => { setShowApprovalModal(false); setSelectedAnticipo(null); }}
-                                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+                                    className="flex-1 px-4 py-2 border border-navy-600 rounded-lg text-gray-300 hover:bg-navy-800 font-medium"
                                 >
                                     Cancelar
                                 </button>
@@ -656,22 +656,22 @@ const AnticiposPage = () => {
             {/* Reject Modal */}
             {showRejectModal && selectedAnticipo && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+                    <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-md w-full">
                         <div className="p-6">
-                            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg className="w-6 h-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <div className="w-12 h-12 bg-red-500/15 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+                            <h3 className="text-lg font-semibold text-gray-100 text-center mb-2">
                                 Rechazar Anticipo
                             </h3>
-                            <p className="text-gray-600 text-center mb-4">
-                                Anticipo de <strong>{formatCurrency(selectedAnticipo.monto)}</strong> para{' '}
+                            <p className="text-gray-400 text-center mb-4">
+                                Anticipo de <strong className="font-mono">{formatCurrency(selectedAnticipo.monto)}</strong> para{' '}
                                 <strong>{selectedAnticipo.empleadoNombre}</strong>
                             </p>
                             <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className="block text-sm font-medium text-gray-300 mb-2">
                                     Motivo del Rechazo <span className="text-red-500">*</span>
                                 </label>
                                 <textarea
@@ -679,14 +679,14 @@ const AnticiposPage = () => {
                                     required
                                     value={motivoRechazo}
                                     onChange={(e) => setMotivoRechazo(e.target.value)}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     placeholder="Explique el motivo del rechazo..."
                                 ></textarea>
                             </div>
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => { setShowRejectModal(false); setSelectedAnticipo(null); setMotivoRechazo(''); }}
-                                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+                                    className="flex-1 px-4 py-2 border border-navy-600 rounded-lg text-gray-300 hover:bg-navy-800 font-medium"
                                 >
                                     Cancelar
                                 </button>
@@ -705,30 +705,30 @@ const AnticiposPage = () => {
             {/* Cancel Modal */}
             {showCancelModal && selectedAnticipo && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+                    <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-md w-full">
                         <div className="p-6">
-                            <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg className="w-6 h-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <div className="w-12 h-12 bg-amber-500/15 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                 </svg>
                             </div>
-                            <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+                            <h3 className="text-lg font-semibold text-gray-100 text-center mb-2">
                                 Cancelar Anticipo
                             </h3>
-                            <p className="text-gray-600 text-center mb-6">
+                            <p className="text-gray-400 text-center mb-6">
                                 ¿Está seguro de que desea cancelar este anticipo de{' '}
-                                <strong>{formatCurrency(selectedAnticipo.monto)}</strong>?
+                                <strong className="font-mono">{formatCurrency(selectedAnticipo.monto)}</strong>?
                             </p>
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => { setShowCancelModal(false); setSelectedAnticipo(null); }}
-                                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+                                    className="flex-1 px-4 py-2 border border-navy-600 rounded-lg text-gray-300 hover:bg-navy-800 font-medium"
                                 >
                                     No, volver
                                 </button>
                                 <button
                                     onClick={handleCancelar}
-                                    className="flex-1 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium"
+                                    className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium"
                                 >
                                     Sí, cancelar
                                 </button>

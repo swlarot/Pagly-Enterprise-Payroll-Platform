@@ -39,6 +39,8 @@ export const systemAdminService = {
     telefono?: string;
   }) => api.post('/api/admin/users', data),
 
+  deleteUser: (userId: string) => api.delete(`/api/admin/users/${userId}`),
+
   // Tenant management
   getAllTenants: (params?: {
     page?: number;
@@ -75,6 +77,9 @@ export const systemAdminService = {
 
   assignUserToTenant: (tenantId: number, data: AssignUserToTenantDto) =>
     api.post<AdminTenantUserDto>(`/api/admin/tenants/${tenantId}/users`, data),
+
+  removeTenantUser: (tenantId: number, userId: string) =>
+    api.delete(`/api/admin/tenants/${tenantId}/users/${userId}`),
 
   // Audit log
   getTenantAuditLog: (

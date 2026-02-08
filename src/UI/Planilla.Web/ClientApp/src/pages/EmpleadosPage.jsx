@@ -122,19 +122,23 @@ const EmpleadosPage = () => {
         e.preventDefault();
 
         try {
-            // Prepare payload
+            const empleadoEnEdicion = editingId ? empleados.find(emp => emp.id === editingId) : null;
+            const tieneUsuarioVinculado = empleadoEnEdicion?.usuarioVinculadoEmail ?? empleadoEnEdicion?.tieneAccesoSistema;
+
             const payload = {
                 nombre: formData.nombre,
                 apellido: formData.apellido,
-                email: formData.email || null,
                 salarioBase: parseFloat(formData.salarioBase),
                 departamentoId: formData.departamentoId ? parseInt(formData.departamentoId) : null,
                 posicionId: formData.posicionId ? parseInt(formData.posicionId) : null,
                 ...(editingId ? { estaActivo: true } : {
                     numeroIdentificacion: formData.numeroIdentificacion,
-                    fechaContratacion: formData.fechaContratacion || new Date().toISOString().split('T')[0]
+                    fechaContratacion: formData.fechaContratacion || new Date().toISOString().split('T')[0],
+                    email: formData.email || null
                 })
             };
+            if (editingId && !tieneUsuarioVinculado)
+                payload.email = formData.email || null;
 
             if (editingId) {
                 await api.put(`/api/empleados/${editingId}`, payload);
@@ -161,7 +165,7 @@ const EmpleadosPage = () => {
             nombre: empleado.nombre,
             apellido: empleado.apellido,
             numeroIdentificacion: empleado.numeroIdentificacion,
-            email: empleado.email || '',
+            email: empleado.usuarioVinculadoEmail ?? empleado.email ?? '',
             salarioBase: empleado.salarioBase.toString(),
             fechaContratacion: empleado.fechaContratacion ? new Date(empleado.fechaContratacion).toISOString().split('T')[0] : '',
             departamentoId: empleado.departamentoId ? empleado.departamentoId.toString() : '',
@@ -281,8 +285,8 @@ const EmpleadosPage = () => {
         return (
             <div className="flex items-center justify-center min-h-96">
                 <div className="text-center">
-                    <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-gray-600">Cargando empleados...</p>
+                    <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-400">Cargando empleados...</p>
                 </div>
             </div>
         );
@@ -292,14 +296,14 @@ const EmpleadosPage = () => {
         <div className="space-y-6">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Total Empleados</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">{empleados.length}</p>
+                            <p className="text-sm font-medium text-gray-400">Total Empleados</p>
+                            <p className="text-3xl font-bold font-display text-gray-100 mt-2">{empleados.length}</p>
                         </div>
-                        <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="w-12 h-12 bg-primary-500/15 rounded-lg flex items-center justify-center">
+                            <svg className="w-6 h-6 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
                         </div>
@@ -309,34 +313,34 @@ const EmpleadosPage = () => {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Empleados Activos</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">{activeEmpleados.length}</p>
+                            <p className="text-sm font-medium text-gray-400">Empleados Activos</p>
+                            <p className="text-3xl font-bold font-display text-gray-100 mt-2">{activeEmpleados.length}</p>
                         </div>
-                        <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="w-12 h-12 bg-green-500/15 rounded-lg flex items-center justify-center">
+                            <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
                     </div>
                     <div className="mt-4 flex items-center text-sm">
-                        <span className="text-green-600 font-medium">
+                        <span className="text-green-400 font-medium">
                             {empleados.length > 0 ? ((activeEmpleados.length / empleados.length) * 100).toFixed(1) : 0}%
                         </span>
                         <span className="text-gray-500 ml-2">del total</span>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Nómina Mensual Est.</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">{formatCurrency(totalNomina)}</p>
+                            <p className="text-sm font-medium text-gray-400">Nómina Mensual Est.</p>
+                            <p className="text-3xl font-bold font-display font-mono text-gray-100 mt-2">{formatCurrency(totalNomina)}</p>
                         </div>
-                        <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-6 h-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="w-12 h-12 bg-purple-500/15 rounded-lg flex items-center justify-center">
+                            <svg className="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
@@ -352,7 +356,7 @@ const EmpleadosPage = () => {
                 {canWrite() && (
                     <button
                         onClick={openNewModal}
-                        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
+                        className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -366,7 +370,7 @@ const EmpleadosPage = () => {
                     <select
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
-                        className="px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="px-4 py-2.5 bg-navy-900 border border-navy-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     >
                         <option value="active">Solo Activos</option>
                         <option value="all">Todos (sin eliminados)</option>
@@ -382,7 +386,7 @@ const EmpleadosPage = () => {
                             placeholder="Buscar por nombre, apellido o cédula..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            className="w-full pl-10 pr-4 py-2.5 bg-navy-900 border border-navy-600 rounded-lg text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                         />
                         <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -392,9 +396,9 @@ const EmpleadosPage = () => {
             </div>
 
             {/* Employee Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900">
+            <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 overflow-hidden">
+                <div className="px-6 py-4 border-b border-navy-700">
+                    <h3 className="text-lg font-semibold font-display text-gray-100">
                         Lista de Empleados
                         <span className="ml-2 text-sm font-normal text-gray-500">
                             ({filteredEmpleados.length} {filteredEmpleados.length === 1 ? 'empleado' : 'empleados'})
@@ -404,7 +408,7 @@ const EmpleadosPage = () => {
 
                 <div className="overflow-x-auto">
                     <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
+                        <thead className="bg-navy-950 border-b border-navy-700">
                             <tr>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Identificación</th>
@@ -417,33 +421,33 @@ const EmpleadosPage = () => {
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-navy-900 divide-y divide-navy-700">
                             {filteredEmpleados.map((empleado) => (
-                                <tr key={empleado.id} className="hover:bg-gray-50 transition-colors">
+                                <tr key={empleado.id} className="hover:bg-navy-800 transition-colors">
                                     <td className="py-4 px-6">
                                         <div className="flex items-center">
-                                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm mr-3">
+                                            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center text-white font-semibold text-sm mr-3">
                                                 {empleado.nombre.charAt(0)}{empleado.apellido.charAt(0)}
                                             </div>
                                             <div>
-                                                <div className="text-sm font-medium text-gray-900">
+                                                <div className="text-sm font-medium text-gray-100">
                                                     {empleado.nombre} {empleado.apellido}
                                                 </div>
                                                 <div className="text-sm text-gray-500">ID: {empleado.id}</div>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="py-4 px-6 text-sm text-gray-900">{empleado.numeroIdentificacion}</td>
+                                    <td className="py-4 px-6 text-sm text-gray-100">{empleado.numeroIdentificacion}</td>
                                     <td className="py-4 px-6">
-                                        {empleado.email ? (
+                                        {(empleado.usuarioVinculadoEmail ?? empleado.email) ? (
                                             <div className="flex flex-col gap-1">
-                                                <span className="text-sm text-gray-900">{empleado.email}</span>
+                                                <span className="text-sm text-gray-100">{empleado.usuarioVinculadoEmail ?? empleado.email}</span>
                                                 {empleado.tieneAccesoSistema ? (
-                                                    <span className="inline-flex items-center w-fit px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                                    <span className="inline-flex items-center w-fit px-2 py-0.5 rounded text-xs font-medium bg-green-500/15 text-green-400">
                                                         {empleado.rolSistema || 'Employee'}
                                                     </span>
                                                 ) : (
-                                                    <span className="inline-flex items-center w-fit px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                                                    <span className="inline-flex items-center w-fit px-2 py-0.5 rounded text-xs font-medium bg-navy-700 text-gray-400">
                                                         Sin acceso
                                                     </span>
                                                 )}
@@ -452,7 +456,7 @@ const EmpleadosPage = () => {
                                             <span className="text-sm text-gray-400">—</span>
                                         )}
                                     </td>
-                                    <td className="py-4 px-6 text-sm font-medium text-gray-900">{formatCurrency(empleado.salarioBase)}</td>
+                                    <td className="py-4 px-6 text-sm font-medium font-mono text-gray-100">{formatCurrency(empleado.salarioBase)}</td>
                                     <td className="py-4 px-6 text-sm text-gray-500">
                                         {new Date(empleado.fechaContratacion).toLocaleDateString('es-PA', {
                                             day: '2-digit',
@@ -460,22 +464,22 @@ const EmpleadosPage = () => {
                                             year: 'numeric'
                                         })}
                                     </td>
-                                    <td className="py-4 px-6 text-sm text-gray-900">
+                                    <td className="py-4 px-6 text-sm text-gray-100">
                                         {empleado.departamentoNombre || <span className="text-gray-400">-</span>}
                                     </td>
-                                    <td className="py-4 px-6 text-sm text-gray-900">
+                                    <td className="py-4 px-6 text-sm text-gray-100">
                                         {empleado.posicionNombre || <span className="text-gray-400">-</span>}
                                     </td>
                                     <td className="py-4 px-6">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                             empleado.isDeleted
-                                                ? 'bg-gray-100 text-gray-700'
+                                                ? 'bg-navy-700 text-gray-300'
                                                 : empleado.estaActivo
-                                                ? 'bg-green-100 text-green-800'
-                                                : 'bg-red-100 text-red-800'
+                                                ? 'bg-green-500/15 text-green-400'
+                                                : 'bg-red-500/15 text-red-400'
                                         }`}>
                                             <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                                                empleado.isDeleted ? 'bg-gray-500' : empleado.estaActivo ? 'bg-green-600' : 'bg-red-600'
+                                                empleado.isDeleted ? 'bg-gray-500' : empleado.estaActivo ? 'bg-green-400' : 'bg-red-400'
                                             }`}></span>
                                             {empleado.isDeleted ? 'Eliminado' : empleado.estaActivo ? 'Activo' : 'Inactivo'}
                                         </span>
@@ -487,7 +491,7 @@ const EmpleadosPage = () => {
                                                     <>
                                                         <button
                                                             onClick={() => handleEdit(empleado)}
-                                                            className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium text-sm"
+                                                            className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300 font-medium text-sm"
                                                         >
                                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -497,7 +501,7 @@ const EmpleadosPage = () => {
                                                         {empleado.userId ? (
                                                             <button
                                                                 onClick={() => handleUnlinkUser(empleado)}
-                                                                className="inline-flex items-center gap-1 text-orange-600 hover:text-orange-800 font-medium text-sm"
+                                                                className="inline-flex items-center gap-1 text-amber-400 hover:text-amber-300 font-medium text-sm"
                                                                 title="Desvincular usuario"
                                                             >
                                                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -505,10 +509,10 @@ const EmpleadosPage = () => {
                                                                 </svg>
                                                                 Desvincular
                                                             </button>
-                                                        ) : empleado.email ? (
+                                                        ) : !(empleado.usuarioVinculadoEmail ?? empleado.email) ? (
                                                             <button
                                                                 onClick={() => handleLinkUser(empleado)}
-                                                                className="inline-flex items-center gap-1 text-green-600 hover:text-green-800 font-medium text-sm"
+                                                                className="inline-flex items-center gap-1 text-green-400 hover:text-green-300 font-medium text-sm"
                                                                 title="Vincular usuario existente"
                                                             >
                                                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -523,7 +527,7 @@ const EmpleadosPage = () => {
                                                     canDelete() && (
                                                         <button
                                                             onClick={() => handleReactivate(empleado)}
-                                                            className="inline-flex items-center gap-1 text-green-600 hover:text-green-800 font-medium text-sm"
+                                                            className="inline-flex items-center gap-1 text-green-400 hover:text-green-300 font-medium text-sm"
                                                         >
                                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -534,7 +538,7 @@ const EmpleadosPage = () => {
                                                 ) : canDelete() && (
                                                     <button
                                                         onClick={() => handleDeleteClick(empleado)}
-                                                        className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-medium text-sm"
+                                                        className="inline-flex items-center gap-1 text-red-400 hover:text-red-300 font-medium text-sm"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -558,7 +562,7 @@ const EmpleadosPage = () => {
                             <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
-                            <h3 className="text-lg font-medium text-gray-900 mb-1">
+                            <h3 className="text-lg font-medium text-gray-100 mb-1">
                                 {searchTerm ? 'No se encontraron empleados' : 'No hay empleados registrados'}
                             </h3>
                             <p className="text-gray-500">
@@ -570,7 +574,7 @@ const EmpleadosPage = () => {
                             {!searchTerm && (
                                 <button
                                     onClick={openNewModal}
-                                    className="mt-4 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                                    className="mt-4 inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
                                 >
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -586,15 +590,15 @@ const EmpleadosPage = () => {
             {/* Add/Edit Employee Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                    <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                         {/* Modal Header */}
-                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
-                            <h3 className="text-xl font-semibold text-gray-900">
+                        <div className="px-6 py-4 border-b border-navy-700 flex items-center justify-between sticky top-0 bg-navy-900">
+                            <h3 className="text-xl font-semibold font-display text-gray-100">
                                 {editingId ? 'Editar Empleado' : 'Nuevo Empleado'}
                             </h3>
                             <button
                                 onClick={resetForm}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                                className="text-gray-400 hover:text-gray-200 transition-colors"
                             >
                                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -606,36 +610,36 @@ const EmpleadosPage = () => {
                         <form onSubmit={handleSubmit} className="p-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Nombre <span className="text-red-500">*</span>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Nombre <span className="text-red-400">*</span>
                                     </label>
                                     <input
                                         type="text"
                                         required
                                         value={formData.nombre}
                                         onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                         placeholder="Ej: Juan"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Apellido <span className="text-red-500">*</span>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Apellido <span className="text-red-400">*</span>
                                     </label>
                                     <input
                                         type="text"
                                         required
                                         value={formData.apellido}
                                         onChange={(e) => setFormData({ ...formData, apellido: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                         placeholder="Ej: Pérez"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Número de Identificación <span className="text-red-500">*</span>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Número de Identificación <span className="text-red-400">*</span>
                                     </label>
                                     <input
                                         type="text"
@@ -643,7 +647,7 @@ const EmpleadosPage = () => {
                                         disabled={editingId}
                                         value={formData.numeroIdentificacion}
                                         onChange={(e) => setFormData({ ...formData, numeroIdentificacion: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                        className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-navy-700 disabled:cursor-not-allowed"
                                         placeholder="Ej: 8-123-4567"
                                     />
                                     {editingId && (
@@ -652,28 +656,62 @@ const EmpleadosPage = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Email
-                                        <span className="text-gray-400 font-normal ml-2 text-xs">
-                                            (opcional)
-                                        </span>
-                                    </label>
-                                    <input
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        placeholder="empleado@empresa.com"
-                                    />
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        💡 Si incluyes un email, se creará automáticamente acceso al sistema con rol "Employee".
-                                        El empleado recibirá un correo para configurar su contraseña.
-                                    </p>
+                                    {editingId && (() => {
+                                        const empleadoEnEdicion = empleados.find(e => e.id === editingId);
+                                        const tieneUsuarioVinculado = empleadoEnEdicion?.usuarioVinculadoEmail || empleadoEnEdicion?.tieneAccesoSistema;
+                                        if (tieneUsuarioVinculado && empleadoEnEdicion?.usuarioVinculadoEmail) {
+                                            return (
+                                                <>
+                                                    <label className="block text-sm font-medium text-gray-300 mb-2">Email (usuario vinculado)</label>
+                                                    <p className="text-lg font-semibold text-gray-100 py-2">{empleadoEnEdicion.usuarioVinculadoEmail}</p>
+                                                    <p className="text-xs text-gray-500 mt-1">El email lo define el usuario vinculado. Para cambiarlo, desvincula desde la tabla y vuelve a vincular.</p>
+                                                </>
+                                            );
+                                        }
+                                        return (
+                                            <>
+                                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                                    Email
+                                                    <span className="text-gray-400 font-normal ml-2 text-xs">(opcional)</span>
+                                                </label>
+                                                <input
+                                                    type="email"
+                                                    value={formData.email}
+                                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                                    className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                                    placeholder="empleado@empresa.com"
+                                                />
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    💡 Si incluyes un email, se creará automáticamente acceso al sistema con rol "Employee".
+                                                    El empleado recibirá un correo para configurar su contraseña.
+                                                </p>
+                                            </>
+                                        );
+                                    })()}
+                                    {!editingId && (
+                                        <>
+                                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                                                Email
+                                                <span className="text-gray-400 font-normal ml-2 text-xs">(opcional)</span>
+                                            </label>
+                                            <input
+                                                type="email"
+                                                value={formData.email}
+                                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                                className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                                placeholder="empleado@empresa.com"
+                                            />
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                💡 Si incluyes un email, se creará automáticamente acceso al sistema con rol "Employee".
+                                                El empleado recibirá un correo para configurar su contraseña.
+                                            </p>
+                                        </>
+                                    )}
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Salario Base <span className="text-red-500">*</span>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Salario Base <span className="text-red-400">*</span>
                                     </label>
                                     <div className="relative">
                                         <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
@@ -684,20 +722,20 @@ const EmpleadosPage = () => {
                                             required
                                             value={formData.salarioBase}
                                             onChange={(e) => setFormData({ ...formData, salarioBase: e.target.value })}
-                                            className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            className="w-full pl-8 pr-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                             placeholder="1500.00"
                                         />
                                     </div>
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Departamento
                                     </label>
                                     <select
                                         value={formData.departamentoId}
                                         onChange={handleDepartmentChange}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                     >
                                         <option value="">Seleccionar departamento...</option>
                                         {departamentos.map(dept => (
@@ -709,14 +747,14 @@ const EmpleadosPage = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Posición
                                     </label>
                                     <select
                                         value={formData.posicionId}
                                         onChange={(e) => setFormData({ ...formData, posicionId: e.target.value })}
                                         disabled={!formData.departamentoId}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                        className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-navy-700 disabled:cursor-not-allowed"
                                     >
                                         <option value="">Seleccionar posición...</option>
                                         {posiciones.map(pos => (
@@ -729,7 +767,7 @@ const EmpleadosPage = () => {
                                         <p className="text-xs text-gray-500 mt-1">Seleccione primero un departamento</p>
                                     )}
                                     {formData.posicionId && getSelectedPositionSalaryRange() && (
-                                        <p className="text-xs text-blue-600 mt-1">
+                                        <p className="text-xs text-primary-400 mt-1">
                                             Rango salarial: {formatCurrency(getSelectedPositionSalaryRange().min)} - {formatCurrency(getSelectedPositionSalaryRange().max)}
                                         </p>
                                     )}
@@ -737,32 +775,32 @@ const EmpleadosPage = () => {
 
                                 {!editingId && (
                                     <div className="md:col-span-2">
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Fecha de Contratación <span className="text-red-500">*</span>
+                                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                                            Fecha de Contratación <span className="text-red-400">*</span>
                                         </label>
                                         <input
                                             type="date"
                                             required={!editingId}
                                             value={formData.fechaContratacion}
                                             onChange={(e) => setFormData({ ...formData, fechaContratacion: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                            className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                         />
                                     </div>
                                 )}
                             </div>
 
                             {/* Modal Footer */}
-                            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                            <div className="flex justify-end gap-3 pt-4 border-t border-navy-700">
                                 <button
                                     type="button"
                                     onClick={resetForm}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+                                    className="px-4 py-2 border border-navy-600 rounded-lg text-gray-300 hover:bg-navy-800 font-medium transition-colors"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-sm"
+                                    className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
                                 >
                                     {editingId ? 'Actualizar Empleado' : 'Crear Empleado'}
                                 </button>

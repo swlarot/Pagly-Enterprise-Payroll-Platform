@@ -2,37 +2,39 @@ import React, { ReactNode, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { TenantRole } from '../../types/api';
+import { canAccessModule } from '../../services/permissionService';
+import { PaglyLogo } from '../ui/PaglyLogo';
 
 interface AuthLayoutProps {
   children: ReactNode;
 }
 
 export default function AuthLayout({ children }: AuthLayoutProps) {
-  const { user, tenant, logout, hasRole, isSystemAdmin, canWrite } = useAuth();
+  const { user, tenant, logout, hasRole, isSystemAdmin, canWrite, permissions } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [orgMenuOpen, setOrgMenuOpen] = useState(true);
   const [conceptosMenuOpen, setConceptosMenuOpen] = useState(true);
   const [asistenciaMenuOpen, setAsistenciaMenuOpen] = useState(true);
 
-  // Matriz de permisos: qué roles pueden ver qué módulos
-  const canAccessModule = (module: string): boolean => {
+  // Verificar acceso a módulos usando permisos granulares
+  const canAccessModuleCheck = (module: string): boolean => {
     if (!user) return false;
 
     const role = user.role;
 
-    // Employee solo puede ver: Dashboard y su propia info
-    if (role === TenantRole.Employee) {
-      return ['dashboard', 'empleados', 'vacaciones', 'ausencias', 'horas-extra'].includes(module);
+    // Owner (0) tiene acceso a todo
+    if (role === TenantRole.Owner) {
+      return true;
     }
 
-    // Accountant puede ver todo excepto roles y permisos
-    if (role === TenantRole.Accountant) {
-      return module !== 'roles';
+    // User (1) necesita permisos personalizados asignados mediante CustomTenantRole
+    if (permissions && permissions.length > 0) {
+      return canAccessModule(module, permissions);
     }
 
-    // Manager, Admin, Owner pueden ver todo
-    return true;
+    // User sin permisos personalizados asignados: sin acceso
+    return false;
   };
 
   const handleLogout = () => {
@@ -72,43 +74,49 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
   );
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-navy-950">
       {/* Sidebar */}
-      <aside className="w-64 bg-gradient-to-b from-slate-900 to-slate-800 shadow-2xl flex flex-col">
+      <aside className="w-64 bg-navy-950 border-r border-navy-700 shadow-2xl flex flex-col">
         {/* Logo */}
-        <div className="p-6 border-b border-slate-700">
+        <div className="p-6 border-b border-navy-700">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-              <svg
-                className="w-7 h-7 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">Pagly</h1>
-              <p className="text-xs text-slate-400">Sistema de Nómina</p>
-            </div>
+            <PaglyLogo variant="full" theme="dark" size="md" />
           </div>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+          {canAccessModuleCheck('dashboard') && (
+            <NavLink
+              to="/dashboard"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  isActive
+                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30'
+                    : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
+                }`
+              }
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                />
+              </svg>
+              <span>Dashboard</span>
+            </NavLink>
+          )}
+
+          {/* Mi Perfil - Employee Self-Service (solo para usuarios vinculados a empleado) */}
           <NavLink
-            to="/dashboard"
+            to="/mi-perfil"
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
                 isActive
-                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                  : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                  ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30'
+                  : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
               }`
             }
           >
@@ -117,21 +125,21 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth={2}
-                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
               />
             </svg>
-            <span>Dashboard</span>
+            <span>Mi Perfil</span>
           </NavLink>
 
-          {/* Organización Submenu - Todos pueden ver */}
-          {canAccessModule('empleados') && (
+          {/* Organización Submenu - Verificar permisos */}
+          {canAccessModuleCheck('empleados') && (
             <div className="space-y-1">
               <button
                 onClick={() => setOrgMenuOpen(!orgMenuOpen)}
                 className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
                   isOrgRouteActive
-                    ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                    : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30'
+                    : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -161,15 +169,15 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
               </button>
 
               {orgMenuOpen && (
-                <div className="ml-4 space-y-1 border-l-2 border-slate-700 pl-2">
-                  {canAccessModule('empleados') && (
+                <div className="ml-4 space-y-1 border-l-2 border-navy-700 pl-2">
+                  {canAccessModuleCheck('empleados') && (
                     <NavLink
                       to="/empleados"
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
                           isActive
-                            ? 'bg-slate-700 text-white'
-                            : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                            ? 'bg-navy-800 text-white'
+                            : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
                         }`
                       }
                     >
@@ -185,14 +193,14 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                     </NavLink>
                   )}
 
-                  {canAccessModule('departamentos') && (
+                  {canAccessModuleCheck('departamentos') && (
                     <NavLink
                       to="/departamentos"
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
                           isActive
-                            ? 'bg-slate-700 text-white'
-                            : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                            ? 'bg-navy-800 text-white'
+                            : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
                         }`
                       }
                     >
@@ -208,14 +216,14 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                     </NavLink>
                   )}
 
-                  {canAccessModule('posiciones') && (
+                  {canAccessModuleCheck('posiciones') && (
                     <NavLink
                       to="/posiciones"
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
                           isActive
-                            ? 'bg-slate-700 text-white'
-                            : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                            ? 'bg-navy-800 text-white'
+                            : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
                         }`
                       }
                     >
@@ -235,15 +243,15 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             </div>
           )}
 
-          {/* Conceptos Submenu (Novedades) - Todos excepto Employee */}
-          {canAccessModule('anticipos') && (
+          {/* Conceptos Submenu (Novedades) - Verificar permisos */}
+          {canAccessModuleCheck('anticipos') && (
             <div className="space-y-1">
               <button
                 onClick={() => setConceptosMenuOpen(!conceptosMenuOpen)}
                 className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
                   isConceptosRouteActive
-                    ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                    : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30'
+                    : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
                 }`}
               >
               <div className="flex items-center gap-3">
@@ -273,14 +281,14 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             </button>
 
             {conceptosMenuOpen && (
-              <div className="ml-4 space-y-1 border-l-2 border-slate-700 pl-2">
+              <div className="ml-4 space-y-1 border-l-2 border-navy-700 pl-2">
                 <NavLink
                   to="/anticipos"
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
                       isActive
-                        ? 'bg-slate-700 text-white'
-                        : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                        ? 'bg-navy-800 text-white'
+                        : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
                     }`
                   }
                 >
@@ -300,8 +308,8 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
                       isActive
-                        ? 'bg-slate-700 text-white'
-                        : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                        ? 'bg-navy-800 text-white'
+                        : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
                     }`
                   }
                 >
@@ -321,8 +329,8 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
                       isActive
-                        ? 'bg-slate-700 text-white'
-                        : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                        ? 'bg-navy-800 text-white'
+                        : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
                     }`
                   }
                 >
@@ -341,15 +349,15 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             </div>
           )}
 
-          {/* Asistencia Submenu - Todos pueden ver */}
-          {canAccessModule('horas-extra') && (
+          {/* Asistencia Submenu - Verificar permisos */}
+          {canAccessModuleCheck('horas-extra') && (
             <div className="space-y-1">
             <button
               onClick={() => setAsistenciaMenuOpen(!asistenciaMenuOpen)}
               className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
                 isAsistenciaRouteActive
-                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                  : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                  ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30'
+                  : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
               }`}
             >
               <div className="flex items-center gap-3">
@@ -379,14 +387,14 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             </button>
 
             {asistenciaMenuOpen && (
-              <div className="ml-4 space-y-1 border-l-2 border-slate-700 pl-2">
+              <div className="ml-4 space-y-1 border-l-2 border-navy-700 pl-2">
                 <NavLink
                   to="/horas-extra"
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
                       isActive
-                        ? 'bg-slate-700 text-white'
-                        : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                        ? 'bg-navy-800 text-white'
+                        : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
                     }`
                   }
                 >
@@ -406,8 +414,8 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
                       isActive
-                        ? 'bg-slate-700 text-white'
-                        : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                        ? 'bg-navy-800 text-white'
+                        : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
                     }`
                   }
                 >
@@ -427,8 +435,8 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-4 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${
                       isActive
-                        ? 'bg-slate-700 text-white'
-                        : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                        ? 'bg-navy-800 text-white'
+                        : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
                     }`
                   }
                 >
@@ -448,14 +456,14 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           )}
 
           {/* Planillas - Todos pueden ver */}
-          {canAccessModule('planillas') && (
+          {canAccessModuleCheck('planillas') && (
             <NavLink
               to="/planillas"
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                    : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30'
+                    : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
                 }`
               }
             >
@@ -471,15 +479,15 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             </NavLink>
           )}
 
-          {/* Reportes - Todos pueden ver */}
-          {canAccessModule('reportes') && (
+          {/* Reportes - Verificar permisos */}
+          {canAccessModuleCheck('reportes') && (
             <NavLink
               to="/reportes"
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                    : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30'
+                    : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
                 }`
               }
             >
@@ -502,8 +510,8 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                    : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
+                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30'
+                    : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
                 }`
               }
             >
@@ -519,43 +527,69 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             </NavLink>
           )}
 
-          <NavLink
-            to="/configuracion"
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
-                isActive
-                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/50'
-                  : 'text-slate-300 hover:bg-slate-700/50 hover:text-white'
-              }`
-            }
-          >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-              />
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              />
-            </svg>
-            <span>Configuración</span>
-          </NavLink>
+          {/* Registro de Auditoría - Owner, Admin, Manager, Accountant */}
+          {canAccessModuleCheck('audit') && (
+            <NavLink
+              to="/audit"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  isActive
+                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30'
+                    : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
+                }`
+              }
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              <span>Registro de Auditoría</span>
+            </NavLink>
+          )}
+
+          {canAccessModuleCheck('configuracion') && (
+            <NavLink
+              to="/configuracion"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all duration-200 ${
+                  isActive
+                    ? 'bg-primary-600 text-white shadow-lg shadow-primary-600/30'
+                    : 'text-gray-400 hover:bg-navy-800 hover:text-gray-200'
+                }`
+              }
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                />
+              </svg>
+              <span>Configuración</span>
+            </NavLink>
+          )}
         </nav>
 
         {/* Footer with Tenant Info */}
-        <div className="p-4 border-t border-slate-700">
-          <div className="text-xs text-slate-400 mb-2">
+        <div className="p-4 border-t border-navy-700">
+          <div className="text-xs text-gray-400 mb-2">
             <p className="font-semibold truncate">{tenant?.name}</p>
             <p className="truncate">
               {tenant?.ruc}-{tenant?.dv}
             </p>
           </div>
-          <div className="text-center text-xs text-slate-400">
+          <div className="text-center text-xs text-gray-400">
             <p className="font-semibold mb-1">v1.0.0</p>
             <p>© {new Date().getFullYear()} Pagly</p>
           </div>
@@ -588,13 +622,13 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         )}
 
         {/* Header */}
-        <header className="h-16 bg-white shadow-sm border-b border-gray-200 flex items-center justify-between px-8">
+        <header className="h-16 bg-navy-900 border-b border-navy-700 flex items-center justify-between px-8">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{getPageTitle()}</h2>
+            <h2 className="text-xl font-bold text-gray-100">{getPageTitle()}</h2>
           </div>
           <div className="flex items-center gap-4">
             {/* Fecha actual */}
-            <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
+            <div className="flex items-center gap-2 px-3 py-2 bg-navy-800 rounded-lg">
               <svg
                 className="w-5 h-5 text-gray-400"
                 fill="none"
@@ -608,7 +642,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                   d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                 />
               </svg>
-              <span className="text-sm font-medium text-gray-700">
+              <span className="text-sm font-medium text-gray-300">
                 {new Date().toLocaleDateString('es-PA', {
                   day: '2-digit',
                   month: 'short',
@@ -618,12 +652,12 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             </div>
 
             {/* Usuario */}
-            <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
+            <div className="flex items-center gap-3 pl-4 border-l border-navy-700">
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{user?.email}</p>
-                <p className="text-xs text-gray-500">{user?.roleName}</p>
+                <p className="text-sm font-medium text-gray-200">{user?.email}</p>
+                <p className="text-xs text-gray-400">{user?.roleName}</p>
               </div>
-              <div className="w-10 h-10 bg-gradient-to-br from-emerald-600 to-emerald-500 rounded-full flex items-center justify-center shadow-md">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary-600 to-primary-500 rounded-full flex items-center justify-center shadow-md">
                 <span className="text-white text-sm font-bold">
                   {user?.email.substring(0, 2).toUpperCase()}
                 </span>
@@ -632,7 +666,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
               {/* Logout Button */}
               <button
                 onClick={handleLogout}
-                className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                className="p-2 text-gray-400 hover:text-red-400 hover:bg-navy-800 rounded-lg transition"
                 title="Cerrar sesión"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -649,7 +683,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto bg-navy-950 p-6">{children}</main>
       </div>
     </div>
   );

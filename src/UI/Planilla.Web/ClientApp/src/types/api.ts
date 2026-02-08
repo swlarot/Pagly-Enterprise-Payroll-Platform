@@ -47,6 +47,7 @@ export interface UserInfoDto {
   role: TenantRole;
   roleName: string;
   isSystemAdmin?: boolean;
+  permissions?: string[];
 }
 
 export interface TenantInfoDto {

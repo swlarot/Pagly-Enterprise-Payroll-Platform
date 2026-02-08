@@ -20,9 +20,11 @@ export interface AppConfig {
   refreshTokenBuffer: number;
 }
 
+// VITE_API_URL vacío = same-origin (SPA y API en mismo dominio)
 const config: AppConfig = {
-  // URL base del API backend
-  apiUrl: import.meta.env.VITE_API_URL || 'http://localhost:5039',
+  apiUrl: import.meta.env.VITE_API_URL !== undefined
+    ? String(import.meta.env.VITE_API_URL)
+    : (import.meta.env.DEV ? 'http://localhost:5039' : ''),
 
   // Clave pública de Stripe (solo para producción)
   stripePublicKey: import.meta.env.VITE_STRIPE_PUBLIC_KEY || '',
@@ -50,8 +52,9 @@ const config: AppConfig = {
  * Valida que la configuración sea correcta al iniciar la aplicación
  */
 export function validateConfig(): void {
-  if (!config.apiUrl) {
-    throw new Error('VITE_API_URL no está configurado');
+  // apiUrl vacío es válido para same-origin (prod); en dev debe ser localhost
+  if (import.meta.env.DEV && !config.apiUrl) {
+    throw new Error('VITE_API_URL no está configurado para desarrollo');
   }
 
   // En producción, verificar que Stripe esté configurado si está habilitado

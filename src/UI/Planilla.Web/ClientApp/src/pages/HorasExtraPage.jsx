@@ -188,8 +188,8 @@ const HorasExtraPage = () => {
         return (
             <div className="flex items-center justify-center min-h-96">
                 <div className="text-center">
-                    <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                    <p className="text-gray-600">Cargando horas extra...</p>
+                    <div className="w-12 h-12 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-400">Cargando horas extra...</p>
                 </div>
             </div>
         );
@@ -199,55 +199,55 @@ const HorasExtraPage = () => {
         <div className="space-y-6">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Pendientes de Aprobar</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">{pendientes}</p>
+                            <p className="text-sm font-medium text-gray-400">Pendientes de Aprobar</p>
+                            <p className="text-3xl font-bold text-gray-100 mt-2">{pendientes}</p>
                         </div>
-                        <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-6 h-6 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="w-12 h-12 bg-amber-500/15 rounded-lg flex items-center justify-center">
+                            <svg className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Horas este Mes</p>
-                            <p className="text-3xl font-bold text-gray-900 mt-2">{horasEsteMes.toFixed(1)}</p>
+                            <p className="text-sm font-medium text-gray-400">Horas este Mes</p>
+                            <p className="text-3xl font-bold text-gray-100 mt-2">{horasEsteMes.toFixed(1)}</p>
                         </div>
-                        <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="w-12 h-12 bg-primary-500/15 rounded-lg flex items-center justify-center">
+                            <svg className="w-6 h-6 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
                     <div className="flex items-center justify-between">
                         <div>
-                            <p className="text-sm font-medium text-gray-600">Monto Estimado</p>
-                            <p className="text-2xl font-bold text-gray-900 mt-2">{formatCurrency(montoEstimado)}</p>
+                            <p className="text-sm font-medium text-gray-400">Monto Estimado</p>
+                            <p className="text-2xl font-bold font-mono text-gray-100 mt-2">{formatCurrency(montoEstimado)}</p>
                         </div>
-                        <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <div className="w-12 h-12 bg-green-500/15 rounded-lg flex items-center justify-center">
+                            <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                         </div>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                    <p className="text-sm font-medium text-gray-600 mb-3">Por Tipo</p>
+                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
+                    <p className="text-sm font-medium text-gray-400 mb-3">Por Tipo</p>
                     <div className="space-y-2">
-                        {porTipo.map(tipo => (
-                            <div key={tipo.valor} className="flex items-center justify-between">
-                                <span className="text-xs text-gray-600">{tipo.nombre.split(' ')[0]}</span>
-                                <span className="px-2 py-0.5 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                        {porTipo.map((tipo, index) => (
+                            <div key={tipo?.valor || `tipo-${index}`} className="flex items-center justify-between">
+                                <span className="text-xs text-gray-400">{tipo.nombre.split(' ')[0]}</span>
+                                <span className="px-2 py-0.5 bg-blue-500/15 text-blue-400 text-xs font-medium rounded-full">
                                     {tipo.cantidad}
                                 </span>
                             </div>
@@ -257,13 +257,13 @@ const HorasExtraPage = () => {
             </div>
 
             {/* Filters and Action Bar */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-4">
                 <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                     <div className="flex flex-col sm:flex-row gap-3 flex-1">
                         <select
                             value={filters.empleadoId}
                             onChange={(e) => setFilters({ ...filters, empleadoId: e.target.value })}
-                            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         >
                             <option value="">Todos los empleados</option>
                             {empleados.map(emp => (
@@ -276,7 +276,7 @@ const HorasExtraPage = () => {
                         <select
                             value={filters.tipo}
                             onChange={(e) => setFilters({ ...filters, tipo: e.target.value })}
-                            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         >
                             <option value="">Todos los tipos</option>
                             {tipos.map(tipo => (
@@ -286,20 +286,20 @@ const HorasExtraPage = () => {
                             ))}
                         </select>
 
-                        <label className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg cursor-pointer">
+                        <label className="flex items-center gap-2 px-3 py-2 bg-navy-950 rounded-lg cursor-pointer">
                             <input
                                 type="checkbox"
                                 checked={filters.soloPendientes}
                                 onChange={(e) => setFilters({ ...filters, soloPendientes: e.target.checked })}
-                                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                                className="w-4 h-4 text-primary-600 rounded focus:ring-2 focus:ring-primary-500/20"
                             />
-                            <span className="text-sm font-medium text-gray-700">Solo pendientes</span>
+                            <span className="text-sm font-medium text-gray-300">Solo pendientes</span>
                         </label>
                     </div>
 
                     <button
                         onClick={() => setShowModal(true)}
-                        className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-sm"
+                        className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -310,9 +310,9 @@ const HorasExtraPage = () => {
             </div>
 
             {/* Table */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900">
+            <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 overflow-hidden">
+                <div className="px-6 py-4 border-b border-navy-700">
+                    <h3 className="text-lg font-semibold text-gray-100">
                         Horas Extra Registradas
                         <span className="ml-2 text-sm font-normal text-gray-500">
                             ({filteredHorasExtra.length} registros)
@@ -322,7 +322,7 @@ const HorasExtraPage = () => {
 
                 <div className="overflow-x-auto">
                     <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
+                        <thead className="bg-navy-950 border-b border-navy-700">
                             <tr>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Empleado</th>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Fecha</th>
@@ -334,10 +334,10 @@ const HorasExtraPage = () => {
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase">Acciones</th>
                             </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-navy-900 divide-y divide-navy-700">
                             {filteredHorasExtra.map((he) => (
-                                <tr key={he.id} className="hover:bg-gray-50 transition-colors">
-                                    <td className="py-4 px-6 text-sm text-gray-900">{he.empleadoNombre}</td>
+                                <tr key={he.id} className="hover:bg-navy-800 transition-colors">
+                                    <td className="py-4 px-6 text-sm text-gray-100">{he.empleadoNombre}</td>
                                     <td className="py-4 px-6 text-sm text-gray-500">
                                         {new Date(he.fecha).toLocaleDateString('es-PA', {
                                             day: '2-digit',
@@ -346,28 +346,28 @@ const HorasExtraPage = () => {
                                         })}
                                     </td>
                                     <td className="py-4 px-6">
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-500/15 text-purple-400">
                                             {he.tipoNombre}
                                         </span>
                                     </td>
-                                    <td className="py-4 px-6 text-sm text-gray-900">
+                                    <td className="py-4 px-6 text-sm text-gray-100">
                                         {formatTime(he.horaInicio)} - {formatTime(he.horaFin)}
                                     </td>
-                                    <td className="py-4 px-6 text-sm font-medium text-gray-900">
+                                    <td className="py-4 px-6 text-sm font-medium text-gray-100">
                                         {he.cantidadHoras.toFixed(2)}h
                                     </td>
-                                    <td className="py-4 px-6 text-sm font-medium text-gray-900">
+                                    <td className="py-4 px-6 text-sm font-medium font-mono text-gray-100">
                                         {formatCurrency(he.montoCalculado)}
                                     </td>
                                     <td className="py-4 px-6">
                                         {he.estaAprobada ? (
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                <span className="w-1.5 h-1.5 bg-green-600 rounded-full mr-1.5"></span>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/15 text-green-400">
+                                                <span className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1.5"></span>
                                                 Aprobada
                                             </span>
                                         ) : (
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                                                <span className="w-1.5 h-1.5 bg-yellow-600 rounded-full mr-1.5"></span>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-400">
+                                                <span className="w-1.5 h-1.5 bg-amber-400 rounded-full mr-1.5"></span>
                                                 Pendiente
                                             </span>
                                         )}
@@ -378,7 +378,7 @@ const HorasExtraPage = () => {
                                                 <>
                                                     <button
                                                         onClick={() => handleAprobar(he.id)}
-                                                        className="inline-flex items-center gap-1 text-green-600 hover:text-green-800 font-medium text-sm"
+                                                        className="inline-flex items-center gap-1 text-green-400 hover:text-green-300 font-medium text-sm"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -387,7 +387,7 @@ const HorasExtraPage = () => {
                                                     </button>
                                                     <button
                                                         onClick={() => handleEdit(he)}
-                                                        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium text-sm"
+                                                        className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300 font-medium text-sm"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -396,7 +396,7 @@ const HorasExtraPage = () => {
                                                     </button>
                                                     <button
                                                         onClick={() => handleRechazar(he.id)}
-                                                        className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-medium text-sm"
+                                                        className="inline-flex items-center gap-1 text-red-400 hover:text-red-300 font-medium text-sm"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -422,7 +422,7 @@ const HorasExtraPage = () => {
                             <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-                            <h3 className="text-lg font-medium text-gray-900 mb-1">
+                            <h3 className="text-lg font-medium text-gray-100 mb-1">
                                 No hay horas extra registradas
                             </h3>
                             <p className="text-gray-500 mb-4">
@@ -430,7 +430,7 @@ const HorasExtraPage = () => {
                             </p>
                             <button
                                 onClick={() => setShowModal(true)}
-                                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                                className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
                             >
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -445,14 +445,14 @@ const HorasExtraPage = () => {
             {/* Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white">
-                            <h3 className="text-xl font-semibold text-gray-900">
+                    <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="px-6 py-4 border-b border-navy-700 flex items-center justify-between sticky top-0 bg-navy-900">
+                            <h3 className="text-xl font-semibold text-gray-100">
                                 {editingId ? 'Editar Hora Extra' : 'Registrar Hora Extra'}
                             </h3>
                             <button
                                 onClick={resetForm}
-                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                                className="text-gray-400 hover:text-gray-200 transition-colors"
                             >
                                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -463,14 +463,14 @@ const HorasExtraPage = () => {
                         <form onSubmit={handleSubmit} className="p-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Empleado <span className="text-red-500">*</span>
                                     </label>
                                     <select
                                         required
                                         value={formData.empleadoId}
                                         onChange={(e) => setFormData({ ...formData, empleadoId: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     >
                                         <option value="">Seleccionar empleado...</option>
                                         {empleados.map(emp => (
@@ -482,7 +482,7 @@ const HorasExtraPage = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Fecha <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -490,22 +490,22 @@ const HorasExtraPage = () => {
                                         required
                                         value={formData.fecha}
                                         onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Tipo <span className="text-red-500">*</span>
                                     </label>
                                     <select
                                         required
                                         value={formData.tipoHoraExtra}
                                         onChange={(e) => setFormData({ ...formData, tipoHoraExtra: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     >
-                                        {tipos.map(tipo => (
-                                            <option key={tipo.valor} value={tipo.valor}>
+                                        {tipos.map((tipo, index) => (
+                                            <option key={tipo?.valor || `tipo-${index}`} value={tipo?.valor}>
                                                 {tipo.nombre}
                                             </option>
                                         ))}
@@ -513,7 +513,7 @@ const HorasExtraPage = () => {
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Hora Inicio <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -521,12 +521,12 @@ const HorasExtraPage = () => {
                                         required
                                         value={formData.horaInicio}
                                         onChange={(e) => setFormData({ ...formData, horaInicio: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Hora Fin <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -534,12 +534,12 @@ const HorasExtraPage = () => {
                                         required
                                         value={formData.horaFin}
                                         onChange={(e) => setFormData({ ...formData, horaFin: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     />
                                 </div>
 
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Motivo <span className="text-red-500">*</span>
                                     </label>
                                     <textarea
@@ -547,23 +547,23 @@ const HorasExtraPage = () => {
                                         value={formData.motivo}
                                         onChange={(e) => setFormData({ ...formData, motivo: e.target.value })}
                                         rows="3"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                         placeholder="Describir el motivo de las horas extra..."
                                     />
                                 </div>
                             </div>
 
-                            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                            <div className="flex justify-end gap-3 pt-4 border-t border-navy-700">
                                 <button
                                     type="button"
                                     onClick={resetForm}
-                                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
+                                    className="px-4 py-2 border border-navy-600 rounded-lg text-gray-300 hover:bg-navy-800 font-medium transition-colors"
                                 >
                                     Cancelar
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors shadow-sm"
+                                    className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
                                 >
                                     {editingId ? 'Actualizar' : 'Registrar'}
                                 </button>

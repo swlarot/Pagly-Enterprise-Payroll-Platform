@@ -109,7 +109,7 @@ export function RoleFormModal({ role, isOpen, onClose, onSuccess }: RoleFormModa
         />
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Descripción</label>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Descripción</label>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -117,12 +117,12 @@ export function RoleFormModal({ role, isOpen, onClose, onSuccess }: RoleFormModa
             rows={3}
             maxLength={200}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full px-3 py-2 bg-navy-800 text-gray-100 border border-navy-600 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Color</label>
+          <label className="block text-sm font-medium text-gray-300 mb-2">Color</label>
           <div className="grid grid-cols-4 gap-3">
             {PREDEFINED_COLORS.map((colorOption) => (
               <button
@@ -131,8 +131,8 @@ export function RoleFormModal({ role, isOpen, onClose, onSuccess }: RoleFormModa
                 onClick={() => setColor(colorOption.value)}
                 className={`flex items-center justify-center p-3 rounded-lg border-2 transition-all ${
                   color === colorOption.value
-                    ? 'border-gray-900 shadow-md scale-105'
-                    : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-gray-100 shadow-md scale-105'
+                    : 'border-navy-700 hover:border-navy-500'
                 }`}
               >
                 <div
@@ -144,7 +144,7 @@ export function RoleFormModal({ role, isOpen, onClose, onSuccess }: RoleFormModa
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-navy-700">
           <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
             Cancelar
           </Button>

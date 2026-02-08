@@ -63,7 +63,7 @@ export function RolesTab() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary-400" />
       </div>
     );
   }
@@ -76,10 +76,11 @@ export function RolesTab() {
         </Button>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+      {/* Banner info */}
+      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 flex items-start gap-3">
+        <AlertCircle className="w-5 h-5 text-blue-300 flex-shrink-0 mt-0.5" />
         <div className="flex-1">
-          <p className="text-sm text-blue-800">
+          <p className="text-sm text-blue-300">
             Crea roles, asígnales permisos y luego asígnalos a los usuarios desde la pestaña Usuarios.
           </p>
         </div>
@@ -88,16 +89,16 @@ export function RolesTab() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Roles de la empresa</h2>
-            <span className="text-sm text-gray-600">{editableRoles.length} roles</span>
+            <h2 className="text-lg font-semibold text-gray-100">Roles de la empresa</h2>
+            <span className="text-sm text-gray-400">{editableRoles.length} roles</span>
           </div>
         </CardHeader>
         <CardBody>
           {editableRoles.length === 0 ? (
             <div className="text-center py-12">
-              <Shield className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No hay roles creados</h3>
-              <p className="text-gray-600 mb-4">Crea el primer rol y asígnale permisos.</p>
+              <Shield className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-100 mb-2">No hay roles creados</h3>
+              <p className="text-gray-400 mb-4">Crea el primer rol y asígnale permisos.</p>
               <Button icon={Plus} onClick={() => setShowCreateModal(true)}>
                 Crear primer rol
               </Button>

@@ -9,15 +9,15 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { isAuthenticated, isLoading, subscription } = useAuth();
+  const { isAuthenticated, isLoading, subscription, tenant, availableTenants } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-gray-50">
+      <div className="flex items-center justify-center h-screen bg-navy-950">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-400">Cargando...</p>
         </div>
       </div>
     );
@@ -27,23 +27,43 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Verificar si es una ruta de system-admin
+  const isSystemAdminRoute = location.pathname.startsWith('/system-admin');
+
+  // Para rutas de system-admin, permitir acceso sin tenant (system admins no tienen tenant)
+  if (isSystemAdminRoute) {
+    // SystemAdminRoute manejará la verificación de permisos
+    return <>{children}</>;
+  }
+
+  // Para rutas normales que requieren tenant:
+  // Si el usuario tiene availableTenants pero no tenant seleccionado, redirigir a selección
+  if (isAuthenticated && !tenant && (availableTenants?.length ?? 0) > 0) {
+    return <Navigate to="/select-tenant" replace />;
+  }
+
+  // Si no hay tenant y no hay availableTenants, puede ser que aún esté cargando
+  // En este caso, permitir que la página se renderice con su propio loading state
+  // en lugar de bloquear completamente el acceso
+  // Las páginas individuales manejarán el caso de tenant null
+
   // Check subscription status
   if (subscription?.status === SubscriptionStatus.Canceled) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
-          <div className="flex items-center justify-center w-12 h-12 bg-red-100 rounded-full mx-auto mb-4">
-            <AlertTriangle className="w-6 h-6 text-red-600" />
+      <div className="min-h-screen bg-navy-950 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-navy-900 border border-navy-700 rounded-lg shadow-2xl shadow-black/30 p-6">
+          <div className="flex items-center justify-center w-12 h-12 bg-red-500/15 rounded-full mx-auto mb-4">
+            <AlertTriangle className="w-6 h-6 text-red-400" />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 text-center mb-2">
+          <h2 className="text-xl font-bold text-gray-100 text-center mb-2">
             Suscripción Cancelada
           </h2>
-          <p className="text-gray-600 text-center mb-6">
-            Tu suscripción ha sido cancelada. Para continuar usando Planilla, por favor reactiva tu suscripción.
+          <p className="text-gray-400 text-center mb-6">
+            Tu suscripción ha sido cancelada. Para continuar usando Pagly, por favor reactiva tu suscripción.
           </p>
           <Link
             to="/billing"
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors"
           >
             <CreditCard className="w-5 h-5" />
             Ir a Facturación
@@ -55,20 +75,20 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   if (subscription?.status === SubscriptionStatus.PastDue) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6">
-          <div className="flex items-center justify-center w-12 h-12 bg-yellow-100 rounded-full mx-auto mb-4">
-            <AlertTriangle className="w-6 h-6 text-yellow-600" />
+      <div className="min-h-screen bg-navy-950 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-navy-900 border border-navy-700 rounded-lg shadow-2xl shadow-black/30 p-6">
+          <div className="flex items-center justify-center w-12 h-12 bg-amber-500/15 rounded-full mx-auto mb-4">
+            <AlertTriangle className="w-6 h-6 text-amber-400" />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 text-center mb-2">
+          <h2 className="text-xl font-bold text-gray-100 text-center mb-2">
             Problema con el Pago
           </h2>
-          <p className="text-gray-600 text-center mb-6">
+          <p className="text-gray-400 text-center mb-6">
             Hay un problema con tu forma de pago. Por favor actualiza tu información de pago para continuar usando el servicio.
           </p>
           <Link
             to="/billing"
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors"
           >
             <CreditCard className="w-5 h-5" />
             Actualizar Pago

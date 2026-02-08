@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { authService } from '../services/authService';
+import { api } from '../services/api';
 import type {
   UserInfoDto,
   TenantInfoDto,
@@ -15,6 +16,7 @@ interface AuthContextType {
   tenant: TenantInfoDto | null;
   subscription: SubscriptionInfoDto | null;
   availableTenants: TenantSummaryDto[];
+  permissions: string[];
   isAuthenticated: boolean;
   isSystemAdmin: boolean;
   isLoading: boolean;
@@ -24,6 +26,7 @@ interface AuthContextType {
   acceptInvite: (token: string, password: string, confirmPassword: string) => Promise<void>;
   canAccessFeature: (feature: keyof SubscriptionInfoDto) => boolean;
   hasRole: (...roles: TenantRole[]) => boolean;
+  hasPermission: (permission: string) => boolean;
   canWrite: () => boolean;
   canDelete: () => boolean;
   isReadOnly: () => boolean;
@@ -36,37 +39,87 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [tenant, setTenant] = useState<TenantInfoDto | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionInfoDto | null>(null);
   const [availableTenants, setAvailableTenants] = useState<TenantSummaryDto[]>([]);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const [isSystemAdmin, setIsSystemAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Flag para evitar re-validación después del login
+  const hasInitializedRef = React.useRef(false);
 
   // Auto-login on mount if token exists
+  // Solo ejecutar una vez al montar el componente
   useEffect(() => {
+    // Evitar ejecución múltiple
+    if (hasInitializedRef.current) {
+      return;
+    }
+    
     const token = localStorage.getItem('auth_token');
     if (token && !isTokenExpired(token)) {
-      validateAndSetUser(token);
+      // Solo validar si no hay tenant ya cargado (evita sobrescribir después del login)
+      // El login() establecerá el tenant, así que no debemos re-validar si ya existe
+      if (!tenant) {
+        validateAndSetUser(token);
+      } else {
+        // Tenant ya cargado (probablemente desde login), solo marcar como no loading
+        setIsLoading(false);
+      }
     } else {
       setIsLoading(false);
       if (token) {
         // Token expired, clean up
         localStorage.removeItem('auth_token');
+        localStorage.removeItem('refresh_token');
       }
     }
-  }, []);
+    
+    hasInitializedRef.current = true;
+  }, []); // Dependencias vacías: solo ejecutar al montar
+
+  // Función para obtener permisos del usuario actual
+  const fetchUserPermissions = async (): Promise<void> => {
+    try {
+      const perms = await api.get<string[]>('/api/permissions/me');
+      setPermissions(perms || []);
+    } catch (error) {
+      console.error('Error fetching user permissions:', error);
+      // Si falla, usar permisos vacíos (usuario sin permisos personalizados)
+      setPermissions([]);
+    }
+  };
 
   const validateAndSetUser = async (token: string) => {
     try {
       const data = await authService.me();
       setUser(data.user);
-      setTenant(data.tenant);
-      setSubscription(data.subscription);
+      setTenant(data.tenant ?? null);
+      setSubscription(data.subscription ?? null);
       setAvailableTenants(data.availableTenants || []);
+
+      // Si el backend indica que debe elegir tenant (token de selección), mantener token y estado
+      if (data.requiresTenantSelection && (data.availableTenants?.length ?? 0) > 0) {
+        // No limpiar token; el usuario debe ir a /select-tenant
+        const payload = parseJwt(token);
+        setIsSystemAdmin(payload?.is_system_admin === 'true' || payload?.is_system_admin === 'True');
+        setIsLoading(false);
+        return;
+      }
 
       // Extract isSystemAdmin from token
       const payload = parseJwt(token);
       setIsSystemAdmin(payload?.is_system_admin === 'true' || payload?.is_system_admin === 'True');
+
+      // Obtener permisos del usuario si tiene tenant seleccionado
+      if (data.tenant) {
+        await fetchUserPermissions();
+      } else {
+        setPermissions([]);
+      }
     } catch (error) {
       console.error('Auth validation failed:', error);
       localStorage.removeItem('auth_token');
+      localStorage.removeItem('refresh_token');
+      setPermissions([]);
     } finally {
       setIsLoading(false);
     }
@@ -86,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Guardar temporalmente los datos del usuario
       setUser(data.user);
       setAvailableTenants(data.availableTenants || []);
+      setPermissions([]); // Sin permisos hasta seleccionar tenant
 
       // Retornar para que LoginPage pueda redirigir al selector
       return {
@@ -98,13 +152,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('auth_token', data.token);
     localStorage.setItem('refresh_token', data.refreshToken);
     setUser(data.user);
+    
+    // Establecer tenant ANTES de otras operaciones para que esté disponible inmediatamente
+    console.log('[AuthContext] Setting tenant from login response:', data.tenant);
     setTenant(data.tenant);
+    
     setSubscription(data.subscription);
     setAvailableTenants(data.availableTenants || []);
 
-    // Extract isSystemAdmin from token
+    // Extract isSystemAdmin from token ANTES de obtener permisos
     const payload = parseJwt(data.token);
-    setIsSystemAdmin(payload?.is_system_admin === 'true' || payload?.is_system_admin === 'True');
+    const adminStatus = payload?.is_system_admin === 'true' || payload?.is_system_admin === 'True';
+    setIsSystemAdmin(adminStatus);
+
+    // Obtener permisos del usuario si tiene tenant seleccionado
+    if (data.tenant) {
+      await fetchUserPermissions();
+    } else {
+      setPermissions([]);
+    }
+
+    console.log('[AuthContext] Login completed. Tenant set:', data.tenant ? `${data.tenant.name} (ID: ${data.tenant.id})` : 'null');
 
     return { requiresTenantSelection: false };
   };
@@ -125,6 +193,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Extract isSystemAdmin from token
     const payload = parseJwt(data.token);
     setIsSystemAdmin(payload?.is_system_admin === 'true' || payload?.is_system_admin === 'True');
+
+    // Obtener permisos del usuario para el tenant seleccionado
+    if (data.tenant) {
+      await fetchUserPermissions();
+    } else {
+      setPermissions([]);
+    }
   };
 
   const logout = () => {
@@ -134,6 +209,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTenant(null);
     setSubscription(null);
     setAvailableTenants([]);
+    setPermissions([]);
     setIsSystemAdmin(false);
   };
 
@@ -144,6 +220,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user);
     setTenant(data.tenant);
     setSubscription(data.subscription);
+    
+    // Obtener permisos del usuario después de aceptar invitación
+    if (data.tenant) {
+      await fetchUserPermissions();
+    } else {
+      setPermissions([]);
+    }
   };
 
   const canAccessFeature = (feature: keyof SubscriptionInfoDto): boolean => {
@@ -175,11 +258,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return false;
   };
 
+  const hasPermission = (permission: string): boolean => {
+    if (!permissions || permissions.length === 0) return false;
+    return permissions.includes(permission);
+  };
+
   const value: AuthContextType = {
     user,
     tenant,
     subscription,
     availableTenants,
+    permissions,
     isAuthenticated: !!user,
     isSystemAdmin,
     isLoading,
@@ -189,6 +278,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     acceptInvite,
     canAccessFeature,
     hasRole,
+    hasPermission,
     canWrite,
     canDelete,
     isReadOnly,
