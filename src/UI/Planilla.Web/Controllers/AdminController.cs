@@ -597,7 +597,7 @@ public class AdminController : ControllerBase
 
             var users = await _context.TenantUsers
                 .Include(tu => tu.User)
-                .Where(tu => tu.TenantId == id)
+                .Where(tu => tu.TenantId == id && tu.IsActive) // Solo usuarios activos
                 .OrderBy(tu => tu.JoinedAt)
                 .Select(tu => new AdminTenantUserDto
                 {
@@ -1052,65 +1052,119 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
-    /// DELETE /api/admin/users/{userId} - Elimina completamente un usuario del sistema (soft delete)
+    /// DELETE /api/admin/users/{userId} - Elimina físicamente un usuario del sistema (hard delete)
     /// Requiere: IsSystemAdmin = true
     /// Validaciones:
+    /// - No se puede eliminar si tiene membresías activas en cualquier tenant
     /// - No se puede eliminar el último SystemAdmin
-    /// - Marca usuario como eliminado (IsDeleted = true)
-    /// - Desactiva todas las asociaciones TenantUser del usuario
+    /// - No se puede eliminar el último Owner de ningún tenant
+    /// Acciones:
+    /// - Desvincula empleados (UserId = null)
+    /// - Elimina RefreshTokens relacionados
+    /// - Elimina TenantUsers relacionados (inactivos)
+    /// - Limpia TenantInvitations (CreatedByUserId = null)
+    /// - Elimina AppUser físicamente
     /// </summary>
     [HttpDelete("users/{userId}")]
     public async Task<IActionResult> DeleteUser(string userId)
     {
         if (string.IsNullOrWhiteSpace(userId))
+        {
+            _logger.LogWarning("DeleteUser called with empty userId");
             return BadRequest(new { error = "El ID del usuario es requerido" });
+        }
+
+        _logger.LogInformation("DeleteUser called for userId: {UserId}", userId);
+
         try
         {
             // 1. Verificar que el usuario existe
+            _logger.LogDebug("Step 1: Looking up user {UserId}", userId);
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
             {
+                _logger.LogWarning("User {UserId} not found", userId);
                 return NotFound(new { error = "Usuario no encontrado" });
             }
+
+            _logger.LogDebug("User found: {Email}, IsSystemAdmin: {IsSystemAdmin}, IsDeleted: {IsDeleted}",
+                user.Email, user.IsSystemAdmin, user.IsDeleted);
 
             // 2. Si ya está eliminado, retornar error
             if (user.IsDeleted)
             {
+                _logger.LogWarning("User {UserId} is already deleted", userId);
                 return BadRequest(new { error = "El usuario ya está eliminado" });
             }
 
             // 3. VALIDACIÓN CRÍTICA: No eliminar el último SystemAdmin
+            _logger.LogDebug("Step 3: Validating SystemAdmin constraint");
             if (user.IsSystemAdmin)
             {
                 var systemAdminsCount = await _userManager.Users
                     .Where(u => u.IsSystemAdmin && !u.IsDeleted)
                     .CountAsync();
 
+                _logger.LogDebug("SystemAdmins count: {Count}", systemAdminsCount);
+
                 if (systemAdminsCount <= 1)
                 {
+                    _logger.LogWarning("Cannot delete last SystemAdmin {UserId}", userId);
                     return BadRequest(new { error = "No se puede eliminar el último SystemAdmin del sistema" });
                 }
             }
 
-            // 3b. VALIDACIÓN CRÍTICA: No eliminar el último Owner de ningún tenant
+            // 4. VALIDACIÓN CRÍTICA: No eliminar si tiene membresías activas en cualquier tenant
+            _logger.LogDebug("Step 4: Checking active tenant memberships");
+            var activeMemberships = await _context.TenantUsers
+                .Where(tu => tu.UserId == userId && tu.IsActive)
+                .Include(tu => tu.Tenant)
+                .Select(tu => new { tu.TenantId, TenantName = tu.Tenant.Name, tu.Role })
+                .ToListAsync();
+
+            _logger.LogDebug("Active memberships found: {Count}", activeMemberships.Count);
+
+            if (activeMemberships.Any())
+            {
+                var tenantsList = string.Join(", ", activeMemberships.Select(m => $"{m.TenantName} ({m.Role})"));
+                _logger.LogWarning("User {UserId} has active memberships in tenants: {Tenants}", userId, tenantsList);
+                return BadRequest(new
+                {
+                    error = "No se puede eliminar el usuario porque tiene membresías activas en uno o más tenants. " +
+                            "Debes removerlo primero de cada tenant.",
+                    activeTenants = activeMemberships.Select(m => new { m.TenantId, m.TenantName, m.Role }).ToList()
+                });
+            }
+
+            // 5. VALIDACIÓN CRÍTICA: No eliminar el último Owner de ningún tenant (verificar inactivos también)
+            _logger.LogDebug("Step 5: Checking Owner constraint");
             var ownerMemberships = await _context.TenantUsers
-                .Where(tu => tu.UserId == userId && tu.Role == TenantRole.Owner && tu.IsActive)
+                .Where(tu => tu.UserId == userId && tu.Role == TenantRole.Owner)
+                .Include(tu => tu.Tenant)
                 .Select(tu => new { tu.TenantId, tu.Tenant.Name })
                 .ToListAsync();
+
+            _logger.LogDebug("Owner memberships found: {Count}", ownerMemberships.Count);
 
             foreach (var ownership in ownerMemberships)
             {
                 var ownersCount = await _context.TenantUsers
                     .Where(tu => tu.TenantId == ownership.TenantId
                               && tu.Role == TenantRole.Owner
-                              && tu.IsActive)
+                              && tu.IsActive
+                              && tu.UserId != userId) // Excluir el usuario actual
                     .CountAsync();
 
-                if (ownersCount <= 1)
+                _logger.LogDebug("Tenant {TenantId} ({TenantName}) has {OwnersCount} other active owners",
+                    ownership.TenantId, ownership.Name, ownersCount);
+
+                if (ownersCount == 0)
                 {
+                    _logger.LogWarning("Cannot delete user {UserId} - last Owner of tenant {TenantId}",
+                        userId, ownership.TenantId);
                     return BadRequest(new
                     {
-                        error = $"No se puede eliminar el último Owner del tenant '{ownership.Name}'. " +
+                        error = $"No se puede eliminar el usuario porque es el último Owner del tenant '{ownership.Name}'. " +
                                 $"Debes asignar otro Owner antes de eliminar este usuario.",
                         tenantId = ownership.TenantId,
                         tenantName = ownership.Name
@@ -1118,94 +1172,245 @@ public class AdminController : ControllerBase
                 }
             }
 
-            // 3c. VERIFICAR: Empleado vinculado (warning, no blocker)
-            var linkedEmployee = await _context.Empleados
-                .FirstOrDefaultAsync(e => e.UserId == userId && e.EstaActivo);
-
-            // 4. Obtener ID del admin actual
+            // 6. Obtener ID del admin actual
+            _logger.LogDebug("Step 6: Getting admin context");
             var currentAdminId = User.FindFirst("sub")?.Value;
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+            var userAgent = HttpContext.Request.Headers["User-Agent"].ToString();
 
-            // 5. Marcar usuario como eliminado (soft delete)
-            user.IsDeleted = true;
-            user.DeletedAt = DateTime.UtcNow;
-            user.DeletedBy = currentAdminId;
+            // 7. Desvincular empleados: todos los empleados vinculados a este usuario
+            _logger.LogDebug("Step 7: Unlinking employees");
+            var linkedEmpleados = await _context.Empleados
+                .Where(e => e.UserId == userId)
+                .ToListAsync();
 
-            var updateResult = await _userManager.UpdateAsync(user);
-            if (!updateResult.Succeeded)
+            _logger.LogDebug("Found {Count} linked employees", linkedEmpleados.Count);
+
+            foreach (var emp in linkedEmpleados)
             {
-                var errors = string.Join(", ", updateResult.Errors.Select(e => e.Description));
-                return BadRequest(new { error = "Error al eliminar usuario", details = errors });
+                emp.UserId = null;
+                _context.Empleados.Update(emp);
             }
 
-            // 6. Desactivar todas las asociaciones TenantUser
+            if (linkedEmpleados.Count > 0)
+            {
+                _logger.LogInformation("Desvinculados {Count} empleado(s) del usuario {UserId} antes de eliminarlo",
+                    linkedEmpleados.Count, userId);
+            }
+
+            // 8. Eliminar RefreshTokens relacionados
+            _logger.LogDebug("Step 8: Removing refresh tokens");
+            var refreshTokens = await _context.RefreshTokens
+                .Where(rt => rt.UserId == userId)
+                .ToListAsync();
+
+            _logger.LogDebug("Found {Count} refresh tokens", refreshTokens.Count);
+
+            if (refreshTokens.Any())
+            {
+                _context.RefreshTokens.RemoveRange(refreshTokens);
+                _logger.LogInformation("Eliminados {Count} refresh token(s) del usuario {UserId}",
+                    refreshTokens.Count, userId);
+            }
+
+            // 9. Obtener TenantIds ANTES de eliminar TenantUsers (necesarios para audit log)
+            _logger.LogDebug("Step 9: Getting tenant IDs before removing tenant user memberships");
             var tenantUsers = await _context.TenantUsers
                 .Where(tu => tu.UserId == userId)
                 .ToListAsync();
 
-            foreach (var tenantUser in tenantUsers)
+            _logger.LogDebug("Found {Count} tenant user memberships", tenantUsers.Count);
+
+            // Guardar los TenantIds ANTES de eliminar los TenantUsers
+            var tenantIdsForAudit = tenantUsers.Select(tu => tu.TenantId).Distinct().ToList();
+
+            if (tenantUsers.Any())
             {
-                tenantUser.IsActive = false;
+                _context.TenantUsers.RemoveRange(tenantUsers);
+                _logger.LogInformation("Eliminadas {Count} membresía(s) de tenant del usuario {UserId}",
+                    tenantUsers.Count, userId);
             }
 
-            // 6b. Desvincular empleado si existe
-            if (linkedEmployee != null)
+            // 10. Limpiar TenantInvitations: manejar TODAS las invitaciones (aceptadas y no aceptadas)
+            _logger.LogDebug("Step 10: Cleaning tenant invitations");
+            var allInvitations = await _context.TenantInvitations
+                .Where(ti => ti.CreatedByUserId == userId)
+                .ToListAsync();
+
+            _logger.LogDebug("Found {Count} total invitations (accepted and pending)", allInvitations.Count);
+
+            if (allInvitations.Any())
             {
-                linkedEmployee.UserId = null;
-                _context.Empleados.Update(linkedEmployee);
-            }
-
-            await _context.SaveChangesAsync();
-
-            // 7. AUDIT LOG para cada tenant afectado
-            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
-            var userAgent = HttpContext.Request.Headers["User-Agent"].ToString();
-
-            foreach (var tenantUser in tenantUsers)
-            {
-                var auditLog = new AuditLogEntry
+                // Para invitaciones NO aceptadas: eliminar físicamente
+                var pendingInvitations = allInvitations.Where(ti => !ti.IsAccepted()).ToList();
+                if (pendingInvitations.Any())
                 {
-                    TenantId = tenantUser.TenantId,
-                    ActorUserId = currentAdminId ?? "system",
-                    ActorEmail = User.FindFirst("email")?.Value ?? "system@admin.com",
-                    Action = "UserDeleted",
-                    EntityType = "AppUser",
-                    EntityId = userId,
-                    IpAddress = ipAddress,
-                    UserAgent = userAgent,
-                    MetadataJson = System.Text.Json.JsonSerializer.Serialize(new
-                    {
-                        UserEmail = user.Email,
-                        DeletedBy = currentAdminId,
-                        DeletedAt = user.DeletedAt,
-                        HadLinkedEmployee = linkedEmployee != null,
-                        LinkedEmployeeName = linkedEmployee != null ? $"{linkedEmployee.Nombre} {linkedEmployee.Apellido}" : null
-                    }),
-                    CreatedAt = DateTime.UtcNow
-                };
+                    _context.TenantInvitations.RemoveRange(pendingInvitations);
+                    _logger.LogInformation("Eliminadas {Count} invitación(es) no aceptadas creadas por usuario {UserId}",
+                        pendingInvitations.Count, userId);
+                }
 
-                _context.AuditLogEntries.Add(auditLog);
+                // Para invitaciones ACEPTADAS: cambiar CreatedByUserId a un usuario del sistema o eliminar
+                // Como CreatedByUserId es Required, necesitamos ponerlo a un usuario válido
+                // Buscar un SystemAdmin para usar como "sistema"
+                var systemAdminUser = await _userManager.Users
+                    .Where(u => u.IsSystemAdmin && !u.IsDeleted && u.Id != userId)
+                    .FirstOrDefaultAsync();
+
+                var acceptedInvitations = allInvitations.Where(ti => ti.IsAccepted()).ToList();
+                if (acceptedInvitations.Any())
+                {
+                    var replacementUserId = systemAdminUser?.Id ?? currentAdminId ?? "system";
+                    
+                    foreach (var invitation in acceptedInvitations)
+                    {
+                        invitation.CreatedByUserId = replacementUserId;
+                        _context.TenantInvitations.Update(invitation);
+                    }
+                    
+                    _logger.LogInformation(
+                        "Actualizadas {Count} invitación(es) aceptadas creadas por usuario {UserId}. CreatedByUserId cambiado a {ReplacementUserId}",
+                        acceptedInvitations.Count, userId, replacementUserId);
+                }
             }
 
-            await _context.SaveChangesAsync();
+            // Guardar cambios antes de eliminar usuario
+            _logger.LogDebug("Step 11: Saving changes before deleting user");
+            try
+            {
+                await _context.SaveChangesAsync();
+                _logger.LogDebug("Changes saved successfully");
+            }
+            catch (Exception saveEx)
+            {
+                _logger.LogError(saveEx, "Error saving changes before deleting user {UserId}", userId);
+                return StatusCode(500, new
+                {
+                    error = "Error al guardar cambios antes de eliminar usuario",
+                    details = saveEx.Message,
+                    innerException = saveEx.InnerException?.Message
+                });
+            }
 
-            _logger.LogWarning("SystemAdmin {AdminId} deleted user {UserId} ({Email})",
-                currentAdminId, userId, user.Email);
+            // 11. AUDIT LOG antes de eliminar (registrar en todos los tenants donde tenía membresía)
+            _logger.LogDebug("Step 12: Creating audit log entries");
+            
+            // Solo crear audit logs si hay tenants válidos (no usar TenantId = 0 porque viola foreign key)
+            if (tenantIdsForAudit != null && tenantIdsForAudit.Any())
+            {
+                foreach (var tenantId in tenantIdsForAudit)
+                {
+                    // Verificar que el tenant existe antes de crear el audit log
+                    var tenantExists = await _context.Tenants.AnyAsync(t => t.Id == tenantId);
+                    if (!tenantExists)
+                    {
+                        _logger.LogWarning("Tenant {TenantId} no existe, omitiendo audit log", tenantId);
+                        continue;
+                    }
 
-            return Ok(new { success = true, message = "Usuario eliminado exitosamente" });
+                    var auditLog = new AuditLogEntry
+                    {
+                        TenantId = tenantId,
+                        ActorUserId = currentAdminId ?? "system",
+                        ActorEmail = User.FindFirst("email")?.Value ?? "system@admin.com",
+                        Action = "UserHardDeleted",
+                        EntityType = "AppUser",
+                        EntityId = userId,
+                        IpAddress = ipAddress,
+                        UserAgent = userAgent,
+                        MetadataJson = System.Text.Json.JsonSerializer.Serialize(new
+                        {
+                            UserEmail = user.Email,
+                            DeletedBy = currentAdminId,
+                            DeletedAt = DateTime.UtcNow,
+                            HadLinkedEmployees = linkedEmpleados.Count,
+                            HadRefreshTokens = refreshTokens.Count,
+                            HadTenantMemberships = tenantUsers.Count
+                        }),
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    _context.AuditLogEntries.Add(auditLog);
+                }
+
+                try
+                {
+                    await _context.SaveChangesAsync();
+                    _logger.LogDebug("Audit log entries saved successfully");
+                }
+                catch (Exception auditEx)
+                {
+                    _logger.LogError(auditEx, "Error saving audit log for user {UserId}. InnerException: {InnerException}", 
+                        userId, auditEx.InnerException?.Message);
+                    // Continuar con la eliminación aunque falle el audit log
+                }
+            }
+            else
+            {
+                _logger.LogInformation("Usuario {UserId} no tenía membresías de tenant, omitiendo audit log", userId);
+            }
+
+            // 12. Eliminar AppUser físicamente (hard delete)
+            _logger.LogDebug("Step 13: Deleting AppUser entity");
+            try
+            {
+                var deleteResult = await _userManager.DeleteAsync(user);
+                if (!deleteResult.Succeeded)
+                {
+                    var errors = string.Join(", ", deleteResult.Errors.Select(e => e.Description));
+                    _logger.LogError("Error al eliminar usuario {UserId}: {Errors}", userId, errors);
+                    return BadRequest(new { error = "Error al eliminar usuario", details = errors });
+                }
+
+                _logger.LogWarning("SystemAdmin {AdminId} performed HARD DELETE on user {UserId} ({Email})",
+                    currentAdminId, userId, user.Email);
+
+                return Ok(new { success = true, message = "Usuario eliminado permanentemente del sistema" });
+            }
+            catch (Exception deleteEx)
+            {
+                _logger.LogError(deleteEx, "Exception during UserManager.DeleteAsync for user {UserId}", userId);
+                return StatusCode(500, new
+                {
+                    error = "Error al eliminar usuario del sistema",
+                    details = deleteEx.Message,
+                    innerException = deleteEx.InnerException?.Message,
+                    stackTrace = deleteEx.StackTrace
+                });
+            }
+        }
+        catch (DbUpdateException dbEx)
+        {
+            _logger.LogError(dbEx, "Database error deleting user {UserId}. InnerException: {InnerException}",
+                userId, dbEx.InnerException?.Message);
+            return StatusCode(500, new
+            {
+                error = "Error de base de datos al eliminar usuario",
+                details = dbEx.Message,
+                innerException = dbEx.InnerException?.Message
+            });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting user {UserId}", userId);
-            return StatusCode(500, new { error = "Error al eliminar el usuario" });
+            _logger.LogError(ex, "Unexpected error deleting user {UserId}. Type: {ExceptionType}, Message: {Message}, StackTrace: {StackTrace}",
+                userId, ex.GetType().Name, ex.Message, ex.StackTrace);
+            return StatusCode(500, new
+            {
+                error = "Error inesperado al eliminar el usuario",
+                details = ex.Message,
+                exceptionType = ex.GetType().Name,
+                innerException = ex.InnerException?.Message
+            });
         }
     }
 
     /// <summary>
-    /// DELETE /api/admin/tenants/{tenantId}/users/{userId} - Remueve un usuario de un tenant específico
+    /// DELETE /api/admin/tenants/{tenantId}/users/{userId} - Remueve físicamente un usuario de un tenant específico (hard delete)
     /// Requiere: IsSystemAdmin = true
     /// Validaciones:
-    /// - No se puede remover al último Owner de un tenant
-    /// - Marca TenantUser como inactivo (IsActive = false)
+    /// - No se puede remover al último Owner activo de un tenant
+    /// - Elimina físicamente el registro TenantUser (permite re-agregar el usuario después)
+    /// - Mantiene registro en AuditLog para auditoría
     /// </summary>
     [HttpDelete("tenants/{tenantId}/users/{userId}")]
     public async Task<IActionResult> RemoveUserFromTenant(int tenantId, string userId)
@@ -1221,7 +1426,7 @@ public class AdminController : ControllerBase
                 return NotFound(new { error = "Tenant no encontrado" });
             }
 
-            // 2. Buscar la relación TenantUser
+            // 2. Buscar la relación TenantUser (activos o inactivos)
             var tenantUser = await _context.TenantUsers
                 .FirstOrDefaultAsync(tu => tu.TenantId == tenantId && tu.UserId == userId);
 
@@ -1230,39 +1435,31 @@ public class AdminController : ControllerBase
                 return NotFound(new { error = "El usuario no pertenece a este tenant" });
             }
 
-            // 3. Si ya está inactivo, retornar error
-            if (!tenantUser.IsActive)
-            {
-                return BadRequest(new { error = "El usuario ya está inactivo en este tenant" });
-            }
-
-            // 4. VALIDACIÓN CRÍTICA: No remover al último Owner del tenant
-            if (tenantUser.Role == TenantRole.Owner)
+            // 3. VALIDACIÓN CRÍTICA: No remover al último Owner activo del tenant
+            if (tenantUser.Role == TenantRole.Owner && tenantUser.IsActive)
             {
                 var ownersCount = await _context.TenantUsers
                     .Where(tu => tu.TenantId == tenantId
                               && tu.Role == TenantRole.Owner
-                              && tu.IsActive)
+                              && tu.IsActive
+                              && tu.Id != tenantUser.Id) // Excluir el usuario actual
                     .CountAsync();
 
-                if (ownersCount <= 1)
+                if (ownersCount == 0)
                 {
-                    return BadRequest(new { error = "No se puede remover el último Owner del tenant" });
+                    return BadRequest(new { error = "No se puede remover el último Owner activo del tenant" });
                 }
             }
 
-            // 5. Marcar TenantUser como inactivo
-            tenantUser.IsActive = false;
-            _context.TenantUsers.Update(tenantUser);
-            await _context.SaveChangesAsync();
-
-            // 6. AUDIT LOG
+            // 4. Obtener información del usuario antes de eliminar (para audit log)
             var currentAdminId = User.FindFirst("sub")?.Value;
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
             var userAgent = HttpContext.Request.Headers["User-Agent"].ToString();
-
             var user = await _userManager.FindByIdAsync(userId);
+            var tenantUserRole = tenantUser.Role;
+            var tenantUserWasActive = tenantUser.IsActive;
 
+            // 5. AUDIT LOG antes de eliminar físicamente
             var auditLog = new AuditLogEntry
             {
                 TenantId = tenantId,
@@ -1276,13 +1473,18 @@ public class AdminController : ControllerBase
                 MetadataJson = System.Text.Json.JsonSerializer.Serialize(new
                 {
                     UserEmail = user?.Email,
-                    Role = tenantUser.Role.ToString(),
-                    RemovedBy = currentAdminId
+                    Role = tenantUserRole.ToString(),
+                    WasActive = tenantUserWasActive,
+                    RemovedBy = currentAdminId,
+                    RemovedAt = DateTime.UtcNow
                 }),
                 CreatedAt = DateTime.UtcNow
             };
 
             _context.AuditLogEntries.Add(auditLog);
+
+            // 6. Eliminar físicamente TenantUser (hard delete)
+            _context.TenantUsers.Remove(tenantUser);
             await _context.SaveChangesAsync();
 
             _logger.LogInformation(
@@ -1667,5 +1869,74 @@ public class AdminController : ControllerBase
             _logger.LogError(ex, "Error hard deleting user {UserId}", userId);
             return StatusCode(500, new { error = "Error al eliminar el usuario" });
         }
+    }
+
+    /// <summary>
+    /// POST /api/admin/test-email - Envía un email de prueba usando Brevo
+    /// Requiere: IsSystemAdmin = true
+    /// Útil para diagnosticar problemas con el servicio de email
+    /// </summary>
+    [HttpPost("test-email")]
+    public async Task<IActionResult> TestEmail([FromBody] TestEmailDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.ToEmail))
+        {
+            return BadRequest(new { error = "El email del destinatario es requerido" });
+        }
+
+        try
+        {
+            _logger.LogInformation("Test email requested by SystemAdmin {AdminId} to {ToEmail}",
+                User.FindFirst("sub")?.Value, dto.ToEmail);
+
+            var testLink = $"{Request.Scheme}://{Request.Host}/login";
+            var result = await _brevoEmailService.SendInvitationEmailAsync(
+                dto.ToEmail,
+                dto.ToName ?? "Usuario de Prueba",
+                testLink,
+                dto.TenantName ?? "Sistema de Prueba"
+            );
+
+            if (result)
+            {
+                return Ok(new
+                {
+                    success = true,
+                    message = $"Email de prueba enviado exitosamente a {dto.ToEmail}",
+                    toEmail = dto.ToEmail
+                });
+            }
+            else
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    error = "El servicio de email retornó false. Revisa los logs para más detalles.",
+                    toEmail = dto.ToEmail
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending test email to {ToEmail}", dto.ToEmail);
+            return StatusCode(500, new
+            {
+                success = false,
+                error = "Error al enviar email de prueba",
+                details = ex.Message,
+                innerException = ex.InnerException?.Message,
+                toEmail = dto.ToEmail
+            });
+        }
+    }
+
+    /// <summary>
+    /// DTO para el endpoint de prueba de email
+    /// </summary>
+    public class TestEmailDto
+    {
+        public string ToEmail { get; set; } = string.Empty;
+        public string? ToName { get; set; }
+        public string? TenantName { get; set; }
     }
 }

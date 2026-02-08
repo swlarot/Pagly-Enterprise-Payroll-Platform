@@ -49,53 +49,58 @@ public class TenantMiddleware
 
                 if (tenantId > 0)
                 {
-                    // Verificar que el tenant existe y está activo
-                    try
+                    // Incluir TenantId en el scope de logs para toda la request (incl. controllers)
+                    using (_logger.BeginScope(new Dictionary<string, object> { ["TenantId"] = tenantId }))
                     {
-                        var tenant = await tenantContext.GetCurrentTenantAsync();
-
-                        if (tenant == null)
+                        // Verificar que el tenant existe y está activo
+                        try
                         {
-                            _logger.LogWarning("Tenant {TenantId} no encontrado o inactivo", tenantId);
+                            var tenant = await tenantContext.GetCurrentTenantAsync();
+
+                            if (tenant == null)
+                            {
+                                _logger.LogWarning("Tenant {TenantId} no encontrado o inactivo", tenantId);
+                                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                                await context.Response.WriteAsJsonAsync(new
+                                {
+                                    error = "Tenant no encontrado o inactivo"
+                                });
+                                return;
+                            }
+
+                            if (tenant.Subscription != null && !tenant.Subscription.IsActiveOrTrialing())
+                            {
+                                _logger.LogWarning("Suscripción inactiva para tenant {TenantId}", tenantId);
+                                context.Response.StatusCode = StatusCodes.Status402PaymentRequired;
+                                await context.Response.WriteAsJsonAsync(new
+                                {
+                                    error = "Suscripción inactiva",
+                                    status = tenant.Subscription.Status.ToString()
+                                });
+                                return;
+                            }
+
+                            if (tenant.Subscription != null && tenant.Subscription.IsTrialExpired())
+                            {
+                                _logger.LogWarning("Trial expirado para tenant {TenantId}", tenantId);
+                                context.Response.StatusCode = StatusCodes.Status402PaymentRequired;
+                                await context.Response.WriteAsJsonAsync(new
+                                {
+                                    error = "Período de prueba expirado",
+                                    message = "Por favor, actualiza tu plan de suscripción"
+                                });
+                                return;
+                            }
+                        }
+                        catch (InvalidOperationException ex)
+                        {
+                            _logger.LogError(ex, "Error al validar tenant {TenantId}", tenantId);
                             context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                            await context.Response.WriteAsJsonAsync(new
-                            {
-                                error = "Tenant no encontrado o inactivo"
-                            });
+                            await context.Response.WriteAsJsonAsync(new { error = ex.Message });
                             return;
                         }
 
-                        // Verificar si la suscripción está activa
-                        if (tenant.Subscription != null && !tenant.Subscription.IsActiveOrTrialing())
-                        {
-                            _logger.LogWarning("Suscripción inactiva para tenant {TenantId}", tenantId);
-                            context.Response.StatusCode = StatusCodes.Status402PaymentRequired;
-                            await context.Response.WriteAsJsonAsync(new
-                            {
-                                error = "Suscripción inactiva",
-                                status = tenant.Subscription.Status.ToString()
-                            });
-                            return;
-                        }
-
-                        // Verificar si el trial ha expirado
-                        if (tenant.Subscription != null && tenant.Subscription.IsTrialExpired())
-                        {
-                            _logger.LogWarning("Trial expirado para tenant {TenantId}", tenantId);
-                            context.Response.StatusCode = StatusCodes.Status402PaymentRequired;
-                            await context.Response.WriteAsJsonAsync(new
-                            {
-                                error = "Período de prueba expirado",
-                                message = "Por favor, actualiza tu plan de suscripción"
-                            });
-                            return;
-                        }
-                    }
-                    catch (InvalidOperationException ex)
-                    {
-                        _logger.LogError(ex, "Error al validar tenant {TenantId}", tenantId);
-                        context.Response.StatusCode = StatusCodes.Status403Forbidden;
-                        await context.Response.WriteAsJsonAsync(new { error = ex.Message });
+                        await _next(context);
                         return;
                     }
                 }

@@ -470,11 +470,56 @@ public class AuthController : ControllerBase
                 return Ok(systemAdminResponse);
             }
 
-            // CASO 2: Usuario regular con tenant
+            // CASO 2: Token de selección de tenant (sin tenant_id aún) — devolver lista de tenants en lugar de 401
+            var requiresSelectionClaim = User.FindFirst("requires_tenant_selection")?.Value;
+            if (requiresSelectionClaim == "true")
+            {
+                var userTenantsForMe = await _context.TenantUsers
+                    .Include(tu => tu.Tenant)
+                    .Where(tu => tu.UserId == userId && tu.IsActive && tu.Tenant != null && tu.Tenant.IsActive)
+                    .OrderBy(tu => tu.JoinedAt)
+                    .ToListAsync();
+
+                if (userTenantsForMe.Count == 0)
+                {
+                    return Unauthorized(new { message = "No tienes acceso a ninguna empresa activa" });
+                }
+
+                var availableTenantsForMe = userTenantsForMe.Select(tu => new TenantSummaryDto
+                {
+                    Id = tu.TenantId,
+                    Name = tu.Tenant!.Name,
+                    Role = tu.Role,
+                    RoleName = tu.Role.ToString(),
+                    Subdomain = tu.Tenant.Subdomain
+                }).ToList();
+
+                var selectionResponse = new AuthResponseDto
+                {
+                    Token = string.Empty,
+                    ExpiresAt = DateTime.MinValue,
+                    User = new UserInfoDto
+                    {
+                        UserId = user.Id,
+                        Email = user.Email!,
+                        Role = TenantRole.Owner, // Dummy, se actualizará al seleccionar
+                        RoleName = "Multiple",
+                        IsSystemAdmin = false
+                    },
+                    Tenant = null,
+                    Subscription = null,
+                    AvailableTenants = availableTenantsForMe,
+                    RequiresTenantSelection = true
+                };
+                _logger.LogInformation("User {UserId} accessed /me with tenant selection token, {Count} tenants", user.Id, availableTenantsForMe.Count);
+                return Ok(selectionResponse);
+            }
+
+            // CASO 3: Usuario regular con tenant ya seleccionado
             var tenantIdClaim = User.FindFirst("tenant_id")?.Value;
             if (string.IsNullOrEmpty(tenantIdClaim) || !int.TryParse(tenantIdClaim, out var tenantId) || tenantId <= 0)
             {
-                return Unauthorized(new { message = "Tenant no identificado" });
+                return Unauthorized(new { message = "Tenant no identificado. Por favor selecciona tu empresa o inicia sesión de nuevo." });
             }
 
             var tenantUser = await _context.TenantUsers
@@ -554,10 +599,14 @@ public class AuthController : ControllerBase
 
         var expiresAt = DateTime.UtcNow.AddHours(jwtExpireHours);
 
+        // 🔍 Buscar si el usuario está vinculado a un empleado
+        var linkedEmployee = _context.Empleados
+            .FirstOrDefault(e => e.UserId == user.Id && e.TenantId == tenant.Id && !e.IsDeleted);
+
         // Solo los tokens de SystemAdmin (generados en GenerateSystemAdminJwtToken) llevan is_system_admin = true.
         // Los usuarios de tenant (Owner, User) siempre reciben false; no se usa user.IsSystemAdmin aquí
         // para evitar que un mismo usuario con acceso sistema y tenant redirija al admin del sistema al entrar.
-        var claims = new[]
+        var claimsList = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id),
             new Claim(JwtRegisteredClaimNames.Email, user.Email!),
@@ -569,10 +618,18 @@ public class AuthController : ControllerBase
             new Claim("is_system_admin", "false")
         };
 
+        // 🎯 Si está vinculado a un empleado, agregar employee_id al token
+        if (linkedEmployee != null)
+        {
+            claimsList.Add(new Claim("employee_id", linkedEmployee.Id.ToString()));
+            _logger.LogInformation("Usuario {UserId} vinculado a empleado {EmpleadoId} - agregando employee_id al JWT",
+                user.Id, linkedEmployee.Id);
+        }
+
         var token = new JwtSecurityToken(
             issuer: jwtIssuer,
             audience: jwtAudience,
-            claims: claims,
+            claims: claimsList,
             expires: expiresAt,
             signingCredentials: credentials
         );
@@ -886,7 +943,8 @@ public class AuthController : ControllerBase
                 return NotFound(new { message = "Refresh token no encontrado" });
             }
 
-            _logger.LogInformation("Refresh token revoked by user");
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+            _logger.LogInformation("Logout (refresh token revoked). UserId={UserId}", userId);
 
             return Ok(new { message = "Sesión cerrada exitosamente" });
         }

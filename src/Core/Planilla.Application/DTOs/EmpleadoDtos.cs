@@ -20,7 +20,8 @@ namespace Vorluno.Planilla.Application.DTOs
         string? PosicionNombre,
         bool TieneAccesoSistema,
         string? RolSistema,
-        bool IsDeleted = false
+        bool IsDeleted = false,
+        string? UsuarioVinculadoEmail = null
     );
 
     /// <summary>

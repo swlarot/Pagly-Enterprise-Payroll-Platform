@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using sib_api_v3_sdk.Api;
 using sib_api_v3_sdk.Client;
 using sib_api_v3_sdk.Model;
@@ -29,13 +30,89 @@ public class BrevoEmailService : IBrevoEmailService
     private readonly string _apiKey;
     private readonly string _senderEmail;
     private readonly string _senderName;
+    private readonly ILogger<BrevoEmailService> _logger;
 
-    public BrevoEmailService(IConfiguration configuration)
+    public BrevoEmailService(IConfiguration configuration, ILogger<BrevoEmailService> logger)
     {
-        _apiKey = configuration["Brevo:ApiKey"]
+        var rawApiKey = configuration["Brevo:ApiKey"]
             ?? throw new InvalidOperationException("Brevo:ApiKey no está configurado en appsettings.json");
+        
         _senderEmail = configuration["Brevo:SenderEmail"] ?? "noreply@planilla.cloud";
         _senderName = configuration["Brevo:SenderName"] ?? "Planilla";
+        _logger = logger;
+
+        // Validar configuración al inicializar
+        if (string.IsNullOrWhiteSpace(rawApiKey))
+        {
+            _logger.LogError("Brevo:ApiKey está vacío o no configurado");
+            throw new InvalidOperationException("Brevo:ApiKey no está configurado correctamente");
+        }
+
+        // Decodificar API Key si está en Base64 (formato JSON)
+        _apiKey = DecodeApiKey(rawApiKey);
+
+        // Validar formato de API Key de Brevo (debe empezar con "xkeysib-")
+        if (!_apiKey.StartsWith("xkeysib-", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning(
+                "La API Key de Brevo no tiene el formato esperado (debe empezar con 'xkeysib-'). " +
+                "Valor recibido: {ApiKeyPrefix}...",
+                _apiKey.Length > 20 ? _apiKey.Substring(0, 20) : _apiKey);
+        }
+
+        if (string.IsNullOrWhiteSpace(_senderEmail))
+        {
+            _logger.LogWarning("Brevo:SenderEmail no está configurado, usando valor por defecto");
+        }
+
+        // Validar formato de email
+        if (!System.Text.RegularExpressions.Regex.IsMatch(_senderEmail, 
+            @"^[^@\s]+@[^@\s]+\.[^@\s]+$", 
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+        {
+            _logger.LogWarning("Brevo:SenderEmail no tiene un formato de email válido: {SenderEmail}", _senderEmail);
+        }
+
+        _logger.LogInformation(
+            "BrevoEmailService inicializado. Sender: {SenderEmail} ({SenderName}), API Key: {ApiKeyPrefix}...",
+            _senderEmail,
+            _senderName,
+            _apiKey.Length > 15 ? _apiKey.Substring(0, 15) : "***");
+    }
+
+    /// <summary>
+    /// Decodifica la API Key si está en Base64 (formato JSON) o retorna la clave directamente
+    /// </summary>
+    private string DecodeApiKey(string rawApiKey)
+    {
+        try
+        {
+            // Intentar decodificar como Base64
+            if (rawApiKey.Length > 50 && !rawApiKey.StartsWith("xkeysib-", StringComparison.OrdinalIgnoreCase))
+            {
+                var decodedBytes = System.Convert.FromBase64String(rawApiKey);
+                var decodedJson = System.Text.Encoding.UTF8.GetString(decodedBytes);
+                
+                // Intentar parsear como JSON
+                using var doc = System.Text.Json.JsonDocument.Parse(decodedJson);
+                if (doc.RootElement.TryGetProperty("api_key", out var apiKeyElement))
+                {
+                    var extractedKey = apiKeyElement.GetString();
+                    if (!string.IsNullOrWhiteSpace(extractedKey))
+                    {
+                        _logger.LogInformation("API Key decodificada desde Base64 JSON");
+                        return extractedKey;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "No se pudo decodificar la API Key como Base64, usando valor directo");
+        }
+
+        // Si no es Base64 o falla la decodificación, usar el valor directo
+        return rawApiKey;
     }
 
     /// <inheritdoc />
@@ -45,8 +122,19 @@ public class BrevoEmailService : IBrevoEmailService
         string invitationLink,
         string tenantName)
     {
+        if (string.IsNullOrWhiteSpace(toEmail))
+        {
+            _logger.LogError("No se puede enviar email: el destinatario está vacío");
+            return false;
+        }
+
         try
         {
+            _logger.LogInformation(
+                "Enviando email de invitación a {ToEmail} para tenant {TenantName}",
+                toEmail,
+                tenantName);
+
             // Configurar API key de Brevo
             sib_api_v3_sdk.Client.Configuration.Default.ApiKey["api-key"] = _apiKey;
 
@@ -65,12 +153,82 @@ public class BrevoEmailService : IBrevoEmailService
 
             var result = await apiInstance.SendTransacEmailAsync(sendSmtpEmail);
 
-            return result != null;
+            if (result != null)
+            {
+                _logger.LogInformation(
+                    "Email enviado exitosamente a {ToEmail}. MessageId: {MessageId}",
+                    toEmail,
+                    result.MessageId);
+                return true;
+            }
+            else
+            {
+                _logger.LogWarning("Brevo retornó null al enviar email a {ToEmail}", toEmail);
+                return false;
+            }
+        }
+        catch (sib_api_v3_sdk.Client.ApiException apiEx)
+        {
+            // Convertir todos los valores a string explícitamente para evitar problemas con tipos dinámicos
+            string errorContentStr = "N/A";
+            string errorMessageStr = apiEx.Message ?? "Sin mensaje";
+            string statusCodeStr = apiEx.ErrorCode.ToString();
+            
+            if (apiEx.ErrorContent != null)
+            {
+                try
+                {
+                    errorContentStr = apiEx.ErrorContent.ToString() ?? "N/A";
+                }
+                catch
+                {
+                    errorContentStr = "Error al convertir ErrorContent a string";
+                }
+            }
+            
+            // Intentar parsear el error como JSON para obtener más detalles
+            string detailedErrorStr = errorContentStr;
+            if (!string.IsNullOrWhiteSpace(errorContentStr) && errorContentStr.StartsWith("{"))
+            {
+                try
+                {
+                    using var errorDoc = System.Text.Json.JsonDocument.Parse(errorContentStr);
+                    if (errorDoc.RootElement.TryGetProperty("message", out System.Text.Json.JsonElement messageElement))
+                    {
+                        var msg = messageElement.GetString();
+                        if (!string.IsNullOrWhiteSpace(msg))
+                            detailedErrorStr = msg;
+                    }
+                    else if (errorDoc.RootElement.TryGetProperty("error", out System.Text.Json.JsonElement errorElement))
+                    {
+                        var err = errorElement.GetString();
+                        if (!string.IsNullOrWhiteSpace(err))
+                            detailedErrorStr = err;
+                    }
+                }
+                catch
+                {
+                    // Si no se puede parsear, usar el contenido directo
+                }
+            }
+
+            _logger.LogError(
+                "Error de API de Brevo al enviar email a {ToEmail}. StatusCode: {StatusCode}, Error: {ErrorMessage}, Details: {ErrorDetails}, FullContent: {ErrorContent}",
+                toEmail,
+                statusCodeStr,
+                errorMessageStr,
+                detailedErrorStr,
+                errorContentStr);
+
+            return false;
         }
         catch (Exception ex)
         {
-            // Log error (en una implementación real se debe inyectar ILogger)
-            Console.Error.WriteLine($"Error enviando email con Brevo: {ex.Message}");
+            _logger.LogError(
+                ex,
+                "Error inesperado al enviar email con Brevo a {ToEmail}. Error: {ErrorMessage}",
+                toEmail,
+                ex.Message);
             return false;
         }
     }

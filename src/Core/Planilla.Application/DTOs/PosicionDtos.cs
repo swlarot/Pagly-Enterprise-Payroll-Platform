@@ -12,7 +12,7 @@ public record PosicionVerDto(
     string Codigo,
     string? Descripcion,
     bool EstaActivo,
-    int DepartamentoId,
+    int? DepartamentoId,
     string DepartamentoNombre,
     decimal SalarioMinimo,
     decimal SalarioMaximo,

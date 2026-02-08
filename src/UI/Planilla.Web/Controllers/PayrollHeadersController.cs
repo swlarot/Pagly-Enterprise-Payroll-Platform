@@ -14,6 +14,7 @@ using Vorluno.Planilla.Application.Services;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Web.Authorization;
 
 namespace Vorluno.Planilla.Web.Controllers;
 
@@ -31,37 +32,49 @@ public class PayrollHeadersController : ControllerBase
     private readonly PayrollCalculationOrchestratorPortable _orchestrator;
     private readonly ITenantContext _tenantContext;
     private readonly IAuditLogService _auditLogService;
+    private readonly ICurrentUserService _currentUserService;
 
     public PayrollHeadersController(
         ApplicationDbContext context,
         PayrollStateMachine stateMachine,
         PayrollCalculationOrchestratorPortable orchestrator,
         ITenantContext tenantContext,
-        IAuditLogService auditLogService)
+        IAuditLogService auditLogService,
+        ICurrentUserService currentUserService)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _stateMachine = stateMachine ?? throw new ArgumentNullException(nameof(stateMachine));
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
         _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
         _auditLogService = auditLogService ?? throw new ArgumentNullException(nameof(auditLogService));
+        _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
     }
 
     /// <summary>
     /// Lista todas las planillas del tenant actual con filtros opcionales.
+    /// 🔐 EMPLOYEE SELF-SERVICE: Si el usuario está vinculado a un empleado, solo ve las planillas donde aparece.
     /// GET /api/payrollheaders?status=Calculated
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [RequirePermission(SystemPermission.PayrollView, SystemPermission.PayrollViewSelf)]
     public async Task<ActionResult<IEnumerable<PayrollHeader>>> GetPayrollHeaders(
         [FromQuery] PayrollStatus? status)
     {
         var tenantId = _tenantContext.TenantId;
+        var linkedEmployeeId = _currentUserService.GetLinkedEmployeeId();
+
         var query = _context.PayrollHeaders
             .Where(p => p.TenantId == tenantId) // ✅ SEGURIDAD: Filtrado por tenant obligatorio
             .Include(p => p.Details)
                 .ThenInclude(d => d.Empleado) // ✅ CRÍTICO: Incluir empleado para cálculos en frontend
             .AsNoTracking()
             .AsQueryable();
+
+        // 🎯 EMPLOYEE SELF-SERVICE: Filtrar planillas donde el empleado aparece
+        if (linkedEmployeeId.HasValue)
+        {
+            query = query.Where(p => p.Details.Any(d => d.EmpleadoId == linkedEmployeeId.Value));
+        }
 
         // Filtrar por Status si se especifica
         if (status.HasValue)
@@ -73,18 +86,32 @@ public class PayrollHeadersController : ControllerBase
             .OrderByDescending(p => p.PeriodStartDate)
             .ToListAsync();
 
+        // 🎯 Si es empleado vinculado, filtrar detalles para mostrar solo SU línea
+        if (linkedEmployeeId.HasValue)
+        {
+            foreach (var header in payrollHeaders)
+            {
+                header.Details = header.Details
+                    .Where(d => d.EmpleadoId == linkedEmployeeId.Value)
+                    .ToList();
+            }
+        }
+
         return Ok(payrollHeaders);
     }
 
     /// <summary>
     /// Obtiene una planilla específica por ID del tenant actual.
+    /// 🔐 EMPLOYEE SELF-SERVICE: Si el usuario está vinculado a un empleado, solo ve su detalle de planilla.
     /// GET /api/payrollheaders/{id}
     /// </summary>
     [HttpGet("{id}")]
-    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [RequirePermission(SystemPermission.PayrollView, SystemPermission.PayrollViewSelf)]
     public async Task<ActionResult<PayrollHeader>> GetPayrollHeader(int id)
     {
         var tenantId = _tenantContext.TenantId;
+        var linkedEmployeeId = _currentUserService.GetLinkedEmployeeId();
+
         var payrollHeader = await _context.PayrollHeaders
             .Where(p => p.Id == id && p.TenantId == tenantId) // ✅ SEGURIDAD: Verificar tenant
             .Include(p => p.Details)
@@ -95,6 +122,21 @@ public class PayrollHeadersController : ControllerBase
         if (payrollHeader == null)
         {
             return NotFound(new { message = $"Planilla con ID {id} no encontrada" });
+        }
+
+        // 🎯 EMPLOYEE SELF-SERVICE: Verificar que el empleado está en esta planilla
+        if (linkedEmployeeId.HasValue)
+        {
+            var hasEmployeeInPayroll = payrollHeader.Details.Any(d => d.EmpleadoId == linkedEmployeeId.Value);
+            if (!hasEmployeeInPayroll)
+            {
+                return Forbid(); // 403 - El empleado no está en esta planilla
+            }
+
+            // Filtrar detalles para mostrar solo SU línea
+            payrollHeader.Details = payrollHeader.Details
+                .Where(d => d.EmpleadoId == linkedEmployeeId.Value)
+                .ToList();
         }
 
         return Ok(payrollHeader);

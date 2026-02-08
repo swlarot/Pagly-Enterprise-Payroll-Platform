@@ -6,20 +6,25 @@ namespace Vorluno.Planilla.Web.Authorization;
 
 /// <summary>
 /// Atributo de autorización basado en permisos granulares.
-/// Verifica que el usuario actual tenga el permiso especificado en su rol.
+/// Verifica que el usuario actual tenga AL MENOS UNO de los permisos especificados.
+/// Útil para Employee Self-Service: el usuario puede tener "employees.read" (ver todos) O "employee.view_self" (ver solo el suyo).
 /// </summary>
-[AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = true)]
+[AttributeUsage(AttributeTargets.Method | AttributeTargets.Class, AllowMultiple = false)]
 public class RequirePermissionAttribute : Attribute, IAsyncAuthorizationFilter
 {
-    private readonly string _permission;
+    private readonly string[] _permissions;
 
     /// <summary>
     /// Crea una nueva instancia del atributo RequirePermission
     /// </summary>
-    /// <param name="permission">Permiso requerido (ej: "employees.create")</param>
-    public RequirePermissionAttribute(string permission)
+    /// <param name="permissions">Permisos requeridos (lógica OR: el usuario necesita AL MENOS UNO)</param>
+    public RequirePermissionAttribute(params string[] permissions)
     {
-        _permission = permission;
+        _permissions = permissions ?? throw new ArgumentNullException(nameof(permissions));
+        if (_permissions.Length == 0)
+        {
+            throw new ArgumentException("Se debe especificar al menos un permiso", nameof(permissions));
+        }
     }
 
     public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
@@ -41,13 +46,19 @@ public class RequirePermissionAttribute : Attribute, IAsyncAuthorizationFilter
             return;
         }
 
-        // Verificar si el usuario tiene el permiso
-        var hasPermission = await roleService.HasPermissionAsync(_permission);
-
-        if (!hasPermission.Success || hasPermission.Value != true)
+        // Verificar si el usuario tiene AL MENOS UNO de los permisos (lógica OR)
+        foreach (var permission in _permissions)
         {
-            context.Result = new ForbidResult();
-            return;
+            var hasPermission = await roleService.HasPermissionAsync(permission);
+
+            if (hasPermission.Success && hasPermission.Value == true)
+            {
+                // Tiene este permiso, permitir acceso
+                return;
+            }
         }
+
+        // No tiene ninguno de los permisos requeridos
+        context.Result = new ForbidResult();
     }
 }
