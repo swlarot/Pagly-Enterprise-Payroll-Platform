@@ -1,0 +1,66 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Build outputs
+**/bin
+**/obj
+**/out
+**/publish
+
+# Node
+**/node_modules
+**/npm-debug.log
+**/ClientApp/node_modules
+
+# IDE / Editor
+.vs
+.vscode
+.idea
+*.user
+*.suo
+*.userosscache
+
+# Tests (no needed in production image)
+tests/
+**/*.Tests/
+**/*.Tests.csproj
+**/coverage
+*.trx
+*.coverage
+
+# Docs and non-essential
+docs/
+*.md
+!README.md
+
+# Scripts (dev only)
+*.ps1
+convert-api-calls.ps1
+fix-pages-api.ps1
+detener-desarrollo.ps1
+iniciar-desarrollo.ps1
+verificar-puertos.ps1
+
+# SQL / cleanup (not needed at runtime)
+*.sql
+cleanup_*.sql
+
+# Logs and temp
+**/logs.txt
+**/*.log
+**/.env
+**/.env.local
+**/.env.development
+!**/.env.example
+
+# Plan files
+*.plan.md
+.cursor
+
+# Misc
+.DS_Store
+Thumbs.db
+*.bak
+*.tmp
