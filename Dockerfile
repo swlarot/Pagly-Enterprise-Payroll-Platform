@@ -40,7 +40,7 @@ COPY src/UI/Planilla.Web/*.csproj src/UI/Planilla.Web/
 
 RUN dotnet restore src/UI/Planilla.Web/Vorluno.Planilla.Web.csproj
 
-COPY src/ ./
+COPY src/ src/
 
 # Copy SPA build from previous stage into wwwroot for publish
 COPY --from=frontend-build /app/wwwroot src/UI/Planilla.Web/wwwroot
