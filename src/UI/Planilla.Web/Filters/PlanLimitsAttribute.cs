@@ -62,9 +62,13 @@ public class PlanLimitsAttribute : Attribute, IAsyncActionFilter
             _ => (false, "Tipo de límite no reconocido")
         };
 
-        // 4. Si no está permitido, retornar error con mensaje específico
+        // 4. Si no está permitido, retornar error y registrar para auditoría
         if (!allowed)
         {
+            var logger = context.HttpContext.RequestServices.GetService<ILogger<PlanLimitsAttribute>>();
+            logger?.LogWarning(
+                "Plan limit validation failed. TenantId={TenantId}, LimitType={LimitType}, Reason={Reason}",
+                tenantId, _limitType, reason);
             context.Result = new BadRequestObjectResult(new
             {
                 error = "PLAN_LIMIT_REACHED",

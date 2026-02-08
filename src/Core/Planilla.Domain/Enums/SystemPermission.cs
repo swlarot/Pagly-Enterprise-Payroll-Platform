@@ -22,6 +22,33 @@ public static class SystemPermission
     public const string EmployeesDelete = "employees.delete";
 
     // ====================================================================
+    // AUTO-SERVICIO DE EMPLEADOS (Employee Self-Service)
+    // ====================================================================
+    /// <summary>Ver solo mi información como empleado</summary>
+    public const string EmployeeViewSelf = "employee.view_self";
+
+    /// <summary>Editar mi información básica como empleado</summary>
+    public const string EmployeeUpdateSelf = "employee.update_self";
+
+    /// <summary>Ver solo mis planillas/recibos de pago</summary>
+    public const string PayrollViewSelf = "payroll.view_self";
+
+    /// <summary>Solicitar mis vacaciones</summary>
+    public const string VacationsRequestSelf = "vacations.request_self";
+
+    /// <summary>Ver mis ausencias registradas</summary>
+    public const string AbsencesViewSelf = "absences.view_self";
+
+    /// <summary>Ver mis horas extra registradas</summary>
+    public const string OvertimeViewSelf = "overtime.view_self";
+
+    /// <summary>Ver mis préstamos activos</summary>
+    public const string LoansViewSelf = "loans.view_self";
+
+    /// <summary>Ver mis deducciones aplicadas</summary>
+    public const string DeductionsViewSelf = "deductions.view_self";
+
+    // ====================================================================
     // GESTIÓN DE ESTRUCTURA ORGANIZACIONAL
     // ====================================================================
     /// <summary>Gestionar departamentos (crear, editar, eliminar)</summary>
@@ -76,8 +103,11 @@ public static class SystemPermission
     public const string ReportsExport = "reports.export";
 
     // ====================================================================
-    // CONFIGURACIÓN Y ADMINISTRACIÓN
+    // DASHBOARD Y CONFIGURACIÓN
     // ====================================================================
+    /// <summary>Ver dashboard principal del tenant</summary>
+    public const string DashboardView = "dashboard.view";
+
     /// <summary>Configurar tasas de CSS, SE, ISR</summary>
     public const string SettingsTaxes = "settings.taxes";
 
@@ -109,6 +139,16 @@ public static class SystemPermission
             new(EmployeesUpdate, "Editar Empleados", "Modificar información de empleados", "employees"),
             new(EmployeesDelete, "Eliminar Empleados", "Desactivar o eliminar empleados", "employees"),
 
+            // Auto-Servicio de Empleados
+            new(EmployeeViewSelf, "Ver Mi Perfil", "Ver solo mi información como empleado", "employee-self-service"),
+            new(EmployeeUpdateSelf, "Editar Mi Perfil", "Actualizar mi información básica", "employee-self-service"),
+            new(PayrollViewSelf, "Ver Mis Planillas", "Consultar solo mis recibos de pago", "employee-self-service"),
+            new(VacationsRequestSelf, "Solicitar Vacaciones", "Crear solicitudes de vacaciones", "employee-self-service"),
+            new(AbsencesViewSelf, "Ver Mis Ausencias", "Consultar mis ausencias registradas", "employee-self-service"),
+            new(OvertimeViewSelf, "Ver Mis Horas Extra", "Consultar mis horas extra", "employee-self-service"),
+            new(LoansViewSelf, "Ver Mis Préstamos", "Consultar mis préstamos activos", "employee-self-service"),
+            new(DeductionsViewSelf, "Ver Mis Deducciones", "Consultar mis deducciones", "employee-self-service"),
+
             // Estructura
             new(DepartmentsManage, "Gestionar Departamentos", "Crear, editar y eliminar departamentos", "structure"),
             new(PositionsManage, "Gestionar Posiciones", "Crear, editar y eliminar posiciones/cargos", "structure"),
@@ -131,7 +171,8 @@ public static class SystemPermission
             new(ReportsView, "Ver Reportes", "Consultar reportes de CSS, ISR, SE", "reports"),
             new(ReportsExport, "Exportar Reportes", "Exportar reportes a Excel/PDF", "reports"),
 
-            // Configuración
+            // Dashboard y Configuración
+            new(DashboardView, "Ver Dashboard", "Acceder al panel principal del tenant", "dashboard"),
             new(SettingsTaxes, "Configurar Impuestos", "Ajustar tasas de CSS, SE, ISR", "settings"),
             new(SettingsRoles, "Gestionar Roles", "Crear y modificar roles personalizados (solo Owner)", "settings"),
             new(SettingsUsers, "Gestionar Usuarios", "Invitar y administrar usuarios", "settings"),

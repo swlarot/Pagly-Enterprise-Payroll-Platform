@@ -1,17 +1,21 @@
 // RISK: Removing Blazor components - converting to Web API + React SPA architecture
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 using Stripe;
 using System.Text;
+using System.Text.Json;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Infrastructure.Configuration;
 using Vorluno.Planilla.Infrastructure.Data;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Infrastructure.Services;
 using Vorluno.Planilla.Web.Extensions;
+using Vorluno.Planilla.Web.Health;
 using Vorluno.Planilla.Application.Mappings;
 using Vorluno.Planilla.Web.Middleware;
 
@@ -25,6 +29,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 
 // 1. LEER LA CADENA DE CONEXI�N
+// --- LOGGING: JSON en producción ---
+if (builder.Environment.IsProduction())
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddJsonConsole(options => { options.IncludeScopes = true; });
+}
+
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
@@ -153,22 +164,46 @@ builder.Services.AddScoped<IEmployeeDeletionValidationService, EmployeeDeletionV
 
 // --- FIN DE NUESTRA CONFIGURACIÓN PRINCIPAL ---
 
-// 13. CONFIGURAR CORS PARA DESARROLLO
+// 13. CONFIGURAR CORS (desarrollo: localhost; producción: Cors:AllowedOrigins desde env/config)
+var corsOrigins = builder.Configuration["Cors:AllowedOrigins"]?
+    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+    .Where(s => !string.IsNullOrWhiteSpace(s))
+    .ToArray() ?? Array.Empty<string>();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowReactApp", policy =>
     {
-        policy.WithOrigins(
-                "http://localhost:5173",  // Vite dev server default
-                "http://localhost:5174",  // Vite fallback ports
-                "http://localhost:5175",
-                "http://localhost:5176",
-                "http://localhost:5177")
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
+        if (corsOrigins.Length > 0)
+        {
+            policy.WithOrigins(corsOrigins)
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        }
+        else if (builder.Environment.IsDevelopment())
+        {
+            policy.WithOrigins(
+                    "http://localhost:5173",
+                    "http://localhost:5174",
+                    "http://localhost:5175",
+                    "http://localhost:5176",
+                    "http://localhost:5177")
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        }
+        else
+        {
+            policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+        }
     });
 });
+
+// 13.1 HEALTH CHECKS (PostgreSQL + multi-tenant)
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ApplicationDbContext>("postgres", tags: new[] { "db", "ready" })
+    .AddCheck<MultiTenantHealthCheck>("multi_tenant", tags: new[] { "ready" });
 
 // RISK: Removing Blazor services - Web API + Identity backend only
 builder.Services.AddControllers()
@@ -330,7 +365,30 @@ app.UseTenantMiddleware();
 
 app.UseAuthorization();
 
-// ✅ CRITICAL FIX: Health endpoint for diagnostics (before controllers)
+// Health: /health con checks (PostgreSQL + multi-tenant) en JSON para CapRover
+app.MapHealthChecks("/health", new HealthCheckOptions
+{
+    ResponseWriter = async (context, report) =>
+    {
+        context.Response.ContentType = "application/json";
+        var json = JsonSerializer.Serialize(new
+        {
+            status = report.Status.ToString(),
+            timestamp = DateTime.UtcNow,
+            environment = app.Environment.EnvironmentName,
+            version = "1.0.0",
+            checks = report.Entries.Select(e => new
+            {
+                name = e.Key,
+                status = e.Value.Status.ToString(),
+                description = e.Value.Description,
+                data = e.Value.Data
+            })
+        }, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+        await context.Response.WriteAsync(json);
+    }
+}).AllowAnonymous();
+
 app.MapGet("/api/health", () => Results.Ok(new
 {
     status = "healthy",

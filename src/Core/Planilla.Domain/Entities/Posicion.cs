@@ -32,8 +32,8 @@ public class Posicion : ITenantEntity
     /// </summary>
     public int TenantId { get; set; }
 
-    // Departamento al que pertenece
-    public int DepartamentoId { get; set; }
+    // Departamento al que pertenece (nullable: la posición puede quedar sin departamento si se elimina el depto)
+    public int? DepartamentoId { get; set; }
 
     // Rango salarial
     public decimal SalarioMinimo { get; set; }
@@ -47,7 +47,7 @@ public class Posicion : ITenantEntity
     public DateTime? UpdatedAt { get; set; }
 
     // Navigation properties
-    public virtual Departamento Departamento { get; set; } = null!;
+    public virtual Departamento? Departamento { get; set; }
     public virtual ICollection<Empleado> Empleados { get; set; } = new List<Empleado>();
     public virtual Tenant? Tenant { get; set; }
 

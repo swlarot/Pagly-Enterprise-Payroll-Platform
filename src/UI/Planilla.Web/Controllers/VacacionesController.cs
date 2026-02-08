@@ -6,6 +6,7 @@ using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Web.Authorization;
 
 namespace Vorluno.Planilla.Web.Controllers;
 
@@ -20,30 +21,46 @@ public class VacacionesController : ControllerBase
     private readonly IUnitOfWork _unitOfWork;
     private readonly ApplicationDbContext _context;
     private readonly ITenantContext _tenantContext;
+    private readonly ICurrentUserService _currentUserService;
 
-    public VacacionesController(IUnitOfWork unitOfWork, ApplicationDbContext context, ITenantContext tenantContext)
+    public VacacionesController(
+        IUnitOfWork unitOfWork,
+        ApplicationDbContext context,
+        ITenantContext tenantContext,
+        ICurrentUserService currentUserService)
     {
         _unitOfWork = unitOfWork;
         _context = context;
         _tenantContext = tenantContext;
+        _currentUserService = currentUserService;
     }
 
     /// <summary>
     /// Obtiene lista de solicitudes de vacaciones
+    /// 🔐 EMPLOYEE SELF-SERVICE: Si el usuario está vinculado a un empleado, solo ve SUS solicitudes.
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [RequirePermission(SystemPermission.VacationsManage, SystemPermission.VacationsRequestSelf)]
     public async Task<IActionResult> GetAll([FromQuery] int? empleadoId = null, [FromQuery] EstadoVacaciones? estado = null)
     {
         var tenantId = _tenantContext.TenantId;
+        var linkedEmployeeId = _currentUserService.GetLinkedEmployeeId();
+
         var query = _context.SolicitudesVacaciones
             .Where(v => v.TenantId == tenantId)
             .Include(v => v.Empleado)
             .AsNoTracking()
             .AsQueryable();
 
-        if (empleadoId.HasValue)
+        // 🎯 EMPLOYEE SELF-SERVICE: Filtrar automáticamente por empleado vinculado
+        if (linkedEmployeeId.HasValue)
+        {
+            query = query.Where(v => v.EmpleadoId == linkedEmployeeId.Value);
+        }
+        else if (empleadoId.HasValue)
+        {
             query = query.Where(v => v.EmpleadoId == empleadoId.Value);
+        }
 
         if (estado.HasValue)
             query = query.Where(v => v.Estado == estado.Value);
@@ -56,12 +73,15 @@ public class VacacionesController : ControllerBase
 
     /// <summary>
     /// Obtiene una solicitud por ID
+    /// 🔐 EMPLOYEE SELF-SERVICE: Si el usuario está vinculado a un empleado, solo ve SUS solicitudes.
     /// </summary>
     [HttpGet("{id}")]
-    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [RequirePermission(SystemPermission.VacationsManage, SystemPermission.VacationsRequestSelf)]
     public async Task<IActionResult> GetById(int id)
     {
         var tenantId = _tenantContext.TenantId;
+        var linkedEmployeeId = _currentUserService.GetLinkedEmployeeId();
+
         var solicitud = await _context.SolicitudesVacaciones
             .Where(v => v.Id == id && v.TenantId == tenantId)
             .Include(v => v.Empleado)
@@ -70,6 +90,12 @@ public class VacacionesController : ControllerBase
 
         if (solicitud == null)
             return NotFound(); // 404 previene info leak
+
+        // 🎯 EMPLOYEE SELF-SERVICE: Verificar que la solicitud pertenece al empleado
+        if (linkedEmployeeId.HasValue && solicitud.EmpleadoId != linkedEmployeeId.Value)
+        {
+            return Forbid(); // 403 - No puede ver solicitudes de otros
+        }
 
         return Ok(MapToDto(solicitud));
     }

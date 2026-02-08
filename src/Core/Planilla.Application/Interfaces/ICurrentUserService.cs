@@ -36,4 +36,30 @@ public interface ICurrentUserService
     /// Indica si el usuario actual está autenticado.
     /// </summary>
     bool IsAuthenticated { get; }
+
+    // ====================================================================
+    // EMPLOYEE SELF-SERVICE: Métodos para detectar empleados vinculados
+    // ====================================================================
+
+    /// <summary>
+    /// Obtiene el ID del tenant actual desde el claim "tenant_id".
+    /// Retorna null si el usuario no está autenticado o no tiene tenant asignado.
+    /// </summary>
+    int? GetTenantId();
+
+    /// <summary>
+    /// Obtiene el ID del empleado vinculado desde el claim "employee_id".
+    /// Retorna null si el usuario no está vinculado a un empleado.
+    /// </summary>
+    int? GetLinkedEmployeeId();
+
+    /// <summary>
+    /// Verifica si el usuario actual está vinculado a un empleado.
+    /// </summary>
+    bool IsLinkedEmployee();
+
+    /// <summary>
+    /// Verifica si el usuario actual es Owner del tenant.
+    /// </summary>
+    bool IsOwner();
 }

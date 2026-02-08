@@ -65,6 +65,42 @@ namespace Vorluno.Planilla.Infrastructure.Services
             _logger.LogInformation($"Invitation email sent successfully to {recipientEmail}");
         }
 
+        public async Task SendEmployeeWelcomeAsync(
+            string recipientEmail,
+            string recipientName,
+            string tenantName,
+            string temporaryPassword,
+            string loginUrl)
+        {
+            _logger.LogInformation("Sending employee welcome email to {RecipientEmail} for tenant {TenantName}", recipientEmail, tenantName);
+
+            var subject = $"Bienvenido a {tenantName} - Planilla";
+            var htmlBody = $@"<!DOCTYPE html>
+<html lang=""es"">
+<head><meta charset=""utf-8""><meta name=""viewport"" content=""width=device-width, initial-scale=1.0""></head>
+<body style=""font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;"">
+    <div style=""background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 24px; text-align: center; border-radius: 8px 8px 0 0;"">
+        <h1 style=""margin: 0; font-size: 24px;"">Bienvenido a Planilla</h1>
+        <p style=""margin: 8px 0 0 0; opacity: 0.9;"">{tenantName}</p>
+    </div>
+    <div style=""background: #fff; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;"">
+        <p>Hola <strong>{recipientName}</strong>,</p>
+        <p>Se ha creado tu acceso al sistema de planilla de <strong>{tenantName}</strong>.</p>
+        <p><strong>Contraseña temporal:</strong></p>
+        <p style=""background: #f3f4f6; padding: 12px; border-radius: 6px; font-family: monospace;"">{temporaryPassword}</p>
+        <p><strong>Recomendamos cambiar tu contraseña después del primer inicio de sesión.</strong></p>
+        <p style=""margin-top: 24px;"">
+            <a href=""{loginUrl}"" style=""display: inline-block; background: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600;"">Iniciar sesión</a>
+        </p>
+        <p style=""margin-top: 24px; font-size: 13px; color: #6b7280;"">Si no esperabas este correo, puedes ignorarlo de forma segura.</p>
+    </div>
+</body>
+</html>";
+
+            await SendEmailAsync(recipientEmail, subject, htmlBody);
+            _logger.LogInformation("Employee welcome email sent to {RecipientEmail}", recipientEmail);
+        }
+
         public async Task SendEmailAsync(string to, string subject, string htmlBody)
         {
             try

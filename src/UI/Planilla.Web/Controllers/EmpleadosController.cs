@@ -3,11 +3,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Planilla.Application.Services;
 using Vorluno.Planilla.Application.DTOs;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Infrastructure.Services;
 using Vorluno.Planilla.Web.Authorization;
 using Vorluno.Planilla.Web.Extensions;
 using Vorluno.Planilla.Web.Filters;
@@ -31,6 +34,9 @@ namespace Vorluno.Planilla.Web.Controllers
         private readonly UserManager<AppUser> _userManager;
         private readonly ILogger<EmpleadosController> _logger;
         private readonly IEmployeeDeletionValidationService _employeeDeletionValidationService;
+        private readonly ICurrentUserService _currentUserService;
+        private readonly IEmailService _emailService;
+        private readonly IConfiguration _configuration;
 
         /// <summary>
         /// Inicializa una nueva instancia de la clase <see cref="EmpleadosController"/>.
@@ -44,7 +50,10 @@ namespace Vorluno.Planilla.Web.Controllers
             IAuditLogService auditLogService,
             UserManager<AppUser> userManager,
             ILogger<EmpleadosController> logger,
-            IEmployeeDeletionValidationService employeeDeletionValidationService)
+            IEmployeeDeletionValidationService employeeDeletionValidationService,
+            ICurrentUserService currentUserService,
+            IEmailService emailService,
+            IConfiguration configuration)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
@@ -55,44 +64,36 @@ namespace Vorluno.Planilla.Web.Controllers
             _userManager = userManager;
             _logger = logger;
             _employeeDeletionValidationService = employeeDeletionValidationService;
+            _currentUserService = currentUserService;
+            _emailService = emailService;
+            _configuration = configuration;
         }
 
         /// <summary>
         /// Obtiene una lista de todos los empleados con su departamento y posición.
-        /// FILTRADO POR ROL: Employee solo ve su propia información.
+        /// 🔐 EMPLOYEE SELF-SERVICE: Si el usuario está vinculado a un empleado, solo ve su propia información.
         /// </summary>
         /// <returns>Una lista de empleados en formato DTO.</returns>
         [HttpGet]
-        [RequirePermission(SystemPermission.EmployeesRead)]
+        [RequirePermission(SystemPermission.EmployeesRead, SystemPermission.EmployeeViewSelf)]
         public async Task<IActionResult> GetAll()
         {
             var tenantId = _tenantContext.TenantId;
-            var role = this.GetCurrentTenantRole();
 
             var query = _context.Empleados
                 .Where(e => e.TenantId == tenantId && !e.IsDeleted)
                 .Include(e => e.Departamento)
                 .Include(e => e.Posicion)
+                .Include(e => e.User)
                 .AsNoTracking();
 
-            // FILTRADO POR ROL: Employee solo ve su propia información
-            if (role == TenantRole.User)
+            // 🎯 EMPLOYEE SELF-SERVICE: Si el usuario está vinculado a un empleado, solo mostrar SU registro
+            var linkedEmployeeId = _currentUserService.GetLinkedEmployeeId();
+            if (linkedEmployeeId.HasValue)
             {
-                var userId = this.GetCurrentUserId();
-                // Buscar el empleado vinculado al usuario actual
-                var empleadoUsuario = await _context.Empleados
-                    .Where(e => e.UserId == userId && e.TenantId == tenantId && !e.IsDeleted)
-                    .FirstOrDefaultAsync();
-
-                if (empleadoUsuario != null)
-                {
-                    query = query.Where(e => e.Id == empleadoUsuario.Id);
-                }
-                else
-                {
-                    // Si no tiene empleado vinculado, retornar lista vacía
-                    return Ok(Array.Empty<EmpleadoVerDto>());
-                }
+                _logger.LogInformation("Usuario vinculado a empleado {EmpleadoId} - filtrando lista",
+                    linkedEmployeeId.Value);
+                query = query.Where(e => e.Id == linkedEmployeeId.Value);
             }
 
             var empleados = await query
@@ -104,7 +105,8 @@ namespace Vorluno.Planilla.Web.Controllers
                             .Where(tu => tu.UserId == e.UserId && tu.TenantId == tenantId)
                             .Select(tu => tu.Role.ToString())
                             .FirstOrDefault()
-                        : null
+                        : null,
+                    UsuarioVinculadoEmail = e.User != null ? e.User.Email : null
                 })
                 .ToListAsync();
 
@@ -123,7 +125,8 @@ namespace Vorluno.Planilla.Web.Controllers
                 e.Empleado.Posicion?.Nombre,
                 !string.IsNullOrEmpty(e.Empleado.UserId),
                 e.RolSistema,
-                e.Empleado.IsDeleted
+                e.Empleado.IsDeleted,
+                e.UsuarioVinculadoEmail
             )).ToList();
 
             return Ok(empleadosDto);
@@ -131,18 +134,30 @@ namespace Vorluno.Planilla.Web.Controllers
 
         /// <summary>
         /// Obtiene un empleado específico por su ID con su departamento y posición.
+        /// 🔐 EMPLOYEE SELF-SERVICE: Si el usuario está vinculado a un empleado, solo puede ver su propio perfil.
         /// </summary>
         /// <param name="id">El ID del empleado.</param>
         /// <returns>El empleado encontrado o un error 404 si no existe.</returns>
         [HttpGet("{id}")]
-        [RequirePermission(SystemPermission.EmployeesRead)]
+        [RequirePermission(SystemPermission.EmployeesRead, SystemPermission.EmployeeViewSelf)]
         public async Task<IActionResult> GetById(int id)
         {
             var tenantId = _tenantContext.TenantId;
+
+            // 🎯 EMPLOYEE SELF-SERVICE: Verificar que solo pueda acceder a SU empleado
+            var linkedEmployeeId = _currentUserService.GetLinkedEmployeeId();
+            if (linkedEmployeeId.HasValue && linkedEmployeeId.Value != id)
+            {
+                _logger.LogWarning("Usuario vinculado a empleado {LinkedId} intentó acceder a empleado {RequestedId}",
+                    linkedEmployeeId.Value, id);
+                return Forbid(); // 403 Forbidden - no puede ver otros empleados
+            }
+
             var result = await _context.Empleados
                 .Where(e => e.Id == id && e.TenantId == tenantId && !e.IsDeleted)
                 .Include(e => e.Departamento)
                 .Include(e => e.Posicion)
+                .Include(e => e.User)
                 .AsNoTracking()
                 .Select(e => new
                 {
@@ -152,7 +167,8 @@ namespace Vorluno.Planilla.Web.Controllers
                             .Where(tu => tu.UserId == e.UserId && tu.TenantId == tenantId)
                             .Select(tu => tu.Role.ToString())
                             .FirstOrDefault()
-                        : null
+                        : null,
+                    UsuarioVinculadoEmail = e.User != null ? e.User.Email : null
                 })
                 .FirstOrDefaultAsync();
 
@@ -176,7 +192,8 @@ namespace Vorluno.Planilla.Web.Controllers
                 result.Empleado.Posicion?.Nombre,
                 !string.IsNullOrEmpty(result.Empleado.UserId),
                 result.RolSistema,
-                result.Empleado.IsDeleted
+                result.Empleado.IsDeleted,
+                result.UsuarioVinculadoEmail
             );
 
             return Ok(empleadoDto);
@@ -195,6 +212,15 @@ namespace Vorluno.Planilla.Web.Controllers
             var tenantId = _tenantContext.TenantId;
             var createdById = this.GetCurrentUserId();
 
+            // Validar número de identificación único (índice único en BD)
+            var numeroIdentificacion = (empleadoDto.NumeroIdentificacion ?? "").Trim();
+            var yaExiste = await _context.Empleados
+                .AnyAsync(e => e.NumeroIdentificacion == numeroIdentificacion && !e.IsDeleted);
+            if (yaExiste)
+            {
+                return BadRequest(new { message = "Este número de identificación ya está registrado. Use otro número o verifique si el empleado ya existe en la lista." });
+            }
+
             var empleado = _mapper.Map<Empleado>(empleadoDto);
             empleado.FechaContratacion = DateTime.UtcNow; // Lógica de negocio simple
             empleado.TenantId = tenantId; // ✅ SEGURIDAD: TenantId del token JWT
@@ -212,14 +238,29 @@ namespace Vorluno.Planilla.Web.Controllers
                 }
             }
 
-            await _unitOfWork.Empleados.AddAsync(empleado);
-            await _unitOfWork.CompleteAsync(); // Guarda los cambios en la BD
+            try
+            {
+                await _unitOfWork.Empleados.AddAsync(empleado);
+                await _unitOfWork.CompleteAsync(); // Guarda los cambios en la BD
+            }
+            catch (DbUpdateException ex)
+            {
+                // Llave duplicada (PostgreSQL 23505) u otra violación de restricción → devolver JSON, no HTML
+                var msg = ex.InnerException?.Message ?? ex.Message;
+                if (msg.Contains("23505") || msg.Contains("NumeroIdentificacion", StringComparison.OrdinalIgnoreCase) || msg.Contains("duplicate", StringComparison.OrdinalIgnoreCase))
+                {
+                    return BadRequest(new { message = "Este número de identificación ya está registrado. Use otro número o verifique si el empleado ya existe en la lista." });
+                }
+                _logger.LogError(ex, "Error al crear empleado");
+                return StatusCode(500, new { message = "Error al guardar el empleado. Intente de nuevo." });
+            }
 
             // Recargar con navegación y rol del sistema
             var result = await _context.Empleados
                 .Where(e => e.Id == empleado.Id && e.TenantId == tenantId)
                 .Include(e => e.Departamento)
                 .Include(e => e.Posicion)
+                .Include(e => e.User)
                 .Select(e => new
                 {
                     Empleado = e,
@@ -228,7 +269,8 @@ namespace Vorluno.Planilla.Web.Controllers
                             .Where(tu => tu.UserId == e.UserId && tu.TenantId == tenantId)
                             .Select(tu => tu.Role.ToString())
                             .FirstOrDefault()
-                        : null
+                        : null,
+                    UsuarioVinculadoEmail = e.User != null ? e.User.Email : null
                 })
                 .FirstOrDefaultAsync();
 
@@ -249,7 +291,8 @@ namespace Vorluno.Planilla.Web.Controllers
                 empleado.Posicion?.Nombre,
                 !string.IsNullOrEmpty(empleado.UserId),
                 result.RolSistema,
-                false
+                false,
+                result.UsuarioVinculadoEmail
             );
 
             // ✅ AUDIT LOG: Registrar creación de empleado
@@ -279,15 +322,26 @@ namespace Vorluno.Planilla.Web.Controllers
 
         /// <summary>
         /// Actualiza un empleado existente.
+        /// 🔐 EMPLOYEE SELF-SERVICE: Si el usuario está vinculado a un empleado, solo puede actualizar su propio perfil.
         /// </summary>
         /// <param name="id">El ID del empleado a actualizar.</param>
         /// <param name="empleadoDto">Los datos actualizados del empleado.</param>
         /// <returns>NoContent si la actualización fue exitosa, NotFound si no existe.</returns>
         [HttpPut("{id}")]
-        [RequirePermission(SystemPermission.EmployeesUpdate)]
+        [RequirePermission(SystemPermission.EmployeesUpdate, SystemPermission.EmployeeUpdateSelf)]
         public async Task<IActionResult> Update(int id, EmpleadoActualizarDto empleadoDto)
         {
             var tenantId = _tenantContext.TenantId;
+
+            // 🎯 EMPLOYEE SELF-SERVICE: Verificar que solo pueda actualizar SU empleado
+            var linkedEmployeeId = _currentUserService.GetLinkedEmployeeId();
+            if (linkedEmployeeId.HasValue && linkedEmployeeId.Value != id)
+            {
+                _logger.LogWarning("Usuario vinculado a empleado {LinkedId} intentó actualizar empleado {RequestedId}",
+                    linkedEmployeeId.Value, id);
+                return Forbid(); // 403 Forbidden - no puede editar otros empleados
+            }
+
             var empleado = await _context.Empleados
                 .FirstOrDefaultAsync(e => e.Id == id && e.TenantId == tenantId);
 
@@ -296,8 +350,14 @@ namespace Vorluno.Planilla.Web.Controllers
                 return NotFound(); // Retorna un 404 Not Found si no existe o no pertenece al tenant
             }
 
+            // Si tiene usuario vinculado, no permitir cambiar el email del empleado (es el del usuario)
+            var emailOriginal = empleado.Email;
+
             // Mantiene NumeroIdentificacion y FechaContratacion originales - solo actualiza campos permitidos
             _mapper.Map(empleadoDto, empleado);
+
+            if (!string.IsNullOrEmpty(empleado.UserId))
+                empleado.Email = emailOriginal;
 
             _unitOfWork.Empleados.Update(empleado);
             await _unitOfWork.CompleteAsync();
@@ -470,7 +530,7 @@ namespace Vorluno.Planilla.Web.Controllers
                     UserName = email,
                     Email = email,
                     NombreCompleto = $"{empleado.Nombre} {empleado.Apellido}",
-                    EmailConfirmed = false
+                    EmailConfirmed = true // Evitar bloqueos si en el futuro se activa RequireConfirmedAccount
                 };
 
                 // Generar password temporal
@@ -496,8 +556,25 @@ namespace Vorluno.Planilla.Web.Controllers
                     JoinedAt = DateTime.UtcNow
                 });
 
-                // TODO: Enviar email de invitación con link para establecer contraseña
-                // await _emailService.SendInvitationAsync(email, tempPassword, tenantName);
+                // Enviar email de bienvenida con contraseña temporal (no bloquear si falla)
+                try
+                {
+                    var baseUrl = _configuration["App:BaseUrl"] ?? "https://localhost:5001";
+                    var loginUrl = baseUrl.TrimEnd('/') + "/login";
+                    var tenant = await _context.Tenants.AsNoTracking().FirstOrDefaultAsync(t => t.Id == tenantId);
+                    var tenantName = tenant?.Name ?? "la empresa";
+                    await _emailService.SendEmployeeWelcomeAsync(
+                        recipientEmail: email,
+                        recipientName: $"{empleado.Nombre} {empleado.Apellido}",
+                        tenantName: tenantName,
+                        temporaryPassword: tempPassword,
+                        loginUrl: loginUrl);
+                    _logger.LogInformation("Employee welcome email sent to {Email}", email);
+                }
+                catch (Exception emailEx)
+                {
+                    _logger.LogWarning(emailEx, "Failed to send welcome email to {Email}. User was created successfully.", email);
+                }
             }
         }
 
@@ -527,6 +604,12 @@ namespace Vorluno.Planilla.Web.Controllers
             if (tenantUser == null)
             {
                 return BadRequest(new { error = "El usuario no pertenece a este tenant o no está activo" });
+            }
+
+            // Solo permitir vincular a usuarios con rol User (no Owner): el vínculo es para "solo ver su información"
+            if (tenantUser.Role != TenantRole.User)
+            {
+                return BadRequest(new { error = "Solo se puede vincular empleados a usuarios con rol 'Usuario'. Los usuarios con rol 'Propietario' no deben vincularse a un empleado." });
             }
 
             // Verificar que el usuario no esté vinculado a otro empleado
@@ -650,9 +733,9 @@ namespace Vorluno.Planilla.Web.Controllers
                     "Found {Count} linked users in tenant {TenantId}",
                     usuariosVinculados.Count, tenantId);
 
-                // Obtener usuarios del tenant con sus datos
+                // Obtener usuarios del tenant con rol User (no Owner): solo ellos pueden vincularse a un empleado para "ver solo su información"
                 var tenantUsersData = await _context.TenantUsers
-                    .Where(tu => tu.TenantId == tenantId && tu.IsActive)
+                    .Where(tu => tu.TenantId == tenantId && tu.IsActive && tu.Role == TenantRole.User)
                     .Where(tu => !usuariosVinculados.Contains(tu.UserId))
                     .Include(tu => tu.User)
                     .AsNoTracking()
