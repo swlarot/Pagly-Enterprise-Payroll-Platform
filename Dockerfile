@@ -20,9 +20,6 @@ COPY src/UI/Planilla.Web/ClientApp/package.json src/UI/Planilla.Web/ClientApp/pa
 RUN npm ci
 
 COPY src/UI/Planilla.Web/ClientApp/ ./
-
-# Aumentar heap de Node para evitar OOM en rendering de chunks (recharts ~2.2MB)
-ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN npm run build
 
 # Vite outDir ../wwwroot from /app/client → /app/wwwroot

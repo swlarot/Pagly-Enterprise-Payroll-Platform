@@ -1,10 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import OvertimeByTypeBarChart from '../components/charts/OvertimeByTypeBarChart';
-import OvertimeCostDistributionPieChart from '../components/charts/OvertimeCostDistributionPieChart';
-import OvertimeLimitsChart from '../components/charts/OvertimeLimitsChart';
+
+const OvertimeByTypeBarChart = lazy(() => import('../components/charts/OvertimeByTypeBarChart'));
+const OvertimeCostDistributionPieChart = lazy(() => import('../components/charts/OvertimeCostDistributionPieChart'));
+const OvertimeLimitsChart = lazy(() => import('../components/charts/OvertimeLimitsChart'));
+
+const ChartFallback = () => (
+    <div className="flex items-center justify-center py-8">
+        <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+    </div>
+);
 
 const HorasExtraPage = () => {
     // Auth context for permissions
@@ -439,16 +446,20 @@ const HorasExtraPage = () => {
             {chartDataByType.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
-                        <OvertimeByTypeBarChart 
-                            data={chartDataByType} 
-                            title="Horas Extra por Tipo"
-                        />
+                        <Suspense fallback={<ChartFallback />}>
+                            <OvertimeByTypeBarChart
+                                data={chartDataByType}
+                                title="Horas Extra por Tipo"
+                            />
+                        </Suspense>
                     </div>
                     <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
-                        <OvertimeCostDistributionPieChart 
-                            data={pieChartData} 
-                            title="Distribución de Costos"
-                        />
+                        <Suspense fallback={<ChartFallback />}>
+                            <OvertimeCostDistributionPieChart
+                                data={pieChartData}
+                                title="Distribución de Costos"
+                            />
+                        </Suspense>
                     </div>
                 </div>
             )}
@@ -800,12 +811,14 @@ const HorasExtraPage = () => {
                                                 </div>
                                             ) : (
                                                 <>
-                                                    <OvertimeLimitsChart
-                                                        horasDelDia={limites.horasDelDia}
-                                                        horasDeLaSemana={limites.horasDeLaSemana}
-                                                        limiteDiario={3}
-                                                        limiteSemanal={9}
-                                                    />
+                                                    <Suspense fallback={<ChartFallback />}>
+                                                        <OvertimeLimitsChart
+                                                            horasDelDia={limites.horasDelDia}
+                                                            horasDeLaSemana={limites.horasDeLaSemana}
+                                                            limiteDiario={3}
+                                                            limiteSemanal={9}
+                                                        />
+                                                    </Suspense>
                                                     {limites.esExceso && (
                                                         <div className="mt-3 px-3 py-2 bg-red-500/15 border border-red-500/30 rounded-lg">
                                                             <p className="text-sm text-red-300">
