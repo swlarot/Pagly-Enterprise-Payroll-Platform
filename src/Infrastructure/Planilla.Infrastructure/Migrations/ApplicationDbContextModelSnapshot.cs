@@ -647,6 +647,17 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.Property<DateTime>("FechaContratacion")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<decimal>("HourlyRate")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("decimal(18, 4)");
+
+                    b.Property<decimal>("HoursPerPeriod")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8, 2)");
+
+                    b.Property<int>("HoursPerWeek")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
@@ -673,6 +684,9 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
+
+                    b.Property<int>("PayPeriodType")
+                        .HasColumnType("integer");
 
                     b.Property<int?>("PosicionId")
                         .HasColumnType("integer");
@@ -735,8 +749,14 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.Property<int>("EmpleadoId")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("EsExceso")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("EstaAprobada")
                         .HasColumnType("boolean");
+
+                    b.Property<decimal?>("FactorExceso")
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("FactorMultiplicador")
                         .HasPrecision(4, 2)
@@ -985,6 +1005,117 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.ToTable("PayrollDetails");
                 });
 
+            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.PayrollEmployeeHours", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("AbsenceDeduction")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<decimal>("AbsenceHours")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8, 2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("DisabilityHours")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8, 2)");
+
+                    b.Property<int>("EmpleadoId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("HolidayHours")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8, 2)");
+
+                    b.Property<decimal>("HolidayPay")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<decimal>("OvertimeDayHours")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8, 2)");
+
+                    b.Property<decimal>("OvertimeDayPay")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<decimal>("OvertimeExcessHours")
+                        .HasColumnType("decimal(8, 2)");
+
+                    b.Property<decimal>("OvertimeExcessPay")
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<decimal>("OvertimeHolidayHours")
+                        .HasColumnType("decimal(8, 2)");
+
+                    b.Property<decimal>("OvertimeHolidayPay")
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<decimal>("OvertimeMixedHours")
+                        .HasColumnType("decimal(8, 2)");
+
+                    b.Property<decimal>("OvertimeMixedPay")
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<decimal>("OvertimeNightHours")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8, 2)");
+
+                    b.Property<decimal>("OvertimeNightPay")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<int>("PayrollHeaderId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("RegularHours")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8, 2)");
+
+                    b.Property<decimal>("RegularPay")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<decimal>("SundayHours")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("decimal(8, 2)");
+
+                    b.Property<decimal>("SundayPay")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TotalHoursPay")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18, 2)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpleadoId");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("IX_PayrollEmployeeHours_TenantId");
+
+                    b.HasIndex("PayrollHeaderId", "EmpleadoId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_PayrollEmployeeHours_HeaderId_EmpleadoId");
+
+                    b.ToTable("PayrollEmployeeHours");
+                });
+
             modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.PayrollHeader", b =>
                 {
                     b.Property<int>("Id")
@@ -1014,6 +1145,9 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
 
                     b.Property<DateTime>("PayDate")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PayPeriodType")
+                        .HasColumnType("integer");
 
                     b.Property<string>("PaymentReference")
                         .HasMaxLength(100)
@@ -1069,6 +1203,9 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                         .HasColumnName("xmin");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "PayPeriodType")
+                        .HasDatabaseName("IX_PayrollHeaders_TenantId_PayPeriodType");
 
                     b.HasIndex("TenantId", "PayrollNumber")
                         .IsUnique()
@@ -2218,6 +2355,33 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
 
                     b.HasOne("Vorluno.Planilla.Domain.Entities.PayrollHeader", "PayrollHeader")
                         .WithMany("Details")
+                        .HasForeignKey("PayrollHeaderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vorluno.Planilla.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Empleado");
+
+                    b.Navigation("PayrollHeader");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.PayrollEmployeeHours", b =>
+                {
+                    b.HasOne("Vorluno.Planilla.Domain.Entities.Empleado", "Empleado")
+                        .WithMany()
+                        .HasForeignKey("EmpleadoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Vorluno.Planilla.Domain.Entities.PayrollHeader", "PayrollHeader")
+                        .WithMany()
                         .HasForeignKey("PayrollHeaderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();

@@ -161,6 +161,9 @@ builder.Services.AddScoped<global::Planilla.Application.Services.IEmailService, 
 builder.Services.AddScoped<global::Planilla.Application.Services.IPlanUsageService, Vorluno.Planilla.Infrastructure.Services.PlanUsageService>();
 builder.Services.AddScoped<ICustomTenantRoleService, CustomTenantRoleService>();
 builder.Services.AddScoped<IEmployeeDeletionValidationService, EmployeeDeletionValidationService>();
+builder.Services.AddScoped<Vorluno.Planilla.Infrastructure.Services.AsistenciaCalculationService>();
+builder.Services.AddScoped<Vorluno.Planilla.Infrastructure.Services.PanamaHolidayService>();
+builder.Services.AddScoped<Vorluno.Planilla.Infrastructure.Services.OvertimeFactorService>();
 
 // --- FIN DE NUESTRA CONFIGURACIÓN PRINCIPAL ---
 

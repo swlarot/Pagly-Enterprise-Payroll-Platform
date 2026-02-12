@@ -76,30 +76,44 @@ public class AsistenciaCalculationService
 
         foreach (var hora in horasExtra)
         {
-            // Determinar factor multiplicador según tipo
-            var factor = hora.TipoHoraExtra switch
+            // Determinar factor multiplicador base según tipo
+            decimal factorBase = hora.TipoHoraExtra switch
             {
                 TipoHoraExtra.Diurna => 1.25m,
                 TipoHoraExtra.Nocturna => 1.50m,
                 TipoHoraExtra.DomingoFeriado => 1.50m,
-                TipoHoraExtra.NocturnaDomingoFeriado => 1.75m,
+                TipoHoraExtra.NocturnaDomingoFeriado => 2.25m, // 1.50 × 1.50 según Código de Trabajo Art. 50
+                TipoHoraExtra.FiestaNacionalDiurna => 3.125m, // 2.50 × 1.25 según Código de Trabajo Art. 49
+                TipoHoraExtra.FiestaNacionalNocturna => 3.75m, // 2.50 × 1.50 según Código de Trabajo Art. 49
+                TipoHoraExtra.MixtaDiurnaNocturna => 1.50m,
+                TipoHoraExtra.MixtaNocturnaDiurna => 1.75m,
                 _ => 1.25m
             };
 
+            // Aplicar factor de exceso si aplica
+            decimal factorTotal = factorBase;
+            if (hora.EsExceso && hora.FactorExceso.HasValue)
+            {
+                factorTotal *= hora.FactorExceso.Value; // Multiplicar por 1.75x adicional
+            }
+
             // Calcular monto para esta hora extra
-            var monto = salarioHora * hora.CantidadHoras * factor;
+            var monto = salarioHora * hora.CantidadHoras * factorTotal;
             montoTotal += monto;
 
-            // Actualizar monto calculado en la entidad
-            hora.MontoCalculado = monto;
+            // Actualizar monto calculado en la entidad si no está calculado o si cambió
+            if (!hora.MontoCalculado.HasValue || hora.MontoCalculado.Value != monto)
+            {
+                hora.MontoCalculado = monto;
+            }
 
             // Acumular horas por tipo para desglose
-            if (hora.TipoHoraExtra == TipoHoraExtra.Diurna)
+            if (hora.TipoHoraExtra == TipoHoraExtra.Diurna || hora.TipoHoraExtra == TipoHoraExtra.MixtaDiurnaNocturna)
                 horasDiurnas += hora.CantidadHoras;
-            else if (hora.TipoHoraExtra == TipoHoraExtra.Nocturna)
+            else if (hora.TipoHoraExtra == TipoHoraExtra.Nocturna || hora.TipoHoraExtra == TipoHoraExtra.MixtaNocturnaDiurna)
                 horasNocturnas += hora.CantidadHoras;
             else
-                horasDomingoFeriado += hora.CantidadHoras;
+                horasDomingoFeriado += hora.CantidadHoras; // Incluye DomingoFeriado, NocturnaDomingoFeriado, FiestaNacionalDiurna, FiestaNacionalNocturna
         }
 
         return (Math.Round(montoTotal, 2), horasDiurnas, horasNocturnas, horasDomingoFeriado);

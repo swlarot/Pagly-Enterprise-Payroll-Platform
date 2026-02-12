@@ -1,7 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import OvertimeByTypeBarChart from '../components/charts/OvertimeByTypeBarChart';
+import OvertimeCostDistributionPieChart from '../components/charts/OvertimeCostDistributionPieChart';
+import OvertimeLimitsChart from '../components/charts/OvertimeLimitsChart';
 
 const HorasExtraPage = () => {
     // Auth context for permissions
@@ -32,11 +35,125 @@ const HorasExtraPage = () => {
         motivo: ''
     });
 
+    // Validación y límites
+    const [limites, setLimites] = useState({
+        horasDelDia: 0,
+        horasDeLaSemana: 0,
+        horasDisponiblesDia: 3,
+        horasDisponiblesSemana: 9,
+        porcentajeDia: 0,
+        porcentajeSemana: 0,
+        esExceso: false,
+        mensaje: ''
+    });
+
+    const [festivoInfo, setFestivoInfo] = useState({
+        esFestivo: false,
+        nombreFestivo: null
+    });
+
+    const [sugerenciaTipo, setSugerenciaTipo] = useState(null);
+    const [validando, setValidando] = useState(false);
+
     useEffect(() => {
         fetchHorasExtra();
         fetchEmpleados();
         fetchTipos();
     }, []);
+
+    // Validar límites cuando cambian empleado, fecha o horas
+    useEffect(() => {
+        if (formData.empleadoId && formData.fecha && formData.horaInicio && formData.horaFin) {
+            validarLimites();
+        }
+    }, [formData.empleadoId, formData.fecha, formData.horaInicio, formData.horaFin]);
+
+    // Verificar si es festivo cuando cambia la fecha
+    useEffect(() => {
+        if (formData.fecha) {
+            verificarFestivo();
+        }
+    }, [formData.fecha]);
+
+    // Sugerir tipo cuando cambian fecha u horario
+    useEffect(() => {
+        if (formData.fecha && formData.horaInicio && formData.horaFin) {
+            sugerirTipo();
+        }
+    }, [formData.fecha, formData.horaInicio, formData.horaFin]);
+
+    const validarLimites = async () => {
+        if (!formData.empleadoId || !formData.fecha) return;
+
+        try {
+            setValidando(true);
+            const fecha = new Date(formData.fecha);
+            const horaInicio = formData.horaInicio.split(':');
+            const horaFin = formData.horaFin.split(':');
+            const horasNuevas = calcularHoras(formData.horaInicio, formData.horaFin);
+
+            const response = await api.get(
+                `/api/horasextra/validar-limites?empleadoId=${formData.empleadoId}&fecha=${fecha.toISOString().split('T')[0]}&horasNuevas=${horasNuevas}`
+            );
+
+            setLimites({
+                horasDelDia: response.horasDelDia || 0,
+                horasDeLaSemana: response.horasDeLaSemana || 0,
+                horasDisponiblesDia: response.horasDisponiblesDia || 3,
+                horasDisponiblesSemana: response.horasDisponiblesSemana || 9,
+                porcentajeDia: response.porcentajeDia || 0,
+                porcentajeSemana: response.porcentajeSemana || 0,
+                esExceso: response.esExceso || false,
+                mensaje: response.mensaje || ''
+            });
+        } catch (err) {
+            console.error('Error al validar límites:', err);
+        } finally {
+            setValidando(false);
+        }
+    };
+
+    const verificarFestivo = async () => {
+        if (!formData.fecha) return;
+
+        try {
+            const fecha = new Date(formData.fecha);
+            const response = await api.get(
+                `/api/horasextra/es-festivo?fecha=${fecha.toISOString().split('T')[0]}`
+            );
+
+            setFestivoInfo({
+                esFestivo: response.esFestivo || false,
+                nombreFestivo: response.nombreFestivo || null
+            });
+        } catch (err) {
+            console.error('Error al verificar festivo:', err);
+        }
+    };
+
+    const sugerirTipo = async () => {
+        if (!formData.fecha || !formData.horaInicio || !formData.horaFin) return;
+
+        try {
+            const fecha = new Date(formData.fecha);
+            const response = await api.get(
+                `/api/horasextra/sugerir-tipo?fecha=${fecha.toISOString().split('T')[0]}&horaInicio=${formData.horaInicio}&horaFin=${formData.horaFin}`
+            );
+
+            setSugerenciaTipo(response);
+        } catch (err) {
+            console.error('Error al sugerir tipo:', err);
+        }
+    };
+
+    const calcularHoras = (inicio, fin) => {
+        const [hInicio, mInicio] = inicio.split(':').map(Number);
+        const [hFin, mFin] = fin.split(':').map(Number);
+        const inicioMinutos = hInicio * 60 + mInicio;
+        const finMinutos = hFin * 60 + mFin;
+        const diferencia = finMinutos - inicioMinutos;
+        return Math.max(0, diferencia / 60);
+    };
 
     const fetchHorasExtra = async () => {
         try {
@@ -91,10 +208,47 @@ const HorasExtraPage = () => {
         .filter(h => !h.estaAprobada)
         .reduce((sum, h) => sum + (h.montoCalculado || 0), 0);
 
+    // Función para obtener nombre corto y único de cada tipo
+    const getTipoDisplayName = (tipoValor) => {
+        const tipoMap = {
+            1: 'Diurna',                    // TipoHoraExtra.Diurna
+            2: 'Nocturna',                  // TipoHoraExtra.Nocturna
+            3: 'Dom/Fer',                    // TipoHoraExtra.DomingoFeriado
+            4: 'Noct. Dom/Fer',             // TipoHoraExtra.NocturnaDomingoFeriado
+            5: 'Fiesta Diurna',              // TipoHoraExtra.FiestaNacionalDiurna
+            6: 'Fiesta Nocturna',            // TipoHoraExtra.FiestaNacionalNocturna
+            7: 'Mixta D-N',                  // TipoHoraExtra.MixtaDiurnaNocturna
+            8: 'Mixta N-D'                   // TipoHoraExtra.MixtaNocturnaDiurna
+        };
+        return tipoMap[tipoValor] || 'Desconocido';
+    };
+
     const porTipo = tipos.map(tipo => ({
         ...tipo,
-        cantidad: horasExtra.filter(h => h.tipoHoraExtra === tipo.valor).length
+        cantidad: horasExtra.filter(h => h.tipoHoraExtra === tipo.valor).length,
+        displayName: getTipoDisplayName(tipo.valor)
     }));
+
+    // Preparar datos para gráficos
+    const chartDataByType = porTipo.map(tipo => {
+        const horasDelTipo = horasExtra.filter(h => h.tipoHoraExtra === tipo.valor);
+        const totalHoras = horasDelTipo.reduce((sum, h) => sum + h.cantidadHoras, 0);
+        const totalMonto = horasDelTipo.reduce((sum, h) => sum + (h.montoCalculado || 0), 0);
+        return {
+            tipo: tipo.displayName,
+            horas: totalHoras,
+            monto: totalMonto
+        };
+    }).filter(item => item.horas > 0);
+
+    const pieChartData = chartDataByType.map((item, index) => {
+        const colors = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#EF4444'];
+        return {
+            name: item.tipo,
+            value: item.monto,
+            color: colors[index % colors.length]
+        };
+    });
 
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('es-PA', {
@@ -111,6 +265,16 @@ const HorasExtraPage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // Validar límites antes de enviar
+        if (limites.esExceso) {
+            const confirmar = window.confirm(
+                `⚠️ Advertencia: ${limites.mensaje}\n\n¿Desea continuar de todas formas?`
+            );
+            if (!confirmar) {
+                return;
+            }
+        }
 
         try {
             const payload = {
@@ -182,6 +346,21 @@ const HorasExtraPage = () => {
             horaFin: '10:00',
             motivo: ''
         });
+        setLimites({
+            horasDelDia: 0,
+            horasDeLaSemana: 0,
+            horasDisponiblesDia: 3,
+            horasDisponiblesSemana: 9,
+            porcentajeDia: 0,
+            porcentajeSemana: 0,
+            esExceso: false,
+            mensaje: ''
+        });
+        setFestivoInfo({
+            esFestivo: false,
+            nombreFestivo: null
+        });
+        setSugerenciaTipo(null);
     };
 
     if (loading) {
@@ -246,7 +425,7 @@ const HorasExtraPage = () => {
                     <div className="space-y-2">
                         {porTipo.map((tipo, index) => (
                             <div key={tipo?.valor || `tipo-${index}`} className="flex items-center justify-between">
-                                <span className="text-xs text-gray-400">{tipo.nombre.split(' ')[0]}</span>
+                                <span className="text-xs text-gray-400" title={tipo.nombre}>{tipo.displayName}</span>
                                 <span className="px-2 py-0.5 bg-blue-500/15 text-blue-400 text-xs font-medium rounded-full">
                                     {tipo.cantidad}
                                 </span>
@@ -255,6 +434,24 @@ const HorasExtraPage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Gráficos */}
+            {chartDataByType.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
+                        <OvertimeByTypeBarChart 
+                            data={chartDataByType} 
+                            title="Horas Extra por Tipo"
+                        />
+                    </div>
+                    <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
+                        <OvertimeCostDistributionPieChart 
+                            data={pieChartData} 
+                            title="Distribución de Costos"
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Filters and Action Bar */}
             <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-4">
@@ -346,9 +543,16 @@ const HorasExtraPage = () => {
                                         })}
                                     </td>
                                     <td className="py-4 px-6">
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-500/15 text-purple-400">
-                                            {he.tipoNombre}
-                                        </span>
+                                        <div className="flex flex-col gap-1">
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-500/15 text-purple-400">
+                                                {he.tipoNombre}
+                                            </span>
+                                            {he.esExceso && (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-red-500/15 text-red-300" title="Excede límite legal (>3h/día o >9h/semana)">
+                                                    ⚠️ Exceso
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="py-4 px-6 text-sm text-gray-100">
                                         {formatTime(he.horaInicio)} - {formatTime(he.horaFin)}
@@ -357,7 +561,14 @@ const HorasExtraPage = () => {
                                         {he.cantidadHoras.toFixed(2)}h
                                     </td>
                                     <td className="py-4 px-6 text-sm font-medium font-mono text-gray-100">
-                                        {formatCurrency(he.montoCalculado)}
+                                        <div className="flex flex-col">
+                                            <span>{formatCurrency(he.montoCalculado)}</span>
+                                            {he.esExceso && he.factorExceso && (
+                                                <span className="text-xs text-gray-400 mt-0.5">
+                                                    Factor: {he.factorMultiplicador.toFixed(2)}x
+                                                </span>
+                                            )}
+                                        </div>
                                     </td>
                                     <td className="py-4 px-6">
                                         {he.estaAprobada ? (
@@ -492,6 +703,13 @@ const HorasExtraPage = () => {
                                         onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
                                         className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     />
+                                    {festivoInfo.esFestivo && (
+                                        <div className="mt-2 px-3 py-2 bg-purple-500/15 border border-purple-500/30 rounded-lg">
+                                            <p className="text-sm text-purple-300">
+                                                🎉 <strong>{festivoInfo.nombreFestivo}</strong> - Día festivo nacional
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div>
@@ -502,7 +720,11 @@ const HorasExtraPage = () => {
                                         required
                                         value={formData.tipoHoraExtra}
                                         onChange={(e) => setFormData({ ...formData, tipoHoraExtra: e.target.value })}
-                                        className="w-full px-3 py-2 bg-navy-800 border border-navy-600 text-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                        className={`w-full px-3 py-2 bg-navy-800 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                                            sugerenciaTipo && parseInt(formData.tipoHoraExtra) !== sugerenciaTipo.tipoSugerido
+                                                ? 'border-blue-500/50'
+                                                : 'border-navy-600'
+                                        } text-gray-200`}
                                     >
                                         {tipos.map((tipo, index) => (
                                             <option key={tipo?.valor || `tipo-${index}`} value={tipo?.valor}>
@@ -510,6 +732,20 @@ const HorasExtraPage = () => {
                                             </option>
                                         ))}
                                     </select>
+                                    {sugerenciaTipo && parseInt(formData.tipoHoraExtra) !== sugerenciaTipo.tipoSugerido && (
+                                        <div className="mt-2 px-3 py-2 bg-blue-500/15 border border-blue-500/30 rounded-lg">
+                                            <p className="text-sm text-blue-300">
+                                                💡 Sugerencia: <strong>{sugerenciaTipo.nombreTipo}</strong> (Factor {sugerenciaTipo.factor}x)
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, tipoHoraExtra: sugerenciaTipo.tipoSugerido.toString() })}
+                                                className="mt-1 text-xs text-blue-400 hover:text-blue-300 underline"
+                                            >
+                                                Usar tipo sugerido
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div>
@@ -551,6 +787,51 @@ const HorasExtraPage = () => {
                                         placeholder="Describir el motivo de las horas extra..."
                                     />
                                 </div>
+
+                                {/* Alertas de límites */}
+                                {formData.empleadoId && formData.fecha && (
+                                    <div className="md:col-span-2">
+                                        <div className="bg-navy-800 rounded-lg p-4 border border-navy-700">
+                                            <h4 className="text-sm font-semibold text-gray-300 mb-3">Límites Legales</h4>
+                                            {validando ? (
+                                                <div className="text-center py-4">
+                                                    <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                                                    <p className="text-xs text-gray-400 mt-2">Validando límites...</p>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <OvertimeLimitsChart
+                                                        horasDelDia={limites.horasDelDia}
+                                                        horasDeLaSemana={limites.horasDeLaSemana}
+                                                        limiteDiario={3}
+                                                        limiteSemanal={9}
+                                                    />
+                                                    {limites.esExceso && (
+                                                        <div className="mt-3 px-3 py-2 bg-red-500/15 border border-red-500/30 rounded-lg">
+                                                            <p className="text-sm text-red-300">
+                                                                ⚠️ <strong>Advertencia:</strong> {limites.mensaje}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                    {limites.porcentajeDia >= 70 && limites.porcentajeDia < 90 && (
+                                                        <div className="mt-3 px-3 py-2 bg-yellow-500/15 border border-yellow-500/30 rounded-lg">
+                                                            <p className="text-sm text-yellow-300">
+                                                                ⚠️ Se está acercando al límite diario
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                    {limites.porcentajeSemana >= 70 && limites.porcentajeSemana < 90 && (
+                                                        <div className="mt-3 px-3 py-2 bg-yellow-500/15 border border-yellow-500/30 rounded-lg">
+                                                            <p className="text-sm text-yellow-300">
+                                                                ⚠️ Se está acercando al límite semanal
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex justify-end gap-3 pt-4 border-t border-navy-700">
@@ -563,9 +844,14 @@ const HorasExtraPage = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
+                                    className={`px-4 py-2 rounded-lg font-medium transition-colors shadow-lg shadow-black/20 ${
+                                        limites.esExceso
+                                            ? 'bg-red-600 hover:bg-red-700 text-white'
+                                            : 'bg-primary-600 hover:bg-primary-700 text-white'
+                                    }`}
                                 >
                                     {editingId ? 'Actualizar' : 'Registrar'}
+                                    {limites.esExceso && ' ⚠️'}
                                 </button>
                             </div>
                         </form>

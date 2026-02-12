@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Vorluno.Planilla.Domain.Enums;
 
 namespace Vorluno.Planilla.Application.DTOs
 {
@@ -20,6 +21,12 @@ namespace Vorluno.Planilla.Application.DTOs
         string? PosicionNombre,
         bool TieneAccesoSistema,
         string? RolSistema,
+        // === Pay Info ===
+        string PayPeriodTypeName = "Quincenal",
+        int HoursPerWeek = 48,
+        decimal HoursPerPeriod = 104,
+        decimal HourlyRate = 0,
+        // === Campos existentes con default ===
         bool IsDeleted = false,
         string? UsuarioVinculadoEmail = null
     );
@@ -49,7 +56,12 @@ namespace Vorluno.Planilla.Application.DTOs
 
         int? DepartamentoId,
 
-        int? PosicionId
+        int? PosicionId,
+
+        // === Pay Info ===
+        PayPeriodType PayPeriodType = PayPeriodType.Quincenal,
+        int HoursPerWeek = 48,
+        decimal? HoursPerPeriod = null
     );
 
     /// <summary>
@@ -75,7 +87,12 @@ namespace Vorluno.Planilla.Application.DTOs
 
         int? DepartamentoId,
 
-        int? PosicionId
+        int? PosicionId,
+
+        // === Pay Info ===
+        PayPeriodType PayPeriodType = PayPeriodType.Quincenal,
+        int HoursPerWeek = 48,
+        decimal? HoursPerPeriod = null
     );
 
     /// <summary>

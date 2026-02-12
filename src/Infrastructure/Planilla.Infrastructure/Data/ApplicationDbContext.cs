@@ -47,6 +47,9 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     public DbSet<PayrollHeader> PayrollHeaders { get; set; }
     public DbSet<PayrollDetail> PayrollDetails { get; set; }
 
+    // Phase P1: Horas trabajadas por empleado por planilla
+    public DbSet<PayrollEmployeeHours> PayrollEmployeeHours { get; set; } = null!;
+
     // Organizaci�n: Departamentos y Posiciones
     public DbSet<Departamento> Departamentos { get; set; }
     public DbSet<Posicion> Posiciones { get; set; }
@@ -240,6 +243,60 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .WithMany()
                 .HasForeignKey(d => d.EmpleadoId)
                 .OnDelete(DeleteBehavior.Restrict); // NO borrar empleado si tiene detalles de planilla
+        });
+
+        // Phase P1: Configuración de PayrollEmployeeHours
+        modelBuilder.Entity<PayrollEmployeeHours>(entity =>
+        {
+            // Índice único: un registro de horas por empleado por planilla
+            entity.HasIndex(e => new { e.PayrollHeaderId, e.EmpleadoId })
+                .IsUnique()
+                .HasDatabaseName("IX_PayrollEmployeeHours_HeaderId_EmpleadoId");
+
+            // Índice por tenant para queries filtradas
+            entity.HasIndex(e => e.TenantId)
+                .HasDatabaseName("IX_PayrollEmployeeHours_TenantId");
+
+            // Configuración de precisión para campos decimales
+            entity.Property(e => e.RegularHours).HasPrecision(8, 2);
+            entity.Property(e => e.SundayHours).HasPrecision(8, 2);
+            entity.Property(e => e.HolidayHours).HasPrecision(8, 2);
+            entity.Property(e => e.OvertimeDayHours).HasPrecision(8, 2);
+            entity.Property(e => e.OvertimeNightHours).HasPrecision(8, 2);
+            entity.Property(e => e.AbsenceHours).HasPrecision(8, 2);
+            entity.Property(e => e.DisabilityHours).HasPrecision(8, 2);
+            entity.Property(e => e.RegularPay).HasPrecision(18, 2);
+            entity.Property(e => e.SundayPay).HasPrecision(18, 2);
+            entity.Property(e => e.HolidayPay).HasPrecision(18, 2);
+            entity.Property(e => e.OvertimeDayPay).HasPrecision(18, 2);
+            entity.Property(e => e.OvertimeNightPay).HasPrecision(18, 2);
+            entity.Property(e => e.AbsenceDeduction).HasPrecision(18, 2);
+            entity.Property(e => e.TotalHoursPay).HasPrecision(18, 2);
+
+            // Relaciones
+            entity.HasOne(e => e.PayrollHeader)
+                .WithMany()
+                .HasForeignKey(e => e.PayrollHeaderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Empleado)
+                .WithMany()
+                .HasForeignKey(e => e.EmpleadoId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
+        });
+
+        // Índice de PayPeriodType en PayrollHeader
+        modelBuilder.Entity<PayrollHeader>()
+            .HasIndex(e => new { e.TenantId, e.PayPeriodType })
+            .HasDatabaseName("IX_PayrollHeaders_TenantId_PayPeriodType");
+
+        // Configuración de precisión para nuevos campos en Empleado
+        modelBuilder.Entity<Empleado>(entity =>
+        {
+            entity.Property(e => e.HoursPerPeriod).HasPrecision(8, 2);
+            entity.Property(e => e.HourlyRate).HasPrecision(18, 4);
         });
 
         // Organizaci�n: Configuraci�n de Departamento

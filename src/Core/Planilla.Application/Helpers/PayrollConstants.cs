@@ -5,6 +5,8 @@
 // Descripción: Constantes de planilla (frecuencias de pago, etc.)
 // ====================================================================
 
+using Vorluno.Planilla.Domain.Enums;
+
 namespace Vorluno.Planilla.Application.Helpers;
 
 /// <summary>
@@ -24,7 +26,8 @@ public static class PayrollConstants
     {
         { "Quincenal", 24 },  // 2 pagos por mes × 12 meses
         { "Mensual", 12 },    // 1 pago por mes × 12 meses
-        { "Semanal", 52 }     // ~4.33 semanas/mes × 12 meses (aproximadamente)
+        { "Semanal", 52 },    // ~4.33 semanas/mes × 12 meses (aproximadamente)
+        { "Bisemanal", 26 }   // 2 pagos por mes (cada 2 semanas exactas)
     };
 
     /// <summary>
@@ -44,5 +47,20 @@ public static class PayrollConstants
         }
 
         return periods;
+    }
+
+    /// <summary>
+    /// Obtiene períodos/año desde el enum PayPeriodType.
+    /// </summary>
+    public static int GetPeriodsPerYear(PayPeriodType periodType)
+    {
+        return periodType switch
+        {
+            PayPeriodType.Semanal => 52,
+            PayPeriodType.Bisemanal => 26,
+            PayPeriodType.Quincenal => 24,
+            PayPeriodType.Mensual => 12,
+            _ => throw new ArgumentException($"Tipo de período inválido: {periodType}")
+        };
     }
 }

@@ -124,6 +124,27 @@ public class ReportesController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Obtiene el reporte de horas extra en formato JSON
+    /// </summary>
+    [HttpGet("horas-extra/{planillaId}")]
+    public async Task<ActionResult<ReporteHorasExtraDto>> GetReporteHorasExtra(int planillaId)
+    {
+        try
+        {
+            var reporte = await _reportesService.GenerarReporteHorasExtra(planillaId);
+            return Ok(reporte);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Error al generar reporte: {ex.Message}" });
+        }
+    }
+
     #endregion
 
     #region Exportación Excel
@@ -221,6 +242,54 @@ public class ReportesController : ControllerBase
             var fileName = $"SeguroEducativo_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
 
             return File(bytes, "application/pdf", fileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Error al exportar: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
+    /// Exporta el reporte de horas extra a Excel
+    /// </summary>
+    [HttpGet("horas-extra/{planillaId}/excel")]
+    [PlanLimits(PlanLimitType.ExportExcel)]
+    public async Task<IActionResult> ExportarHorasExtraExcel(int planillaId)
+    {
+        try
+        {
+            var reporte = await _reportesService.GenerarReporteHorasExtra(planillaId);
+            // TODO: Implementar ExportarExcelHorasExtra en ExportacionService
+            // Por ahora retornar JSON como placeholder
+            return Ok(new { message = "Exportación Excel de horas extra pendiente de implementación", reporte });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Error al exportar: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
+    /// Exporta el reporte de horas extra a PDF
+    /// </summary>
+    [HttpGet("horas-extra/{planillaId}/pdf")]
+    [PlanLimits(PlanLimitType.ExportPdf)]
+    public async Task<IActionResult> ExportarHorasExtraPdf(int planillaId)
+    {
+        try
+        {
+            var reporte = await _reportesService.GenerarReporteHorasExtra(planillaId);
+            // TODO: Implementar ExportarPdfHorasExtra en ExportacionService
+            // Por ahora retornar JSON como placeholder
+            return Ok(new { message = "Exportación PDF de horas extra pendiente de implementación", reporte });
         }
         catch (InvalidOperationException ex)
         {

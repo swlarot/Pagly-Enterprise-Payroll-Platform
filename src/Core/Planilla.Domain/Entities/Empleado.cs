@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Domain.Interfaces;
 
 namespace Vorluno.Planilla.Domain.Entities;
@@ -104,6 +105,41 @@ public class Empleado : ITenantEntity
     [StringLength(20)]
     public string PayFrequency { get; set; } = "Quincenal";
 
+    // ====================================================================
+    // Pay Info — Configuración de pago por horas
+    // ====================================================================
+
+    /// <summary>
+    /// Tipo de período de pago (reemplaza PayFrequency string).
+    /// Determina cómo se anualiza el salario para ISR.
+    /// </summary>
+    public PayPeriodType PayPeriodType { get; set; } = PayPeriodType.Quincenal;
+
+    /// <summary>
+    /// Horas semanales del contrato laboral (Panamá estándar: 48 horas = 8h × 6 días)
+    /// Código de Trabajo Art. 31: máximo 48 horas semanales diurnas
+    /// </summary>
+    public int HoursPerWeek { get; set; } = 48;
+
+    /// <summary>
+    /// Horas del período, calculadas según PayPeriodType:
+    /// - Semanal: HoursPerWeek (48)
+    /// - Bisemanal: HoursPerWeek × 2 (96)
+    /// - Quincenal: HoursPerWeek × 2.167 (~104)
+    /// - Mensual: HoursPerWeek × 4.333 (~208)
+    /// El usuario puede overridear este cálculo.
+    /// </summary>
+    [Column(TypeName = "decimal(8, 2)")]
+    public decimal HoursPerPeriod { get; set; } = 104m;
+
+    /// <summary>
+    /// Tasa por hora calculada: SalarioBase / HoursPerPeriod.
+    /// Se almacena para performance pero se recalcula cuando cambia SalarioBase o HoursPerPeriod.
+    /// Usado para calcular horas extra, dominicales, feriados.
+    /// </summary>
+    [Column(TypeName = "decimal(18, 4)")]
+    public decimal HourlyRate { get; set; } = 0m;
+
     /// <summary>
     /// N�mero de dependientes declarados (m�ximo 3 para deducci�n ISR)
     /// </summary>
@@ -137,4 +173,46 @@ public class Empleado : ITenantEntity
 
     // Navigation property para Usuario (si está vinculado)
     public virtual AppUser? User { get; set; }
+
+    // ====================================================================
+    // Métodos helper para Pay Info
+    // ====================================================================
+
+    /// <summary>
+    /// Sincroniza PayFrequency (legacy string) con PayPeriodType (nuevo enum).
+    /// </summary>
+    public void SyncPayFrequencyFromType()
+    {
+        PayFrequency = PayPeriodType switch
+        {
+            PayPeriodType.Semanal => "Semanal",
+            PayPeriodType.Bisemanal => "Bisemanal",
+            PayPeriodType.Quincenal => "Quincenal",
+            PayPeriodType.Mensual => "Mensual",
+            _ => "Quincenal"
+        };
+    }
+
+    /// <summary>
+    /// Recalcula HourlyRate basado en SalarioBase y HoursPerPeriod.
+    /// </summary>
+    public void RecalculateHourlyRate()
+    {
+        HourlyRate = HoursPerPeriod > 0 ? Math.Round(SalarioBase / HoursPerPeriod, 4) : 0;
+    }
+
+    /// <summary>
+    /// Calcula HoursPerPeriod sugerido basado en HoursPerWeek y PayPeriodType.
+    /// </summary>
+    public static decimal CalculateSuggestedHoursPerPeriod(int hoursPerWeek, PayPeriodType periodType)
+    {
+        return periodType switch
+        {
+            PayPeriodType.Semanal => hoursPerWeek,
+            PayPeriodType.Bisemanal => hoursPerWeek * 2m,
+            PayPeriodType.Quincenal => Math.Round(hoursPerWeek * (52m / 24m), 0),
+            PayPeriodType.Mensual => Math.Round(hoursPerWeek * (52m / 12m), 0),
+            _ => hoursPerWeek * 2m
+        };
+    }
 }

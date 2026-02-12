@@ -125,6 +125,10 @@ namespace Vorluno.Planilla.Web.Controllers
                 e.Empleado.Posicion?.Nombre,
                 !string.IsNullOrEmpty(e.Empleado.UserId),
                 e.RolSistema,
+                e.Empleado.PayPeriodType.ToString(),
+                e.Empleado.HoursPerWeek,
+                e.Empleado.HoursPerPeriod,
+                e.Empleado.HourlyRate,
                 e.Empleado.IsDeleted,
                 e.UsuarioVinculadoEmail
             )).ToList();
@@ -192,6 +196,10 @@ namespace Vorluno.Planilla.Web.Controllers
                 result.Empleado.Posicion?.Nombre,
                 !string.IsNullOrEmpty(result.Empleado.UserId),
                 result.RolSistema,
+                result.Empleado.PayPeriodType.ToString(),
+                result.Empleado.HoursPerWeek,
+                result.Empleado.HoursPerPeriod,
+                result.Empleado.HourlyRate,
                 result.Empleado.IsDeleted,
                 result.UsuarioVinculadoEmail
             );
@@ -291,6 +299,10 @@ namespace Vorluno.Planilla.Web.Controllers
                 empleado.Posicion?.Nombre,
                 !string.IsNullOrEmpty(empleado.UserId),
                 result.RolSistema,
+                empleado.PayPeriodType.ToString(),
+                empleado.HoursPerWeek,
+                empleado.HoursPerPeriod,
+                empleado.HourlyRate,
                 false,
                 result.UsuarioVinculadoEmail
             );
