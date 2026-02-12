@@ -494,13 +494,13 @@ const PlanillasPage = () => {
                                 )}
                             </button>
 
-                            {/* Botón Gestionar Horas - solo en Draft */}
+                            {/* Botón Gestionar Horas - disponible en Draft y Calculated */}
                             <button
                                 onClick={toggleHoursPanel}
                                 className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20 ${
                                     showHoursPanel
-                                        ? 'bg-emerald-700 hover:bg-emerald-800 text-white'
-                                        : 'bg-navy-700 hover:bg-navy-600 text-gray-200 border border-navy-600'
+                                        ? 'bg-red-600 hover:bg-red-700 text-white'
+                                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                                 }`}
                             >
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -559,6 +559,20 @@ const PlanillasPage = () => {
                                 </svg>
                                 Recalcular
                             </button>
+                            {/* Botón Gestionar Horas - también disponible en Calculated */}
+                            <button
+                                onClick={toggleHoursPanel}
+                                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20 ${
+                                    showHoursPanel
+                                        ? 'bg-red-600 hover:bg-red-700 text-white'
+                                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                }`}
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {showHoursPanel ? 'Cerrar Horas' : 'Editar Horas'}
+                            </button>
                         </>
                     )}
 
@@ -590,8 +604,8 @@ const PlanillasPage = () => {
                 </div>
             )}
 
-            {/* Panel de Horas Trabajadas - visible solo en Draft */}
-            {selectedPlanilla && selectedPlanilla.status === 0 && showHoursPanel && (
+            {/* Panel de Horas Trabajadas - visible en Draft y Calculated */}
+            {selectedPlanilla && (selectedPlanilla.status === 0 || selectedPlanilla.status === 1) && showHoursPanel && (
                 <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-emerald-700/50 overflow-hidden">
                     <div className="px-6 py-4 border-b border-navy-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
@@ -600,9 +614,15 @@ const PlanillasPage = () => {
                                 <span className="ml-2 text-sm font-normal text-gray-500">
                                     — {selectedPlanilla.payrollNumber}
                                 </span>
+                                {selectedPlanilla.status === 1 && (
+                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400">
+                                        Calculada
+                                    </span>
+                                )}
                             </h3>
                             <p className="text-xs text-gray-500 mt-0.5">
                                 Los cambios se guardan automáticamente al dejar de editar un campo
+                                {selectedPlanilla.status === 1 && ' • Recuerda recalcular la planilla después de editar'}
                             </p>
                         </div>
                         <div className="flex gap-2">
@@ -650,35 +670,35 @@ const PlanillasPage = () => {
                             <p className="text-sm mt-1">Usa "Auto-llenar Regulares" para generar los registros con horas estándar</p>
                         </div>
                     ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm table-fixed">
+                        <div className="overflow-x-auto p-4">
+                            <table className="w-full text-sm">
                                 <colgroup>
-                                    <col className="w-[min(180px,20%)]" />
-                                    <col className="w-[64px]" />
-                                    <col className="w-[64px]" />
-                                    <col className="w-[64px]" />
-                                    <col className="w-[64px]" />
-                                    <col className="w-[64px]" />
-                                    <col className="w-[64px]" />
-                                    <col className="w-[64px]" />
-                                    <col className="w-[64px]" />
-                                    <col className="w-[64px]" />
+                                    <col className="w-[min(200px,22%)]" />
+                                    <col className="w-[70px]" />
+                                    <col className="w-[70px]" />
+                                    <col className="w-[70px]" />
+                                    <col className="w-[70px]" />
+                                    <col className="w-[70px]" />
+                                    <col className="w-[70px]" />
+                                    <col className="w-[70px]" />
+                                    <col className="w-[70px]" />
+                                    <col className="w-[70px]" />
                                 </colgroup>
-                                <thead className="bg-navy-950 border-b border-navy-700">
+                                <thead className="bg-navy-950 border-b-2 border-navy-600">
                                     <tr>
-                                        <th className="text-left py-3 px-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Empleado</th>
-                                        <th className="text-center py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider w-[64px]" title="Horas regulares">Regulares</th>
-                                        <th className="text-center py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider w-[64px]" title="Horas domingo">Domingo</th>
-                                        <th className="text-center py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider w-[64px]" title="Horas feriado">Feriado</th>
-                                        <th className="text-center py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider w-[64px]" title="Horas extra diurnas">Extra Diurna</th>
-                                        <th className="text-center py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider w-[64px]" title="Horas extra nocturnas">Extra Nocturna</th>
-                                        <th className="text-center py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider w-[64px]" title="Horas extra en festivos nacionales">Extra Festivos</th>
-                                        <th className="text-center py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider w-[64px]" title="Horas extra mixtas">Extra Mixtas</th>
-                                        <th className="text-center py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider w-[64px]" title="Horas extra con exceso">Extra Exceso</th>
-                                        <th className="text-center py-3 px-2 text-xs font-medium text-gray-500 uppercase tracking-wider w-[64px]" title="Horas de ausencia">Ausencias</th>
+                                        <th className="text-left py-4 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Empleado</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas regulares">Regulares</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas domingo">Domingo</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas feriado">Feriado</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas extra diurnas">Extra Diurna</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas extra nocturnas">Extra Nocturna</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas extra en festivos nacionales">Extra Festivos</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas extra mixtas">Extra Mixtas</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas extra con exceso">Extra Exceso</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas de ausencia">Ausencias</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-navy-700">
+                                <tbody className="divide-y divide-navy-700/50">
                                     {employeeHours.map((row) => {
                                         const emp = empleados.find(e => e.id === row.empleadoId);
                                         const nombreCompleto = emp
@@ -686,98 +706,98 @@ const PlanillasPage = () => {
                                             : `Empleado #${row.empleadoId}`;
                                         const num = (v) => (v != null && v !== '' && !Number.isNaN(Number(v))) ? Number(v) : 0;
                                         return (
-                                            <tr key={row.empleadoId} className="hover:bg-navy-800 transition-colors">
-                                                <td className="py-2 px-3 text-gray-100 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                                            <tr key={row.empleadoId} className="hover:bg-navy-800/50 transition-colors">
+                                                <td className="py-3 px-4 text-gray-100 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
                                                     {nombreCompleto}
                                                 </td>
-                                                <td className="py-2 px-2 text-center align-middle w-[64px]">
+                                                <td className="py-3 px-3 text-center align-middle">
                                                     <input
                                                         type="number"
                                                         min="0"
                                                         step="0.5"
                                                         value={num(row.regularHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'regularHours', e.target.value)}
-                                                        className="w-full min-w-0 max-w-[64px] mx-auto block px-1.5 py-1.5 bg-navy-800 border border-navy-600 rounded text-gray-100 text-center focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-navy-600 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                                                     />
                                                 </td>
-                                                <td className="py-2 px-2 text-center align-middle w-[64px]">
+                                                <td className="py-3 px-3 text-center align-middle">
                                                     <input
                                                         type="number"
                                                         min="0"
                                                         step="0.5"
                                                         value={num(row.sundayHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'sundayHours', e.target.value)}
-                                                        className="w-full min-w-0 max-w-[64px] mx-auto block px-1.5 py-1.5 bg-navy-800 border border-navy-600 rounded text-gray-100 text-center focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-navy-600 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                                                     />
                                                 </td>
-                                                <td className="py-2 px-2 text-center align-middle w-[64px]">
+                                                <td className="py-3 px-3 text-center align-middle">
                                                     <input
                                                         type="number"
                                                         min="0"
                                                         step="0.5"
                                                         value={num(row.holidayHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'holidayHours', e.target.value)}
-                                                        className="w-full min-w-0 max-w-[64px] mx-auto block px-1.5 py-1.5 bg-navy-800 border border-navy-600 rounded text-gray-100 text-center focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-navy-600 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                                                     />
                                                 </td>
-                                                <td className="py-2 px-2 text-center align-middle w-[64px]">
+                                                <td className="py-3 px-3 text-center align-middle">
                                                     <input
                                                         type="number"
                                                         min="0"
                                                         step="0.5"
                                                         value={num(row.overtimeDayHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'overtimeDayHours', e.target.value)}
-                                                        className="w-full min-w-0 max-w-[64px] mx-auto block px-1.5 py-1.5 bg-navy-800 border border-navy-600 rounded text-gray-100 text-center focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-navy-600 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                                                     />
                                                 </td>
-                                                <td className="py-2 px-2 text-center align-middle w-[64px]">
+                                                <td className="py-3 px-3 text-center align-middle">
                                                     <input
                                                         type="number"
                                                         min="0"
                                                         step="0.5"
                                                         value={num(row.overtimeNightHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'overtimeNightHours', e.target.value)}
-                                                        className="w-full min-w-0 max-w-[64px] mx-auto block px-1.5 py-1.5 bg-navy-800 border border-navy-600 rounded text-gray-100 text-center focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-navy-600 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                                                     />
                                                 </td>
-                                                <td className="py-2 px-2 text-center align-middle w-[64px]">
+                                                <td className="py-3 px-3 text-center align-middle">
                                                     <input
                                                         type="number"
                                                         min="0"
                                                         step="0.5"
                                                         value={num(row.overtimeHolidayHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'overtimeHolidayHours', e.target.value)}
-                                                        className="w-full min-w-0 max-w-[64px] mx-auto block px-1.5 py-1.5 bg-navy-800 border border-purple-600/50 rounded text-purple-300 text-center focus:outline-none focus:ring-1 focus:ring-purple-500 focus:border-purple-500"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-purple-600/50 rounded-md text-purple-300 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                                                     />
                                                 </td>
-                                                <td className="py-2 px-2 text-center align-middle w-[64px]">
+                                                <td className="py-3 px-3 text-center align-middle">
                                                     <input
                                                         type="number"
                                                         min="0"
                                                         step="0.5"
                                                         value={num(row.overtimeMixedHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'overtimeMixedHours', e.target.value)}
-                                                        className="w-full min-w-0 max-w-[64px] mx-auto block px-1.5 py-1.5 bg-navy-800 border border-blue-600/50 rounded text-blue-300 text-center focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-blue-600/50 rounded-md text-blue-300 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                                                     />
                                                 </td>
-                                                <td className="py-2 px-2 text-center align-middle w-[64px]">
+                                                <td className="py-3 px-3 text-center align-middle">
                                                     <input
                                                         type="number"
                                                         min="0"
                                                         step="0.5"
                                                         value={num(row.overtimeExcessHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'overtimeExcessHours', e.target.value)}
-                                                        className="w-full min-w-0 max-w-[64px] mx-auto block px-1.5 py-1.5 bg-navy-800 border border-orange-600/50 rounded text-orange-300 text-center focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-orange-600/50 rounded-md text-orange-300 text-sm text-center focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
                                                     />
                                                 </td>
-                                                <td className="py-2 px-2 text-center align-middle w-[64px]">
+                                                <td className="py-3 px-3 text-center align-middle">
                                                     <input
                                                         type="number"
                                                         min="0"
                                                         step="0.5"
                                                         value={num(row.absenceHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'absenceHours', e.target.value)}
-                                                        className="w-full min-w-0 max-w-[64px] mx-auto block px-1.5 py-1.5 bg-navy-800 border border-red-900/50 rounded text-red-300 text-center focus:outline-none focus:ring-1 focus:ring-red-500 focus:border-red-500"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-red-900/50 rounded-md text-red-300 text-sm text-center focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
                                                     />
                                                 </td>
                                             </tr>
