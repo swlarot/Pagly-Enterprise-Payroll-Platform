@@ -41,3 +41,7 @@ nul
 # Carpetas de configuración (docs/ se sube al repo)
 .claude/
 scripts/
+
+# Configuración local con credenciales (no subir a GitHub)
+**/appsettings.Development.json
+**/appsettings.Local.json

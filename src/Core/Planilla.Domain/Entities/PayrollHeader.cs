@@ -55,6 +55,13 @@ public class PayrollHeader : ITenantEntity
     public DateTime PayDate { get; set; }
 
     /// <summary>
+    /// Tipo de período de esta planilla.
+    /// CRÍTICO: Determina cómo se anualizan los salarios para ISR.
+    /// Se establece al crear la planilla y no debe cambiar después.
+    /// </summary>
+    public PayPeriodType PayPeriodType { get; set; } = PayPeriodType.Quincenal;
+
+    /// <summary>
     /// Estado actual de la planilla en el workflow.
     /// </summary>
     public PayrollStatus Status { get; set; } = PayrollStatus.Draft;

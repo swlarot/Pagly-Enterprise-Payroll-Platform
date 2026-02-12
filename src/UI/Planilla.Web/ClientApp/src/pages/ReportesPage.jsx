@@ -336,6 +336,56 @@ const ReportesPage = () => {
             );
         }
 
+        if (modalType === 'horas-extra') {
+            return (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                        <thead className="bg-navy-800">
+                            <tr>
+                                <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Cédula</th>
+                                <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Nombre</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Hrs Diurna</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Hrs Nocturna</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Hrs Dom/Fer</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Hrs Festivos</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Hrs Mixtas</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Hrs Exceso</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Total Hrs</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Monto Total</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-navy-700">
+                            {reporteData.empleados?.map((emp, idx) => (
+                                <tr key={idx} className="hover:bg-navy-800">
+                                    <td className="px-3 py-2 text-gray-300">{emp.numeroIdentificacion}</td>
+                                    <td className="px-3 py-2 text-gray-300">{emp.nombreCompleto}</td>
+                                    <td className="px-3 py-2 text-right font-mono text-gray-300">{emp.horasDiurnas.toFixed(2)}h</td>
+                                    <td className="px-3 py-2 text-right font-mono text-gray-300">{emp.horasNocturnas.toFixed(2)}h</td>
+                                    <td className="px-3 py-2 text-right font-mono text-gray-300">{emp.horasDomingoFeriado.toFixed(2)}h</td>
+                                    <td className="px-3 py-2 text-right font-mono text-gray-300">{emp.horasFestivos.toFixed(2)}h</td>
+                                    <td className="px-3 py-2 text-right font-mono text-gray-300">{emp.horasMixtas.toFixed(2)}h</td>
+                                    <td className="px-3 py-2 text-right font-mono text-gray-300">{emp.horasExceso.toFixed(2)}h</td>
+                                    <td className="px-3 py-2 text-right font-medium font-mono text-gray-100">{emp.totalHoras.toFixed(2)}h</td>
+                                    <td className="px-3 py-2 text-right font-bold font-mono text-green-400">{formatCurrency(emp.montoTotal)}</td>
+                                </tr>
+                            ))}
+                            <tr className="bg-amber-500/15 font-bold">
+                                <td className="px-3 py-2 text-amber-400" colSpan="2">TOTALES</td>
+                                <td className="px-3 py-2 text-right font-mono text-amber-400">{reporteData.totales?.totalHorasDiurnas.toFixed(2)}h</td>
+                                <td className="px-3 py-2 text-right font-mono text-amber-400">{reporteData.totales?.totalHorasNocturnas.toFixed(2)}h</td>
+                                <td className="px-3 py-2 text-right font-mono text-amber-400">{reporteData.totales?.totalHorasDomingoFeriado.toFixed(2)}h</td>
+                                <td className="px-3 py-2 text-right font-mono text-amber-400">{reporteData.totales?.totalHorasFestivos.toFixed(2)}h</td>
+                                <td className="px-3 py-2 text-right font-mono text-amber-400">{reporteData.totales?.totalHorasMixtas.toFixed(2)}h</td>
+                                <td className="px-3 py-2 text-right font-mono text-amber-400">{reporteData.totales?.totalHorasExceso.toFixed(2)}h</td>
+                                <td className="px-3 py-2 text-right font-mono text-amber-400">{reporteData.totales?.totalHoras.toFixed(2)}h</td>
+                                <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.totalMonto)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
         return null;
     };
 
@@ -344,7 +394,8 @@ const ReportesPage = () => {
             'css': 'Reporte Planilla CSS',
             'seguro-educativo': 'Reporte Seguro Educativo',
             'isr': 'Reporte Impuesto Sobre la Renta',
-            'planilla-detallada': 'Planilla Detallada Completa'
+            'planilla-detallada': 'Planilla Detallada Completa',
+            'horas-extra': 'Reporte de Horas Extra'
         };
         return titles[modalType] || 'Reporte';
     };
@@ -397,6 +448,16 @@ const ReportesPage = () => {
                     borderColor="border-purple-500"
                     bgGradient="bg-gradient-to-br from-purple-500/15 to-purple-500/15"
                     tipo="planilla-detallada"
+                />
+
+                <ReporteCard
+                    title="Horas Extra"
+                    description="Reporte detallado de horas extra por tipo: diurna, nocturna, festivos, mixtas y exceso"
+                    icon={<svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                    color="bg-orange-600"
+                    borderColor="border-orange-500"
+                    bgGradient="bg-gradient-to-br from-orange-500/15 to-orange-500/15"
+                    tipo="horas-extra"
                 />
 
                 <ReporteCard

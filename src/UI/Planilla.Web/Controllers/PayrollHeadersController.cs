@@ -14,6 +14,7 @@ using Vorluno.Planilla.Application.Services;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Infrastructure.Services;
 using Vorluno.Planilla.Web.Authorization;
 
 namespace Vorluno.Planilla.Web.Controllers;
@@ -33,6 +34,7 @@ public class PayrollHeadersController : ControllerBase
     private readonly ITenantContext _tenantContext;
     private readonly IAuditLogService _auditLogService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly AsistenciaCalculationService _asistenciaService;
 
     public PayrollHeadersController(
         ApplicationDbContext context,
@@ -40,7 +42,8 @@ public class PayrollHeadersController : ControllerBase
         PayrollCalculationOrchestratorPortable orchestrator,
         ITenantContext tenantContext,
         IAuditLogService auditLogService,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        AsistenciaCalculationService asistenciaService)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _stateMachine = stateMachine ?? throw new ArgumentNullException(nameof(stateMachine));
@@ -48,6 +51,7 @@ public class PayrollHeadersController : ControllerBase
         _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
         _auditLogService = auditLogService ?? throw new ArgumentNullException(nameof(auditLogService));
         _currentUserService = currentUserService ?? throw new ArgumentNullException(nameof(currentUserService));
+        _asistenciaService = asistenciaService ?? throw new ArgumentNullException(nameof(asistenciaService));
     }
 
     /// <summary>
@@ -195,6 +199,7 @@ public class PayrollHeadersController : ControllerBase
             PeriodStartDate = DateTime.SpecifyKind(request.PeriodStartDate, DateTimeKind.Utc),
             PeriodEndDate = DateTime.SpecifyKind(request.PeriodEndDate, DateTimeKind.Utc),
             PayDate = DateTime.SpecifyKind(request.PayDate, DateTimeKind.Utc),
+            PayPeriodType = request.PayPeriodType,
             Status = PayrollStatus.Draft,
             CreatedAt = DateTime.UtcNow
         };
@@ -303,13 +308,55 @@ public class PayrollHeadersController : ControllerBase
             decimal totalNetPay = 0;
             decimal totalEmployerCost = 0;
 
+            // Obtener horas registradas para esta planilla (si existen)
+            var employeeHoursMap = await _context.PayrollEmployeeHours
+                .Where(h => h.PayrollHeaderId == payrollHeader.Id && h.TenantId == tenantId)
+                .ToDictionaryAsync(h => h.EmpleadoId);
+
             foreach (var employee in activeEmployees)
             {
-                // Calcular usando el orquestador
+                // Determinar grossPay: si hay horas registradas, calcular basado en horas
+                decimal grossPay = employee.SalarioBase;
+
+                if (employeeHoursMap.TryGetValue(employee.Id, out var hours))
+                {
+                    var hourlyRate = employee.HourlyRate > 0
+                        ? employee.HourlyRate
+                        : (employee.HoursPerPeriod > 0 ? employee.SalarioBase / employee.HoursPerPeriod : employee.SalarioBase);
+
+                    hours.RegularPay = hours.RegularHours * hourlyRate;
+                    hours.SundayPay = hours.SundayHours * hourlyRate * 1.50m;
+                    hours.HolidayPay = hours.HolidayHours * hourlyRate * 1.50m;
+                    hours.OvertimeDayPay = hours.OvertimeDayHours * hourlyRate * 1.25m;
+                    hours.OvertimeNightPay = hours.OvertimeNightHours * hourlyRate * 1.50m;
+                    
+                    // Calcular pagos de horas extra complejas
+                    // Festivos: promedio entre diurna (3.125x) y nocturna (3.75x) = 3.4375x
+                    // En la práctica, se debería separar por tipo, pero para compatibilidad usamos promedio
+                    hours.OvertimeHolidayPay = hours.OvertimeHolidayHours * hourlyRate * 3.4375m;
+                    
+                    // Mixtas: promedio entre diurna-nocturna (1.50x) y nocturna-diurna (1.75x) = 1.625x
+                    hours.OvertimeMixedPay = hours.OvertimeMixedHours * hourlyRate * 1.625m;
+                    
+                    // Exceso: factor adicional 1.75x sobre el factor base promedio (1.375x) = 2.40625x
+                    // Nota: En la práctica, el exceso se aplica sobre el tipo específico, pero para simplificar usamos promedio
+                    hours.OvertimeExcessPay = hours.OvertimeExcessHours * hourlyRate * 2.40625m;
+                    
+                    hours.AbsenceDeduction = hours.AbsenceHours * hourlyRate;
+                    hours.TotalHoursPay = hours.RegularPay + hours.SundayPay + hours.HolidayPay
+                        + hours.OvertimeDayPay + hours.OvertimeNightPay
+                        + hours.OvertimeHolidayPay + hours.OvertimeMixedPay + hours.OvertimeExcessPay
+                        - hours.AbsenceDeduction;
+                    hours.UpdatedAt = DateTime.UtcNow;
+
+                    grossPay = hours.TotalHoursPay;
+                }
+
+                // Calcular usando el orquestador — ISR se anualiza según PayPeriodType de la PLANILLA
                 var calculationResult = await _orchestrator.CalculateEmployeePayrollAsync(
                     companyId: tenantId,
-                    grossPay: employee.SalarioBase,
-                    payFrequency: employee.PayFrequency,
+                    grossPay: grossPay,
+                    payFrequency: payrollHeader.PayPeriodType.ToString(),
                     yearsCotized: employee.YearsCotized,
                     averageSalaryLast10Years: employee.AverageSalaryLast10Years,
                     cssRiskPercentage: employee.CssRiskPercentage,
@@ -320,16 +367,52 @@ public class PayrollHeadersController : ControllerBase
                     calculationDate: DateTime.UtcNow
                 );
 
-                // Crear PayrollDetail con los resultados
+                // Calcular horas extra aprobadas del período (incluye todos los tipos: festivos, mixtas, exceso)
+                decimal overtimePay = 0m;
+                decimal horasExtraDiurnas = 0m;
+                decimal horasExtraNocturnas = 0m;
+                decimal horasExtraDomingoFeriado = 0m;
+
+                var horasExtraAprobadas = await _asistenciaService.GetHorasExtraAprobadas(
+                    employee.Id, payrollHeader.PeriodStartDate, payrollHeader.PeriodEndDate);
+
+                if (horasExtraAprobadas.Any())
+                {
+                    // Calcular salario hora para horas extra
+                    var salarioHora = employee.HourlyRate > 0
+                        ? employee.HourlyRate
+                        : (employee.HoursPerPeriod > 0 ? employee.SalarioBase / employee.HoursPerPeriod : employee.SalarioBase / 208m);
+
+                    var (montoHorasExtra, horasDiurnas, horasNocturnas, horasDomingoFeriado) =
+                        await _asistenciaService.CalcularMontoHorasExtra(
+                            employee.Id, salarioHora, payrollHeader.PeriodStartDate, payrollHeader.PeriodEndDate);
+
+                    overtimePay = montoHorasExtra;
+                    horasExtraDiurnas = horasDiurnas;
+                    horasExtraNocturnas = horasNocturnas;
+                    horasExtraDomingoFeriado = horasDomingoFeriado;
+                }
+                else if (employeeHoursMap.ContainsKey(employee.Id))
+                {
+                    // Fallback: usar horas manuales si no hay horas extra aprobadas
+                    overtimePay = employeeHoursMap[employee.Id].OvertimeDayPay + employeeHoursMap[employee.Id].OvertimeNightPay;
+                    horasExtraDiurnas = employeeHoursMap[employee.Id].OvertimeDayHours;
+                    horasExtraNocturnas = employeeHoursMap[employee.Id].OvertimeNightHours;
+                }
+
                 var detail = new PayrollDetail
                 {
                     PayrollHeaderId = payrollHeader.Id,
                     EmpleadoId = employee.Id,
                     GrossPay = calculationResult.GrossPay,
                     BaseSalary = employee.SalarioBase,
-                    OvertimePay = 0, // TODO: Implementar overtime en futuras fases
+                    OvertimePay = overtimePay,
                     Bonuses = 0,
                     Commissions = 0,
+                    HorasExtraDiurnas = horasExtraDiurnas,
+                    HorasExtraNocturnas = horasExtraNocturnas,
+                    HorasExtraDomingoFeriado = horasExtraDomingoFeriado,
+                    MontoHorasExtra = overtimePay,
                     CssEmployee = calculationResult.CssEmployee,
                     CssEmployer = calculationResult.CssEmployer,
                     RiskContribution = calculationResult.RiskContribution,
@@ -340,7 +423,7 @@ public class PayrollHeadersController : ControllerBase
                     TotalDeductions = calculationResult.TotalDeductions,
                     NetPay = calculationResult.NetPay,
                     EmployerCost = calculationResult.TotalEmployerCost,
-                    TenantId = tenantId // ✅ SEGURIDAD: TenantId del tenant
+                    TenantId = tenantId
                 };
 
                 _context.PayrollDetails.Add(detail);
@@ -609,6 +692,384 @@ public class PayrollHeadersController : ControllerBase
             return Conflict(new { message = "La planilla fue modificada por otro usuario. Por favor, recargue e intente nuevamente." });
         }
     }
+
+    // ====================================================================
+    // ENDPOINTS DE HORAS TRABAJADAS
+    // ====================================================================
+
+    /// <summary>
+    /// Obtiene las horas registradas para todos los empleados de una planilla.
+    /// GET /api/payrollheaders/{id}/hours
+    /// </summary>
+    [HttpGet("{id}/hours")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
+    public async Task<ActionResult> GetPayrollHours(int id)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        var payrollHeader = await _context.PayrollHeaders
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
+
+        if (payrollHeader == null)
+            return NotFound(new { message = $"Planilla con ID {id} no encontrada" });
+
+        var hours = await _context.PayrollEmployeeHours
+            .Where(h => h.PayrollHeaderId == id && h.TenantId == tenantId)
+            .Include(h => h.Empleado)
+            .AsNoTracking()
+            .ToListAsync();
+
+        return Ok(hours);
+    }
+
+    /// <summary>
+    /// Registra/actualiza las horas de un empleado en una planilla específica.
+    /// PUT /api/payrollheaders/{payrollId}/hours/{empleadoId}
+    /// </summary>
+    [HttpPut("{payrollId}/hours/{empleadoId}")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
+    public async Task<ActionResult> UpsertEmployeeHours(
+        int payrollId, int empleadoId, [FromBody] UpsertEmployeeHoursRequest request)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        var payrollHeader = await _context.PayrollHeaders
+            .FirstOrDefaultAsync(p => p.Id == payrollId && p.TenantId == tenantId);
+
+        if (payrollHeader == null)
+            return NotFound(new { message = $"Planilla con ID {payrollId} no encontrada" });
+
+        if (payrollHeader.Status != PayrollStatus.Draft && payrollHeader.Status != PayrollStatus.Calculated)
+            return BadRequest(new { message = "Solo se pueden modificar horas en planillas con estado Draft o Calculated" });
+
+        var employee = await _context.Empleados
+            .FirstOrDefaultAsync(e => e.Id == empleadoId && e.TenantId == tenantId);
+
+        if (employee == null)
+            return NotFound(new { message = $"Empleado con ID {empleadoId} no encontrado" });
+
+        var existing = await _context.PayrollEmployeeHours
+            .FirstOrDefaultAsync(h => h.PayrollHeaderId == payrollId && h.EmpleadoId == empleadoId && h.TenantId == tenantId);
+
+        if (existing != null)
+        {
+            existing.RegularHours = request.RegularHours;
+            existing.SundayHours = request.SundayHours;
+            existing.HolidayHours = request.HolidayHours;
+            existing.OvertimeDayHours = request.OvertimeDayHours;
+            existing.OvertimeNightHours = request.OvertimeNightHours;
+            existing.OvertimeHolidayHours = request.OvertimeHolidayHours;
+            existing.OvertimeMixedHours = request.OvertimeMixedHours;
+            existing.OvertimeExcessHours = request.OvertimeExcessHours;
+            existing.AbsenceHours = request.AbsenceHours;
+            existing.DisabilityHours = request.DisabilityHours;
+            existing.UpdatedAt = DateTime.UtcNow;
+        }
+        else
+        {
+            var newHours = new PayrollEmployeeHours
+            {
+                PayrollHeaderId = payrollId,
+                EmpleadoId = empleadoId,
+                TenantId = tenantId,
+                RegularHours = request.RegularHours,
+                SundayHours = request.SundayHours,
+                HolidayHours = request.HolidayHours,
+                OvertimeDayHours = request.OvertimeDayHours,
+                OvertimeNightHours = request.OvertimeNightHours,
+                OvertimeHolidayHours = request.OvertimeHolidayHours,
+                OvertimeMixedHours = request.OvertimeMixedHours,
+                OvertimeExcessHours = request.OvertimeExcessHours,
+                AbsenceHours = request.AbsenceHours,
+                DisabilityHours = request.DisabilityHours
+            };
+            _context.PayrollEmployeeHours.Add(newHours);
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = "Horas registradas exitosamente" });
+    }
+
+    /// <summary>
+    /// Auto-genera horas regulares default para todos los empleados activos.
+    /// POST /api/payrollheaders/{id}/hours/generate-defaults
+    /// </summary>
+    [HttpPost("{id}/hours/generate-defaults")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
+    public async Task<ActionResult> GenerateDefaultHours(int id)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        var payrollHeader = await _context.PayrollHeaders
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
+
+        if (payrollHeader == null)
+            return NotFound(new { message = $"Planilla con ID {id} no encontrada" });
+
+        if (payrollHeader.Status != PayrollStatus.Draft && payrollHeader.Status != PayrollStatus.Calculated)
+            return BadRequest(new { message = "Solo se pueden generar horas en planillas con estado Draft o Calculated" });
+
+        var activeEmployees = await _context.Empleados
+            .Where(e => e.TenantId == tenantId && e.EstaActivo && !e.IsDeleted)
+            .ToListAsync();
+
+        var existingHoursIds = await _context.PayrollEmployeeHours
+            .Where(h => h.PayrollHeaderId == id && h.TenantId == tenantId)
+            .Select(h => h.EmpleadoId)
+            .ToListAsync();
+
+        int generated = 0;
+        foreach (var emp in activeEmployees)
+        {
+            if (existingHoursIds.Contains(emp.Id)) continue;
+
+            _context.PayrollEmployeeHours.Add(new PayrollEmployeeHours
+            {
+                PayrollHeaderId = id,
+                EmpleadoId = emp.Id,
+                TenantId = tenantId,
+                RegularHours = emp.HoursPerPeriod
+            });
+            generated++;
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = $"Horas generadas para {generated} empleados", generated });
+    }
+
+    /// <summary>
+    /// Importa horas extra y ausencias aprobadas del período a PayrollEmployeeHours.
+    /// POST /api/payrollheaders/{id}/hours/import-novedades?mode=overwrite|sum
+    /// </summary>
+    [HttpPost("{id}/hours/import-novedades")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
+    public async Task<ActionResult> ImportNovedades(int id, [FromQuery] string mode = "overwrite")
+    {
+        var tenantId = _tenantContext.TenantId;
+        var modeLower = mode?.ToLower() ?? "overwrite";
+        var overwrite = modeLower == "overwrite";
+        var isSumMode = modeLower == "sum";
+
+        var payrollHeader = await _context.PayrollHeaders
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
+
+        if (payrollHeader == null)
+            return NotFound(new { message = $"Planilla con ID {id} no encontrada" });
+
+        if (payrollHeader.Status != PayrollStatus.Draft && payrollHeader.Status != PayrollStatus.Calculated)
+            return BadRequest(new { message = "Solo se pueden importar novedades en planillas con estado Draft o Calculated" });
+
+        var activeEmployees = await _context.Empleados
+            .Where(e => e.TenantId == tenantId && e.EstaActivo && !e.IsDeleted)
+            .ToListAsync();
+
+        var existingHours = await _context.PayrollEmployeeHours
+            .Where(h => h.PayrollHeaderId == id && h.TenantId == tenantId)
+            .ToDictionaryAsync(h => h.EmpleadoId);
+
+        int employeesWithData = 0;
+        decimal totalOvertimeDay = 0;
+        decimal totalOvertimeNight = 0;
+        decimal totalAbsenceHours = 0;
+        var employeesWithExistingValues = new List<int>();
+
+        foreach (var employee in activeEmployees)
+        {
+            // Consultar horas extra aprobadas del período
+            var horasExtra = await _asistenciaService.GetHorasExtraAprobadas(
+                employee.Id, payrollHeader.PeriodStartDate, payrollHeader.PeriodEndDate);
+
+            // Consultar ausencias del período
+            var ausencias = await _asistenciaService.GetAusenciasDelPeriodo(
+                employee.Id, payrollHeader.PeriodStartDate, payrollHeader.PeriodEndDate);
+
+            if (horasExtra.Count == 0 && ausencias.Count == 0) continue;
+
+            // Sumar horas extra por tipo
+            // Nota: Mantenemos compatibilidad con campos antiguos (OvertimeDayHours/OvertimeNightHours)
+            // pero también distribuimos en nuevos campos específicos para tipos complejos
+            decimal overtimeDay = 0;
+            decimal overtimeNight = 0;
+            decimal overtimeHoliday = 0;
+            decimal overtimeMixed = 0;
+            decimal overtimeExcess = 0;
+            
+            foreach (var he in horasExtra)
+            {
+                // Clasificar para campos antiguos (compatibilidad)
+                switch (he.TipoHoraExtra)
+                {
+                    case TipoHoraExtra.Diurna:
+                    case TipoHoraExtra.DomingoFeriado:
+                        overtimeDay += he.CantidadHoras;
+                        break;
+                    case TipoHoraExtra.Nocturna:
+                    case TipoHoraExtra.NocturnaDomingoFeriado:
+                        overtimeNight += he.CantidadHoras;
+                        break;
+                    case TipoHoraExtra.FiestaNacionalDiurna:
+                        overtimeDay += he.CantidadHoras; // Para compatibilidad
+                        overtimeHoliday += he.CantidadHoras; // Nuevo campo específico
+                        break;
+                    case TipoHoraExtra.FiestaNacionalNocturna:
+                        overtimeNight += he.CantidadHoras; // Para compatibilidad
+                        overtimeHoliday += he.CantidadHoras; // Nuevo campo específico
+                        break;
+                    case TipoHoraExtra.MixtaDiurnaNocturna:
+                        overtimeDay += he.CantidadHoras; // Para compatibilidad
+                        overtimeMixed += he.CantidadHoras; // Nuevo campo específico
+                        break;
+                    case TipoHoraExtra.MixtaNocturnaDiurna:
+                        overtimeNight += he.CantidadHoras; // Para compatibilidad
+                        overtimeMixed += he.CantidadHoras; // Nuevo campo específico
+                        break;
+                    default:
+                        overtimeDay += he.CantidadHoras;
+                        break;
+                }
+                
+                // Contar horas con exceso
+                if (he.EsExceso)
+                {
+                    overtimeExcess += he.CantidadHoras;
+                }
+            }
+
+            // Convertir días de ausencia a horas (asumiendo 8 horas por día laboral)
+            decimal absenceHours = 0;
+            foreach (var ausencia in ausencias)
+            {
+                var inicio = ausencia.FechaInicio < payrollHeader.PeriodStartDate 
+                    ? payrollHeader.PeriodStartDate 
+                    : ausencia.FechaInicio;
+                var fin = ausencia.FechaFin > payrollHeader.PeriodEndDate 
+                    ? payrollHeader.PeriodEndDate 
+                    : ausencia.FechaFin;
+                var dias = (decimal)(fin - inicio).TotalDays + 1;
+                absenceHours += dias * 8m; // 8 horas por día
+            }
+
+            if (overtimeDay == 0 && overtimeNight == 0 && overtimeHoliday == 0 
+                && overtimeMixed == 0 && overtimeExcess == 0 && absenceHours == 0) continue;
+
+            employeesWithData++;
+
+            // Verificar si ya tiene valores en PayrollEmployeeHours
+            if (existingHours.TryGetValue(employee.Id, out var existing))
+            {
+                bool hasExistingValues = existing.OvertimeDayHours > 0 
+                    || existing.OvertimeNightHours > 0 
+                    || existing.AbsenceHours > 0;
+
+                // Solo pedir confirmación en la primera llamada (overwrite por defecto) si hay valores
+                // Si es modo "sum", siempre sumar sin preguntar
+                if (hasExistingValues && overwrite && !isSumMode)
+                {
+                    employeesWithExistingValues.Add(employee.Id);
+                    continue; // Skip para pedir confirmación
+                }
+
+                // Actualizar existente
+                if (overwrite && !isSumMode)
+                {
+                    // Sobrescribir valores existentes
+                    existing.OvertimeDayHours = overtimeDay;
+                    existing.OvertimeNightHours = overtimeNight;
+                    existing.OvertimeHolidayHours = overtimeHoliday;
+                    existing.OvertimeMixedHours = overtimeMixed;
+                    existing.OvertimeExcessHours = overtimeExcess;
+                    existing.AbsenceHours = absenceHours;
+                }
+                else
+                {
+                    // Sumar a valores existentes (modo "sum" o cuando no hay valores previos)
+                    existing.OvertimeDayHours += overtimeDay;
+                    existing.OvertimeNightHours += overtimeNight;
+                    existing.OvertimeHolidayHours += overtimeHoliday;
+                    existing.OvertimeMixedHours += overtimeMixed;
+                    existing.OvertimeExcessHours += overtimeExcess;
+                    existing.AbsenceHours += absenceHours;
+                }
+                existing.UpdatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                // Crear nuevo registro (solo con novedades, RegularHours se mantiene en 0 o se llena con auto-llenar)
+                var newHours = new PayrollEmployeeHours
+                {
+                    PayrollHeaderId = id,
+                    EmpleadoId = employee.Id,
+                    TenantId = tenantId,
+                    RegularHours = 0, // No se tocan las regulares
+                    OvertimeDayHours = overtimeDay,
+                    OvertimeNightHours = overtimeNight,
+                    OvertimeHolidayHours = overtimeHoliday,
+                    OvertimeMixedHours = overtimeMixed,
+                    OvertimeExcessHours = overtimeExcess,
+                    AbsenceHours = absenceHours,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.PayrollEmployeeHours.Add(newHours);
+                existingHours[employee.Id] = newHours;
+            }
+
+            totalOvertimeDay += overtimeDay;
+            totalOvertimeNight += overtimeNight;
+            totalAbsenceHours += absenceHours;
+        }
+
+        // Si hay empleados con valores existentes y no se eligió overwrite, retornar info para confirmación
+        if (employeesWithExistingValues.Count > 0 && !overwrite)
+        {
+            return Ok(new
+            {
+                requiresConfirmation = true,
+                employeesWithExistingValues = employeesWithExistingValues.Count,
+                message = $"Hay {employeesWithExistingValues.Count} empleado(s) con horas extra/ausencias ya registradas. ¿Desea sobrescribir o sumar?"
+            });
+        }
+
+        await _context.SaveChangesAsync();
+
+        var totalOvertimeHours = totalOvertimeDay + totalOvertimeNight;
+        return Ok(new
+        {
+            requiresConfirmation = false,
+            message = $"Importadas {totalOvertimeHours:F1} horas extra y {totalAbsenceHours:F1} horas de ausencias de {employeesWithData} empleado(s)",
+            summary = new
+            {
+                employeesProcessed = employeesWithData,
+                overtimeDayHours = totalOvertimeDay,
+                overtimeNightHours = totalOvertimeNight,
+                absenceHours = totalAbsenceHours,
+                totalOvertimeHours = totalOvertimeHours
+            }
+        });
+    }
+
+    /// <summary>
+    /// Asegura que el tenant tenga configuración de impuestos (CSS, SE, ISR). Si no existe, crea la configuración por defecto.
+    /// Útil cuando "Calcular Planilla" falla por falta de configuración (p. ej. empresa creada antes de tener seed al arrancar).
+    /// POST /api/payrollheaders/ensure-tax-config
+    /// </summary>
+    [HttpPost("ensure-tax-config")]
+    [Authorize(Roles = "Owner,Admin,Manager")]
+    public async Task<ActionResult> EnsureTaxConfig([FromServices] ILogger<PayrollHeadersController> logger)
+    {
+        var tenantId = _tenantContext.TenantId;
+        if (tenantId <= 0)
+            return BadRequest(new { message = "No se pudo determinar el tenant" });
+        try
+        {
+            await PayrollConfigSeeder.SeedForNewTenantAsync(_context, tenantId, logger);
+            return Ok(new { message = "Configuración de planilla verificada o creada correctamente" });
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "EnsureTaxConfig failed for tenant {TenantId}", tenantId);
+            return StatusCode(500, new { message = "No se pudo crear la configuración. Contacte al administrador." });
+        }
+    }
 }
 
 /// <summary>
@@ -618,5 +1079,19 @@ public record CreatePayrollHeaderRequest(
     string PayrollNumber,
     DateTime PeriodStartDate,
     DateTime PeriodEndDate,
-    DateTime PayDate
+    DateTime PayDate,
+    PayPeriodType PayPeriodType = PayPeriodType.Quincenal
+);
+
+public record UpsertEmployeeHoursRequest(
+    decimal RegularHours,
+    decimal SundayHours = 0,
+    decimal HolidayHours = 0,
+    decimal OvertimeDayHours = 0,
+    decimal OvertimeNightHours = 0,
+    decimal OvertimeHolidayHours = 0,
+    decimal OvertimeMixedHours = 0,
+    decimal OvertimeExcessHours = 0,
+    decimal AbsenceHours = 0,
+    decimal DisabilityHours = 0
 );

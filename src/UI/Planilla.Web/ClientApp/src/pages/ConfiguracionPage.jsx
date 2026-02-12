@@ -1,13 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { UsageDashboard } from '../components/UsageDashboard';
 import { TenantRole } from '../types/api';
+import { api } from '../services/api';
 
 const ConfiguracionPage = () => {
     const { hasRole } = useAuth();
     const [activeTab, setActiveTab] = useState('tasas');
+    const [taxConfig, setTaxConfig] = useState(null);
+    const [taxConfigLoading, setTaxConfigLoading] = useState(false);
+    const [ensureTaxConfigLoading, setEnsureTaxConfigLoading] = useState(false);
+
+    const fetchTaxConfig = async () => {
+        setTaxConfigLoading(true);
+        try {
+            const data = await api.get('/api/configuracion/tax-config');
+            setTaxConfig(data);
+        } catch (err) {
+            if (err.statusCode === 404) setTaxConfig(null);
+            else toast.error(err.message || 'Error al cargar configuración');
+        } finally {
+            setTaxConfigLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'tasas') fetchTaxConfig();
+    }, [activeTab]);
+
+    const handleEnsureTaxConfig = async () => {
+        setEnsureTaxConfigLoading(true);
+        try {
+            await api.post('/api/configuracion/ensure-tax-config');
+            toast.success('Configuración creada correctamente');
+            await fetchTaxConfig();
+        } catch (err) {
+            toast.error(err.message || 'Error al crear configuración');
+        } finally {
+            setEnsureTaxConfigLoading(false);
+        }
+    };
 
     // Filtrar tabs según rol del usuario
     // Validación defensiva: si hasRole es undefined, visible será false por defecto
@@ -63,71 +97,99 @@ const ConfiguracionPage = () => {
                                 </div>
                             </div>
 
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead className="bg-navy-950 border-b border-navy-700">
-                                        <tr>
-                                            <th className="text-left py-3 px-4 text-sm font-medium text-gray-300">Concepto</th>
-                                            <th className="text-center py-3 px-4 text-sm font-medium text-gray-300">Tasa Empleado</th>
-                                            <th className="text-center py-3 px-4 text-sm font-medium text-gray-300">Tasa Patrono</th>
-                                            <th className="text-left py-3 px-4 text-sm font-medium text-gray-300">Observaciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-navy-900 divide-y divide-navy-700">
-                                        <tr>
-                                            <td className="py-3 px-4 text-sm font-medium text-gray-100">CSS (Caja de Seguro Social)</td>
-                                            <td className="py-3 px-4 text-sm text-center">
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400">
-                                                    9.75%
-                                                </span>
-                                            </td>
-                                            <td className="py-3 px-4 text-sm text-center">
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400">
-                                                    14.25%
-                                                </span>
-                                            </td>
-                                            <td className="py-3 px-4 text-sm text-gray-500">Topes escalonados según salario</td>
-                                        </tr>
-                                        <tr>
-                                            <td className="py-3 px-4 text-sm font-medium text-gray-100">Seguro Educativo</td>
-                                            <td className="py-3 px-4 text-sm text-center">
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-500/15 text-purple-400">
-                                                    1.25%
-                                                </span>
-                                            </td>
-                                            <td className="py-3 px-4 text-sm text-center">
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-500/15 text-purple-400">
-                                                    1.50%
-                                                </span>
-                                            </td>
-                                            <td className="py-3 px-4 text-sm text-gray-500">Sin tope máximo</td>
-                                        </tr>
-                                        <tr>
-                                            <td className="py-3 px-4 text-sm font-medium text-gray-100">Riesgo Profesional</td>
-                                            <td className="py-3 px-4 text-sm text-center">
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-navy-700 text-gray-300">
-                                                    -
-                                                </span>
-                                            </td>
-                                            <td className="py-3 px-4 text-sm text-center">
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-400">
-                                                    0.56% - 5.39%
-                                                </span>
-                                            </td>
-                                            <td className="py-3 px-4 text-sm text-gray-500">Según tipo de actividad</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            <div className="mt-6 p-4 bg-navy-950 rounded-lg border border-navy-700">
-                                <h4 className="text-sm font-semibold text-gray-100 mb-2">Notas Importantes:</h4>
-                                <ul className="text-sm text-gray-400 space-y-1 list-disc list-inside">
-                                    <li>Las tasas de CSS tienen topes escalonados: B/. 1,500 / 2,000 / 2,500 según salario</li>
-                                    <li>El Seguro Educativo aplica sobre el salario total sin tope máximo</li>
-                                    <li>El Riesgo Profesional varía según la actividad económica de la empresa</li>
-                                </ul>
-                            </div>
+                            {taxConfigLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                                </div>
+                            ) : !taxConfig ? (
+                                <div className="py-8 px-6 bg-navy-950 rounded-xl border border-amber-500/30 text-center">
+                                    <p className="text-gray-300 mb-2">No hay configuración de impuestos (CSS, SE, ISR) para tu empresa.</p>
+                                    <p className="text-sm text-gray-500 mb-6">Sin esta configuración no podrás calcular planillas. Crea una con los valores por defecto de la Ley 462.</p>
+                                    <button
+                                        type="button"
+                                        onClick={handleEnsureTaxConfig}
+                                        disabled={ensureTaxConfigLoading}
+                                        className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {ensureTaxConfigLoading ? (
+                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                                            </svg>
+                                        )}
+                                        Crear configuración por defecto (Ley 462)
+                                    </button>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full">
+                                            <thead className="bg-navy-950 border-b border-navy-700">
+                                                <tr>
+                                                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-300">Concepto</th>
+                                                    <th className="text-center py-3 px-4 text-sm font-medium text-gray-300">Tasa Empleado</th>
+                                                    <th className="text-center py-3 px-4 text-sm font-medium text-gray-300">Tasa Patrono</th>
+                                                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-300">Observaciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-navy-900 divide-y divide-navy-700">
+                                                <tr>
+                                                    <td className="py-3 px-4 text-sm font-medium text-gray-100">CSS (Caja de Seguro Social)</td>
+                                                    <td className="py-3 px-4 text-sm text-center">
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400">
+                                                            {Number(taxConfig.cssEmployeeRate).toFixed(2)}%
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-sm text-center">
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400">
+                                                            {Number(taxConfig.cssEmployerBaseRate).toFixed(2)}%
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-sm text-gray-500">Topes: ${Number(taxConfig.cssMaxContributionBaseStandard).toFixed(0)} / {Number(taxConfig.cssMaxContributionBaseIntermediate).toFixed(0)} / {Number(taxConfig.cssMaxContributionBaseHigh).toFixed(0)}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="py-3 px-4 text-sm font-medium text-gray-100">Seguro Educativo</td>
+                                                    <td className="py-3 px-4 text-sm text-center">
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-500/15 text-purple-400">
+                                                            {Number(taxConfig.educationalInsuranceEmployeeRate).toFixed(2)}%
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-sm text-center">
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-500/15 text-purple-400">
+                                                            {Number(taxConfig.educationalInsuranceEmployerRate).toFixed(2)}%
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-sm text-gray-500">Sin tope máximo</td>
+                                                </tr>
+                                                <tr>
+                                                    <td className="py-3 px-4 text-sm font-medium text-gray-100">Riesgo Profesional</td>
+                                                    <td className="py-3 px-4 text-sm text-center">
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-navy-700 text-gray-300">-</span>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-sm text-center">
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/15 text-amber-400">
+                                                            {Number(taxConfig.cssRiskRateLow).toFixed(2)}% - {Number(taxConfig.cssRiskRateHigh).toFixed(2)}%
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3 px-4 text-sm text-gray-500">Según tipo de actividad</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div className="mt-4 text-xs text-gray-500">
+                                        Vigente desde {new Date(taxConfig.effectiveStartDate).toLocaleDateString('es-PA', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                        {taxConfig.effectiveEndDate ? ` hasta ${new Date(taxConfig.effectiveEndDate).toLocaleDateString('es-PA', { day: '2-digit', month: 'short', year: 'numeric' })}` : ' (actual)'}.
+                                    </div>
+                                    <div className="mt-6 p-4 bg-navy-950 rounded-lg border border-navy-700">
+                                        <h4 className="text-sm font-semibold text-gray-100 mb-2">Notas:</h4>
+                                        <ul className="text-sm text-gray-400 space-y-1 list-disc list-inside">
+                                            <li>Topes CSS según años cotizados y salario promedio (configuración actual en uso)</li>
+                                            <li>Deducción ISR por dependiente: ${Number(taxConfig.dependentDeductionAmount).toFixed(0)} (máx. {taxConfig.maxDependents} dependientes)</li>
+                                        </ul>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     )}
 

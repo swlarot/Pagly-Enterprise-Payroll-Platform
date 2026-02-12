@@ -316,4 +316,143 @@ public class ReportesService
             resumenPorDepartamento.Any() ? resumenPorDepartamento : null
         );
     }
+
+    /// <summary>
+    /// Genera el reporte detallado de horas extra de una planilla
+    /// </summary>
+    public async Task<ReporteHorasExtraDto> GenerarReporteHorasExtra(int planillaId)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        // SEGURIDAD CRÍTICA: Filtrar por TenantId para aislar datos entre tenants
+        var planilla = await _context.PayrollHeaders
+            .Where(p => p.Id == planillaId && p.TenantId == tenantId)
+            .Include(p => p.Details)
+                .ThenInclude(d => d.Empleado)
+            .FirstOrDefaultAsync();
+
+        if (planilla == null)
+            throw new InvalidOperationException($"Planilla {planillaId} no encontrada o no autorizada");
+
+        // Obtener información del tenant para datos de la empresa
+        var tenant = await _tenantContext.GetCurrentTenantAsync();
+
+        // Obtener horas extra aprobadas del período de la planilla
+        var horasExtra = await _context.HorasExtra
+            .Where(h => h.TenantId == tenantId
+                && h.EstaAprobada
+                && h.Fecha >= planilla.PeriodStartDate
+                && h.Fecha <= planilla.PeriodEndDate)
+            .Include(h => h.Empleado)
+            .ToListAsync();
+
+        // Agrupar por empleado
+        var empleados = planilla.Details
+            .Where(d => d.Empleado != null)
+            .Select(d => {
+                var horasDelEmpleado = horasExtra.Where(h => h.EmpleadoId == d.EmpleadoId).ToList();
+
+                decimal horasDiurnas = horasDelEmpleado
+                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.Diurna)
+                    .Sum(h => h.CantidadHoras);
+
+                decimal horasNocturnas = horasDelEmpleado
+                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.Nocturna)
+                    .Sum(h => h.CantidadHoras);
+
+                decimal horasDomingoFeriado = horasDelEmpleado
+                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.DomingoFeriado || h.TipoHoraExtra == TipoHoraExtra.NocturnaDomingoFeriado)
+                    .Sum(h => h.CantidadHoras);
+
+                decimal horasFestivos = horasDelEmpleado
+                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.FiestaNacionalDiurna || h.TipoHoraExtra == TipoHoraExtra.FiestaNacionalNocturna)
+                    .Sum(h => h.CantidadHoras);
+
+                decimal horasMixtas = horasDelEmpleado
+                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.MixtaDiurnaNocturna || h.TipoHoraExtra == TipoHoraExtra.MixtaNocturnaDiurna)
+                    .Sum(h => h.CantidadHoras);
+
+                decimal horasExceso = horasDelEmpleado
+                    .Where(h => h.EsExceso)
+                    .Sum(h => h.CantidadHoras);
+
+                decimal totalHoras = horasDelEmpleado.Sum(h => h.CantidadHoras);
+
+                decimal montoDiurnas = horasDelEmpleado
+                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.Diurna)
+                    .Sum(h => h.MontoCalculado ?? 0);
+
+                decimal montoNocturnas = horasDelEmpleado
+                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.Nocturna)
+                    .Sum(h => h.MontoCalculado ?? 0);
+
+                decimal montoDomingoFeriado = horasDelEmpleado
+                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.DomingoFeriado || h.TipoHoraExtra == TipoHoraExtra.NocturnaDomingoFeriado)
+                    .Sum(h => h.MontoCalculado ?? 0);
+
+                decimal montoFestivos = horasDelEmpleado
+                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.FiestaNacionalDiurna || h.TipoHoraExtra == TipoHoraExtra.FiestaNacionalNocturna)
+                    .Sum(h => h.MontoCalculado ?? 0);
+
+                decimal montoMixtas = horasDelEmpleado
+                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.MixtaDiurnaNocturna || h.TipoHoraExtra == TipoHoraExtra.MixtaNocturnaDiurna)
+                    .Sum(h => h.MontoCalculado ?? 0);
+
+                decimal montoExceso = horasDelEmpleado
+                    .Where(h => h.EsExceso)
+                    .Sum(h => h.MontoCalculado ?? 0);
+
+                decimal montoTotal = horasDelEmpleado.Sum(h => h.MontoCalculado ?? 0);
+
+                return new EmpleadoHorasExtraDto(
+                    d.Empleado!.NumeroIdentificacion,
+                    $"{d.Empleado.Nombre} {d.Empleado.Apellido}",
+                    horasDiurnas,
+                    horasNocturnas,
+                    horasDomingoFeriado,
+                    horasFestivos,
+                    horasMixtas,
+                    horasExceso,
+                    totalHoras,
+                    montoDiurnas,
+                    montoNocturnas,
+                    montoDomingoFeriado,
+                    montoFestivos,
+                    montoMixtas,
+                    montoExceso,
+                    montoTotal
+                );
+            })
+            .Where(e => e.TotalHoras > 0) // Solo empleados con horas extra
+            .OrderBy(e => e.NombreCompleto)
+            .ToList();
+
+        var totales = new TotalesHorasExtraDto(
+            empleados.Sum(e => e.HorasDiurnas),
+            empleados.Sum(e => e.HorasNocturnas),
+            empleados.Sum(e => e.HorasDomingoFeriado),
+            empleados.Sum(e => e.HorasFestivos),
+            empleados.Sum(e => e.HorasMixtas),
+            empleados.Sum(e => e.HorasExceso),
+            empleados.Sum(e => e.TotalHoras),
+            empleados.Sum(e => e.MontoDiurnas),
+            empleados.Sum(e => e.MontoNocturnas),
+            empleados.Sum(e => e.MontoDomingoFeriado),
+            empleados.Sum(e => e.MontoFestivos),
+            empleados.Sum(e => e.MontoMixtas),
+            empleados.Sum(e => e.MontoExceso),
+            empleados.Sum(e => e.MontoTotal)
+        );
+
+        return new ReporteHorasExtraDto(
+            tenant?.Name ?? "Sin nombre",
+            tenant != null && !string.IsNullOrEmpty(tenant.RUC) && !string.IsNullOrEmpty(tenant.DV)
+                ? $"{tenant.RUC}-{tenant.DV}"
+                : "Sin RUC",
+            $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
+            DateTime.Now,
+            empleados,
+            totales
+        );
+    }
 }

@@ -13,8 +13,11 @@ public record HoraExtraDto(
     TimeSpan HoraFin,
     decimal CantidadHoras,
     decimal FactorMultiplicador,
+    bool EsExceso,
+    decimal? FactorExceso,
     decimal? MontoCalculado,
     bool EstaAprobada,
     string? AprobadoPor,
-    string Motivo
+    string Motivo,
+    string? Observaciones
 );

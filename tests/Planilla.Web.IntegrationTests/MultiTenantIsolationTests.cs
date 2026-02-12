@@ -3,7 +3,6 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Vorluno.Planilla.Application.DTOs;
-using Vorluno.Planilla.Application.DTOs.Auth;
 using Xunit;
 
 namespace Planilla.Web.IntegrationTests;
@@ -19,19 +18,7 @@ public class MultiTenantIsolationTests : IClassFixture<CustomWebApplicationFacto
 
     private async Task<string> RegisterTenantAsync(string companyName)
     {
-        var client = _factory.CreateClient();
-        var registerDto = new RegisterDto
-        {
-            Email = $"test-{Guid.NewGuid()}@example.com",
-            Password = "Test@1234",
-            CompanyName = companyName,
-            RUC = Guid.NewGuid().ToString().Substring(0, 8),
-            DV = "12"
-        };
-
-        var response = await client.PostAsJsonAsync("/api/auth/register", registerDto);
-        var authResponse = await response.Content.ReadFromJsonAsync<AuthResponseDto>();
-        return authResponse!.Token;
+        return await TestTenantHelper.CreateTenantAndGetTokenAsync(_factory, companyName);
     }
 
     private HttpClient CreateAuthenticatedClient(string token)
@@ -54,6 +41,7 @@ public class MultiTenantIsolationTests : IClassFixture<CustomWebApplicationFacto
             Nombre: "Employee A",
             Apellido: "From Tenant A",
             NumeroIdentificacion: "A-001",
+            Email: null,
             SalarioBase: 1000,
             DepartamentoId: null,
             PosicionId: null
@@ -69,6 +57,7 @@ public class MultiTenantIsolationTests : IClassFixture<CustomWebApplicationFacto
             Nombre: "Employee B",
             Apellido: "From Tenant B",
             NumeroIdentificacion: "B-001",
+            Email: null,
             SalarioBase: 2000,
             DepartamentoId: null,
             PosicionId: null
@@ -103,6 +92,7 @@ public class MultiTenantIsolationTests : IClassFixture<CustomWebApplicationFacto
             Nombre: "Employee B",
             Apellido: "Belongs to B",
             NumeroIdentificacion: "B-002",
+            Email: null,
             SalarioBase: 1500,
             DepartamentoId: null,
             PosicionId: null
@@ -132,6 +122,7 @@ public class MultiTenantIsolationTests : IClassFixture<CustomWebApplicationFacto
             Nombre: "Original Name",
             Apellido: "Original Apellido",
             NumeroIdentificacion: "B-003",
+            Email: null,
             SalarioBase: 1200,
             DepartamentoId: null,
             PosicionId: null
@@ -145,6 +136,7 @@ public class MultiTenantIsolationTests : IClassFixture<CustomWebApplicationFacto
         var updateDto = new EmpleadoActualizarDto(
             Nombre: "Hacked Name",
             Apellido: "Hacked Apellido",
+            Email: null,
             SalarioBase: 99999,
             EstaActivo: true,
             DepartamentoId: null,
@@ -177,6 +169,7 @@ public class MultiTenantIsolationTests : IClassFixture<CustomWebApplicationFacto
             Nombre: "Protected Employee",
             Apellido: "Tenant B",
             NumeroIdentificacion: "B-004",
+            Email: null,
             SalarioBase: 1300,
             DepartamentoId: null,
             PosicionId: null

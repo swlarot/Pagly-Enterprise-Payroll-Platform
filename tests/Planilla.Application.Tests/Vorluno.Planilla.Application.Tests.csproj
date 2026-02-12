@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Core\Planilla.Application\Vorluno.Planilla.Application.csproj" />
+    <ProjectReference Include="..\..\src\Core\Planilla.Domain\Vorluno.Planilla.Domain.csproj" />
   </ItemGroup>
 
 </Project>

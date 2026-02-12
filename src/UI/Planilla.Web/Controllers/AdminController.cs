@@ -323,6 +323,16 @@ public class AdminController : ControllerBase
 
             await transaction.CommitAsync();
 
+            // Crear configuración de planilla (CSS, SE, ISR) para el nuevo tenant
+            try
+            {
+                await PayrollConfigSeeder.SeedForNewTenantAsync(_context, tenant.Id, _logger);
+            }
+            catch (Exception seedEx)
+            {
+                _logger.LogWarning(seedEx, "No se pudo crear configuración de planilla para tenant {TenantId}. Puede crearla desde Configuración o reiniciar la app.", tenant.Id);
+            }
+
             _logger.LogInformation("SystemAdmin {AdminId} created tenant {TenantId} ({TenantName})",
                 User.FindFirst("sub")?.Value, tenant.Id, tenant.Name);
 

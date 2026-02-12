@@ -43,9 +43,21 @@ public class HoraExtra : ITenantEntity
     public decimal CantidadHoras { get; set; }
 
     /// <summary>
-    /// Factor multiplicador según tipo (1.25, 1.50, 1.75)
+    /// Factor multiplicador según tipo (1.25, 1.50, 1.75, etc.)
     /// </summary>
     public decimal FactorMultiplicador { get; set; }
+
+    /// <summary>
+    /// Indica si estas horas extra exceden el límite legal (>3h/día o >9h/semana)
+    /// Según Código de Trabajo Art. 48
+    /// </summary>
+    public bool EsExceso { get; set; }
+
+    /// <summary>
+    /// Factor adicional por exceso (1.75x cuando EsExceso = true)
+    /// Se multiplica al FactorMultiplicador base
+    /// </summary>
+    public decimal? FactorExceso { get; set; }
 
     /// <summary>
     /// Monto calculado (se calcula en la planilla)
