@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build:*)",
+      "Bash(dotnet ef migrations add:*)",
+      "Bash(dotnet ef database update:*)",
+      "Bash(dotnet add reference:*)",
+      "Bash(dotnet add:*)",
+      "Bash(dotnet test:*)",
+      "Bash(dotnet ef migrations list:*)",
+      "Bash(dotnet run:*)",
+      "Bash(curl:*)",
+      "Bash(taskkill:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(dir:*)",
+      "Bash(powershell:*)",
+      "Bash(move:*)",
+      "Bash(git mv:*)",
+      "Bash(dotnet remove:*)",
+      "Bash(dotnet ef database drop:*)",
+      "Bash(grep:*)",
+      "Bash(findstr:*)"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python .claude/hooks/route_prompt.py"
+          }
+        ]
+      }
+    ]
+  }
+}

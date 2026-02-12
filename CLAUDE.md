@@ -519,4 +519,74 @@ cd src/UI/Planilla.Web/ClientApp && npm run dev
 
 ---
 
+## Deploy — CapRover + DigitalOcean
+
+### Cómo funciona (LEER ANTES DE HACER PUSH)
+
+**Todo push a `master` dispara un deploy automático en producción** via GitHub webhook → CapRover.
+
+```
+git push origin master  →  CapRover build Docker  →  Contenedor en prod
+```
+
+No se usa `caprover deploy` manualmente. El deploy es automático al pushear.
+
+### Pipeline Dockerfile (3 stages)
+
+```
+Stage 1 (node:20-alpine):   npm ci + npm run build
+                            vite outDir: '../wwwroot' → /app/wwwroot/
+Stage 2 (dotnet/sdk:9.0):   dotnet restore + dotnet publish --no-restore
+                            copia /app/wwwroot → src/UI/Planilla.Web/wwwroot
+Stage 3 (dotnet/aspnet:9.0): runtime en puerto 80
+                            startup: Program.cs ejecuta MigrateAsync() automáticamente
+```
+
+### Archivos CRÍTICOS — no modificar sin entender el impacto
+
+| Archivo | Qué rompe si se cambia mal |
+|---------|---------------------------|
+| `Dockerfile` | Todo el build |
+| `captain-definition` | CapRover no sabe qué desplegar |
+| `vite.config.js` → `outDir: '../wwwroot'` | Frontend no llega al contenedor |
+| `Vorluno.Planilla.Web.csproj` (nombre) | `dotnet publish` del Dockerfile falla |
+| `Planilla.sln` | `dotnet restore` no encuentra proyectos nuevos |
+| `package-lock.json` | `npm ci` falla si no está commiteado |
+
+### Reglas obligatorias antes de hacer push
+
+1. **Si agregaste dependencias npm**: commitear `package-lock.json` (Dockerfile usa `npm ci`, no `npm install`)
+2. **Si creaste nuevas migraciones EF Core**: deben estar en `Migrations/` y commiteadas — se aplican al arrancar en producción
+3. **Si creaste un nuevo proyecto .csproj**: agregarlo al `Planilla.sln` o dotnet restore falla en Docker
+4. **Si registraste nuevos servicios**: verificar que estén en `Program.cs` o la app crashea al arrancar
+5. **NUNCA** hardcodear connection strings, JWT keys o API keys en código — van en variables de entorno de CapRover
+6. **NUNCA** cambiar `outDir` en `vite.config.js` sin actualizar el Dockerfile simultáneamente
+
+### Verificación post-deploy
+
+```
+GET /health      → {"status":"Healthy",...}   (PostgreSQL + MultiTenant checks)
+GET /api/health  → {"status":"healthy",...}   (check rápido)
+```
+
+Buscar en logs de CapRover: `"Migraciones aplicadas correctamente"`
+
+### Rollback
+
+Panel CapRover → App → Deployment tab → click Deploy en versión anterior (~30 segundos).
+O: `git revert HEAD && git push origin master`
+
+### Variables de entorno en CapRover (App Config)
+
+```
+ConnectionStrings__DefaultConnection
+Jwt__Key  /  Jwt__Issuer  /  Jwt__Audience
+ASPNETCORE_ENVIRONMENT = Production
+Stripe__PublishableKey / Stripe__SecretKey / Stripe__WebhookSecret  (opcional)
+```
+
+> Para diagnóstico detallado de fallos de deploy, usar el skill `/deploy-caprover`.
+
+---
+
 **IMPORTANTE**: Este documento es la fuente de verdad para el proyecto Planilla. Todos los agentes deben seguir estas convenciones y patrones.
