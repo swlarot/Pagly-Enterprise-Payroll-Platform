@@ -81,19 +81,19 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         : 'text-gray-300 hover:bg-navy-800/60 hover:text-gray-100'
     }`;
 
-  // Clases para los bloques prominentes de Planillas y Reportes
+  // Bloques prominentes — dark glass, línea izquierda de acento al estar activo
   const prominentPlanillasClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-[15px] transition-all duration-200 border ${
+    `flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-[14.5px] transition-all duration-200 border border-l-[3px] ${
       isActive
-        ? 'bg-primary-600/30 border-primary-500/50 text-white shadow-md shadow-primary-500/10'
-        : 'bg-primary-600/15 border-primary-600/30 text-gray-200 hover:bg-primary-600/25 hover:text-white hover:border-primary-500/50'
+        ? 'bg-navy-800/80 border-navy-700/60 border-l-blue-400 text-white shadow-sm'
+        : 'bg-navy-800/30 border-navy-700/40 border-l-transparent text-gray-400 hover:bg-navy-800/60 hover:text-gray-100 hover:border-l-blue-500/40'
     }`;
 
   const prominentReportesClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-[15px] transition-all duration-200 border ${
+    `flex items-center gap-3 px-4 py-3.5 rounded-xl font-bold text-[14.5px] transition-all duration-200 border border-l-[3px] ${
       isActive
-        ? 'bg-emerald-600/30 border-emerald-500/50 text-white shadow-md shadow-emerald-500/10'
-        : 'bg-emerald-600/15 border-emerald-600/30 text-gray-200 hover:bg-emerald-600/25 hover:text-white hover:border-emerald-500/50'
+        ? 'bg-navy-800/80 border-navy-700/60 border-l-violet-400 text-white shadow-sm'
+        : 'bg-navy-800/30 border-navy-700/40 border-l-transparent text-gray-400 hover:bg-navy-800/60 hover:text-gray-100 hover:border-l-violet-500/40'
     }`;
 
   // Header nav tabs: texto blanco, línea abajo en hover, fondo verde en activo
@@ -104,27 +104,27 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         : 'text-gray-200 border-transparent hover:text-white hover:border-gray-500'
     }`;
 
-  // Ítems verticales con barra inferior del color de la categoría
+  // Ítems verticales — sin fondo, sin barra
   const novedadesTileClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2.5 w-full px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer border-b-2 text-[13px] font-medium ${
+    `flex items-center gap-2.5 w-full px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer text-[13px] font-medium ${
       isActive
-        ? 'bg-rose-500/10 border-rose-400 text-white'
-        : 'text-gray-300 border-transparent hover:text-white hover:bg-rose-900/20 hover:border-rose-500/30'
+        ? 'text-white'
+        : 'text-gray-400 hover:text-gray-100'
     }`;
 
   const asistenciaTileClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2.5 w-full px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer border-b-2 text-[13px] font-medium ${
+    `flex items-center gap-2.5 w-full px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer text-[13px] font-medium ${
       isActive
-        ? 'bg-sky-500/10 border-sky-400 text-white'
-        : 'text-gray-300 border-transparent hover:text-white hover:bg-sky-900/20 hover:border-sky-500/30'
+        ? 'text-white'
+        : 'text-gray-400 hover:text-gray-100'
     }`;
 
-  // Clases para el footer horizontal admin (Roles, Audit, Config) — misma estética que header tabs
+  // Admin footer tabs — mismo estilo dark glass + border-l que el resto del sidebar
   const adminFooterTabClass = (isActive: boolean) =>
-    `flex items-center gap-2 px-3 py-1.5 rounded-xl text-[12.5px] font-semibold transition-all duration-200 select-none whitespace-nowrap ${
+    `flex items-center gap-1.5 w-full px-3 py-2 rounded-lg transition-all duration-150 cursor-pointer border border-l-[3px] text-[12px] font-medium ${
       isActive
-        ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-md shadow-violet-500/25 ring-1 ring-violet-500/30'
-        : 'text-gray-300 hover:text-white hover:bg-white/[0.07]'
+        ? 'bg-navy-800/80 border-navy-700/60 border-l-violet-400 text-white'
+        : 'bg-navy-800/20 border-navy-700/30 border-l-transparent text-gray-400 hover:bg-navy-800/50 hover:text-gray-100 hover:border-l-violet-500/40'
     }`;
 
   return (
@@ -162,19 +162,19 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             <div>
               <button
                 onClick={() => toggleGroup('novedades')}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-200 bg-gradient-to-r from-rose-900/40 to-rose-950/20 border border-rose-700/25 hover:from-rose-800/50"
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-200 bg-navy-800/30 border border-navy-700/40 border-l-[3px] border-l-rose-400 hover:bg-navy-800/60 hover:text-gray-100"
               >
                 <div className="flex items-center gap-2">
                   <svg className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                       d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-[10.5px] font-bold tracking-widest uppercase text-rose-400">
+                  <span className="text-[10.5px] font-bold tracking-widest uppercase text-gray-400">
                     Novedades
                   </span>
                 </div>
                 <svg
-                  className={`w-3 h-3 text-rose-500 transition-transform duration-200 ${expandedGroups.has('novedades') ? 'rotate-180' : ''}`}
+                  className={`w-3 h-3 text-gray-600 transition-transform duration-200 ${expandedGroups.has('novedades') ? 'rotate-180' : ''}`}
                   fill="none" viewBox="0 0 24 24" stroke="currentColor"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
@@ -214,19 +214,19 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             <div>
               <button
                 onClick={() => toggleGroup('asistencia')}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-200 bg-gradient-to-r from-sky-900/40 to-sky-950/20 border border-sky-700/25 hover:from-sky-800/50"
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all duration-200 bg-navy-800/30 border border-navy-700/40 border-l-[3px] border-l-sky-400 hover:bg-navy-800/60 hover:text-gray-100"
               >
                 <div className="flex items-center gap-2">
                   <svg className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                       d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <span className="text-[10.5px] font-bold tracking-widest uppercase text-sky-400">
+                  <span className="text-[10.5px] font-bold tracking-widest uppercase text-gray-400">
                     Asistencia
                   </span>
                 </div>
                 <svg
-                  className={`w-3 h-3 text-sky-500 transition-transform duration-200 ${expandedGroups.has('asistencia') ? 'rotate-180' : ''}`}
+                  className={`w-3 h-3 text-gray-600 transition-transform duration-200 ${expandedGroups.has('asistencia') ? 'rotate-180' : ''}`}
                   fill="none" viewBox="0 0 24 24" stroke="currentColor"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
@@ -266,10 +266,10 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             <div className="h-px bg-gradient-to-r from-navy-700 to-transparent" />
           </div>
 
-          {/* ── PLANILLAS (bloque prominente azul) ── */}
+          {/* ── PLANILLAS ── */}
           {canAccessModuleCheck('planillas') && (
             <NavLink to="/planillas" className={prominentPlanillasClass}>
-              <svg className="w-7 h-7 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-5 h-5 flex-shrink-0 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
               </svg>
@@ -277,10 +277,10 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             </NavLink>
           )}
 
-          {/* ── REPORTES (bloque prominente esmeralda) ── */}
+          {/* ── REPORTES ── */}
           {canAccessModuleCheck('reportes') && (
             <NavLink to="/reportes" className={prominentReportesClass}>
-              <svg className="w-7 h-7 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-5 h-5 flex-shrink-0 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
@@ -317,37 +317,21 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         {/* ── FOOTER: Admin tabs + Tenant info ── */}
         <div className="px-3 pt-2 pb-3 border-t border-navy-700">
 
-          {/* Tabs de administración (solo Owner) — segmented control igual que header */}
+          {/* Administración (solo Owner) — lista vertical igual que Novedades/Asistencia */}
           {hasRole(TenantRole.Owner) && (
             <div className="mb-3">
-              <p className="text-[10px] font-bold tracking-widest uppercase text-gray-600 px-1 mb-1.5">Administración</p>
-              <div
-                className="flex items-center gap-0.5 p-1 rounded-2xl w-full"
-                style={{
-                  background: 'rgba(5,12,28,0.85)',
-                  border: '1px solid rgba(99,120,160,0.18)',
-                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)'
-                }}
-              >
-                {/* Roles */}
-                <NavLink
-                  to="/roles"
-                  className={({ isActive }) => adminFooterTabClass(isActive) + ' flex-1 justify-center'}
-                >
-                  <svg className="w-[15px] h-[15px] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="flex flex-col gap-0.5">
+                <NavLink to="/roles" className={({ isActive }) => adminFooterTabClass(isActive)}>
+                  <svg className="w-3.5 h-3.5 shrink-0 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                       d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
                   Roles
                 </NavLink>
 
-                {/* Auditoría */}
                 {canAccessModuleCheck('audit') && (
-                  <NavLink
-                    to="/audit"
-                    className={({ isActive }) => adminFooterTabClass(isActive) + ' flex-1 justify-center'}
-                  >
-                    <svg className="w-[15px] h-[15px] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <NavLink to="/audit" className={({ isActive }) => adminFooterTabClass(isActive)}>
+                    <svg className="w-3.5 h-3.5 shrink-0 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                     </svg>
@@ -355,54 +339,44 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                   </NavLink>
                 )}
 
-                {/* Configuración */}
                 {canAccessModuleCheck('configuracion') && (
-                  <NavLink
-                    to="/configuracion"
-                    className={({ isActive }) => adminFooterTabClass(isActive) + ' flex-1 justify-center'}
-                  >
-                    <svg className="w-[15px] h-[15px] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <NavLink to="/configuracion" className={({ isActive }) => adminFooterTabClass(isActive)}>
+                    <svg className="w-3.5 h-3.5 shrink-0 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     </svg>
-                    Config.
+                    Configuración
                   </NavLink>
                 )}
               </div>
             </div>
           )}
 
-          {/* Tenant info + plan badge */}
+          {/* Tenant info */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-primary-600 to-primary-500 flex items-center justify-center flex-shrink-0">
                 <span className="text-white text-[10px] font-bold font-display">
                   {tenant?.name?.substring(0, 2).toUpperCase() || 'PL'}
                 </span>
               </div>
               <div className="min-w-0">
-                <p className="text-xs font-semibold text-gray-200 truncate max-w-[120px]">{tenant?.name}</p>
+                <p className="text-xs font-semibold text-gray-200 truncate max-w-[140px]">{tenant?.name}</p>
                 <p className="text-[10px] text-gray-600 truncate">{tenant?.ruc}-{tenant?.dv}</p>
               </div>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary-500/15 text-primary-400 border border-primary-500/20 font-medium">
-                {(tenant as any)?.subscriptionPlan || 'Free'}
-              </span>
-              {/* Logout */}
-              <button
-                onClick={handleLogout}
-                className="p-1.5 text-gray-600 hover:text-red-400 hover:bg-navy-800 rounded-lg transition"
-                title="Cerrar sesión"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-              </button>
-            </div>
+            <button
+              onClick={handleLogout}
+              className="p-1.5 text-gray-600 hover:text-red-400 hover:bg-navy-800 rounded-lg transition flex-shrink-0"
+              title="Cerrar sesión"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
           </div>
         </div>
       </aside>
@@ -501,13 +475,17 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
               <div className="relative">
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center ring-2 ring-navy-800">
                   <span className="text-white text-[11px] font-bold tracking-tight">
-                    {user?.email.substring(0, 2).toUpperCase()}
+                    {user?.fullName
+                      ? user.fullName.split(' ').map((n: string) => n[0]).slice(0, 2).join('').toUpperCase()
+                      : user?.email.substring(0, 2).toUpperCase()}
                   </span>
                 </div>
                 <span className="absolute bottom-0 right-0 w-2 h-2 bg-emerald-400 rounded-full ring-1 ring-navy-900" />
               </div>
               <div className="leading-tight hidden lg:block">
-                <p className="text-[12px] font-semibold text-gray-100 leading-none">{user?.email.split('@')[0]}</p>
+                <p className="text-[12px] font-semibold text-gray-100 leading-none">
+                  {user?.fullName || user?.email.split('@')[0]}
+                </p>
                 <p className="text-[10px] text-gray-500 mt-0.5">{user?.roleName}</p>
               </div>
               <button

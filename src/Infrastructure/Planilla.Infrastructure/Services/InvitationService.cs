@@ -500,6 +500,6 @@ public class InvitationService : IInvitationService
         var role = tenantUser?.Role ?? TenantRole.User;
         var plan = tenant.Subscription?.Plan.ToString() ?? "Free";
 
-        return _jwtTokenService.GenerateToken(user.Id, user.Email!, tenant.Id, role, plan);
+        return _jwtTokenService.GenerateToken(user.Id, user.Email!, tenant.Id, role, plan, nombreCompleto: user.NombreCompleto);
     }
 }

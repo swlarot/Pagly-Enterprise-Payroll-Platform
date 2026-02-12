@@ -11,7 +11,7 @@ public interface IJwtTokenService
     /// <summary>
     /// Genera un token JWT (access token) para un usuario autenticado en un tenant
     /// </summary>
-    string GenerateToken(string userId, string email, int tenantId, TenantRole role, string plan, bool isSystemAdmin = false);
+    string GenerateToken(string userId, string email, int tenantId, TenantRole role, string plan, bool isSystemAdmin = false, string? nombreCompleto = null);
 
     /// <summary>
     /// Genera un refresh token y lo almacena en la base de datos

@@ -28,7 +28,7 @@ public class JwtTokenService : IJwtTokenService
     /// <summary>
     /// Genera un token JWT para un usuario autenticado en un tenant
     /// </summary>
-    public string GenerateToken(string userId, string email, int tenantId, TenantRole role, string plan, bool isSystemAdmin = false)
+    public string GenerateToken(string userId, string email, int tenantId, TenantRole role, string plan, bool isSystemAdmin = false, string? nombreCompleto = null)
     {
         var claims = new List<Claim>
         {
@@ -41,6 +41,9 @@ public class JwtTokenService : IJwtTokenService
             new Claim("is_system_admin", isSystemAdmin.ToString().ToLower()),
             new Claim(ClaimTypes.Role, role.ToString())
         };
+
+        if (!string.IsNullOrEmpty(nombreCompleto))
+            claims.Add(new Claim("nombre_completo", nombreCompleto));
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]!));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

@@ -195,7 +195,7 @@ export default function AdminDashboardPage() {
             <h1 className="text-3xl font-bold text-gray-100 font-display">
               {getGreeting()},{' '}
               <span className="text-primary-400">
-                {user?.email?.split('@')[0]}
+                {user?.fullName || user?.email?.split('@')[0]}
               </span>
             </h1>
             <p className="text-gray-400 mt-1 font-body">
