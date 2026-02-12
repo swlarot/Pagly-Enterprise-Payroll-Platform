@@ -39,7 +39,14 @@ obj/
 nul
 
 # Carpetas de configuración (docs/ se sube al repo)
-.claude/
+# .claude/skills/ SÍ se sube (skills compartidos del equipo)
+# .claude/settings.json SÍ se sube (permisos del proyecto, sin secretos)
+# Solo ignorar archivos locales/temporales de Claude Code
+.claude/settings.local.json
+.claude/settings.json.backup
+.claude/settings.lightweight.json
+.claude/memory/
+.claude/todos/
 scripts/
 
 # Configuración local con credenciales (no subir a GitHub)
