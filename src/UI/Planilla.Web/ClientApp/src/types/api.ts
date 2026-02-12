@@ -44,6 +44,7 @@ export interface SelectTenantDto {
 export interface UserInfoDto {
   userId: string;
   email: string;
+  fullName?: string;
   role: TenantRole;
   roleName: string;
   isSystemAdmin?: boolean;

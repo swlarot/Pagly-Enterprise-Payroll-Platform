@@ -88,10 +88,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Enriquece el objeto de usuario con el nombre completo extraído del JWT
+  const enrichUserWithToken = (user: UserInfoDto, token: string): UserInfoDto => {
+    const payload = parseJwt(token);
+    const fullName = payload?.nombre_completo as string | undefined;
+    if (fullName) {
+      return { ...user, fullName };
+    }
+    return user;
+  };
+
   const validateAndSetUser = async (token: string) => {
     try {
       const data = await authService.me();
-      setUser(data.user);
+      setUser(enrichUserWithToken(data.user, token));
       setTenant(data.tenant ?? null);
       setSubscription(data.subscription ?? null);
       setAvailableTenants(data.availableTenants || []);
@@ -137,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Guardar temporalmente los datos del usuario
-      setUser(data.user);
+      setUser(enrichUserWithToken(data.user, data.token));
       setAvailableTenants(data.availableTenants || []);
       setPermissions([]); // Sin permisos hasta seleccionar tenant
 
@@ -151,7 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Login normal (un solo tenant o SystemAdmin)
     localStorage.setItem('auth_token', data.token);
     localStorage.setItem('refresh_token', data.refreshToken);
-    setUser(data.user);
+    setUser(enrichUserWithToken(data.user, data.token));
     
     // Establecer tenant ANTES de otras operaciones para que esté disponible inmediatamente
     console.log('[AuthContext] Setting tenant from login response:', data.tenant);
@@ -185,7 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Guardar el nuevo token con el tenant seleccionado
     localStorage.setItem('auth_token', data.token);
     localStorage.setItem('refresh_token', data.refreshToken);
-    setUser(data.user);
+    setUser(enrichUserWithToken(data.user, data.token));
     setTenant(data.tenant);
     setSubscription(data.subscription);
     setAvailableTenants(data.availableTenants || []);
@@ -217,7 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await authService.acceptInvite({ token, password, confirmPassword });
     localStorage.setItem('auth_token', data.token);
     localStorage.setItem('refresh_token', data.refreshToken);
-    setUser(data.user);
+    setUser(enrichUserWithToken(data.user, data.token));
     setTenant(data.tenant);
     setSubscription(data.subscription);
     

@@ -618,6 +618,9 @@ public class AuthController : ControllerBase
             new Claim("is_system_admin", "false")
         };
 
+        if (!string.IsNullOrEmpty(user.NombreCompleto))
+            claimsList.Add(new Claim("nombre_completo", user.NombreCompleto));
+
         // 🎯 Si está vinculado a un empleado, agregar employee_id al token
         if (linkedEmployee != null)
         {
