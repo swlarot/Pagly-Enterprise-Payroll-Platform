@@ -53,15 +53,19 @@ public class PayPeriodAndHoursTests
     [Fact]
     public void RecalculateHourlyRate_StandardValues_ReturnsCorrectRate()
     {
+        // Quincenal 1500 -> mensual 3000; 48h/semana -> 208h/mes; tasa = 3000/208
         var empleado = new Empleado
         {
             SalarioBase = 1500m,
-            HoursPerPeriod = 104m
+            PayPeriodType = PayPeriodType.Quincenal,
+            HoursPerWeek = 48
         };
 
         empleado.RecalculateHourlyRate();
 
-        empleado.HourlyRate.Should().Be(Math.Round(1500m / 104m, 4));
+        var salarioMensual = 1500m * 24 / 12m;
+        var horasPorMes = 48m * Empleado.WeeksPerMonth;
+        empleado.HourlyRate.Should().Be(Math.Round(salarioMensual / horasPorMes, 4));
     }
 
     [Fact]
@@ -70,7 +74,8 @@ public class PayPeriodAndHoursTests
         var empleado = new Empleado
         {
             SalarioBase = 1500m,
-            HoursPerPeriod = 0m
+            PayPeriodType = PayPeriodType.Quincenal,
+            HoursPerWeek = 0
         };
 
         empleado.RecalculateHourlyRate();
@@ -84,7 +89,8 @@ public class PayPeriodAndHoursTests
         var empleado = new Empleado
         {
             SalarioBase = 0m,
-            HoursPerPeriod = 104m
+            PayPeriodType = PayPeriodType.Quincenal,
+            HoursPerWeek = 48
         };
 
         empleado.RecalculateHourlyRate();
@@ -95,10 +101,12 @@ public class PayPeriodAndHoursTests
     [Fact]
     public void RecalculateHourlyRate_HighSalary_ReturnsCorrectRate()
     {
+        // Mensual 10000 -> 208h/mes (48h/semana); tasa = 10000/208
         var empleado = new Empleado
         {
             SalarioBase = 10000m,
-            HoursPerPeriod = 208m  // Mensual
+            PayPeriodType = PayPeriodType.Mensual,
+            HoursPerWeek = 48
         };
 
         empleado.RecalculateHourlyRate();
@@ -215,7 +223,7 @@ public class PayPeriodAndHoursTests
         empleado.HoursPerPeriod = Empleado.CalculateSuggestedHoursPerPeriod(
             empleado.HoursPerWeek, empleado.PayPeriodType);
 
-        // Recalcular HourlyRate
+        // Recalcular HourlyRate (base mensual: 2400/208)
         empleado.RecalculateHourlyRate();
 
         // Sincronizar PayFrequency legacy
@@ -225,5 +233,29 @@ public class PayPeriodAndHoursTests
         empleado.HoursPerPeriod.Should().Be(208m);
         empleado.HourlyRate.Should().Be(Math.Round(2400m / 208m, 4));
         empleado.PayFrequency.Should().Be("Mensual");
+    }
+
+    // ====================================================================
+    // Tasa por hora con base mensual (Empleado.GetPeriodsPerYear, ComputeHourlyRateFromMonthly)
+    // ====================================================================
+
+    [Theory]
+    [InlineData(PayPeriodType.Semanal, 52)]
+    [InlineData(PayPeriodType.Bisemanal, 26)]
+    [InlineData(PayPeriodType.Quincenal, 24)]
+    [InlineData(PayPeriodType.Mensual, 12)]
+    public void Empleado_GetPeriodsPerYear_MatchesPayrollConstants(PayPeriodType type, int expected)
+    {
+        Empleado.GetPeriodsPerYear(type).Should().Be(expected);
+        Empleado.GetPeriodsPerYear(type).Should().Be(PayrollConstants.GetPeriodsPerYear(type));
+    }
+
+    [Fact]
+    public void ComputeHourlyRateFromMonthly_Quincenal1500_48h_ReturnsCorrectRate()
+    {
+        var rate = Empleado.ComputeHourlyRateFromMonthly(1500m, 48, PayPeriodType.Quincenal);
+        var salarioMensual = 1500m * 24 / 12m;
+        var horasPorMes = 48m * Empleado.WeeksPerMonth;
+        rate.Should().Be(Math.Round(salarioMensual / horasPorMes, 4));
     }
 }

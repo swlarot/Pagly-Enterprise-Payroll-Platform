@@ -133,12 +133,17 @@ public class Empleado : ITenantEntity
     public decimal HoursPerPeriod { get; set; } = 104m;
 
     /// <summary>
-    /// Tasa por hora calculada: SalarioBase / HoursPerPeriod.
-    /// Se almacena para performance pero se recalcula cuando cambia SalarioBase o HoursPerPeriod.
+    /// Tasa por hora calculada con base mensual: SalarioMensual / (HoursPerWeek × 4.333).
+    /// Se almacena para performance pero se recalcula cuando cambia SalarioBase, HoursPerWeek o PayPeriodType.
     /// Usado para calcular horas extra, dominicales, feriados.
     /// </summary>
     [Column(TypeName = "decimal(18, 4)")]
     public decimal HourlyRate { get; set; } = 0m;
+
+    /// <summary>
+    /// Semanas por mes (promedio anual): 52/12 ≈ 4.333. Usado para tasa por hora mensual.
+    /// </summary>
+    public const decimal WeeksPerMonth = 52m / 12m;
 
     /// <summary>
     /// N�mero de dependientes declarados (m�ximo 3 para deducci�n ISR)
@@ -194,11 +199,50 @@ public class Empleado : ITenantEntity
     }
 
     /// <summary>
-    /// Recalcula HourlyRate basado en SalarioBase y HoursPerPeriod.
+    /// Períodos por año según tipo de período (para convertir salario del período a mensual).
+    /// </summary>
+    public static int GetPeriodsPerYear(PayPeriodType periodType)
+    {
+        return periodType switch
+        {
+            PayPeriodType.Semanal => 52,
+            PayPeriodType.Bisemanal => 26,
+            PayPeriodType.Quincenal => 24,
+            PayPeriodType.Mensual => 12,
+            _ => 24
+        };
+    }
+
+    /// <summary>
+    /// Obtiene el salario mensual equivalente a partir del SalarioBase del período.
+    /// </summary>
+    public decimal GetMonthlySalary()
+    {
+        var periodsPerYear = GetPeriodsPerYear(PayPeriodType);
+        return SalarioBase * periodsPerYear / 12m;
+    }
+
+    /// <summary>
+    /// Calcula la tasa por hora con base mensual: SalarioMensual / (HoursPerWeek × 4.333).
+    /// Útil para fallbacks cuando HourlyRate no está persistido (ej. en controladores).
+    /// </summary>
+    public static decimal ComputeHourlyRateFromMonthly(decimal salarioBase, int hoursPerWeek, PayPeriodType periodType)
+    {
+        if (salarioBase <= 0) return 0m;
+        if (hoursPerWeek <= 0) return 0m;
+        var periodsPerYear = GetPeriodsPerYear(periodType);
+        var salarioMensual = salarioBase * periodsPerYear / 12m;
+        var horasPorMes = hoursPerWeek * WeeksPerMonth;
+        return Math.Round(salarioMensual / horasPorMes, 4);
+    }
+
+    /// <summary>
+    /// Recalcula HourlyRate con base mensual: SalarioMensual / (HoursPerWeek × 4.333).
+    /// Independiente del período de pago (semanal, bisemanal, quincenal, mensual).
     /// </summary>
     public void RecalculateHourlyRate()
     {
-        HourlyRate = HoursPerPeriod > 0 ? Math.Round(SalarioBase / HoursPerPeriod, 4) : 0;
+        HourlyRate = ComputeHourlyRateFromMonthly(SalarioBase, HoursPerWeek, PayPeriodType);
     }
 
     /// <summary>
