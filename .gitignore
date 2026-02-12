@@ -1,4 +1,7 @@
 
+# Editor / IDE
+.cursor/
+
 # Logs
 *.log
 backend.log

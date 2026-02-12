@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import toast, { Toaster, ToastBar } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { RoleGuard } from './components/auth/RoleGuard';
@@ -45,29 +45,72 @@ function App() {
       <Toaster
         position="top-right"
         toastOptions={{
-          duration: 4000,
+          duration: 5000,
           style: {
             background: '#102a43',
             color: '#f3f4f6',
-            fontSize: '14px',
+            fontSize: '15px',
             border: '1px solid #334e68',
+            borderRadius: '12px',
+            padding: '14px 16px',
+            maxWidth: '420px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
           },
           success: {
-            duration: 3000,
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff',
-            },
+            duration: 4000,
+            iconTheme: { primary: '#10b981', secondary: '#fff' },
           },
           error: {
-            duration: 5000,
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fff',
-            },
+            duration: 7000,
+            iconTheme: { primary: '#ef4444', secondary: '#fff' },
           },
         }}
-      />
+      >
+        {(t) => (
+          <ToastBar toast={t}>
+            {({ icon, message }) => (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
+                {icon}
+                <span style={{ flex: 1, fontSize: '15px', lineHeight: '1.5' }}>{message}</span>
+                {t.type !== 'loading' && (
+                  <button
+                    onClick={() => toast.dismiss(t.id)}
+                    style={{
+                      flexShrink: 0,
+                      width: '28px',
+                      height: '28px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      background: 'rgba(255,255,255,0.08)',
+                      color: '#94a3b8',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '16px',
+                      lineHeight: '1',
+                      transition: 'all 0.15s',
+                      padding: 0,
+                      minHeight: 'unset',
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.18)';
+                      (e.currentTarget as HTMLButtonElement).style.color = '#f1f5f9';
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.background = 'rgba(255,255,255,0.08)';
+                      (e.currentTarget as HTMLButtonElement).style.color = '#94a3b8';
+                    }}
+                    aria-label="Cerrar notificación"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            )}
+          </ToastBar>
+        )}
+      </Toaster>
 
       <Routes>
         {/* Public Routes - Login Only (No Self-Registration) */}

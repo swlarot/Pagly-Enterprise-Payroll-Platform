@@ -57,32 +57,28 @@ const ConfiguracionPage = () => {
 
     return (
         <div className="space-y-6">
-            {/* Tab Navigation */}
-            <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 overflow-hidden">
-                <div className="border-b border-navy-700">
-                    <nav className="flex -mb-px">
-                        {tabs.map(tab => (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`group relative min-w-0 flex-1 overflow-hidden py-4 px-4 text-sm font-medium text-center hover:bg-navy-800 focus:z-10 ${
-                                    activeTab === tab.id
-                                        ? 'text-primary-400 border-b-2 border-primary-500'
-                                        : 'text-gray-500 hover:text-gray-200'
-                                }`}
-                            >
-                                <div className="flex items-center justify-center gap-2">
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
-                                    </svg>
-                                    <span>{tab.label}</span>
-                                </div>
-                            </button>
-                        ))}
-                    </nav>
-                </div>
+            {/* Tab Navigation — estilo pill */}
+            <div className="flex gap-1 p-1 bg-navy-800 rounded-xl border border-navy-700 w-fit flex-wrap">
+                {tabs.map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                            activeTab === tab.id
+                                ? 'bg-primary-600 text-white shadow-md'
+                                : 'text-gray-400 hover:text-gray-200 hover:bg-navy-700'
+                        }`}
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
+                        </svg>
+                        <span>{tab.label}</span>
+                    </button>
+                ))}
+            </div>
 
-                {/* Tab Content */}
+            {/* Tab Content */}
+            <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 overflow-hidden">
                 <div className="p-6">
                     {/* Tab: Tasas CSS/SE */}
                     {activeTab === 'tasas' && (
@@ -124,7 +120,12 @@ const ConfiguracionPage = () => {
                             ) : (
                                 <>
                                     <div className="overflow-x-auto">
-                                        <table className="w-full">
+                                        {/* Encabezado CSS — acento azul */}
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <div className="w-2 h-6 rounded-full bg-blue-500"/>
+                                            <h4 className="text-sm font-bold text-blue-400 uppercase tracking-wider">CSS — Caja de Seguro Social</h4>
+                                        </div>
+                                        <table className="w-full mb-6">
                                             <thead className="bg-navy-950 border-b border-navy-700">
                                                 <tr>
                                                     <th className="text-left py-3 px-4 text-sm font-medium text-gray-300">Concepto</th>
@@ -148,6 +149,24 @@ const ConfiguracionPage = () => {
                                                     </td>
                                                     <td className="py-3 px-4 text-sm text-gray-500">Topes: ${Number(taxConfig.cssMaxContributionBaseStandard).toFixed(0)} / {Number(taxConfig.cssMaxContributionBaseIntermediate).toFixed(0)} / {Number(taxConfig.cssMaxContributionBaseHigh).toFixed(0)}</td>
                                                 </tr>
+                                            </tbody>
+                                        </table>
+
+                                        {/* Encabezado Seguro Educativo — acento violeta */}
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <div className="w-2 h-6 rounded-full bg-purple-500"/>
+                                            <h4 className="text-sm font-bold text-purple-400 uppercase tracking-wider">SE — Seguro Educativo</h4>
+                                        </div>
+                                        <table className="w-full mb-6">
+                                            <thead className="bg-navy-950 border-b border-navy-700">
+                                                <tr>
+                                                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-300">Concepto</th>
+                                                    <th className="text-center py-3 px-4 text-sm font-medium text-gray-300">Tasa Empleado</th>
+                                                    <th className="text-center py-3 px-4 text-sm font-medium text-gray-300">Tasa Patrono</th>
+                                                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-300">Observaciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-navy-900 divide-y divide-navy-700">
                                                 <tr>
                                                     <td className="py-3 px-4 text-sm font-medium text-gray-100">Seguro Educativo</td>
                                                     <td className="py-3 px-4 text-sm text-center">
@@ -162,6 +181,24 @@ const ConfiguracionPage = () => {
                                                     </td>
                                                     <td className="py-3 px-4 text-sm text-gray-500">Sin tope máximo</td>
                                                 </tr>
+                                            </tbody>
+                                        </table>
+
+                                        {/* Encabezado Riesgos Profesionales — acento naranja */}
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <div className="w-2 h-6 rounded-full bg-amber-500"/>
+                                            <h4 className="text-sm font-bold text-amber-400 uppercase tracking-wider">RP — Riesgos Profesionales</h4>
+                                        </div>
+                                        <table className="w-full">
+                                            <thead className="bg-navy-950 border-b border-navy-700">
+                                                <tr>
+                                                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-300">Concepto</th>
+                                                    <th className="text-center py-3 px-4 text-sm font-medium text-gray-300">Tasa Empleado</th>
+                                                    <th className="text-center py-3 px-4 text-sm font-medium text-gray-300">Tasa Patrono</th>
+                                                    <th className="text-left py-3 px-4 text-sm font-medium text-gray-300">Observaciones</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-navy-900 divide-y divide-navy-700">
                                                 <tr>
                                                     <td className="py-3 px-4 text-sm font-medium text-gray-100">Riesgo Profesional</td>
                                                     <td className="py-3 px-4 text-sm text-center">
@@ -324,7 +361,7 @@ const ConfiguracionPage = () => {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Email de Soporte */}
-                                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
+                                <div className="group bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 hover:border-primary-500/40 p-6 hover:-translate-y-0.5 transition-all cursor-pointer">
                                     <div className="flex items-center gap-4 mb-4">
                                         <div className="w-12 h-12 bg-primary-500/10 rounded-lg flex items-center justify-center">
                                             <svg className="w-6 h-6 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -345,7 +382,7 @@ const ConfiguracionPage = () => {
                                 </div>
 
                                 {/* Sitio Web */}
-                                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
+                                <div className="group bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 hover:border-primary-500/40 p-6 hover:-translate-y-0.5 transition-all cursor-pointer">
                                     <div className="flex items-center gap-4 mb-4">
                                         <div className="w-12 h-12 bg-green-500/15 rounded-lg flex items-center justify-center">
                                             <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -375,15 +412,15 @@ const ConfiguracionPage = () => {
                             <div className="mt-6 p-6 bg-gradient-to-r from-primary-500/10 to-purple-500/10 rounded-xl border border-primary-500">
                                 <h4 className="text-sm font-semibold text-gray-100 mb-3">Recursos Útiles</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="bg-navy-900 p-4 rounded-lg shadow-lg shadow-black/20">
+                                    <div className="group bg-navy-900 p-4 rounded-lg shadow-lg shadow-black/20 border border-navy-700 hover:border-primary-500/40 hover:-translate-y-0.5 transition-all cursor-pointer">
                                         <h5 className="font-medium text-gray-100 mb-1">Documentación</h5>
                                         <p className="text-xs text-gray-400">Guías y tutoriales</p>
                                     </div>
-                                    <div className="bg-navy-900 p-4 rounded-lg shadow-lg shadow-black/20">
+                                    <div className="group bg-navy-900 p-4 rounded-lg shadow-lg shadow-black/20 border border-navy-700 hover:border-primary-500/40 hover:-translate-y-0.5 transition-all cursor-pointer">
                                         <h5 className="font-medium text-gray-100 mb-1">FAQ</h5>
                                         <p className="text-xs text-gray-400">Preguntas frecuentes</p>
                                     </div>
-                                    <div className="bg-navy-900 p-4 rounded-lg shadow-lg shadow-black/20">
+                                    <div className="group bg-navy-900 p-4 rounded-lg shadow-lg shadow-black/20 border border-navy-700 hover:border-primary-500/40 hover:-translate-y-0.5 transition-all cursor-pointer">
                                         <h5 className="font-medium text-gray-100 mb-1">Actualizaciones</h5>
                                         <p className="text-xs text-gray-400">Nuevas funciones</p>
                                     </div>
