@@ -230,6 +230,27 @@ const HorasExtraPage = () => {
         return tipoMap[tipoValor] || 'Desconocido';
     };
 
+    // Badge de tipo de hora extra con color semántico por tipo
+    const getOvertimeTypeBadge = (tipoValor, tipoNombre) => {
+        const colores = {
+            1: 'bg-blue-500/15 text-blue-400 border-blue-500/20',        // Diurna
+            2: 'bg-purple-500/15 text-purple-400 border-purple-500/20',   // Nocturna
+            3: 'bg-amber-500/15 text-amber-400 border-amber-500/20',      // Dom/Feriado
+            4: 'bg-red-500/15 text-red-400 border-red-500/20',            // Noct. Dom/Feriado
+            5: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20', // Fiesta Diurna
+            6: 'bg-pink-500/15 text-pink-400 border-pink-500/20',          // Fiesta Nocturna
+            7: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20',          // Mixta D-N
+            8: 'bg-orange-500/15 text-orange-400 border-orange-500/20',    // Mixta N-D
+        };
+        const color = colores[tipoValor] || 'bg-gray-500/15 text-gray-400 border-gray-500/20';
+        const label = tipoNombre || getTipoDisplayName(tipoValor);
+        return (
+            <span className={`px-2 py-0.5 rounded-lg text-xs font-semibold border ${color}`}>
+                {label}
+            </span>
+        );
+    };
+
     const porTipo = tipos.map(tipo => ({
         ...tipo,
         cantidad: horasExtra.filter(h => h.tipoHoraExtra === tipo.valor).length,
@@ -390,6 +411,12 @@ const HorasExtraPage = () => {
                         <div>
                             <p className="text-sm font-medium text-gray-400">Pendientes de Aprobar</p>
                             <p className="text-3xl font-bold text-gray-100 mt-2">{pendientes}</p>
+                            <div className="flex items-center gap-1 mt-2">
+                                <svg className="w-3 h-3 text-amber-400" viewBox="0 0 12 12" fill="none">
+                                    <path d="M2 9l3-3 2 2 3-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                                <span className="text-xs text-gray-500">Requieren aprobación</span>
+                            </div>
                         </div>
                         <div className="w-12 h-12 bg-amber-500/15 rounded-lg flex items-center justify-center">
                             <svg className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -404,6 +431,12 @@ const HorasExtraPage = () => {
                         <div>
                             <p className="text-sm font-medium text-gray-400">Horas este Mes</p>
                             <p className="text-3xl font-bold text-gray-100 mt-2">{horasEsteMes.toFixed(1)}</p>
+                            <div className="flex items-center gap-1 mt-2">
+                                <svg className="w-3 h-3 text-primary-400" viewBox="0 0 12 12" fill="none">
+                                    <path d="M2 9l3-3 2 2 3-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                                <span className="text-xs text-gray-500">Este mes</span>
+                            </div>
                         </div>
                         <div className="w-12 h-12 bg-primary-500/15 rounded-lg flex items-center justify-center">
                             <svg className="w-6 h-6 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -418,6 +451,12 @@ const HorasExtraPage = () => {
                         <div>
                             <p className="text-sm font-medium text-gray-400">Monto Estimado</p>
                             <p className="text-2xl font-bold font-mono text-gray-100 mt-2">{formatCurrency(montoEstimado)}</p>
+                            <div className="flex items-center gap-1 mt-2">
+                                <svg className="w-3 h-3 text-green-400" viewBox="0 0 12 12" fill="none">
+                                    <path d="M2 9l3-3 2 2 3-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                                <span className="text-xs text-gray-500">Pendientes de pago</span>
+                            </div>
                         </div>
                         <div className="w-12 h-12 bg-green-500/15 rounded-lg flex items-center justify-center">
                             <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -555,12 +594,10 @@ const HorasExtraPage = () => {
                                     </td>
                                     <td className="py-4 px-6">
                                         <div className="flex flex-col gap-1">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-500/15 text-purple-400">
-                                                {he.tipoNombre}
-                                            </span>
+                                            {getOvertimeTypeBadge(he.tipoHoraExtra, he.tipoNombre)}
                                             {he.esExceso && (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-red-500/15 text-red-300" title="Excede límite legal (>3h/día o >9h/semana)">
-                                                    ⚠️ Exceso
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-red-500/15 text-red-300 border border-red-500/20" title="Excede límite legal (>3h/día o >9h/semana)">
+                                                    ⚠ Exceso
                                                 </span>
                                             )}
                                         </div>

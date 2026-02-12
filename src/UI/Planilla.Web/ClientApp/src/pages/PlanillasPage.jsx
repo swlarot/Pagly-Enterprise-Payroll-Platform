@@ -37,6 +37,8 @@ const PlanillasPage = () => {
     const [hoursLoading, setHoursLoading] = useState(false);
     // Ref para rastrear timers de debounce por empleadoId
     const debounceTimers = useRef({});
+    // Ref para rastrear si estamos abriendo el panel desde la tabla
+    const openingFromTable = useRef(false);
     const [ensureTaxConfigLoading, setEnsureTaxConfigLoading] = useState(false);
     const [importNovedadesLoading, setImportNovedadesLoading] = useState(false);
     const [showImportConfirmModal, setShowImportConfirmModal] = useState(false);
@@ -46,9 +48,17 @@ const PlanillasPage = () => {
         fetchData();
     }, []);
 
-    // Al cambiar la planilla seleccionada, cerrar panel de horas
+    // Al cambiar la planilla seleccionada, cerrar panel de horas solo si no se está abriendo desde la tabla
     useEffect(() => {
-        setShowHoursPanel(false);
+        // Si estamos abriendo desde la tabla, no cerrar el panel
+        if (openingFromTable.current) {
+            openingFromTable.current = false;
+            return;
+        }
+        // Si cambiamos de planilla y el panel está abierto, cerrarlo
+        if (showHoursPanel) {
+            setShowHoursPanel(false);
+        }
     }, [selectedPlanilla?.id]);
 
     // Enriquece una planilla con totales calculados desde details
@@ -226,6 +236,38 @@ const PlanillasPage = () => {
         debounceTimers.current[empleadoId] = setTimeout(() => {
             saveEmployeeHours(empleadoId);
         }, 800);
+    };
+
+    // Guarda todas las horas pendientes y cierra el panel
+    const handleSaveAndClose = async () => {
+        try {
+            // Limpiar todos los timers de debounce pendientes y guardar inmediatamente
+            const empleadosConCambiosPendientes = new Set();
+            
+            Object.keys(debounceTimers.current).forEach(empleadoId => {
+                if (debounceTimers.current[empleadoId]) {
+                    clearTimeout(debounceTimers.current[empleadoId]);
+                    delete debounceTimers.current[empleadoId];
+                    empleadosConCambiosPendientes.add(parseInt(empleadoId));
+                }
+            });
+
+            // Guardar solo las horas de empleados con cambios pendientes
+            const savePromises = Array.from(empleadosConCambiosPendientes).map(empleadoId => 
+                saveEmployeeHours(empleadoId)
+            );
+
+            // Si hay cambios pendientes, esperar a que se completen
+            if (savePromises.length > 0) {
+                await Promise.all(savePromises);
+                toast.success('Horas guardadas correctamente');
+            }
+            
+            // Cerrar el panel
+            setShowHoursPanel(false);
+        } catch (err) {
+            toast.error(err.message || 'Error al guardar horas');
+        }
     };
 
     // Guarda las horas de un empleado en la API
@@ -428,6 +470,34 @@ const PlanillasPage = () => {
                 )}
             </div>
 
+            {/* Hero card de planilla activa */}
+            {selectedPlanilla && (
+                <div className="bg-navy-900 border border-navy-700 rounded-xl p-5 flex items-center justify-between">
+                    <div>
+                        <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Planilla Activa</p>
+                        <h2 className="text-xl font-bold text-gray-100 font-display">
+                            Planilla {selectedPlanilla.payrollNumber}
+                            {selectedPlanilla.payPeriodType !== undefined && selectedPlanilla.payPeriodType !== null &&
+                                getPayPeriodBadge(selectedPlanilla.payPeriodType)
+                            }
+                        </h2>
+                        <p className="text-sm text-gray-400 mt-0.5">
+                            {new Date(selectedPlanilla.periodStartDate).toLocaleDateString('es-PA')} — {new Date(selectedPlanilla.periodEndDate).toLocaleDateString('es-PA')}
+                        </p>
+                    </div>
+                    {/* Badge de estado grande */}
+                    <div className={`px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wide ${
+                        selectedPlanilla.status === 0 ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20' :
+                        selectedPlanilla.status === 1 ? 'bg-primary-500/15 text-primary-400 border border-primary-500/20' :
+                        selectedPlanilla.status === 2 ? 'bg-green-500/15 text-green-400 border border-green-500/20' :
+                        selectedPlanilla.status === 3 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' :
+                        'bg-red-500/15 text-red-400 border border-red-500/20'
+                    }`}>
+                        {['Borrador', 'Calculado', 'Aprobado', 'Pagado', 'Cancelado'][selectedPlanilla.status] || 'Borrador'}
+                    </div>
+                </div>
+            )}
+
             {/* Summary Cards */}
             {selectedPlanilla ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -469,137 +539,213 @@ const PlanillasPage = () => {
                 </div>
             )}
 
-            {/* Action Buttons Based on Status */}
+            {/* Panel de Acciones */}
             {selectedPlanilla && (
-                <div className="flex flex-wrap gap-3">
-                    {selectedPlanilla.status === 0 && (
-                        <>
-                            <button
-                                onClick={handleCalculate}
-                                disabled={processingAction === 'calculating'}
-                                className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {processingAction === 'calculating' ? (
-                                    <>
-                                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                        Calculando...
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                        </svg>
-                                        Calcular Planilla
-                                    </>
-                                )}
-                            </button>
+                <div className="bg-navy-900 border border-navy-700 rounded-xl overflow-hidden">
+                    {/* Header del panel */}
+                    <div className="px-5 py-3 bg-navy-950/60 border-b border-navy-700 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-primary-400 animate-pulse" />
+                            <span className="text-sm font-semibold text-gray-300">Acciones — Planilla {selectedPlanilla.payrollNumber}</span>
+                        </div>
+                        <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide ${
+                            selectedPlanilla.status === 0 ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20' :
+                            selectedPlanilla.status === 1 ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20' :
+                            selectedPlanilla.status === 2 ? 'bg-green-500/15 text-green-400 border border-green-500/20' :
+                            selectedPlanilla.status === 3 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' :
+                            'bg-red-500/15 text-red-400 border border-red-500/20'
+                        }`}>
+                            {['Borrador', 'Calculado', 'Aprobado', 'Pagado', 'Cancelado'][selectedPlanilla.status] || 'Borrador'}
+                        </span>
+                    </div>
 
-                            {/* Botón Gestionar Horas - disponible en Draft y Calculated */}
-                            <button
-                                onClick={toggleHoursPanel}
-                                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20 ${
-                                    showHoursPanel
-                                        ? 'bg-red-600 hover:bg-red-700 text-white'
-                                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                                }`}
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                {showHoursPanel ? 'Cerrar Panel de Horas' : 'Gestionar Horas'}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleEnsureTaxConfig}
-                                disabled={ensureTaxConfigLoading}
-                                className="inline-flex items-center gap-2 text-sm text-gray-400 hover:text-emerald-400 transition-colors disabled:opacity-50"
-                                title="Si Calcular Planilla falla por falta de configuración CSS/SE/ISR, haz clic aquí"
-                            >
-                                {ensureTaxConfigLoading ? (
-                                    <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                                ) : (
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    {/* Botones de acción */}
+                    <div className="p-5 flex flex-wrap gap-3">
+
+                        {/* ESTADO: Borrador */}
+                        {selectedPlanilla.status === 0 && (
+                            <>
+                                {/* Botón principal: Calcular */}
+                                <button
+                                    onClick={handleCalculate}
+                                    disabled={processingAction === 'calculating'}
+                                    className="group inline-flex items-center gap-3 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all shadow-lg shadow-primary-900/40 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5 hover:shadow-xl"
+                                >
+                                    {processingAction === 'calculating' ? (
+                                        <>
+                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            Calculando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                            </svg>
+                                            Calcular Planilla
+                                        </>
+                                    )}
+                                </button>
+
+                                {/* Botón: Editar Horas */}
+                                <button
+                                    onClick={toggleHoursPanel}
+                                    className="inline-flex items-center gap-3 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-emerald-500/50 text-gray-200 hover:text-emerald-300 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all hover:-translate-y-0.5"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
-                                )}
-                                Crear config. impuestos
-                            </button>
-                        </>
-                    )}
+                                    {showHoursPanel ? 'Cerrar Horas' : 'Editar Horas'}
+                                </button>
 
-                    {selectedPlanilla.status === 1 && (
-                        <>
-                            <button
-                                onClick={handleApprove}
-                                disabled={processingAction === 'approving'}
-                                className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {processingAction === 'approving' ? (
-                                    <>
-                                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                        Aprobando...
-                                    </>
-                                ) : (
-                                    <>
+                                {/* Botón secundario: Configurar Impuestos */}
+                                <button
+                                    type="button"
+                                    onClick={handleEnsureTaxConfig}
+                                    disabled={ensureTaxConfigLoading}
+                                    title="Si Calcular Planilla falla por falta de configuración CSS/SE/ISR, haz clic aquí"
+                                    className="inline-flex items-center gap-3 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-amber-500/40 text-gray-300 hover:text-amber-300 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {ensureTaxConfigLoading ? (
+                                        <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                                    ) : (
                                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                         </svg>
-                                        Aprobar Planilla
-                                    </>
-                                )}
-                            </button>
+                                    )}
+                                    Configurar Impuestos
+                                </button>
+
+                                {/* Botón: Ver Detalles */}
+                                <button
+                                    onClick={() => viewDetails(selectedPlanilla)}
+                                    className="inline-flex items-center gap-3 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-primary-500/40 text-gray-400 hover:text-primary-300 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all hover:-translate-y-0.5"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                    Ver Detalles
+                                </button>
+                            </>
+                        )}
+
+                        {/* ESTADO: Calculado */}
+                        {selectedPlanilla.status === 1 && (
+                            <>
+                                {/* Botón principal: Aprobar */}
+                                <button
+                                    onClick={handleApprove}
+                                    disabled={processingAction === 'approving'}
+                                    className="inline-flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all shadow-lg shadow-green-900/40 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5 hover:shadow-xl"
+                                >
+                                    {processingAction === 'approving' ? (
+                                        <>
+                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            Aprobando...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Aprobar Planilla
+                                        </>
+                                    )}
+                                </button>
+
+                                {/* Botón: Recalcular */}
+                                <button
+                                    onClick={handleCalculate}
+                                    disabled={processingAction === 'calculating'}
+                                    className="inline-flex items-center gap-3 bg-amber-600 hover:bg-amber-700 text-white px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all shadow-lg shadow-amber-900/40 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5"
+                                >
+                                    {processingAction === 'calculating' ? (
+                                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                    )}
+                                    Recalcular
+                                </button>
+
+                                {/* Botón: Editar Horas */}
+                                <button
+                                    onClick={toggleHoursPanel}
+                                    className="inline-flex items-center gap-3 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-emerald-500/50 text-gray-200 hover:text-emerald-300 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all hover:-translate-y-0.5"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    {showHoursPanel ? 'Cerrar Horas' : 'Editar Horas'}
+                                </button>
+
+                                {/* Botón: Ver Detalles */}
+                                <button
+                                    onClick={() => viewDetails(selectedPlanilla)}
+                                    className="inline-flex items-center gap-3 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-primary-500/40 text-gray-400 hover:text-primary-300 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all hover:-translate-y-0.5"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                    Ver Detalles
+                                </button>
+                            </>
+                        )}
+
+                        {/* ESTADO: Aprobado */}
+                        {selectedPlanilla.status === 2 && (
+                            <>
+                                <button
+                                    disabled
+                                    className="inline-flex items-center gap-3 bg-emerald-600/50 text-white/60 px-6 py-3.5 rounded-xl font-semibold text-[15px] cursor-not-allowed border border-emerald-700/30"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                    Procesar Pago
+                                    <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full">Próximamente</span>
+                                </button>
+                                <button
+                                    onClick={() => viewDetails(selectedPlanilla)}
+                                    className="inline-flex items-center gap-3 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-primary-500/40 text-gray-200 hover:text-primary-300 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all hover:-translate-y-0.5"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                    Ver Detalles
+                                </button>
+                            </>
+                        )}
+
+                        {/* ESTADO: Pagado o Cancelado */}
+                        {(selectedPlanilla.status === 3 || selectedPlanilla.status === 4) && (
                             <button
-                                onClick={handleCalculate}
-                                disabled={processingAction === 'calculating'}
-                                className="inline-flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                onClick={() => viewDetails(selectedPlanilla)}
+                                className="inline-flex items-center gap-3 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-primary-500/40 text-gray-200 hover:text-primary-300 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all hover:-translate-y-0.5"
                             >
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                 </svg>
-                                Recalcular
+                                Ver Detalles Completos
                             </button>
-                            {/* Botón Gestionar Horas - también disponible en Calculated */}
-                            <button
-                                onClick={toggleHoursPanel}
-                                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20 ${
-                                    showHoursPanel
-                                        ? 'bg-red-600 hover:bg-red-700 text-white'
-                                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                                }`}
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        )}
+                    </div>
+
+                    {/* Nota de ayuda contextual */}
+                    {selectedPlanilla.status === 0 && (
+                        <div className="px-5 pb-4">
+                            <p className="text-xs text-gray-600 flex items-center gap-1.5">
+                                <svg className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                {showHoursPanel ? 'Cerrar Horas' : 'Editar Horas'}
-                            </button>
-                        </>
-                    )}
-
-                    {selectedPlanilla.status === 2 && (
-                        <button
-                            disabled
-                            className="inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-lg font-medium shadow-lg shadow-black/20 opacity-50 cursor-not-allowed"
-                            title="Próximamente"
-                        >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
-                            Procesar Pago (Próximamente)
-                        </button>
-                    )}
-
-                    {(selectedPlanilla.status === 3 || selectedPlanilla.status === 4) && (
-                        <button
-                            onClick={() => viewDetails(selectedPlanilla)}
-                            className="inline-flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
-                        >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                            </svg>
-                            Ver Detalles
-                        </button>
+                                Si "Calcular" falla por configuración faltante, usa "Configurar Impuestos" primero e intenta de nuevo.
+                            </p>
+                        </div>
                     )}
                 </div>
             )}
@@ -653,6 +799,17 @@ const PlanillasPage = () => {
                                     </svg>
                                 )}
                                 Importar Novedades
+                            </button>
+                            <button
+                                onClick={handleSaveAndClose}
+                                disabled={hoursLoading || importNovedadesLoading}
+                                className="inline-flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Guardar cambios y cerrar el panel"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Guardar y Cerrar
                             </button>
                         </div>
                     </div>
@@ -898,7 +1055,15 @@ const PlanillasPage = () => {
                             </thead>
                             <tbody className="bg-navy-900 divide-y divide-navy-700">
                                 {planillas.map((planilla) => (
-                                    <tr key={planilla.id} className="hover:bg-navy-800 transition-colors">
+                                    <tr
+                                        key={planilla.id}
+                                        className={`border-l-2 transition-all cursor-pointer hover:bg-navy-800/50 ${
+                                            selectedPlanilla?.id === planilla.id
+                                                ? 'border-primary-500 bg-navy-800/30'
+                                                : 'border-transparent hover:border-primary-500'
+                                        }`}
+                                        onClick={() => setSelectedPlanilla(planilla)}
+                                    >
                                         <td className="py-4 px-6 text-sm font-medium text-gray-100">
                                             <div className="flex items-center flex-wrap gap-1">
                                                 <span>{planilla.payrollNumber}</span>
@@ -909,25 +1074,63 @@ const PlanillasPage = () => {
                                         </td>
                                         <td className="py-4 px-6 text-sm text-gray-500">
                                             {new Date(planilla.periodStartDate).toLocaleDateString('es-PA', { day: '2-digit', month: 'short' })}
-                                            {' - '}
+                                            {' — '}
                                             {new Date(planilla.periodEndDate).toLocaleDateString('es-PA', { day: '2-digit', month: 'short', year: 'numeric' })}
                                         </td>
-                                        <td className="py-4 px-6 text-sm text-gray-100">{planilla.employeeCount || empleadosCount}</td>
-                                        <td className="py-4 px-6 text-sm font-medium text-gray-100 font-mono">{formatCurrency(planilla.totalGrossPay)}</td>
-                                        <td className="py-4 px-6 text-sm text-gray-100 font-mono">{formatCurrency(planilla.totalDeductions)}</td>
-                                        <td className="py-4 px-6 text-sm font-medium text-gray-100 font-mono">{formatCurrency(planilla.totalNetPay)}</td>
-                                        <td className="py-4 px-6">{getStatusBadge(planilla.status)}</td>
+                                        <td className="py-4 px-6 text-sm text-gray-300">{planilla.employeeCount || empleadosCount}</td>
+                                        {/* Montos con font-mono y prefijo B/. */}
+                                        <td className="py-4 px-6 text-sm font-mono text-gray-200">
+                                            B/. {Number(planilla.totalGrossPay || 0).toLocaleString('es-PA', { minimumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="py-4 px-6 text-sm font-mono text-gray-400">
+                                            B/. {Number(planilla.totalDeductions || 0).toLocaleString('es-PA', { minimumFractionDigits: 2 })}
+                                        </td>
+                                        <td className="py-4 px-6 text-sm font-mono font-semibold text-gray-200">
+                                            B/. {Number(planilla.totalNetPay || 0).toLocaleString('es-PA', { minimumFractionDigits: 2 })}
+                                        </td>
+                                        {/* Badge de estado colorido en español */}
                                         <td className="py-4 px-6">
-                                            <button
-                                                onClick={() => viewDetails(planilla)}
-                                                className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300 font-medium text-sm"
-                                            >
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                </svg>
-                                                Ver
-                                            </button>
+                                            <span className={`px-2 py-1 rounded-lg text-xs font-bold uppercase ${
+                                                planilla.status === 0 ? 'bg-yellow-500/15 text-yellow-400' :
+                                                planilla.status === 1 ? 'bg-blue-500/15 text-blue-400' :
+                                                planilla.status === 2 ? 'bg-green-500/15 text-green-400' :
+                                                planilla.status === 3 ? 'bg-emerald-500/15 text-emerald-400' :
+                                                'bg-red-500/15 text-red-400'
+                                            }`}>
+                                                {['Borrador', 'Calculado', 'Aprobado', 'Pagado', 'Cancelado'][planilla.status] || 'Borrador'}
+                                            </span>
+                                        </td>
+                                        {/* Acciones con texto */}
+                                        <td className="py-4 px-6" onClick={(e) => e.stopPropagation()}>
+                                            <div className="flex items-center gap-2">
+                                                {(planilla.status === 0 || planilla.status === 1) && (
+                                                    <button
+                                                        onClick={async (e) => {
+                                                            e.stopPropagation();
+                                                            openingFromTable.current = true;
+                                                            setSelectedPlanilla(planilla);
+                                                            await fetchHours(planilla.id);
+                                                            setShowHoursPanel(true);
+                                                        }}
+                                                        className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-lg transition-all"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                        </svg>
+                                                        Horas
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); viewDetails(planilla); }}
+                                                    className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium text-gray-300 bg-navy-800 hover:bg-primary-500/10 hover:text-primary-400 border border-navy-600 hover:border-primary-500/30 rounded-lg transition-all"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                    </svg>
+                                                    Ver
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

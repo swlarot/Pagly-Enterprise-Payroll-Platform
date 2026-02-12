@@ -87,28 +87,23 @@ const ReportesPage = () => {
         return new Date(dateString).toLocaleDateString('es-PA');
     };
 
-    const ReporteCard = ({ title, description, icon, color, borderColor, bgGradient, tipo, comingSoon }) => (
-        <div className={`rounded-2xl shadow-lg shadow-black/20 hover:shadow-xl hover:shadow-black/25 transition-shadow p-6 ${bgGradient} border ${borderColor}`}>
-            {/* Icono y título */}
-            <div className="flex items-start gap-4 mb-4">
-                <div className={`w-12 h-12 ${color} rounded-full flex items-center justify-center shadow-lg shadow-black/20`}>
-                    {icon}
-                </div>
-                <div className="flex-1">
-                    <h3 className="font-semibold text-lg text-gray-100 flex items-center gap-2">
-                        {title}
-                        {comingSoon && <span className="px-2 py-0.5 bg-amber-500/15 text-amber-400 text-xs rounded-full">Próximamente</span>}
-                    </h3>
-                    <p className="text-sm text-gray-400 mt-1">{description}</p>
-                </div>
+    // Componente de card activa con el nuevo diseño
+    const ReporteCard = ({ title, description, icon, accentClass, tipo }) => (
+        <div className="group bg-navy-900 border border-navy-700 hover:border-primary-500/40 rounded-xl p-5 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/30">
+            {/* Icono grande */}
+            <div className={`w-12 h-12 bg-gradient-to-br from-primary-600/20 to-primary-500/10 border border-primary-500/20 rounded-xl flex items-center justify-center mb-4 ${accentClass}`}>
+                {icon}
             </div>
+
+            {/* Título y descripción */}
+            <h3 className="text-base font-bold text-gray-100 font-display mb-1">{title}</h3>
+            <p className="text-sm text-gray-500 mb-4 leading-relaxed">{description}</p>
 
             {/* Select planilla */}
             <select
                 value={selectedPlanilla}
                 onChange={(e) => setSelectedPlanilla(e.target.value)}
-                disabled={comingSoon}
-                className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 mb-4 disabled:opacity-50"
+                className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 mb-4 text-sm"
             >
                 <option value="">Seleccionar planilla...</option>
                 {planillas.map(p => (
@@ -118,36 +113,42 @@ const ReportesPage = () => {
                 ))}
             </select>
 
-            {/* Botones */}
-            <div className="flex gap-2">
+            {/* Botones de acción */}
+            <div className="flex items-center gap-2 pt-3 border-t border-navy-700">
+                {/* Ver */}
                 <button
                     onClick={() => verReporte(tipo)}
-                    disabled={!selectedPlanilla || loading || comingSoon}
-                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-white ${color} rounded-lg hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity`}
+                    disabled={!selectedPlanilla || loading}
+                    title="Ver reporte"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-navy-800 hover:bg-primary-600 border border-navy-700 hover:border-primary-600 rounded-lg text-xs font-medium text-gray-400 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
                     Ver
                 </button>
+                {/* Excel */}
                 <button
                     onClick={() => descargarExcel(tipo)}
-                    disabled={!selectedPlanilla || loading || comingSoon}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    disabled={!selectedPlanilla || loading}
+                    title="Descargar Excel"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-navy-800 hover:bg-emerald-600 border border-navy-700 hover:border-emerald-600 rounded-lg text-xs font-medium text-gray-400 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
                     Excel
                 </button>
+                {/* PDF */}
                 <button
                     onClick={() => descargarPdf(tipo)}
-                    disabled={!selectedPlanilla || loading || comingSoon}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    disabled={!selectedPlanilla || loading}
+                    title="Descargar PDF"
+                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-navy-800 hover:bg-red-600 border border-navy-700 hover:border-red-600 rounded-lg text-xs font-medium text-gray-400 hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
                     </svg>
                     PDF
                 </button>
@@ -408,79 +409,82 @@ const ReportesPage = () => {
                 <p className="text-gray-400 mt-1">Genere y descargue reportes oficiales para CSS, Seguro Educativo, ISR y más</p>
             </div>
 
-            {/* Grid de cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Grid de cards — 2 columnas en desktop */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <ReporteCard
                     title="Planilla CSS"
                     description="Reporte para la Caja de Seguro Social con aportes CSS de empleados y empleador"
-                    icon={<svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>}
-                    color="bg-primary-600"
-                    borderColor="border-primary-500"
-                    bgGradient="bg-gradient-to-br from-primary-500/10 to-primary-500/15"
+                    icon={
+                        <svg className="w-6 h-6 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                    }
+                    accentClass="bg-gradient-to-br from-primary-600/20 to-primary-500/10 border-primary-500/20"
                     tipo="css"
                 />
 
                 <ReporteCard
                     title="Seguro Educativo"
-                    description="Reporte de aportes al Seguro Educativo"
-                    icon={<svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M12 14l9-5-9-5-9 5 9 5z" /><path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" /></svg>}
-                    color="bg-green-600"
-                    borderColor="border-green-500"
-                    bgGradient="bg-gradient-to-br from-green-500/15 to-green-500/15"
+                    description="Reporte de aportes al Seguro Educativo para la DGI"
+                    icon={
+                        <svg className="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path d="M12 14l9-5-9-5-9 5 9 5z" />
+                            <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222" />
+                        </svg>
+                    }
+                    accentClass="bg-gradient-to-br from-purple-600/20 to-purple-500/10 border-purple-500/20"
                     tipo="seguro-educativo"
                 />
 
                 <ReporteCard
                     title="Impuesto sobre la Renta"
                     description="Reporte ISR para la DGI con proyección anual y retenciones"
-                    icon={<svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>}
-                    color="bg-amber-600"
-                    borderColor="border-amber-500"
-                    bgGradient="bg-gradient-to-br from-amber-500/15 to-amber-500/15"
+                    icon={
+                        <svg className="w-6 h-6 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                    }
+                    accentClass="bg-gradient-to-br from-amber-600/20 to-amber-500/10 border-amber-500/20"
                     tipo="isr"
                 />
 
                 <ReporteCard
                     title="Planilla Detallada"
                     description="Desglose completo de la planilla con todos los conceptos: salarios, deducciones, horas extra, etc."
-                    icon={<svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
-                    color="bg-purple-600"
-                    borderColor="border-purple-500"
-                    bgGradient="bg-gradient-to-br from-purple-500/15 to-purple-500/15"
+                    icon={
+                        <svg className="w-6 h-6 text-violet-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    }
+                    accentClass="bg-gradient-to-br from-violet-600/20 to-violet-500/10 border-violet-500/20"
                     tipo="planilla-detallada"
                 />
 
                 <ReporteCard
                     title="Horas Extra"
                     description="Reporte detallado de horas extra por tipo: diurna, nocturna, festivos, mixtas y exceso"
-                    icon={<svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                    color="bg-orange-600"
-                    borderColor="border-orange-500"
-                    bgGradient="bg-gradient-to-br from-orange-500/15 to-orange-500/15"
+                    icon={
+                        <svg className="w-6 h-6 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    }
+                    accentClass="bg-gradient-to-br from-orange-600/20 to-orange-500/10 border-orange-500/20"
                     tipo="horas-extra"
                 />
 
-                <ReporteCard
-                    title="Costos Patronales"
-                    description="Resumen de todos los aportes del empleador: CSS patronal, SE patronal, riesgo profesional"
-                    icon={<svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>}
-                    color="bg-red-600"
-                    borderColor="border-red-500"
-                    bgGradient="bg-gradient-to-br from-red-500/15 to-red-500/15"
-                    tipo="css"
-                    comingSoon
-                />
-
-                <ReporteCard
-                    title="Recibos de Pago"
-                    description="Generar recibos individuales de pago para cada empleado"
-                    icon={<svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}
-                    color="bg-gray-600"
-                    borderColor="border-navy-600"
-                    bgGradient="bg-gradient-to-br from-navy-800 to-navy-700"
-                    tipo="recibos"
-                    comingSoon
-                />
+                {/* Banner Coming Soon — único, ocupa todo el ancho */}
+                <div className="col-span-full mt-2 flex items-center gap-3 px-5 py-3.5 bg-navy-800/50 border border-navy-700/50 rounded-xl">
+                    <div className="w-8 h-8 rounded-lg bg-navy-700 flex items-center justify-center flex-shrink-0">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-gray-400">Más reportes en camino</p>
+                        <p className="text-xs text-gray-600">Costos patronales, recibos de pago, reportes de CSS, análisis de tendencias y más</p>
+                    </div>
+                </div>
             </div>
 
             {/* Modal */}

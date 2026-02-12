@@ -2,12 +2,132 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Base tipográfica — optimizada para legibilidad ─── */
 body {
   font-family: 'DM Sans', sans-serif;
   background-color: #0a1929;
   color: #f3f4f6;
+  font-size: 16px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Space Grotesk', sans-serif;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+/* Texto secundario más legible — gris claro en vez de muy tenue */
+.text-gray-400 {
+  color: #a3b8c8 !important; /* más claro que el gris-400 por defecto */
+}
+.text-gray-500 {
+  color: #8eaabf !important;
+}
+
+/* ─── Tablas — filas más altas y texto más legible ─── */
+table {
+  font-size: 15px;
+}
+
+thead th {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  padding-top: 14px !important;
+  padding-bottom: 14px !important;
+}
+
+tbody td {
+  padding-top: 14px !important;
+  padding-bottom: 14px !important;
+  line-height: 1.5;
+}
+
+/* ─── Inputs y selects — texto más grande y altura generosa ─── */
+input, select, textarea {
+  font-size: 15px !important;
+  min-height: 44px;
+}
+
+/* ─── Botones — mínimo 44px de altura (accesibilidad táctil) ─── */
+button {
+  min-height: 36px;
+}
+
+/* ─── Focus visible — borde claro para navegación por teclado ─── */
+:focus-visible {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ─── Scrollbar custom ─── */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: #102a43;
+}
+::-webkit-scrollbar-thumb {
+  background: #334e68;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #059669;
+}
+
+/* ─── Keyframes globales ─── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ─── Clases utilitarias Pagly ─── */
+@layer components {
+  .pagly-card {
+    @apply bg-navy-900 border border-navy-700 rounded-xl shadow-lg shadow-black/20;
+  }
+
+  .pagly-stat {
+    @apply pagly-card p-6 hover:border-primary-500/40 transition-all duration-200;
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.4s ease-out both;
+  }
+
+  .animate-slide-in-left {
+    animation: slideInLeft 0.3s ease-out both;
+  }
+
+  /* Tabla legible — clase opcional para tablas con más espacio */
+  .pagly-table th {
+    @apply text-xs font-semibold text-gray-300 uppercase tracking-widest py-3.5 px-5;
+  }
+  .pagly-table td {
+    @apply py-3.5 px-5 text-[15px];
+  }
+  .pagly-table tbody tr {
+    @apply border-b border-navy-800 hover:bg-navy-800/40 transition-colors;
+  }
 }

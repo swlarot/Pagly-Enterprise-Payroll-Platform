@@ -323,78 +323,53 @@ const EmpleadosPage = () => {
 
     return (
         <div className="space-y-6">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-400">Total Empleados</p>
-                            <p className="text-3xl font-bold font-display text-gray-100 mt-2">{empleados.length}</p>
-                        </div>
-                        <div className="w-12 h-12 bg-primary-500/15 rounded-lg flex items-center justify-center">
-                            <svg className="w-6 h-6 text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+            {/* Action Bar + Stats bar compacta */}
+            <div className="flex flex-col gap-4">
+                {/* Fila superior: botón + stats */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    {canWrite() && (
+                        <button
+                            onClick={openNewModal}
+                            className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
+                        >
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                             </svg>
+                            Agregar Empleado
+                        </button>
+                    )}
+
+                    {/* Stats bar compacta */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-navy-800 border border-navy-700 rounded-lg">
+                            <div className="w-2 h-2 rounded-full bg-primary-400" />
+                            <span className="text-sm text-gray-300 font-medium">
+                                {empleados.length} <span className="text-gray-500 font-normal">registrados</span>
+                            </span>
                         </div>
-                    </div>
-                    <div className="mt-4 flex items-center text-sm">
-                        <span className="text-gray-500">Registrados en el sistema</span>
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-navy-800 border border-navy-700 rounded-lg">
+                            <div className="w-2 h-2 rounded-full bg-green-400" />
+                            <span className="text-sm text-gray-300 font-medium">
+                                {activeEmpleados.length} <span className="text-gray-500 font-normal">activos</span>
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-navy-800 border border-navy-700 rounded-lg">
+                            <div className="w-2 h-2 rounded-full bg-red-400" />
+                            <span className="text-sm text-gray-300 font-medium">
+                                {empleados.filter(e => !e.estaActivo && !e.isDeleted).length} <span className="text-gray-500 font-normal">inactivos</span>
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-navy-800 border border-navy-700 rounded-lg">
+                            <div className="w-2 h-2 rounded-full bg-purple-400" />
+                            <span className="text-sm font-mono text-gray-300 font-medium">
+                                {formatCurrency(totalNomina)} <span className="text-gray-500 font-normal font-sans">nómina est.</span>
+                            </span>
+                        </div>
                     </div>
                 </div>
 
-                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-400">Empleados Activos</p>
-                            <p className="text-3xl font-bold font-display text-gray-100 mt-2">{activeEmpleados.length}</p>
-                        </div>
-                        <div className="w-12 h-12 bg-green-500/15 rounded-lg flex items-center justify-center">
-                            <svg className="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </div>
-                    </div>
-                    <div className="mt-4 flex items-center text-sm">
-                        <span className="text-green-400 font-medium">
-                            {empleados.length > 0 ? ((activeEmpleados.length / empleados.length) * 100).toFixed(1) : 0}%
-                        </span>
-                        <span className="text-gray-500 ml-2">del total</span>
-                    </div>
-                </div>
-
-                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-400">Nómina Mensual Est.</p>
-                            <p className="text-3xl font-bold font-display font-mono text-gray-100 mt-2">{formatCurrency(totalNomina)}</p>
-                        </div>
-                        <div className="w-12 h-12 bg-purple-500/15 rounded-lg flex items-center justify-center">
-                            <svg className="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                        </div>
-                    </div>
-                    <div className="mt-4 flex items-center text-sm">
-                        <span className="text-gray-500">Solo salarios base</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* Action Bar */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                {canWrite() && (
-                    <button
-                        onClick={openNewModal}
-                        className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
-                    >
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        Agregar Empleado
-                    </button>
-                )}
-
-                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                {/* Fila inferior: filtros + buscador */}
+                <div className="flex flex-col sm:flex-row gap-3">
                     {/* Status Filter */}
                     <select
                         value={statusFilter}
@@ -409,7 +384,7 @@ const EmpleadosPage = () => {
                     </select>
 
                     {/* Search Bar */}
-                    <div className="relative w-full sm:w-80">
+                    <div className="relative flex-1 sm:max-w-sm">
                         <input
                             type="text"
                             placeholder="Buscar por nombre, apellido o cédula..."
@@ -439,39 +414,48 @@ const EmpleadosPage = () => {
                     <table className="w-full">
                         <thead className="bg-navy-950 border-b border-navy-700">
                             <tr>
-                                <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
-                                <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Identificación</th>
-                                <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Email / Acceso</th>
-                                <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Salario Base</th>
-                                <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Tasa/h</th>
-                                <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Contratación</th>
-                                <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Departamento</th>
-                                <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Posición</th>
-                                <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                                <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
+                                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre</th>
+                                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Identificación</th>
+                                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Email / Acceso</th>
+                                <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Salario Base</th>
+                                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Tasa/h</th>
+                                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Contratación</th>
+                                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Departamento</th>
+                                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Posición</th>
+                                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="bg-navy-900 divide-y divide-navy-700">
-                            {filteredEmpleados.map((empleado) => (
-                                <tr key={empleado.id} className="hover:bg-navy-800 transition-colors">
-                                    <td className="py-4 px-6">
-                                        <div className="flex items-center">
-                                            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-600 rounded-full flex items-center justify-center text-white font-semibold text-sm mr-3">
-                                                {empleado.nombre.charAt(0)}{empleado.apellido.charAt(0)}
+                            {filteredEmpleados.map((empleado) => {
+                                // Color de avatar consistente basado en el primer char del nombre
+                                const avatarColors = [
+                                    'bg-gradient-to-br from-primary-600 to-primary-500',
+                                    'bg-gradient-to-br from-blue-600 to-blue-500',
+                                    'bg-gradient-to-br from-purple-600 to-purple-500',
+                                    'bg-gradient-to-br from-amber-600 to-amber-500',
+                                    'bg-gradient-to-br from-red-600 to-red-500',
+                                ];
+                                const avatarColor = avatarColors[(empleado.nombre?.charCodeAt(0) || 0) % 5];
+                                return (
+                                <tr key={empleado.id} className="border-l-2 border-transparent hover:border-primary-500 hover:bg-navy-800/50 transition-all">
+                                    {/* Nombre + Avatar */}
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${avatarColor}`}>
+                                                {empleado.nombre?.[0]?.toUpperCase()}{empleado.apellido?.[0]?.toUpperCase()}
                                             </div>
                                             <div>
-                                                <div className="text-sm font-medium text-gray-100">
-                                                    {empleado.nombre} {empleado.apellido}
-                                                </div>
-                                                <div className="text-sm text-gray-500">ID: {empleado.id}</div>
+                                                <p className="text-sm font-semibold text-gray-200">{empleado.nombre} {empleado.apellido}</p>
+                                                <p className="text-xs text-gray-500">{empleado.usuarioVinculadoEmail ?? empleado.email ?? `ID: ${empleado.id}`}</p>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="py-4 px-6 text-sm text-gray-100">{empleado.numeroIdentificacion}</td>
-                                    <td className="py-4 px-6">
+                                    <td className="py-3 px-4 text-sm text-gray-300">{empleado.numeroIdentificacion}</td>
+                                    <td className="py-3 px-4">
                                         {(empleado.usuarioVinculadoEmail ?? empleado.email) ? (
                                             <div className="flex flex-col gap-1">
-                                                <span className="text-sm text-gray-100">{empleado.usuarioVinculadoEmail ?? empleado.email}</span>
+                                                <span className="text-sm text-gray-300">{empleado.usuarioVinculadoEmail ?? empleado.email}</span>
                                                 {empleado.tieneAccesoSistema ? (
                                                     <span className="inline-flex items-center w-fit px-2 py-0.5 rounded text-xs font-medium bg-green-500/15 text-green-400">
                                                         {empleado.rolSistema || 'Employee'}
@@ -483,11 +467,16 @@ const EmpleadosPage = () => {
                                                 )}
                                             </div>
                                         ) : (
-                                            <span className="text-sm text-gray-400">—</span>
+                                            <span className="text-sm text-gray-500">—</span>
                                         )}
                                     </td>
-                                    <td className="py-4 px-6 text-sm font-medium font-mono text-gray-100">{formatCurrency(empleado.salarioBase)}</td>
-                                    <td className="py-4 px-6 text-sm font-mono text-gray-300">
+                                    {/* Salario con font-mono y prefijo B/. */}
+                                    <td className="py-3 px-4 text-right">
+                                        <span className="text-sm font-mono text-gray-200">
+                                            B/. {Number(empleado.salarioBase || 0).toLocaleString('es-PA', { minimumFractionDigits: 2 })}
+                                        </span>
+                                    </td>
+                                    <td className="py-3 px-4 text-sm font-mono text-gray-300">
                                         {(() => {
                                             const hours = empleado.hoursPerPeriod || 104;
                                             const rate = hours > 0 ? empleado.salarioBase / hours : 0;
@@ -497,102 +486,104 @@ const EmpleadosPage = () => {
                                             {PAY_PERIOD_CONFIG[empleado.payPeriodType]?.name ?? 'Quincenal'}
                                         </div>
                                     </td>
-                                    <td className="py-4 px-6 text-sm text-gray-500">
+                                    <td className="py-3 px-4 text-sm text-gray-500">
                                         {new Date(empleado.fechaContratacion).toLocaleDateString('es-PA', {
                                             day: '2-digit',
                                             month: 'short',
                                             year: 'numeric'
                                         })}
                                     </td>
-                                    <td className="py-4 px-6 text-sm text-gray-100">
-                                        {empleado.departamentoNombre || <span className="text-gray-400">-</span>}
+                                    <td className="py-3 px-4 text-sm text-gray-300">
+                                        {empleado.departamentoNombre || <span className="text-gray-500">-</span>}
                                     </td>
-                                    <td className="py-4 px-6 text-sm text-gray-100">
-                                        {empleado.posicionNombre || <span className="text-gray-400">-</span>}
+                                    <td className="py-3 px-4 text-sm text-gray-300">
+                                        {empleado.posicionNombre || <span className="text-gray-500">-</span>}
                                     </td>
-                                    <td className="py-4 px-6">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                            empleado.isDeleted
-                                                ? 'bg-navy-700 text-gray-300'
-                                                : empleado.estaActivo
-                                                ? 'bg-green-500/15 text-green-400'
-                                                : 'bg-red-500/15 text-red-400'
-                                        }`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                                    {/* Estado con punto de color */}
+                                    <td className="py-3 px-4">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                                                 empleado.isDeleted ? 'bg-gray-500' : empleado.estaActivo ? 'bg-green-400' : 'bg-red-400'
-                                            }`}></span>
-                                            {empleado.isDeleted ? 'Eliminado' : empleado.estaActivo ? 'Activo' : 'Inactivo'}
-                                        </span>
+                                            }`} />
+                                            <span className={`text-sm font-medium ${
+                                                empleado.isDeleted ? 'text-gray-400' : empleado.estaActivo ? 'text-green-400' : 'text-red-400'
+                                            }`}>
+                                                {empleado.isDeleted ? 'Eliminado' : empleado.estaActivo ? 'Activo' : 'Inactivo'}
+                                            </span>
+                                        </div>
                                     </td>
-                                    <td className="py-4 px-6">
+                                    {/* Acciones: botones de icono compactos */}
+                                    <td className="py-3 px-4">
                                         {!isReadOnly() ? (
-                                            <div className="flex items-center gap-2 flex-wrap">
+                                            <div className="flex items-center gap-1">
                                                 {canWrite() && (
                                                     <>
+                                                        {/* Editar */}
                                                         <button
                                                             onClick={() => handleEdit(empleado)}
-                                                            className="inline-flex items-center gap-1 text-primary-400 hover:text-primary-300 font-medium text-sm"
+                                                            title="Editar"
+                                                            className="p-1.5 text-gray-400 hover:text-primary-400 hover:bg-primary-500/10 rounded-lg transition-all"
                                                         >
                                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                                             </svg>
-                                                            Editar
                                                         </button>
+                                                        {/* Vincular / Desvincular usuario */}
                                                         {empleado.userId ? (
                                                             <button
                                                                 onClick={() => handleUnlinkUser(empleado)}
-                                                                className="inline-flex items-center gap-1 text-amber-400 hover:text-amber-300 font-medium text-sm"
                                                                 title="Desvincular usuario"
+                                                                className="p-1.5 text-gray-400 hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition-all"
                                                             >
                                                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                                                                 </svg>
-                                                                Desvincular
                                                             </button>
                                                         ) : !(empleado.usuarioVinculadoEmail ?? empleado.email) ? (
                                                             <button
                                                                 onClick={() => handleLinkUser(empleado)}
-                                                                className="inline-flex items-center gap-1 text-green-400 hover:text-green-300 font-medium text-sm"
                                                                 title="Vincular usuario existente"
+                                                                className="p-1.5 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-all"
                                                             >
                                                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                                                                 </svg>
-                                                                Vincular
                                                             </button>
                                                         ) : null}
                                                     </>
                                                 )}
+                                                {/* Reactivar / Eliminar */}
                                                 {empleado.isDeleted ? (
                                                     canDelete() && (
                                                         <button
                                                             onClick={() => handleReactivate(empleado)}
-                                                            className="inline-flex items-center gap-1 text-green-400 hover:text-green-300 font-medium text-sm"
+                                                            title="Reactivar"
+                                                            className="p-1.5 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-all"
                                                         >
                                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                                             </svg>
-                                                            Reactivar
                                                         </button>
                                                     )
                                                 ) : canDelete() && (
                                                     <button
                                                         onClick={() => handleDeleteClick(empleado)}
-                                                        className="inline-flex items-center gap-1 text-red-400 hover:text-red-300 font-medium text-sm"
+                                                        title="Eliminar"
+                                                        className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                         </svg>
-                                                        Eliminar
                                                     </button>
                                                 )}
                                             </div>
                                         ) : (
-                                            <span className="text-sm text-gray-400 italic">Solo lectura</span>
+                                            <span className="text-sm text-gray-500 italic">Solo lectura</span>
                                         )}
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
 
