@@ -450,25 +450,17 @@ public class HorasExtraController : ControllerBase
 
     /// <summary>
     /// Calcula el monto de horas extra usando el HourlyRate del empleado.
-    /// Si HourlyRate es 0, calcula: SalarioBase / HoursPerPeriod (o fallback a SalarioBase si HoursPerPeriod es 0).
+    /// Si HourlyRate es 0, calcula con base mensual: SalarioMensual / (HoursPerWeek × 4.333).
     /// Considera FactorExceso si aplica.
     /// </summary>
     private decimal CalcularMonto(Empleado empleado, decimal cantidadHoras, decimal factorMultiplicador, decimal? factorExceso = null)
     {
         decimal hourlyRate = empleado.HourlyRate;
 
-        // Si HourlyRate no está calculado, calcularlo
         if (hourlyRate <= 0)
         {
-            if (empleado.HoursPerPeriod > 0)
-            {
-                hourlyRate = empleado.SalarioBase / empleado.HoursPerPeriod;
-            }
-            else
-            {
-                // Fallback: asumir salario mensual / 208 horas (mes estándar)
-                hourlyRate = empleado.SalarioBase / 208m;
-            }
+            hourlyRate = Empleado.ComputeHourlyRateFromMonthly(
+                empleado.SalarioBase, empleado.HoursPerWeek, empleado.PayPeriodType);
         }
 
         // Calcular monto: tasa × horas × factor base × (factor exceso si aplica)

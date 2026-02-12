@@ -322,7 +322,7 @@ public class PayrollHeadersController : ControllerBase
                 {
                     var hourlyRate = employee.HourlyRate > 0
                         ? employee.HourlyRate
-                        : (employee.HoursPerPeriod > 0 ? employee.SalarioBase / employee.HoursPerPeriod : employee.SalarioBase);
+                        : Empleado.ComputeHourlyRateFromMonthly(employee.SalarioBase, employee.HoursPerWeek, employee.PayPeriodType);
 
                     hours.RegularPay = hours.RegularHours * hourlyRate;
                     hours.SundayPay = hours.SundayHours * hourlyRate * 1.50m;
@@ -378,10 +378,10 @@ public class PayrollHeadersController : ControllerBase
 
                 if (horasExtraAprobadas.Any())
                 {
-                    // Calcular salario hora para horas extra
+                    // Calcular salario hora para horas extra (base mensual si no hay HourlyRate)
                     var salarioHora = employee.HourlyRate > 0
                         ? employee.HourlyRate
-                        : (employee.HoursPerPeriod > 0 ? employee.SalarioBase / employee.HoursPerPeriod : employee.SalarioBase / 208m);
+                        : Empleado.ComputeHourlyRateFromMonthly(employee.SalarioBase, employee.HoursPerWeek, employee.PayPeriodType);
 
                     var (montoHorasExtra, horasDiurnas, horasNocturnas, horasDomingoFeriado) =
                         await _asistenciaService.CalcularMontoHorasExtra(
