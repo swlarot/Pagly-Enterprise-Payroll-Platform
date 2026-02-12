@@ -59,6 +59,11 @@ cleanup_*.sql
 *.plan.md
 .cursor
 
+# Claude Code / AI tools (no necesarios en producción)
+.claude/
+.agents/
+.cursor/
+
 # Misc
 .DS_Store
 Thumbs.db
