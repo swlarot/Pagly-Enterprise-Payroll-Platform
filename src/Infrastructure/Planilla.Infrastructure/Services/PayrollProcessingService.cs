@@ -51,8 +51,9 @@ public class PayrollProcessingService
         // ====================================================================
 
         // Calcular salario hora y diario para conceptos de asistencia
+        // SalarioBase ya es mensual
         decimal salarioMensual = empleado.SalarioBase;
-        decimal salarioHora = _asistenciaService.CalcularSalarioHora(salarioMensual, 48);
+        decimal salarioHora = _asistenciaService.CalcularSalarioHora(salarioMensual, empleado.HoursPerWeek);
         decimal salarioDiario = _asistenciaService.CalcularSalarioDiario(salarioMensual);
 
         // Horas extra aprobadas del período
@@ -74,9 +75,11 @@ public class PayrollProcessingService
         // PASO 2: Calcular GrossPay ajustado con asistencia
         // ====================================================================
 
-        // GrossPay ajustado = salarioBase + horasExtra - ausencias
+        // GrossPay ajustado = salario del período + horasExtra - ausencias
+        // SalarioBase es mensual, necesitamos el salario del período para esta planilla
         // (Las vacaciones ya están incluidas en el salario base en Panamá)
-        decimal grossPayAjustado = empleado.SalarioBase + montoHorasExtra - descuentoAusencias;
+        decimal salarioPeriodo = empleado.GetSalarioPeriodo();
+        decimal grossPayAjustado = salarioPeriodo + montoHorasExtra - descuentoAusencias;
 
         // ====================================================================
         // PASO 3: Calcular deducciones básicas (CSS, SE, ISR)

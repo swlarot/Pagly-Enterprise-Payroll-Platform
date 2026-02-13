@@ -459,8 +459,9 @@ public class HorasExtraController : ControllerBase
 
         if (hourlyRate <= 0)
         {
+            // SalarioBase ya es mensual, no necesita conversión por período
             hourlyRate = Empleado.ComputeHourlyRateFromMonthly(
-                empleado.SalarioBase, empleado.HoursPerWeek, empleado.PayPeriodType);
+                empleado.SalarioBase, empleado.HoursPerWeek);
         }
 
         // Calcular monto: tasa × horas × factor base × (factor exceso si aplica)

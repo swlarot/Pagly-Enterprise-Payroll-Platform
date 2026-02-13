@@ -27,14 +27,17 @@ public class AsistenciaCalculationService
 
     /// <summary>
     /// Calcula el salario por hora basado en el salario mensual y horas semanales.
-    /// Fórmula: salarioMensual / (horasSemanales * 4.33)
+    /// Fórmula: salarioMensual / (horasSemanales * 4.3333)
+    /// Usa la constante oficial MITRADEL: 52 semanas / 12 meses = 4.3333 semanas por mes
     /// </summary>
     public decimal CalcularSalarioHora(decimal salarioMensual, int horasSemanales = 48)
     {
         if (salarioMensual <= 0) throw new ArgumentException("Salario mensual debe ser mayor a cero", nameof(salarioMensual));
         if (horasSemanales <= 0) throw new ArgumentException("Horas semanales debe ser mayor a cero", nameof(horasSemanales));
 
-        return Math.Round(salarioMensual / (horasSemanales * 4.33m), 2);
+        // Usar constante oficial MITRADEL: 52/12 = 4.3333...
+        const decimal weeksPerMonth = 52m / 12m;
+        return Math.Round(salarioMensual / (horasSemanales * weeksPerMonth), 2);
     }
 
     /// <summary>
