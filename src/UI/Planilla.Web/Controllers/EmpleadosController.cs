@@ -110,28 +110,41 @@ namespace Vorluno.Planilla.Web.Controllers
                 })
                 .ToListAsync();
 
-            var empleadosDto = empleados.Select(e => new EmpleadoVerDto(
-                e.Empleado.Id,
-                e.Empleado.Nombre,
-                e.Empleado.Apellido,
-                e.Empleado.NumeroIdentificacion,
-                e.Empleado.Email,
-                e.Empleado.SalarioBase,
-                e.Empleado.FechaContratacion,
-                e.Empleado.EstaActivo,
-                e.Empleado.DepartamentoId,
-                e.Empleado.Departamento?.Nombre,
-                e.Empleado.PosicionId,
-                e.Empleado.Posicion?.Nombre,
-                !string.IsNullOrEmpty(e.Empleado.UserId),
-                e.RolSistema,
-                e.Empleado.PayPeriodType.ToString(),
-                e.Empleado.HoursPerWeek,
-                e.Empleado.HoursPerPeriod,
-                e.Empleado.HourlyRate,
-                e.Empleado.IsDeleted,
-                e.UsuarioVinculadoEmail
-            )).ToList();
+            var empleadosDto = empleados.Select(e => 
+            {
+                // Recalcular HourlyRate si es 0 (empleados creados antes de la corrección)
+                var hourlyRate = e.Empleado.HourlyRate;
+                if (hourlyRate <= 0 && e.Empleado.SalarioBase > 0 && e.Empleado.HoursPerWeek > 0)
+                {
+                    hourlyRate = Domain.Entities.Empleado.ComputeHourlyRateFromMonthly(
+                        e.Empleado.SalarioBase, 
+                        e.Empleado.HoursPerWeek
+                    );
+                }
+                
+                return new EmpleadoVerDto(
+                    e.Empleado.Id,
+                    e.Empleado.Nombre,
+                    e.Empleado.Apellido,
+                    e.Empleado.NumeroIdentificacion,
+                    e.Empleado.Email,
+                    e.Empleado.SalarioBase,
+                    e.Empleado.FechaContratacion,
+                    e.Empleado.EstaActivo,
+                    e.Empleado.DepartamentoId,
+                    e.Empleado.Departamento?.Nombre,
+                    e.Empleado.PosicionId,
+                    e.Empleado.Posicion?.Nombre,
+                    !string.IsNullOrEmpty(e.Empleado.UserId),
+                    e.RolSistema,
+                    e.Empleado.PayPeriodType.ToString(),
+                    e.Empleado.HoursPerWeek,
+                    e.Empleado.HoursPerPeriod,
+                    hourlyRate,
+                    e.Empleado.IsDeleted,
+                    e.UsuarioVinculadoEmail
+                );
+            }).ToList();
 
             return Ok(empleadosDto);
         }
@@ -181,6 +194,16 @@ namespace Vorluno.Planilla.Web.Controllers
                 return NotFound(); // Retorna un 404 Not Found si no existe o no pertenece al tenant
             }
 
+            // Recalcular HourlyRate si es 0 (empleados creados antes de la corrección)
+            var hourlyRate = result.Empleado.HourlyRate;
+            if (hourlyRate <= 0 && result.Empleado.SalarioBase > 0 && result.Empleado.HoursPerWeek > 0)
+            {
+                hourlyRate = Domain.Entities.Empleado.ComputeHourlyRateFromMonthly(
+                    result.Empleado.SalarioBase, 
+                    result.Empleado.HoursPerWeek
+                );
+            }
+
             var empleadoDto = new EmpleadoVerDto(
                 result.Empleado.Id,
                 result.Empleado.Nombre,
@@ -199,7 +222,7 @@ namespace Vorluno.Planilla.Web.Controllers
                 result.Empleado.PayPeriodType.ToString(),
                 result.Empleado.HoursPerWeek,
                 result.Empleado.HoursPerPeriod,
-                result.Empleado.HourlyRate,
+                hourlyRate,
                 result.Empleado.IsDeleted,
                 result.UsuarioVinculadoEmail
             );
@@ -284,6 +307,16 @@ namespace Vorluno.Planilla.Web.Controllers
 
             empleado = result!.Empleado;
 
+            // Recalcular HourlyRate si es 0 (por seguridad)
+            var hourlyRate = empleado.HourlyRate;
+            if (hourlyRate <= 0 && empleado.SalarioBase > 0 && empleado.HoursPerWeek > 0)
+            {
+                hourlyRate = Domain.Entities.Empleado.ComputeHourlyRateFromMonthly(
+                    empleado.SalarioBase, 
+                    empleado.HoursPerWeek
+                );
+            }
+
             var empleadoCreadoDto = new EmpleadoVerDto(
                 empleado.Id,
                 empleado.Nombre,
@@ -302,7 +335,7 @@ namespace Vorluno.Planilla.Web.Controllers
                 empleado.PayPeriodType.ToString(),
                 empleado.HoursPerWeek,
                 empleado.HoursPerPeriod,
-                empleado.HourlyRate,
+                hourlyRate,
                 false,
                 result.UsuarioVinculadoEmail
             );

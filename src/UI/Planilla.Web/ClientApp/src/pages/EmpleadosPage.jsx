@@ -478,13 +478,18 @@ const EmpleadosPage = () => {
                                     </td>
                                     <td className="py-3 px-4 text-sm font-mono text-gray-300">
                                         {(() => {
-                                            const hours = empleado.hoursPerPeriod || 104;
-                                            const rate = hours > 0 ? empleado.salarioBase / hours : 0;
+                                            // Usar hourlyRate del backend si está disponible y > 0
+                                            if (empleado.hourlyRate && empleado.hourlyRate > 0) {
+                                                return formatCurrency(empleado.hourlyRate);
+                                            }
+                                            // Fallback: calcular usando la fórmula correcta (mensual)
+                                            // Tasa = SalarioBase (mensual) / (HoursPerWeek × 4.3333)
+                                            const hoursPerWeek = empleado.hoursPerWeek || 48;
+                                            const weeksPerMonth = 52 / 12; // 4.3333...
+                                            const hoursPerMonth = hoursPerWeek * weeksPerMonth;
+                                            const rate = hoursPerMonth > 0 ? empleado.salarioBase / hoursPerMonth : 0;
                                             return formatCurrency(rate);
                                         })()}
-                                        <div className="text-xs text-gray-500 mt-0.5">
-                                            {PAY_PERIOD_CONFIG[empleado.payPeriodType]?.name ?? 'Quincenal'}
-                                        </div>
                                     </td>
                                     <td className="py-3 px-4 text-sm text-gray-500">
                                         {new Date(empleado.fechaContratacion).toLocaleDateString('es-PA', {
