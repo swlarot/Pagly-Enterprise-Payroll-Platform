@@ -29,6 +29,11 @@ public class Empleado : ITenantEntity
     [EmailAddress]
     public string? Email { get; set; }
 
+    /// <summary>
+    /// Salario base MENSUAL del empleado (regla de negocio Panamá - MITRADEL).
+    /// Este valor SIEMPRE representa el salario mensual, independientemente del PayPeriodType.
+    /// Para obtener el salario del período, usar GetSalarioPeriodo().
+    /// </summary>
     [Column(TypeName = "decimal(18, 2)")]
     [Range(0, double.MaxValue, ErrorMessage = "El salario base no puede ser negativo.")]
     public decimal SalarioBase { get; set; }
@@ -133,8 +138,9 @@ public class Empleado : ITenantEntity
     public decimal HoursPerPeriod { get; set; } = 104m;
 
     /// <summary>
-    /// Tasa por hora calculada con base mensual: SalarioMensual / (HoursPerWeek × 4.333).
-    /// Se almacena para performance pero se recalcula cuando cambia SalarioBase, HoursPerWeek o PayPeriodType.
+    /// Tasa por hora calculada con base mensual: SalarioBase (mensual) / (HoursPerWeek × 4.3333).
+    /// Se almacena para performance pero se recalcula cuando cambia SalarioBase o HoursPerWeek.
+    /// NO depende del PayPeriodType - siempre se calcula con base mensual.
     /// Usado para calcular horas extra, dominicales, feriados.
     /// </summary>
     [Column(TypeName = "decimal(18, 4)")]
@@ -214,35 +220,49 @@ public class Empleado : ITenantEntity
     }
 
     /// <summary>
-    /// Obtiene el salario mensual equivalente a partir del SalarioBase del período.
+    /// Obtiene el salario mensual. SalarioBase YA es mensual, no necesita conversión.
     /// </summary>
     public decimal GetMonthlySalary()
     {
-        var periodsPerYear = GetPeriodsPerYear(PayPeriodType);
-        return SalarioBase * periodsPerYear / 12m;
+        return SalarioBase;
     }
 
     /// <summary>
-    /// Calcula la tasa por hora con base mensual: SalarioMensual / (HoursPerWeek × 4.333).
+    /// Calcula la tasa por hora con base mensual: SalarioMensual / (HoursPerWeek × 4.3333).
+    /// SalarioBase debe ser el salario MENSUAL del empleado.
     /// Útil para fallbacks cuando HourlyRate no está persistido (ej. en controladores).
     /// </summary>
-    public static decimal ComputeHourlyRateFromMonthly(decimal salarioBase, int hoursPerWeek, PayPeriodType periodType)
+    public static decimal ComputeHourlyRateFromMonthly(decimal salarioMensual, int hoursPerWeek)
     {
-        if (salarioBase <= 0) return 0m;
+        if (salarioMensual <= 0) return 0m;
         if (hoursPerWeek <= 0) return 0m;
-        var periodsPerYear = GetPeriodsPerYear(periodType);
-        var salarioMensual = salarioBase * periodsPerYear / 12m;
         var horasPorMes = hoursPerWeek * WeeksPerMonth;
         return Math.Round(salarioMensual / horasPorMes, 4);
     }
 
     /// <summary>
-    /// Recalcula HourlyRate con base mensual: SalarioMensual / (HoursPerWeek × 4.333).
+    /// Recalcula HourlyRate con base mensual: SalarioBase (mensual) / (HoursPerWeek × 4.3333).
+    /// SalarioBase debe ser el salario MENSUAL del empleado.
     /// Independiente del período de pago (semanal, bisemanal, quincenal, mensual).
     /// </summary>
     public void RecalculateHourlyRate()
     {
-        HourlyRate = ComputeHourlyRateFromMonthly(SalarioBase, HoursPerWeek, PayPeriodType);
+        var hoursPerMonth = (decimal)HoursPerWeek * WeeksPerMonth;
+        HourlyRate = hoursPerMonth > 0
+            ? Math.Round(SalarioBase / hoursPerMonth, 4)
+            : 0;
+    }
+
+    /// <summary>
+    /// Calcula el salario que se paga en cada período (cheque).
+    /// SalarioBase (mensual) × 12 / períodos por año.
+    /// </summary>
+    public decimal GetSalarioPeriodo()
+    {
+        var periodsPerYear = GetPeriodsPerYear(PayPeriodType);
+        return periodsPerYear > 0
+            ? Math.Round(SalarioBase * 12m / periodsPerYear, 2)
+            : SalarioBase;
     }
 
     /// <summary>

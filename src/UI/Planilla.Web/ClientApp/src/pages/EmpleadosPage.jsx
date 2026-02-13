@@ -742,7 +742,7 @@ const EmpleadosPage = () => {
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Salario Base <span className="text-red-400">*</span>
+                                        Salario Base (Mensual) <span className="text-red-400">*</span>
                                     </label>
                                     <div className="relative">
                                         <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
@@ -757,6 +757,9 @@ const EmpleadosPage = () => {
                                             placeholder="1500.00"
                                         />
                                     </div>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        El salario mensual del empleado (independiente del período de pago)
+                                    </p>
                                 </div>
 
                                 {/* Sección: Información de Pago */}
@@ -823,6 +826,23 @@ const EmpleadosPage = () => {
                                                 </p>
                                             </div>
 
+                                            {/* Salario por Período (readonly) */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                                    Salario por Período
+                                                    <span className="text-gray-500 font-normal ml-2 text-xs">(calculado)</span>
+                                                </label>
+                                                <div className="w-full px-3 py-2 border border-navy-700 bg-navy-950 text-blue-400 rounded-lg font-mono font-semibold">
+                                                    {formData.salarioBase && PAY_PERIOD_CONFIG[formData.payPeriodType]
+                                                        ? formatCurrency(parseFloat(formData.salarioBase) * 12 / PAY_PERIOD_CONFIG[formData.payPeriodType].periodsPerYear)
+                                                        : <span className="text-gray-600">—</span>
+                                                    }
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Salario mensual × 12 &divide; períodos al año
+                                                </p>
+                                            </div>
+
                                             {/* Tasa por Hora (readonly) */}
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -830,13 +850,13 @@ const EmpleadosPage = () => {
                                                     <span className="text-gray-500 font-normal ml-2 text-xs">(calculada)</span>
                                                 </label>
                                                 <div className="w-full px-3 py-2 border border-navy-700 bg-navy-950 text-emerald-400 rounded-lg font-mono font-semibold">
-                                                    {formData.salarioBase && formData.hoursPerPeriod && parseFloat(formData.hoursPerPeriod) > 0
-                                                        ? formatCurrency(parseFloat(formData.salarioBase) / parseFloat(formData.hoursPerPeriod))
+                                                    {formData.salarioBase && formData.hoursPerWeek && parseFloat(formData.hoursPerWeek) > 0
+                                                        ? formatCurrency(parseFloat(formData.salarioBase) / (parseFloat(formData.hoursPerWeek) * 4.3333))
                                                         : <span className="text-gray-600">—</span>
                                                     }
                                                 </div>
                                                 <p className="text-xs text-gray-500 mt-1">
-                                                    Salario base &divide; horas por período
+                                                    Salario mensual &divide; (horas semanales × 4.3333)
                                                 </p>
                                             </div>
                                         </div>
