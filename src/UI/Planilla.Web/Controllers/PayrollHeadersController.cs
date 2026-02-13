@@ -62,7 +62,8 @@ public class PayrollHeadersController : ControllerBase
     [HttpGet]
     [RequirePermission(SystemPermission.PayrollView, SystemPermission.PayrollViewSelf)]
     public async Task<ActionResult<IEnumerable<PayrollHeader>>> GetPayrollHeaders(
-        [FromQuery] PayrollStatus? status)
+        [FromQuery] PayrollStatus? status,
+        [FromQuery] int? empleadoId = null)
     {
         var tenantId = _tenantContext.TenantId;
         var linkedEmployeeId = _currentUserService.GetLinkedEmployeeId();
@@ -78,6 +79,11 @@ public class PayrollHeadersController : ControllerBase
         if (linkedEmployeeId.HasValue)
         {
             query = query.Where(p => p.Details.Any(d => d.EmpleadoId == linkedEmployeeId.Value));
+        }
+        else if (empleadoId.HasValue)
+        {
+            // Owner/Admin puede filtrar por empleado específico (para ver perfil de empleado)
+            query = query.Where(p => p.Details.Any(d => d.EmpleadoId == empleadoId.Value));
         }
 
         // Filtrar por Status si se especifica
