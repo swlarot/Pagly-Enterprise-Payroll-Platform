@@ -31,7 +31,7 @@ Built with **Clean Architecture** principles, the system provides a robust found
 ## ✨ Key Features
 
 ### 💰 Payroll Engine
-- **CSS Calculations** — Tiered caps per Law 462 (9.75% employee / 12.25% employer)
+- **CSS Calculations** — Tiered caps per CSS Reform (9.75% employee / 13.25% employer until Feb 2027)
 - **Educational Insurance** — 1.25% employee / 1.50% employer (no cap)
 - **ISR (Income Tax)** — Progressive brackets with dependent deductions
 - **Professional Risk** — Configurable by job category (0.56% - 5.39%)
@@ -169,7 +169,7 @@ Para desplegar en CapRover (p. ej. droplet DigitalOcean):
 
 | Regulation | Rate | Notes |
 |------------|------|-------|
-| **CSS (Social Security)** | 9.75% employee / 12.25% employer | Tiered caps per Law 462 |
+| **CSS (Social Security)** | 9.75% employee / 13.25% employer | CSS Reform: 13.25% until Feb 2027, 14.25% until Feb 2029, 15.25% from Mar 2029 |
 | **Educational Insurance** | 1.25% employee / 1.50% employer | No maximum cap |
 | **ISR (Income Tax)** | Progressive | Annual brackets with deductions |
 | **Professional Risk** | 0.56% - 5.39% | Based on job category |

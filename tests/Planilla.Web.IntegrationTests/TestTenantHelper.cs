@@ -94,7 +94,7 @@ public static class TestTenantHelper
             Description = "Test Config",
             IsActive = true,
             CssEmployeeRate = 9.75m,
-            CssEmployerBaseRate = 12.25m,
+            CssEmployerBaseRate = 13.25m,
             CssRiskRateLow = 0.56m,
             CssRiskRateMedium = 2.10m,
             CssRiskRateHigh = 5.67m,

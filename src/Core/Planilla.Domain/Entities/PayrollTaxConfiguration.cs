@@ -54,7 +54,7 @@ public class PayrollTaxConfiguration : ITenantEntity
 
     /// <summary>
     /// Tasa base de aporte CSS del empleador.
-    /// Escalonada según Ley 462: 13.25% → 14.25% → 15.25%
+    /// Escalonada según Reforma CSS: hasta feb. 2027: 13.25% → mar. 2027-feb. 2029: 14.25% → desde mar. 2029: 15.25%
     /// </summary>
     [Required]
     [Range(0, 100)]
