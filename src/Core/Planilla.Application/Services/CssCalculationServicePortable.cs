@@ -2,7 +2,7 @@
 // Planilla - CssCalculationServicePortable
 // Source: Core360 Stage 4, Sección 3
 // Portado: 2025-12-26
-// Descripción: Servicio de cálculo CSS (Caja de Seguro Social) según Ley 462 de Panamá
+// Descripción: Servicio de cálculo CSS (Caja de Seguro Social) según Reforma CSS de Panamá
 // Cambios vs Core360:
 //   - Eliminado ILogger (opcional)
 //   - Reemplazado repositorio por IPayrollConfigProvider
@@ -18,7 +18,7 @@ using Vorluno.Planilla.Application.Results;
 namespace Vorluno.Planilla.Application.Services;
 
 /// <summary>
-/// Servicio de cálculo de CSS (Caja de Seguro Social) según Ley 462 de Panamá.
+/// Servicio de cálculo de CSS (Caja de Seguro Social) según Reforma CSS de Panamá.
 /// Implementa topes variables de cotización según años cotizados y salario promedio.
 /// </summary>
 public class CssCalculationServicePortable
@@ -173,10 +173,11 @@ public class CssCalculationServicePortable
         // Calcular CSS empleador
         var contributionBase = Math.Min(grossPay, cap);
 
-        // Tasa escalonada según Ley 462:
-        // 2020-2024: 13.25%
-        // 2025-2027: 14.25%
-        // 2028+: 15.25%
+        // Tasa escalonada según Reforma CSS:
+        // Hasta feb. 2027: 13.25%
+        // Mar. 2027 – feb. 2029: 14.25%
+        // Desde mar. 2029: 15.25%
+        // La tasa se lee de PayrollTaxConfiguration.CssEmployerBaseRate
         var rate = config.CssEmployerBaseRate;
         var amount = RoundingPolicy.CalculatePercentage(contributionBase, rate);
 

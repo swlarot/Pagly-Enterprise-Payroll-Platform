@@ -82,7 +82,7 @@ public class PayrollDetail : ITenantEntity
 
     /// <summary>
     /// Aporte CSS del empleador (costo patronal).
-    /// Tasa escalonada: 13.25% / 14.25% / 15.25% según período.
+    /// Tasa escalonada según Reforma CSS: hasta feb. 2027: 13.25% / mar. 2027-feb. 2029: 14.25% / desde mar. 2029: 15.25%.
     /// </summary>
     public decimal CssEmployer { get; set; }
 

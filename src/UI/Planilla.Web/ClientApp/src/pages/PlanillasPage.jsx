@@ -1,7 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
+import {
+    CheckCircle2,
+    Circle,
+    Calculator,
+    CheckCheck,
+    CreditCard,
+    Banknote,
+    Clock,
+    Settings,
+    Eye,
+    RotateCcw,
+    Plus,
+    Zap,
+    Upload,
+    Save,
+    AlertTriangle,
+    X,
+} from 'lucide-react';
 import { SkeletonCard, SkeletonTable } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
+import { Modal } from '../components/ui/Modal';
+import { Button } from '../components/ui/Button';
 import { api } from '../services/api';
 
 // Configuración de tipos de período de pago
@@ -11,6 +31,14 @@ const PAY_PERIOD_CONFIG = {
     2: { name: 'Quincenal', periodsPerYear: 24 },
     3: { name: 'Mensual', periodsPerYear: 12 },
 };
+
+// Pasos del workflow de la planilla
+const WORKFLOW_STEPS = [
+    { status: 0, label: 'Borrador', icon: Circle },
+    { status: 1, label: 'Calculado', icon: Calculator },
+    { status: 2, label: 'Aprobado', icon: CheckCheck },
+    { status: 3, label: 'Pagado', icon: Banknote },
+];
 
 const PlanillasPage = () => {
     const [planillas, setPlanillas] = useState([]);
@@ -22,6 +50,7 @@ const PlanillasPage = () => {
     const [showNewModal, setShowNewModal] = useState(false);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [planillaDetails, setPlanillaDetails] = useState(null);
+    const [showApproveConfirmModal, setShowApproveConfirmModal] = useState(false);
     const [formData, setFormData] = useState({
         payrollNumber: '',
         payPeriodType: 2,
@@ -192,7 +221,7 @@ const PlanillasPage = () => {
         try {
             setImportNovedadesLoading(true);
             const response = await api.post(`/api/payrollheaders/${selectedPlanilla.id}/hours/import-novedades?mode=${mode}`);
-            
+
             if (response.requiresConfirmation) {
                 setImportConfirmData({
                     employeesCount: response.employeesWithExistingValues,
@@ -243,7 +272,7 @@ const PlanillasPage = () => {
         try {
             // Limpiar todos los timers de debounce pendientes y guardar inmediatamente
             const empleadosConCambiosPendientes = new Set();
-            
+
             Object.keys(debounceTimers.current).forEach(empleadoId => {
                 if (debounceTimers.current[empleadoId]) {
                     clearTimeout(debounceTimers.current[empleadoId]);
@@ -253,7 +282,7 @@ const PlanillasPage = () => {
             });
 
             // Guardar solo las horas de empleados con cambios pendientes
-            const savePromises = Array.from(empleadosConCambiosPendientes).map(empleadoId => 
+            const savePromises = Array.from(empleadosConCambiosPendientes).map(empleadoId =>
                 saveEmployeeHours(empleadoId)
             );
 
@@ -262,7 +291,7 @@ const PlanillasPage = () => {
                 await Promise.all(savePromises);
                 toast.success('Horas guardadas correctamente');
             }
-            
+
             // Cerrar el panel
             setShowHoursPanel(false);
         } catch (err) {
@@ -395,11 +424,18 @@ const PlanillasPage = () => {
         }
     };
 
-    const handleApprove = async () => {
+    // handleApprove ahora abre el modal de confirmación
+    const handleApprove = () => {
+        setShowApproveConfirmModal(true);
+    };
+
+    // confirmedApprove ejecuta la llamada API real
+    const confirmedApprove = async () => {
         if (!selectedPlanilla) return;
 
         try {
             setProcessingAction('approving');
+            setShowApproveConfirmModal(false);
 
             await api.post(`/api/payrollheaders/${selectedPlanilla.id}/approve`);
 
@@ -422,6 +458,13 @@ const PlanillasPage = () => {
         }
     };
 
+    // Formatea la etiqueta del selector de planilla
+    const formatPlanillaOption = (planilla) => {
+        const periodoLabel = PAY_PERIOD_CONFIG[planilla.payPeriodType]?.name || '';
+        const fechaLabel = new Date(planilla.periodStartDate).toLocaleDateString('es-PA', { month: 'short', year: 'numeric' });
+        return `${planilla.payrollNumber} — ${fechaLabel}${periodoLabel ? ` (${periodoLabel})` : ''}`;
+    };
+
     if (loading) {
         return (
             <div className="space-y-6">
@@ -436,93 +479,246 @@ const PlanillasPage = () => {
         );
     }
 
+    // Determina si la planilla tiene datos calculados
+    const hasCalculatedData = selectedPlanilla && selectedPlanilla.status >= 1;
+
     return (
         <div className="space-y-6">
-            {/* Header Actions */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <button
-                    onClick={openNewModal}
-                    className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
-                >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    Nueva Planilla
-                </button>
 
-                {planillas.length > 0 && (
-                    <div className="relative w-full sm:w-64">
+            {/* ==================== HEADER ==================== */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h1 className="text-2xl font-bold text-gray-100">Planillas de Nómina</h1>
+                    <p className="text-sm text-gray-500 mt-0.5">Gestiona y aprueba tus planillas de pago</p>
+                </div>
+                <Button
+                    icon={Plus}
+                    variant="success"
+                    size="md"
+                    onClick={openNewModal}
+                >
+                    Nueva Planilla
+                </Button>
+            </div>
+
+            {/* Selector mejorado de planilla */}
+            {planillas.length > 0 && (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <label className="text-sm font-medium text-gray-400 whitespace-nowrap">
+                        Seleccionar planilla
+                    </label>
+                    <div className="relative w-full sm:w-80">
                         <select
                             value={selectedPlanilla?.id || ''}
                             onChange={(e) => {
                                 const planilla = planillas.find(p => p.id === parseInt(e.target.value));
                                 setSelectedPlanilla(planilla);
                             }}
-                            className="w-full px-3 py-2.5 bg-navy-900 border border-navy-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                            className="w-full pl-3 pr-8 py-2.5 bg-navy-900 border border-navy-600 rounded-lg text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent appearance-none cursor-pointer"
                         >
                             {planillas.map(p => (
                                 <option key={p.id} value={p.id}>
-                                    {p.payrollNumber} - {new Date(p.periodStartDate).toLocaleDateString('es-PA', { month: 'short', year: 'numeric' })}
+                                    {formatPlanillaOption(p)}
                                 </option>
                             ))}
                         </select>
-                    </div>
-                )}
-            </div>
-
-            {/* Hero card de planilla activa */}
-            {selectedPlanilla && (
-                <div className="bg-navy-900 border border-navy-700 rounded-xl p-5 flex items-center justify-between">
-                    <div>
-                        <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Planilla Activa</p>
-                        <h2 className="text-xl font-bold text-gray-100 font-display">
-                            Planilla {selectedPlanilla.payrollNumber}
-                            {selectedPlanilla.payPeriodType !== undefined && selectedPlanilla.payPeriodType !== null &&
-                                getPayPeriodBadge(selectedPlanilla.payPeriodType)
-                            }
-                        </h2>
-                        <p className="text-sm text-gray-400 mt-0.5">
-                            {new Date(selectedPlanilla.periodStartDate).toLocaleDateString('es-PA')} — {new Date(selectedPlanilla.periodEndDate).toLocaleDateString('es-PA')}
-                        </p>
-                    </div>
-                    {/* Badge de estado grande */}
-                    <div className={`px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wide ${
-                        selectedPlanilla.status === 0 ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20' :
-                        selectedPlanilla.status === 1 ? 'bg-primary-500/15 text-primary-400 border border-primary-500/20' :
-                        selectedPlanilla.status === 2 ? 'bg-green-500/15 text-green-400 border border-green-500/20' :
-                        selectedPlanilla.status === 3 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' :
-                        'bg-red-500/15 text-red-400 border border-red-500/20'
-                    }`}>
-                        {['Borrador', 'Calculado', 'Aprobado', 'Pagado', 'Cancelado'][selectedPlanilla.status] || 'Borrador'}
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5">
+                            <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* Summary Cards */}
+            {/* ==================== WORKFLOW STEPPER ==================== */}
+            {selectedPlanilla && (
+                <div className="bg-navy-900 border border-navy-700 rounded-xl p-5">
+                    {/* Nombre y fechas */}
+                    <div className="mb-5">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <h2 className="text-lg font-bold text-gray-100 font-display">
+                                Planilla {selectedPlanilla.payrollNumber}
+                            </h2>
+                            {selectedPlanilla.payPeriodType !== undefined && selectedPlanilla.payPeriodType !== null &&
+                                getPayPeriodBadge(selectedPlanilla.payPeriodType)
+                            }
+                            {selectedPlanilla.status === 4 && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/15 text-red-400 border border-red-500/20 ml-1">
+                                    Cancelada
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-sm text-gray-400 mt-0.5">
+                            Período: {new Date(selectedPlanilla.periodStartDate).toLocaleDateString('es-PA')} — {new Date(selectedPlanilla.periodEndDate).toLocaleDateString('es-PA')}
+                            {selectedPlanilla.payDate && (
+                                <span className="ml-3 text-gray-500">
+                                    Fecha de pago: {new Date(selectedPlanilla.payDate).toLocaleDateString('es-PA')}
+                                </span>
+                            )}
+                        </p>
+                    </div>
+
+                    {/* Stepper horizontal */}
+                    <div className="flex items-center">
+                        {WORKFLOW_STEPS.map((step, index) => {
+                            const currentStatus = selectedPlanilla.status === 4 ? -1 : selectedPlanilla.status;
+                            const isPast = currentStatus > step.status;
+                            const isActive = currentStatus === step.status;
+                            const isFuture = currentStatus < step.status;
+
+                            return (
+                                <React.Fragment key={step.status}>
+                                    {/* Paso */}
+                                    <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+                                        <div className={`
+                                            w-9 h-9 rounded-full flex items-center justify-center transition-all
+                                            ${isPast ? 'bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400' : ''}
+                                            ${isActive ? 'bg-primary-600 border-2 border-primary-400 text-white ring-4 ring-primary-500/20' : ''}
+                                            ${isFuture ? 'bg-navy-800 border-2 border-navy-600 text-gray-600' : ''}
+                                        `}>
+                                            {isPast ? (
+                                                <CheckCircle2 className="w-5 h-5" />
+                                            ) : (
+                                                <step.icon className="w-4 h-4" />
+                                            )}
+                                        </div>
+                                        <span className={`text-xs font-medium ${
+                                            isPast ? 'text-emerald-400' :
+                                            isActive ? 'text-primary-400' :
+                                            'text-gray-600'
+                                        }`}>
+                                            {step.label}
+                                        </span>
+                                    </div>
+
+                                    {/* Línea conectora */}
+                                    {index < WORKFLOW_STEPS.length - 1 && (
+                                        <div className={`flex-1 h-0.5 mx-2 rounded-full ${
+                                            currentStatus > step.status ? 'bg-emerald-500' : 'bg-navy-700'
+                                        }`} />
+                                    )}
+                                </React.Fragment>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* ==================== SUMMARY CARDS ==================== */}
             {selectedPlanilla ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
-                        <h3 className="text-sm font-medium text-gray-400 mb-2">Salarios Brutos</h3>
-                        <p className="text-3xl font-bold text-gray-100 font-mono">{formatCurrency(selectedPlanilla.totalGrossPay)}</p>
-                        <p className="text-sm text-primary-400 mt-2">{empleadosCount} empleados</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    {/* Salario Bruto */}
+                    <div className="bg-navy-900 rounded-xl border border-navy-700 p-5">
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Salario Bruto</p>
+                        {hasCalculatedData ? (
+                            <>
+                                <p className="text-2xl font-bold text-gray-100 font-mono">{formatCurrency(selectedPlanilla.totalGrossPay)}</p>
+                                <p className="text-xs text-gray-500 mt-1.5">
+                                    {empleadosCount} empleados
+                                    {empleadosCount > 0 && selectedPlanilla.totalGrossPay > 0 && (
+                                        <span className="ml-1">
+                                            • Promedio B/. {(selectedPlanilla.totalGrossPay / empleadosCount).toLocaleString('es-PA', { minimumFractionDigits: 2 })}
+                                        </span>
+                                    )}
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-2xl font-bold text-gray-600 font-mono" title="Calcula la planilla para ver los totales">—</p>
+                                <p className="text-xs text-gray-600 mt-1.5">{empleadosCount} empleados</p>
+                            </>
+                        )}
                     </div>
 
-                    <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
-                        <h3 className="text-sm font-medium text-gray-400 mb-2">Aportes CSS</h3>
-                        <p className="text-3xl font-bold text-gray-100 font-mono">{formatCurrency(selectedPlanilla.totalEmployeeCss + selectedPlanilla.totalEmployerCss)}</p>
-                        <p className="text-sm text-amber-400 mt-2">Empleado + Patrono</p>
+                    {/* Neto a Pagar */}
+                    <div className="bg-navy-900 rounded-xl border border-navy-700 p-5">
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Neto a Pagar</p>
+                        {hasCalculatedData ? (
+                            <>
+                                <p className="text-2xl font-bold text-emerald-400 font-mono">{formatCurrency(selectedPlanilla.totalNetPay)}</p>
+                                {selectedPlanilla.totalGrossPay > 0 && (
+                                    <p className="text-xs text-gray-500 mt-1.5">
+                                        Ahorro deducc: B/. {(selectedPlanilla.totalGrossPay - selectedPlanilla.totalNetPay).toLocaleString('es-PA', { minimumFractionDigits: 2 })}
+                                    </p>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-2xl font-bold text-gray-600 font-mono" title="Calcula la planilla para ver los totales">—</p>
+                                <p className="text-xs text-gray-600 mt-1.5">Pendiente de cálculo</p>
+                            </>
+                        )}
                     </div>
 
-                    <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
-                        <h3 className="text-sm font-medium text-gray-400 mb-2">Seguro Educativo</h3>
-                        <p className="text-3xl font-bold text-gray-100 font-mono">{formatCurrency(selectedPlanilla.totalEmployeeSe + selectedPlanilla.totalEmployerSe)}</p>
-                        <p className="text-sm text-purple-400 mt-2">Empleado + Patrono</p>
+                    {/* Aportes CSS */}
+                    <div className="bg-navy-900 rounded-xl border border-navy-700 p-5">
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Aportes CSS</p>
+                        {hasCalculatedData ? (
+                            <>
+                                <p className="text-2xl font-bold text-amber-400 font-mono">
+                                    {formatCurrency((selectedPlanilla.totalEmployeeCss || 0) + (selectedPlanilla.totalEmployerCss || 0))}
+                                </p>
+                                <div className="mt-1.5 space-y-0.5">
+                                    <div className="flex justify-between text-xs text-gray-500">
+                                        <span>Empleado:</span>
+                                        <span className="font-mono">{formatCurrency(selectedPlanilla.totalEmployeeCss)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs text-gray-500">
+                                        <span>Patrono:</span>
+                                        <span className="font-mono">{formatCurrency(selectedPlanilla.totalEmployerCss)}</span>
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-2xl font-bold text-gray-600 font-mono" title="Calcula la planilla para ver los totales">—</p>
+                                <p className="text-xs text-gray-600 mt-1.5">Empleado + Patrono</p>
+                            </>
+                        )}
                     </div>
 
-                    <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
-                        <h3 className="text-sm font-medium text-gray-400 mb-2">ISR Retenido</h3>
-                        <p className="text-3xl font-bold text-gray-100 font-mono">{formatCurrency(selectedPlanilla.totalIncomeTax)}</p>
-                        <p className="text-sm text-red-400 mt-2">Según tabla DGI</p>
+                    {/* Seguro Educativo */}
+                    <div className="bg-navy-900 rounded-xl border border-navy-700 p-5">
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Seguro Educativo</p>
+                        {hasCalculatedData ? (
+                            <>
+                                <p className="text-2xl font-bold text-purple-400 font-mono">
+                                    {formatCurrency((selectedPlanilla.totalEmployeeSe || 0) + (selectedPlanilla.totalEmployerSe || 0))}
+                                </p>
+                                <div className="mt-1.5 space-y-0.5">
+                                    <div className="flex justify-between text-xs text-gray-500">
+                                        <span>Empleado:</span>
+                                        <span className="font-mono">{formatCurrency(selectedPlanilla.totalEmployeeSe)}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs text-gray-500">
+                                        <span>Patrono:</span>
+                                        <span className="font-mono">{formatCurrency(selectedPlanilla.totalEmployerSe)}</span>
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-2xl font-bold text-gray-600 font-mono" title="Calcula la planilla para ver los totales">—</p>
+                                <p className="text-xs text-gray-600 mt-1.5">Empleado + Patrono</p>
+                            </>
+                        )}
+                    </div>
+
+                    {/* ISR Retenido */}
+                    <div className="bg-navy-900 rounded-xl border border-navy-700 p-5">
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">ISR Retenido</p>
+                        {hasCalculatedData ? (
+                            <>
+                                <p className="text-2xl font-bold text-red-400 font-mono">{formatCurrency(selectedPlanilla.totalIncomeTax)}</p>
+                                <p className="text-xs text-gray-500 mt-1.5">Según tabla DGI</p>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-2xl font-bold text-gray-600 font-mono" title="Calcula la planilla para ver los totales">—</p>
+                                <p className="text-xs text-gray-600 mt-1.5">Según tabla DGI</p>
+                            </>
+                        )}
                     </div>
                 </div>
             ) : (
@@ -539,33 +735,24 @@ const PlanillasPage = () => {
                 </div>
             )}
 
-            {/* Panel de Acciones */}
+            {/* ==================== PANEL DE ACCIONES ==================== */}
             {selectedPlanilla && (
                 <div className="bg-navy-900 border border-navy-700 rounded-xl overflow-hidden">
-                    {/* Header del panel */}
-                    <div className="px-5 py-3 bg-navy-950/60 border-b border-navy-700 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-primary-400 animate-pulse" />
-                            <span className="text-sm font-semibold text-gray-300">Acciones — Planilla {selectedPlanilla.payrollNumber}</span>
-                        </div>
-                        <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide ${
-                            selectedPlanilla.status === 0 ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/20' :
-                            selectedPlanilla.status === 1 ? 'bg-blue-500/15 text-blue-400 border border-blue-500/20' :
-                            selectedPlanilla.status === 2 ? 'bg-green-500/15 text-green-400 border border-green-500/20' :
-                            selectedPlanilla.status === 3 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' :
-                            'bg-red-500/15 text-red-400 border border-red-500/20'
-                        }`}>
-                            {['Borrador', 'Calculado', 'Aprobado', 'Pagado', 'Cancelado'][selectedPlanilla.status] || 'Borrador'}
+                    {/* Header del panel sin badge de estado (ya está en el stepper) */}
+                    <div className="px-5 py-3 bg-navy-950/60 border-b border-navy-700 flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-primary-400 animate-pulse" />
+                        <span className="text-sm font-semibold text-gray-300">
+                            Acciones — Planilla {selectedPlanilla.payrollNumber}
                         </span>
                     </div>
 
                     {/* Botones de acción */}
-                    <div className="p-5 flex flex-wrap gap-3">
+                    <div className="p-5">
 
                         {/* ESTADO: Borrador */}
                         {selectedPlanilla.status === 0 && (
-                            <>
-                                {/* Botón principal: Calcular */}
+                            <div className="flex flex-wrap gap-3 items-center">
+                                {/* Acción Principal */}
                                 <button
                                     onClick={handleCalculate}
                                     disabled={processingAction === 'calculating'}
@@ -578,62 +765,53 @@ const PlanillasPage = () => {
                                         </>
                                     ) : (
                                         <>
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                            </svg>
+                                            <Calculator className="w-5 h-5" />
                                             Calcular Planilla
                                         </>
                                     )}
                                 </button>
 
-                                {/* Botón: Editar Horas */}
+                                {/* Separador visual */}
+                                <div className="w-px h-8 bg-navy-700 hidden sm:block" />
+
+                                {/* Herramientas secundarias */}
                                 <button
                                     onClick={toggleHoursPanel}
-                                    className="inline-flex items-center gap-3 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-emerald-500/50 text-gray-200 hover:text-emerald-300 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all hover:-translate-y-0.5"
+                                    className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-emerald-500/50 text-gray-200 hover:text-emerald-300 px-4 py-2.5 rounded-xl font-medium text-sm transition-all hover:-translate-y-0.5"
                                 >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
+                                    <Clock className="w-4 h-4" />
                                     {showHoursPanel ? 'Cerrar Horas' : 'Editar Horas'}
                                 </button>
 
-                                {/* Botón secundario: Configurar Impuestos */}
                                 <button
                                     type="button"
                                     onClick={handleEnsureTaxConfig}
                                     disabled={ensureTaxConfigLoading}
                                     title="Si Calcular Planilla falla por falta de configuración CSS/SE/ISR, haz clic aquí"
-                                    className="inline-flex items-center gap-3 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-amber-500/40 text-gray-300 hover:text-amber-300 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-amber-500/40 text-gray-300 hover:text-amber-300 px-4 py-2.5 rounded-xl font-medium text-sm transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {ensureTaxConfigLoading ? (
-                                        <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                                        <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
                                     ) : (
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        </svg>
+                                        <Settings className="w-4 h-4" />
                                     )}
-                                    Configurar Impuestos
+                                    Config. Impuestos
                                 </button>
 
-                                {/* Botón: Ver Detalles */}
                                 <button
                                     onClick={() => viewDetails(selectedPlanilla)}
-                                    className="inline-flex items-center gap-3 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-primary-500/40 text-gray-400 hover:text-primary-300 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all hover:-translate-y-0.5"
+                                    className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-primary-500/40 text-gray-400 hover:text-primary-300 px-4 py-2.5 rounded-xl font-medium text-sm transition-all hover:-translate-y-0.5"
                                 >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
+                                    <Eye className="w-4 h-4" />
                                     Ver Detalles
                                 </button>
-                            </>
+                            </div>
                         )}
 
                         {/* ESTADO: Calculado */}
                         {selectedPlanilla.status === 1 && (
-                            <>
-                                {/* Botón principal: Aprobar */}
+                            <div className="flex flex-wrap gap-3 items-center">
+                                {/* Acción Principal */}
                                 <button
                                     onClick={handleApprove}
                                     disabled={processingAction === 'approving'}
@@ -646,91 +824,75 @@ const PlanillasPage = () => {
                                         </>
                                     ) : (
                                         <>
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
+                                            <CheckCheck className="w-5 h-5" />
                                             Aprobar Planilla
                                         </>
                                     )}
                                 </button>
 
-                                {/* Botón: Recalcular */}
+                                {/* Separador visual */}
+                                <div className="w-px h-8 bg-navy-700 hidden sm:block" />
+
+                                {/* Herramientas secundarias */}
                                 <button
                                     onClick={handleCalculate}
                                     disabled={processingAction === 'calculating'}
-                                    className="inline-flex items-center gap-3 bg-amber-600 hover:bg-amber-700 text-white px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all shadow-lg shadow-amber-900/40 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5"
+                                    className="inline-flex items-center gap-2 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-600/30 hover:border-amber-500/50 text-amber-400 px-4 py-2.5 rounded-xl font-medium text-sm transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {processingAction === 'calculating' ? (
-                                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
                                     ) : (
-                                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                        </svg>
+                                        <RotateCcw className="w-4 h-4" />
                                     )}
                                     Recalcular
                                 </button>
 
-                                {/* Botón: Editar Horas */}
                                 <button
                                     onClick={toggleHoursPanel}
-                                    className="inline-flex items-center gap-3 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-emerald-500/50 text-gray-200 hover:text-emerald-300 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all hover:-translate-y-0.5"
+                                    className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-emerald-500/50 text-gray-200 hover:text-emerald-300 px-4 py-2.5 rounded-xl font-medium text-sm transition-all hover:-translate-y-0.5"
                                 >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                    </svg>
+                                    <Clock className="w-4 h-4" />
                                     {showHoursPanel ? 'Cerrar Horas' : 'Editar Horas'}
                                 </button>
 
-                                {/* Botón: Ver Detalles */}
                                 <button
                                     onClick={() => viewDetails(selectedPlanilla)}
-                                    className="inline-flex items-center gap-3 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-primary-500/40 text-gray-400 hover:text-primary-300 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all hover:-translate-y-0.5"
+                                    className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-primary-500/40 text-gray-400 hover:text-primary-300 px-4 py-2.5 rounded-xl font-medium text-sm transition-all hover:-translate-y-0.5"
                                 >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
+                                    <Eye className="w-4 h-4" />
                                     Ver Detalles
                                 </button>
-                            </>
+                            </div>
                         )}
 
                         {/* ESTADO: Aprobado */}
                         {selectedPlanilla.status === 2 && (
-                            <>
+                            <div className="flex flex-wrap gap-3 items-center">
                                 <button
                                     disabled
-                                    className="inline-flex items-center gap-3 bg-emerald-600/50 text-white/60 px-6 py-3.5 rounded-xl font-semibold text-[15px] cursor-not-allowed border border-emerald-700/30"
+                                    className="inline-flex items-center gap-3 bg-emerald-600/20 text-emerald-400/50 px-6 py-3.5 rounded-xl font-semibold text-[15px] cursor-not-allowed border border-emerald-700/20"
                                 >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                                    </svg>
+                                    <CreditCard className="w-5 h-5" />
                                     Procesar Pago
-                                    <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full">Próximamente</span>
+                                    <span className="text-xs bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">Próximamente</span>
                                 </button>
                                 <button
                                     onClick={() => viewDetails(selectedPlanilla)}
-                                    className="inline-flex items-center gap-3 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-primary-500/40 text-gray-200 hover:text-primary-300 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all hover:-translate-y-0.5"
+                                    className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-primary-500/40 text-gray-200 hover:text-primary-300 px-4 py-2.5 rounded-xl font-medium text-sm transition-all hover:-translate-y-0.5"
                                 >
-                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                    </svg>
+                                    <Eye className="w-4 h-4" />
                                     Ver Detalles
                                 </button>
-                            </>
+                            </div>
                         )}
 
                         {/* ESTADO: Pagado o Cancelado */}
                         {(selectedPlanilla.status === 3 || selectedPlanilla.status === 4) && (
                             <button
                                 onClick={() => viewDetails(selectedPlanilla)}
-                                className="inline-flex items-center gap-3 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-primary-500/40 text-gray-200 hover:text-primary-300 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all hover:-translate-y-0.5"
+                                className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-primary-500/40 text-gray-200 hover:text-primary-300 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all hover:-translate-y-0.5"
                             >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
+                                <Eye className="w-5 h-5" />
                                 Ver Detalles Completos
                             </button>
                         )}
@@ -743,14 +905,14 @@ const PlanillasPage = () => {
                                 <svg className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                Si "Calcular" falla por configuración faltante, usa "Configurar Impuestos" primero e intenta de nuevo.
+                                Si "Calcular" falla por configuración faltante, usa "Config. Impuestos" primero e intenta de nuevo.
                             </p>
                         </div>
                     )}
                 </div>
             )}
 
-            {/* Panel de Horas Trabajadas - visible en Draft y Calculated */}
+            {/* ==================== PANEL DE HORAS TRABAJADAS ==================== */}
             {selectedPlanilla && (selectedPlanilla.status === 0 || selectedPlanilla.status === 1) && showHoursPanel && (
                 <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-emerald-700/50 overflow-hidden">
                     <div className="px-6 py-4 border-b border-navy-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -780,9 +942,7 @@ const PlanillasPage = () => {
                                 {hoursLoading ? (
                                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                                 ) : (
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                    </svg>
+                                    <Zap className="w-4 h-4" />
                                 )}
                                 Auto-llenar Regulares
                             </button>
@@ -794,9 +954,7 @@ const PlanillasPage = () => {
                                 {importNovedadesLoading ? (
                                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                                 ) : (
-                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                    </svg>
+                                    <Upload className="w-4 h-4" />
                                 )}
                                 Importar Novedades
                             </button>
@@ -806,9 +964,7 @@ const PlanillasPage = () => {
                                 className="inline-flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Guardar cambios y cerrar el panel"
                             >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
+                                <Save className="w-4 h-4" />
                                 Guardar y Cerrar
                             </button>
                         </div>
@@ -820,14 +976,33 @@ const PlanillasPage = () => {
                         </div>
                     ) : employeeHours.length === 0 ? (
                         <div className="text-center py-10 text-gray-500">
-                            <svg className="w-12 h-12 mx-auto mb-3 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                            <Clock className="w-12 h-12 mx-auto mb-3 text-gray-600" />
                             <p className="font-medium text-gray-400">No hay registros de horas</p>
                             <p className="text-sm mt-1">Usa "Auto-llenar Regulares" para generar los registros con horas estándar</p>
                         </div>
                     ) : (
                         <div className="overflow-x-auto p-4">
+                            {/* Leyenda de colores */}
+                            <div className="flex flex-wrap items-center gap-4 mb-4 px-1 py-2 bg-navy-950/40 rounded-lg border border-navy-700">
+                                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Leyenda:</span>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-3 h-3 rounded-sm bg-emerald-500/30 border border-emerald-400" />
+                                    <span className="text-xs text-gray-400">Horas base</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-3 h-3 rounded-sm bg-orange-500/30 border border-orange-400" />
+                                    <span className="text-xs text-gray-400">H. Extra</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-3 h-3 rounded-sm bg-purple-500/30 border border-purple-400" />
+                                    <span className="text-xs text-gray-400">H. Extra especiales</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-3 h-3 rounded-sm bg-red-500/30 border border-red-400" />
+                                    <span className="text-xs text-gray-400">Ausencias</span>
+                                </div>
+                            </div>
+
                             <table className="w-full text-sm">
                                 <colgroup>
                                     <col className="w-[min(200px,22%)]" />
@@ -841,18 +1016,18 @@ const PlanillasPage = () => {
                                     <col className="w-[70px]" />
                                     <col className="w-[70px]" />
                                 </colgroup>
-                                <thead className="bg-navy-950 border-b-2 border-navy-600">
+                                <thead className="bg-navy-950 border-b-2 border-navy-600 sticky top-0 z-10">
                                     <tr>
                                         <th className="text-left py-4 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Empleado</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas regulares">Regulares</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas domingo">Domingo</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas feriado">Feriado</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas extra diurnas">Extra Diurna</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas extra nocturnas">Extra Nocturna</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas extra en festivos nacionales">Extra Festivos</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas extra mixtas">Extra Mixtas</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas extra con exceso">Extra Exceso</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider" title="Horas de ausencia">Ausencias</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-emerald-500 uppercase tracking-wider" title="Horas regulares">Regulares</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-emerald-500 uppercase tracking-wider" title="Horas domingo">Domingo</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-emerald-500 uppercase tracking-wider" title="Horas feriado">Feriado</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-orange-400 uppercase tracking-wider" title="Horas extra diurnas">Extra Diurna</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-orange-400 uppercase tracking-wider" title="Horas extra nocturnas">Extra Nocturna</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-purple-400 uppercase tracking-wider" title="Horas extra en festivos nacionales">Extra Festivos</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-purple-400 uppercase tracking-wider" title="Horas extra mixtas">Extra Mixtas</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-purple-400 uppercase tracking-wider" title="Horas extra con exceso">Extra Exceso</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-red-400 uppercase tracking-wider" title="Horas de ausencia">Ausencias</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-navy-700/50">
@@ -867,6 +1042,7 @@ const PlanillasPage = () => {
                                                 <td className="py-3 px-4 text-gray-100 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
                                                     {nombreCompleto}
                                                 </td>
+                                                {/* Horas base — verde esmeralda */}
                                                 <td className="py-3 px-3 text-center align-middle">
                                                     <input
                                                         type="number"
@@ -874,7 +1050,7 @@ const PlanillasPage = () => {
                                                         step="0.5"
                                                         value={num(row.regularHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'regularHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-navy-600 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-emerald-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                                                     />
                                                 </td>
                                                 <td className="py-3 px-3 text-center align-middle">
@@ -884,7 +1060,7 @@ const PlanillasPage = () => {
                                                         step="0.5"
                                                         value={num(row.sundayHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'sundayHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-navy-600 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-emerald-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                                                     />
                                                 </td>
                                                 <td className="py-3 px-3 text-center align-middle">
@@ -894,9 +1070,10 @@ const PlanillasPage = () => {
                                                         step="0.5"
                                                         value={num(row.holidayHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'holidayHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-navy-600 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-emerald-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                                                     />
                                                 </td>
+                                                {/* Horas extra diurna/nocturna — naranja */}
                                                 <td className="py-3 px-3 text-center align-middle">
                                                     <input
                                                         type="number"
@@ -904,7 +1081,7 @@ const PlanillasPage = () => {
                                                         step="0.5"
                                                         value={num(row.overtimeDayHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'overtimeDayHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-navy-600 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-orange-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
                                                     />
                                                 </td>
                                                 <td className="py-3 px-3 text-center align-middle">
@@ -914,9 +1091,10 @@ const PlanillasPage = () => {
                                                         step="0.5"
                                                         value={num(row.overtimeNightHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'overtimeNightHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-navy-600 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-orange-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
                                                     />
                                                 </td>
+                                                {/* Horas extra especiales — morado */}
                                                 <td className="py-3 px-3 text-center align-middle">
                                                     <input
                                                         type="number"
@@ -924,7 +1102,7 @@ const PlanillasPage = () => {
                                                         step="0.5"
                                                         value={num(row.overtimeHolidayHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'overtimeHolidayHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-purple-600/50 rounded-md text-purple-300 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-purple-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                                                     />
                                                 </td>
                                                 <td className="py-3 px-3 text-center align-middle">
@@ -934,7 +1112,7 @@ const PlanillasPage = () => {
                                                         step="0.5"
                                                         value={num(row.overtimeMixedHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'overtimeMixedHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-blue-600/50 rounded-md text-blue-300 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-purple-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                                                     />
                                                 </td>
                                                 <td className="py-3 px-3 text-center align-middle">
@@ -944,9 +1122,10 @@ const PlanillasPage = () => {
                                                         step="0.5"
                                                         value={num(row.overtimeExcessHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'overtimeExcessHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-orange-600/50 rounded-md text-orange-300 text-sm text-center focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-purple-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
                                                     />
                                                 </td>
+                                                {/* Ausencias — rojo */}
                                                 <td className="py-3 px-3 text-center align-middle">
                                                     <input
                                                         type="number"
@@ -954,7 +1133,7 @@ const PlanillasPage = () => {
                                                         step="0.5"
                                                         value={num(row.absenceHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'absenceHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-red-900/50 rounded-md text-red-300 text-sm text-center focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
+                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-red-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
                                                     />
                                                 </td>
                                             </tr>
@@ -967,12 +1146,19 @@ const PlanillasPage = () => {
                 </div>
             )}
 
-            {/* Modal de confirmación para importar novedades */}
-            {showImportConfirmModal && importConfirmData && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-navy-900 rounded-xl shadow-xl border border-navy-700 max-w-md w-full p-6">
-                        <h3 className="text-lg font-semibold text-gray-100 mb-4">Confirmar importación</h3>
-                        <p className="text-gray-300 mb-6">{importConfirmData.message}</p>
+            {/* ==================== MODAL: CONFIRMAR IMPORTACIÓN ==================== */}
+            <Modal
+                isOpen={showImportConfirmModal}
+                onClose={() => {
+                    setShowImportConfirmModal(false);
+                    setImportConfirmData(null);
+                }}
+                title="Confirmar importación"
+                size="sm"
+            >
+                {importConfirmData && (
+                    <div className="space-y-4">
+                        <p className="text-gray-300">{importConfirmData.message}</p>
                         <div className="flex gap-3">
                             <button
                                 onClick={() => {
@@ -1003,10 +1189,52 @@ const PlanillasPage = () => {
                             </button>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+            </Modal>
 
-            {/* History Table */}
+            {/* ==================== MODAL: CONFIRMAR APROBACIÓN ==================== */}
+            <Modal
+                isOpen={showApproveConfirmModal}
+                onClose={() => setShowApproveConfirmModal(false)}
+                title="Confirmar Aprobación"
+                size="sm"
+            >
+                <div className="space-y-4">
+                    <div className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                        <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-amber-300">
+                            Esta acción es irreversible. Al aprobar, la planilla no podrá editarse.
+                        </p>
+                    </div>
+                    {selectedPlanilla && (
+                        <div className="bg-navy-800 rounded-lg p-4 border border-navy-600">
+                            <p className="text-xs text-gray-500 mb-1">Total neto a pagar</p>
+                            <p className="text-2xl font-bold text-emerald-400 font-mono">
+                                {formatCurrency(selectedPlanilla.totalNetPay)}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                                Planilla {selectedPlanilla.payrollNumber} — {empleadosCount} empleados
+                            </p>
+                        </div>
+                    )}
+                    <div className="flex gap-3 pt-2">
+                        <button
+                            onClick={() => setShowApproveConfirmModal(false)}
+                            className="flex-1 bg-navy-700 hover:bg-navy-600 text-gray-200 px-4 py-2.5 rounded-lg font-medium transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            onClick={confirmedApprove}
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg shadow-green-900/40"
+                        >
+                            Confirmar Aprobación
+                        </button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* ==================== HISTORIAL DE PLANILLAS ==================== */}
             <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 overflow-hidden">
                 <div className="px-6 py-4 border-b border-navy-700">
                     <h3 className="text-lg font-semibold text-gray-100">
@@ -1031,9 +1259,7 @@ const PlanillasPage = () => {
                                 onClick={openNewModal}
                                 className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
                             >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                                </svg>
+                                <Plus className="w-5 h-5" />
                                 Nueva Planilla
                             </button>
                         }
@@ -1114,9 +1340,7 @@ const PlanillasPage = () => {
                                                         }}
                                                         className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-lg transition-all"
                                                     >
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                        </svg>
+                                                        <Clock className="w-4 h-4" />
                                                         Horas
                                                     </button>
                                                 )}
@@ -1124,10 +1348,7 @@ const PlanillasPage = () => {
                                                     onClick={(e) => { e.stopPropagation(); viewDetails(planilla); }}
                                                     className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium text-gray-300 bg-navy-800 hover:bg-primary-500/10 hover:text-primary-400 border border-navy-600 hover:border-primary-500/30 rounded-lg transition-all"
                                                 >
-                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                    </svg>
+                                                    <Eye className="w-4 h-4" />
                                                     Ver
                                                 </button>
                                             </div>
@@ -1140,218 +1361,197 @@ const PlanillasPage = () => {
                 )}
             </div>
 
-            {/* Modal: Nueva Planilla */}
-            {showNewModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="px-6 py-4 border-b border-navy-700 flex items-center justify-between sticky top-0 bg-navy-900">
-                            <h3 className="text-xl font-semibold text-gray-100">Nueva Planilla</h3>
-                            <button
-                                onClick={() => setShowNewModal(false)}
-                                className="text-gray-400 hover:text-gray-300 transition-colors"
-                            >
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
+            {/* ==================== MODAL: NUEVA PLANILLA ==================== */}
+            <Modal
+                isOpen={showNewModal}
+                onClose={() => setShowNewModal(false)}
+                title="Nueva Planilla"
+                size="lg"
+            >
+                <form onSubmit={handleCreatePlanilla}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        {/* Número de Planilla */}
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                                Número de Planilla <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                required
+                                value={formData.payrollNumber}
+                                onChange={(e) => setFormData({ ...formData, payrollNumber: e.target.value })}
+                                className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
+                                placeholder="2025-001"
+                            />
                         </div>
 
-                        <form onSubmit={handleCreatePlanilla} className="p-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                {/* Número de Planilla */}
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Número de Planilla <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        required
-                                        value={formData.payrollNumber}
-                                        onChange={(e) => setFormData({ ...formData, payrollNumber: e.target.value })}
-                                        className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
-                                        placeholder="2025-001"
-                                    />
-                                </div>
+                        {/* Tipo de Período */}
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                                Tipo de Período <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                                value={formData.payPeriodType}
+                                onChange={(e) => setFormData({ ...formData, payPeriodType: parseInt(e.target.value) })}
+                                className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
+                            >
+                                {Object.entries(PAY_PERIOD_CONFIG).map(([key, config]) => (
+                                    <option key={key} value={key}>
+                                        {config.name} — {config.periodsPerYear} períodos / año
+                                    </option>
+                                ))}
+                            </select>
+                            <p className="mt-1 text-xs text-gray-500">
+                                Define la frecuencia de pago para esta planilla
+                            </p>
+                        </div>
 
-                                {/* Tipo de Período */}
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Tipo de Período <span className="text-red-500">*</span>
-                                    </label>
-                                    <select
-                                        value={formData.payPeriodType}
-                                        onChange={(e) => setFormData({ ...formData, payPeriodType: parseInt(e.target.value) })}
-                                        className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
-                                    >
-                                        {Object.entries(PAY_PERIOD_CONFIG).map(([key, config]) => (
-                                            <option key={key} value={key}>
-                                                {config.name} — {config.periodsPerYear} períodos / año
-                                            </option>
+                        {/* Fecha Inicio */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                                Fecha Inicio Período <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="date"
+                                required
+                                value={formData.periodStartDate}
+                                onChange={(e) => setFormData({ ...formData, periodStartDate: e.target.value })}
+                                className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
+                            />
+                        </div>
+
+                        {/* Fecha Fin */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                                Fecha Fin Período <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="date"
+                                required
+                                value={formData.periodEndDate}
+                                onChange={(e) => setFormData({ ...formData, periodEndDate: e.target.value })}
+                                className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
+                            />
+                        </div>
+
+                        {/* Fecha de Pago */}
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                                Fecha de Pago <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="date"
+                                required
+                                value={formData.payDate}
+                                onChange={(e) => setFormData({ ...formData, payDate: e.target.value })}
+                                className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-navy-700">
+                        <button
+                            type="button"
+                            onClick={() => setShowNewModal(false)}
+                            className="px-4 py-2 border border-navy-600 rounded-lg text-gray-300 hover:bg-navy-800 font-medium transition-colors"
+                        >
+                            Cancelar
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
+                        >
+                            Crear Planilla
+                        </button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* ==================== MODAL: DETALLES DE PLANILLA ==================== */}
+            <Modal
+                isOpen={showDetailsModal}
+                onClose={() => setShowDetailsModal(false)}
+                title={planillaDetails ? `Detalles — ${planillaDetails.payrollNumber}` : 'Detalles de Planilla'}
+                size="full"
+            >
+                {planillaDetails && (
+                    <div>
+                        {/* Header Info */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                            <div>
+                                <p className="text-sm text-gray-400">Período</p>
+                                <p className="font-medium text-gray-100">
+                                    {new Date(planillaDetails.periodStartDate).toLocaleDateString('es-PA')}
+                                    {' - '}
+                                    {new Date(planillaDetails.periodEndDate).toLocaleDateString('es-PA')}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-400">Fecha de Pago</p>
+                                <p className="font-medium text-gray-100">
+                                    {new Date(planillaDetails.payDate).toLocaleDateString('es-PA')}
+                                </p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-400">Estado</p>
+                                <div className="mt-1">{getStatusBadge(planillaDetails.status)}</div>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-400">Total Neto</p>
+                                <p className="font-bold text-lg text-gray-100 font-mono">{formatCurrency(planillaDetails.totalNetPay)}</p>
+                            </div>
+                        </div>
+
+                        {/* Details Table */}
+                        {planillaDetails.details && planillaDetails.details.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className="bg-navy-950 border-b border-navy-700">
+                                        <tr>
+                                            <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Empleado</th>
+                                            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">Bruto</th>
+                                            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">CSS</th>
+                                            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">SE</th>
+                                            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">ISR</th>
+                                            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">Total Ded.</th>
+                                            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">Neto</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-navy-900 divide-y divide-navy-700">
+                                        {planillaDetails.details.map((detail) => (
+                                            <tr key={detail.id} className="hover:bg-navy-800">
+                                                <td className="py-3 px-4 text-sm text-gray-100">{detail.empleado?.nombre} {detail.empleado?.apellido}</td>
+                                                <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.grossPay)}</td>
+                                                <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.cssEmployee)}</td>
+                                                <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.educationalInsuranceEmployee)}</td>
+                                                <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.incomeTax)}</td>
+                                                <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.totalDeductions)}</td>
+                                                <td className="py-3 px-4 text-sm text-right font-medium text-gray-100 font-mono">{formatCurrency(detail.netPay)}</td>
+                                            </tr>
                                         ))}
-                                    </select>
-                                    <p className="mt-1 text-xs text-gray-500">
-                                        Define la frecuencia de pago para esta planilla
-                                    </p>
-                                </div>
-
-                                {/* Fecha Inicio */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Fecha Inicio Período <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="date"
-                                        required
-                                        value={formData.periodStartDate}
-                                        onChange={(e) => setFormData({ ...formData, periodStartDate: e.target.value })}
-                                        className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
-                                    />
-                                </div>
-
-                                {/* Fecha Fin */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Fecha Fin Período <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="date"
-                                        required
-                                        value={formData.periodEndDate}
-                                        onChange={(e) => setFormData({ ...formData, periodEndDate: e.target.value })}
-                                        className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
-                                    />
-                                </div>
-
-                                {/* Fecha de Pago */}
-                                <div className="md:col-span-2">
-                                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                                        Fecha de Pago <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="date"
-                                        required
-                                        value={formData.payDate}
-                                        onChange={(e) => setFormData({ ...formData, payDate: e.target.value })}
-                                        className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
-                                    />
-                                </div>
+                                    </tbody>
+                                    <tfoot className="bg-navy-950 border-t-2 border-navy-600">
+                                        <tr>
+                                            <td className="py-3 px-4 text-sm font-bold text-gray-100">TOTALES</td>
+                                            <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalGrossPay)}</td>
+                                            <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.cssEmployee || 0), 0) || 0)}</td>
+                                            <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.educationalInsuranceEmployee || 0), 0) || 0)}</td>
+                                            <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.incomeTax || 0), 0) || 0)}</td>
+                                            <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalDeductions)}</td>
+                                            <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalNetPay)}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
                             </div>
-
-                            <div className="flex justify-end gap-3 pt-4 border-t border-navy-700">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowNewModal(false)}
-                                    className="px-4 py-2 border border-navy-600 rounded-lg text-gray-300 hover:bg-navy-800 font-medium transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
-                                >
-                                    Crear Planilla
-                                </button>
+                        ) : (
+                            <div className="text-center py-8 text-gray-500">
+                                No hay detalles de empleados para esta planilla
                             </div>
-                        </form>
+                        )}
                     </div>
-                </div>
-            )}
+                )}
+            </Modal>
 
-            {/* Modal: Detalles de Planilla */}
-            {showDetailsModal && planillaDetails && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="px-6 py-4 border-b border-navy-700 flex items-center justify-between sticky top-0 bg-navy-900">
-                            <h3 className="text-xl font-semibold text-gray-100">
-                                Detalles de Planilla — {planillaDetails.payrollNumber}
-                            </h3>
-                            <button
-                                onClick={() => setShowDetailsModal(false)}
-                                className="text-gray-400 hover:text-gray-300 transition-colors"
-                            >
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-
-                        <div className="p-6">
-                            {/* Header Info */}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                                <div>
-                                    <p className="text-sm text-gray-400">Período</p>
-                                    <p className="font-medium text-gray-100">
-                                        {new Date(planillaDetails.periodStartDate).toLocaleDateString('es-PA')}
-                                        {' - '}
-                                        {new Date(planillaDetails.periodEndDate).toLocaleDateString('es-PA')}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-400">Fecha de Pago</p>
-                                    <p className="font-medium text-gray-100">
-                                        {new Date(planillaDetails.payDate).toLocaleDateString('es-PA')}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-400">Estado</p>
-                                    <div className="mt-1">{getStatusBadge(planillaDetails.status)}</div>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-gray-400">Total Neto</p>
-                                    <p className="font-bold text-lg text-gray-100 font-mono">{formatCurrency(planillaDetails.totalNetPay)}</p>
-                                </div>
-                            </div>
-
-                            {/* Details Table */}
-                            {planillaDetails.details && planillaDetails.details.length > 0 ? (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full">
-                                        <thead className="bg-navy-950 border-b border-navy-700">
-                                            <tr>
-                                                <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Empleado</th>
-                                                <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">Bruto</th>
-                                                <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">CSS</th>
-                                                <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">SE</th>
-                                                <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">ISR</th>
-                                                <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">Total Ded.</th>
-                                                <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">Neto</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="bg-navy-900 divide-y divide-navy-700">
-                                            {planillaDetails.details.map((detail) => (
-                                                <tr key={detail.id} className="hover:bg-navy-800">
-                                                    <td className="py-3 px-4 text-sm text-gray-100">{detail.empleado?.nombre} {detail.empleado?.apellido}</td>
-                                                    <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.grossPay)}</td>
-                                                    <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.cssEmployee)}</td>
-                                                    <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.educationalInsuranceEmployee)}</td>
-                                                    <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.incomeTax)}</td>
-                                                    <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.totalDeductions)}</td>
-                                                    <td className="py-3 px-4 text-sm text-right font-medium text-gray-100 font-mono">{formatCurrency(detail.netPay)}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                        <tfoot className="bg-navy-950 border-t-2 border-navy-600">
-                                            <tr>
-                                                <td className="py-3 px-4 text-sm font-bold text-gray-100">TOTALES</td>
-                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalGrossPay)}</td>
-                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.cssEmployee || 0), 0) || 0)}</td>
-                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.educationalInsuranceEmployee || 0), 0) || 0)}</td>
-                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.incomeTax || 0), 0) || 0)}</td>
-                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalDeductions)}</td>
-                                                <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalNetPay)}</td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
-                            ) : (
-                                <div className="text-center py-8 text-gray-500">
-                                    No hay detalles de empleados para esta planilla
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

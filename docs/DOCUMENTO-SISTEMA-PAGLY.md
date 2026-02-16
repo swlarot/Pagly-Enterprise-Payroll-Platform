@@ -54,7 +54,7 @@ Cumple con las regulaciones laborales panameñas: Ley 462 de la CSS, Seguro Educ
 
 | Concepto | Tasa empleado | Tasa patronal |
 |----------|---------------|---------------|
-| CSS | 9.75% | 12.25% |
+| CSS | 9.75% | 13.25% (hasta feb. 2027) |
 | Seguro Educativo | 1.25% | 1.50% |
 
 **Topes de cotización** (base sobre la que se calcula):

@@ -87,8 +87,8 @@ public class MockPayrollConfigProvider : IPayrollConfigProvider
             // CSS - Empleado (fija según Ley 462)
             CssEmployeeRate: 9.75m,
 
-            // CSS - Empleador (escalonada según Ley 462)
-            // 2020-2024: 13.25%, 2025-2027: 14.25%, 2028+: 15.25%
+            // CSS - Empleador (escalonada según Reforma CSS)
+            // Hasta feb. 2027: 13.25%, mar. 2027-feb. 2029: 14.25%, desde mar. 2029: 15.25%
             CssEmployerBaseRate: 13.25m,
 
             // CSS - Topes de cotización según Ley 462

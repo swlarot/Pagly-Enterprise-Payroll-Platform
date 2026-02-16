@@ -87,16 +87,20 @@ public static class PayrollConfigSeeder
         }
 
         // Crear configuración default para Panamá 2026
+        // Reforma CSS - Tasas patronales escalonadas:
+        //   Hasta feb. 2027: 13.25%
+        //   Mar. 2027 – feb. 2029: 14.25% (crear nueva config con EffectiveStartDate = 2027-03-01)
+        //   Desde mar. 2029: 15.25% (crear nueva config con EffectiveStartDate = 2029-03-01)
         var config = new PayrollTaxConfiguration
         {
             TenantId = tenantId,  // CRÍTICO: asignar tenant
             EffectiveStartDate = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-            EffectiveEndDate = null,
-            Description = "Configuración Panamá 2026 - Ley 462 CSS",
+            EffectiveEndDate = new DateTime(2027, 2, 28, 23, 59, 59, DateTimeKind.Utc), // Vigente hasta feb. 2027
+            Description = "Configuración Panamá 2026 - Reforma CSS (13.25% patronal hasta feb. 2027)",
 
             // Tasas CSS (Caja de Seguro Social)
             CssEmployeeRate = 9.75m,      // Empleado: 9.75%
-            CssEmployerBaseRate = 12.25m,  // Empleador base: 12.25%
+            CssEmployerBaseRate = 13.25m,  // Empleador base: 13.25% (vigente hasta feb. 2027, reforma CSS)
 
             // Tasas de riesgo profesional
             CssRiskRateLow = 0.41m,        // Riesgo bajo: 0.41%

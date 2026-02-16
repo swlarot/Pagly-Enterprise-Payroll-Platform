@@ -342,7 +342,7 @@ Con la planilla aprobada, puede generar:
 1. Vaya a **Configuración** > **Tasas CSS/SE**
 2. Verifique que las tasas coinciden con las vigentes:
    - CSS Empleado: 9.75%
-   - CSS Patrono: 12.25%
+   - CSS Patrono: 13.25% (hasta feb. 2027; luego 14.25% hasta feb. 2029; 15.25% desde mar. 2029)
    - Tope CSS: B/.1,500.00
    - SE Empleado: 1.25%
    - SE Patrono: 1.50%

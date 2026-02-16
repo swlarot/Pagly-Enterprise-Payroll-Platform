@@ -32,11 +32,11 @@ Design, validate, and implement all payroll calculation logic ensuring 100% comp
 
 ### Panamanian Labor Legislation (Current 2024-2026)
 
-**Caja de Seguro Social (CSS) - Ley 462 (Modificada 2025):**
+**Caja de Seguro Social (CSS) - Reforma CSS:**
 
 | Concepto | Empleado | Patrono | Tope |
 |----------|----------|---------|------|
-| CSS Regular | 9.75% | 12.25% | B/.1,500.00 mensual |
+| CSS Regular | 9.75% | 13.25% (hasta feb. 2027) | B/.1,500.00 mensual |
 | Riesgo Profesional | 0% | 0.98% - 5.67% | Sin tope |
 
 **Seguro Educativo (SE):**
@@ -311,7 +311,7 @@ Debe incluir:
   - Salario bruto
   - Base CSS (con tope aplicado)
   - CSS empleado (9.75%)
-  - CSS patrono (12.25%)
+  - CSS patrono (13.25%)
   - Riesgo profesional
 - Totales consolidados
 

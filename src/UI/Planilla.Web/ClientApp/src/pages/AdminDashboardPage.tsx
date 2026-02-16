@@ -423,7 +423,7 @@ export default function AdminDashboardPage() {
                   textColor: 'text-primary-400',
                 },
                 {
-                  label: 'CSS Patronal (12.25%)',
+                  label: 'CSS Patronal (13.25%)',
                   value: stats.ultimaPlanilla?.totalEmployerCss,
                   color: 'bg-blue-500',
                   textColor: 'text-blue-400',

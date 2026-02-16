@@ -17,7 +17,7 @@ description: >
   - B/.50,000.01+: B/.5,850 + 25% sobre el excedente de B/.50,000
 
 ## Aportes del Empleador
-- **CSS Patronal**: 12.25% del salario bruto (Ley 462 escalonado)
+- **CSS Patronal**: 13.25% del salario bruto (Reforma CSS: 13.25% hasta feb. 2027, 14.25% hasta feb. 2029, 15.25% desde mar. 2029)
 - **Seguro Educativo Patronal**: 1.50% del salario bruto (SIN tope)
 - **Riesgos Profesionales**: varía por actividad (0.56% — 5.67%)
 

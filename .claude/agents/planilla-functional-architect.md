@@ -140,7 +140,7 @@ Act as orchestrator for technical agents:
 │  │   ├── (=) Salario Neto                                    │
 │  │   │                                                       │
 │  │   └── Cálculo costo patronal:                             │
-│  │       ├── CSS Patrono (12.25%)                            │
+│  │       ├── CSS Patrono (13.25%)                            │
 │  │       ├── SE Patrono (1.50%)                              │
 │  │       └── Riesgo Profesional (variable)                   │
 │  │                                                           │

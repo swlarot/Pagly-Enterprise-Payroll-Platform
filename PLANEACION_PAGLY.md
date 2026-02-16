@@ -50,7 +50,7 @@ Las tasas de contribución son pilares del cálculo de planilla. Tanto el emplea
 
 | Concepto | Tasa Empleado | Tasa Empleador | Base de Cálculo |
 | :--- | :--- | :--- | :--- |
-| **Seguro Social (CSS)** | 9.75% [17] | 12.25% [17] | Salario Bruto. |
+| **Seguro Social (CSS)** | 9.75% [17] | 13.25% [17] | Salario Bruto (13.25% hasta feb. 2027). |
 | **Seguro Educativo** | 1.25% [17] | 1.50% [17] | Salario Bruto. |
 | **Riesgos Profesionales** | 0.00% | 0.98% - 5.67% [17] | Salario Bruto (Variable por riesgo).[16, 17] |
 
