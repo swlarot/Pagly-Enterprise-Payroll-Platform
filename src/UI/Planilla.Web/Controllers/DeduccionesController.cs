@@ -31,10 +31,6 @@ public class DeduccionesController : ControllerBase
     /// <summary>
     /// Obtiene una lista de deducciones con filtros opcionales.
     /// </summary>
-    /// <param name="empleadoId">Filtrar por empleado (opcional).</param>
-    /// <param name="tipo">Filtrar por tipo de deducción (opcional).</param>
-    /// <param name="activas">Filtrar solo deducciones activas (opcional).</param>
-    /// <returns>Lista de deducciones.</returns>
     [HttpGet]
     public async Task<IActionResult> GetAll(
         [FromQuery] int? empleadoId,
@@ -45,22 +41,17 @@ public class DeduccionesController : ControllerBase
         var query = _context.DeduccionesFijas
             .Where(d => d.TenantId == tenantId)
             .Include(d => d.Empleado)
+            .Include(d => d.Acreedor)
             .AsQueryable();
 
         if (empleadoId.HasValue)
-        {
             query = query.Where(d => d.EmpleadoId == empleadoId.Value);
-        }
 
         if (tipo.HasValue)
-        {
             query = query.Where(d => d.TipoDeduccion == tipo.Value);
-        }
 
         if (activas.HasValue && activas.Value)
-        {
             query = query.Where(d => d.EstaActivo);
-        }
 
         var deducciones = await query
             .AsNoTracking()
@@ -75,8 +66,6 @@ public class DeduccionesController : ControllerBase
     /// <summary>
     /// Obtiene una deducción específica por su ID.
     /// </summary>
-    /// <param name="id">ID de la deducción.</param>
-    /// <returns>Detalles de la deducción.</returns>
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -84,23 +73,19 @@ public class DeduccionesController : ControllerBase
         var deduccion = await _context.DeduccionesFijas
             .Where(d => d.Id == id && d.TenantId == tenantId)
             .Include(d => d.Empleado)
+            .Include(d => d.Acreedor)
             .AsNoTracking()
             .FirstOrDefaultAsync();
 
         if (deduccion == null)
-        {
             return NotFound();
-        }
 
-        var deduccionDto = MapToDto(deduccion);
-        return Ok(deduccionDto);
+        return Ok(MapToDto(deduccion));
     }
 
     /// <summary>
     /// Obtiene todas las deducciones de un empleado específico.
     /// </summary>
-    /// <param name="empleadoId">ID del empleado.</param>
-    /// <returns>Lista de deducciones del empleado.</returns>
     [HttpGet("empleado/{empleadoId}")]
     public async Task<IActionResult> GetByEmpleado(int empleadoId)
     {
@@ -108,25 +93,22 @@ public class DeduccionesController : ControllerBase
         var empleado = await _context.Empleados
             .FirstOrDefaultAsync(e => e.Id == empleadoId && e.TenantId == tenantId);
         if (empleado == null)
-        {
             return NotFound(new { message = "Empleado no encontrado" });
-        }
 
         var deducciones = await _context.DeduccionesFijas
             .Where(d => d.EmpleadoId == empleadoId && d.TenantId == tenantId)
             .Include(d => d.Empleado)
+            .Include(d => d.Acreedor)
             .AsNoTracking()
             .OrderBy(d => d.Prioridad)
             .ToListAsync();
 
-        var deduccionesDto = deducciones.Select(MapToDto);
-        return Ok(deduccionesDto);
+        return Ok(deducciones.Select(MapToDto));
     }
 
     /// <summary>
     /// Obtiene la lista de tipos de deducción con sus nombres.
     /// </summary>
-    /// <returns>Lista de tipos de deducción.</returns>
     [HttpGet("tipos")]
     public IActionResult GetTipos()
     {
@@ -144,45 +126,56 @@ public class DeduccionesController : ControllerBase
     /// <summary>
     /// Crea una nueva deducción.
     /// </summary>
-    /// <param name="request">Datos de la deducción a crear.</param>
-    /// <returns>Deducción creada.</returns>
     [HttpPost]
     [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Create(CreateDeduccionRequest request)
     {
         var tenantId = _tenantContext.TenantId;
 
-        // Validar empleado existe
         var empleado = await _context.Empleados
             .FirstOrDefaultAsync(e => e.Id == request.EmpleadoId && e.TenantId == tenantId);
         if (empleado == null)
-        {
             return BadRequest(new { message = "Empleado no encontrado" });
-        }
 
-        // Validaciones de negocio
+        // Validaciones basicas
         if (request.EsPorcentaje)
         {
             if (!request.Porcentaje.HasValue || request.Porcentaje.Value <= 0)
-            {
-                return BadRequest(new { message = "El porcentaje debe ser mayor a cero cuando es deducción por porcentaje" });
-            }
+                return BadRequest(new { message = "El porcentaje debe ser mayor a cero cuando es deduccion por porcentaje" });
             if (request.Porcentaje.Value > 100)
-            {
                 return BadRequest(new { message = "El porcentaje no puede ser mayor a 100" });
-            }
         }
         else
         {
             if (request.Monto <= 0)
-            {
-                return BadRequest(new { message = "El monto debe ser mayor a cero cuando es deducción fija" });
-            }
+                return BadRequest(new { message = "El monto debe ser mayor a cero cuando es deduccion fija" });
         }
 
         if (request.FechaFin.HasValue && request.FechaFin.Value < request.FechaInicio)
-        {
             return BadRequest(new { message = "La fecha fin no puede ser anterior a la fecha inicio" });
+
+        // Validaciones para pension alimenticia y embargo: requieren expediente y juzgado
+        if (request.TipoDeduccion == TipoDeduccion.PensionAlimenticia || request.TipoDeduccion == TipoDeduccion.Embargo)
+        {
+            if (string.IsNullOrWhiteSpace(request.NumeroExpediente))
+                return BadRequest(new { message = "El numero de expediente es obligatorio para pension alimenticia y embargos" });
+            if (string.IsNullOrWhiteSpace(request.Juzgado))
+                return BadRequest(new { message = "El juzgado es obligatorio para pension alimenticia y embargos" });
+        }
+
+        // Auto-asignar categoria segun tipo si no se envia explicitamente
+        var categoria = request.Categoria ?? InferirCategoria(request.TipoDeduccion, request.NumeroExpediente);
+
+        // Auto-llenado desde catálogo de acreedores si se proporciona AcreedorId
+        Acreedor? acreedor = null;
+        if (request.AcreedorId.HasValue)
+        {
+            acreedor = await _context.Acreedores
+                .FirstOrDefaultAsync(a => a.Id == request.AcreedorId.Value && a.TenantId == tenantId);
+            if (acreedor == null)
+                return BadRequest(new { message = "Acreedor no encontrado" });
+            if (!acreedor.EstaActivo)
+                return BadRequest(new { message = "El acreedor seleccionado esta inactivo" });
         }
 
         var deduccion = new DeduccionFija
@@ -200,6 +193,29 @@ public class DeduccionesController : ControllerBase
             Referencia = request.Referencia,
             Prioridad = request.Prioridad,
             Observaciones = request.Observaciones,
+            // Acreedor - auto-llenar desde catálogo o usar campos manuales
+            AcreedorId = request.AcreedorId,
+            NombreAcreedor = acreedor?.Nombre ?? request.NombreAcreedor,
+            IdentificacionAcreedor = acreedor?.Identificacion ?? request.IdentificacionAcreedor,
+            CuentaBancariaAcreedor = acreedor?.NumeroCuenta ?? request.CuentaBancariaAcreedor,
+            BancoAcreedor = acreedor?.Banco ?? request.BancoAcreedor,
+            // Orden Judicial
+            NumeroExpediente = request.NumeroExpediente,
+            Juzgado = request.Juzgado,
+            FechaOrdenJudicial = request.FechaOrdenJudicial,
+            NombreJuez = request.NombreJuez,
+            EstadoOrdenJudicial = request.EstadoOrdenJudicial,
+            // Control de calculo
+            BaseCalculo = request.BaseCalculo,
+            Categoria = categoria,
+            MontoTotalACobrar = request.MontoTotalACobrar,
+            // Autorizacion
+            TieneAutorizacionEscrita = request.TieneAutorizacionEscrita,
+            FechaAutorizacion = request.FechaAutorizacion,
+            DocumentoAutorizacionRef = request.DocumentoAutorizacionRef,
+            // Aplicacion especial
+            AplicaADecimoTercerMes = request.AplicaADecimoTercerMes,
+            AplicaAPrestaciones = request.AplicaAPrestaciones,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -207,21 +223,17 @@ public class DeduccionesController : ControllerBase
         await repository.AddAsync(deduccion);
         await _unitOfWork.CompleteAsync();
 
-        // Recargar con navegación
         deduccion = await _context.DeduccionesFijas
             .Include(d => d.Empleado)
+            .Include(d => d.Acreedor)
             .FirstOrDefaultAsync(d => d.Id == deduccion.Id);
 
-        var deduccionDto = MapToDto(deduccion!);
-        return CreatedAtAction(nameof(GetById), new { id = deduccion!.Id }, deduccionDto);
+        return CreatedAtAction(nameof(GetById), new { id = deduccion!.Id }, MapToDto(deduccion));
     }
 
     /// <summary>
     /// Actualiza una deducción existente.
     /// </summary>
-    /// <param name="id">ID de la deducción.</param>
-    /// <param name="request">Datos actualizados.</param>
-    /// <returns>NoContent si fue exitoso.</returns>
     [HttpPut("{id}")]
     [Authorize(Roles = "Owner,Admin,Manager")]
     public async Task<IActionResult> Update(int id, CreateDeduccionRequest request)
@@ -231,33 +243,46 @@ public class DeduccionesController : ControllerBase
             .FirstOrDefaultAsync(d => d.Id == id && d.TenantId == tenantId);
 
         if (deduccion == null)
-        {
             return NotFound();
-        }
 
         // Validaciones
         if (request.EsPorcentaje)
         {
             if (!request.Porcentaje.HasValue || request.Porcentaje.Value <= 0)
-            {
-                return BadRequest(new { message = "El porcentaje debe ser mayor a cero cuando es deducción por porcentaje" });
-            }
+                return BadRequest(new { message = "El porcentaje debe ser mayor a cero cuando es deduccion por porcentaje" });
             if (request.Porcentaje.Value > 100)
-            {
                 return BadRequest(new { message = "El porcentaje no puede ser mayor a 100" });
-            }
         }
         else
         {
             if (request.Monto <= 0)
-            {
-                return BadRequest(new { message = "El monto debe ser mayor a cero cuando es deducción fija" });
-            }
+                return BadRequest(new { message = "El monto debe ser mayor a cero cuando es deduccion fija" });
         }
 
         if (request.FechaFin.HasValue && request.FechaFin.Value < request.FechaInicio)
-        {
             return BadRequest(new { message = "La fecha fin no puede ser anterior a la fecha inicio" });
+
+        // Validaciones para pension alimenticia y embargo
+        if (request.TipoDeduccion == TipoDeduccion.PensionAlimenticia || request.TipoDeduccion == TipoDeduccion.Embargo)
+        {
+            if (string.IsNullOrWhiteSpace(request.NumeroExpediente))
+                return BadRequest(new { message = "El numero de expediente es obligatorio para pension alimenticia y embargos" });
+            if (string.IsNullOrWhiteSpace(request.Juzgado))
+                return BadRequest(new { message = "El juzgado es obligatorio para pension alimenticia y embargos" });
+        }
+
+        var categoria = request.Categoria ?? InferirCategoria(request.TipoDeduccion, request.NumeroExpediente);
+
+        // Auto-llenado desde catálogo de acreedores si se proporciona AcreedorId
+        Acreedor? acreedor = null;
+        if (request.AcreedorId.HasValue)
+        {
+            acreedor = await _context.Acreedores
+                .FirstOrDefaultAsync(a => a.Id == request.AcreedorId.Value && a.TenantId == tenantId);
+            if (acreedor == null)
+                return BadRequest(new { message = "Acreedor no encontrado" });
+            if (!acreedor.EstaActivo)
+                return BadRequest(new { message = "El acreedor seleccionado esta inactivo" });
         }
 
         deduccion.TipoDeduccion = request.TipoDeduccion;
@@ -270,6 +295,29 @@ public class DeduccionesController : ControllerBase
         deduccion.Referencia = request.Referencia;
         deduccion.Prioridad = request.Prioridad;
         deduccion.Observaciones = request.Observaciones;
+        // Acreedor - auto-llenar desde catálogo o usar campos manuales
+        deduccion.AcreedorId = request.AcreedorId;
+        deduccion.NombreAcreedor = acreedor?.Nombre ?? request.NombreAcreedor;
+        deduccion.IdentificacionAcreedor = acreedor?.Identificacion ?? request.IdentificacionAcreedor;
+        deduccion.CuentaBancariaAcreedor = acreedor?.NumeroCuenta ?? request.CuentaBancariaAcreedor;
+        deduccion.BancoAcreedor = acreedor?.Banco ?? request.BancoAcreedor;
+        // Orden Judicial
+        deduccion.NumeroExpediente = request.NumeroExpediente;
+        deduccion.Juzgado = request.Juzgado;
+        deduccion.FechaOrdenJudicial = request.FechaOrdenJudicial;
+        deduccion.NombreJuez = request.NombreJuez;
+        deduccion.EstadoOrdenJudicial = request.EstadoOrdenJudicial;
+        // Control de calculo
+        deduccion.BaseCalculo = request.BaseCalculo;
+        deduccion.Categoria = categoria;
+        deduccion.MontoTotalACobrar = request.MontoTotalACobrar;
+        // Autorizacion
+        deduccion.TieneAutorizacionEscrita = request.TieneAutorizacionEscrita;
+        deduccion.FechaAutorizacion = request.FechaAutorizacion;
+        deduccion.DocumentoAutorizacionRef = request.DocumentoAutorizacionRef;
+        // Aplicacion especial
+        deduccion.AplicaADecimoTercerMes = request.AplicaADecimoTercerMes;
+        deduccion.AplicaAPrestaciones = request.AplicaAPrestaciones;
         deduccion.UpdatedAt = DateTime.UtcNow;
 
         await _unitOfWork.CompleteAsync();
@@ -277,31 +325,52 @@ public class DeduccionesController : ControllerBase
     }
 
     /// <summary>
-    /// Elimina físicamente una deducción fija de la base de datos.
+    /// Desactiva una deducción (soft delete). Si tiene orden judicial vigente, rechaza sin motivo.
     /// </summary>
-    /// <param name="id">ID de la deducción.</param>
-    /// <returns>NoContent si fue exitoso.</returns>
     [HttpDelete("{id}")]
     [Authorize(Roles = "Owner,Admin")]
-    public async Task<IActionResult> Desactivar(int id)
+    public async Task<IActionResult> Desactivar(int id, [FromQuery] string? motivo = null)
     {
         var tenantId = _tenantContext.TenantId;
         var deduccion = await _context.DeduccionesFijas
             .FirstOrDefaultAsync(d => d.Id == id && d.TenantId == tenantId);
 
         if (deduccion == null)
-        {
             return NotFound();
+
+        // Si tiene orden judicial vigente, requerir motivo
+        if (deduccion.EstadoOrdenJudicial == EstadoOrdenJudicial.Vigente && string.IsNullOrWhiteSpace(motivo))
+        {
+            return BadRequest(new { message = "No se puede desactivar una deduccion con orden judicial vigente sin proporcionar un motivo. Use ?motivo=..." });
         }
 
-        _context.DeduccionesFijas.Remove(deduccion);
+        deduccion.EstaActivo = false;
+        deduccion.UpdatedAt = DateTime.UtcNow;
+
+        if (!string.IsNullOrWhiteSpace(motivo) && deduccion.EstadoOrdenJudicial.HasValue)
+        {
+            deduccion.MotivoLevantamiento = motivo;
+            deduccion.FechaLevantamiento = DateTime.UtcNow;
+        }
+
         await _unitOfWork.CompleteAsync();
         return NoContent();
     }
 
     /// <summary>
-    /// Mapea una entidad DeduccionFija a DeduccionFijaDto.
+    /// Infiere la categoria de prelacion segun el tipo de deduccion.
     /// </summary>
+    private static CategoriaDeduccion InferirCategoria(TipoDeduccion tipo, string? numeroExpediente)
+    {
+        return tipo switch
+        {
+            TipoDeduccion.PensionAlimenticia => CategoriaDeduccion.PensionAlimenticia,
+            TipoDeduccion.Embargo => CategoriaDeduccion.EmbargoJudicial,
+            TipoDeduccion.PrestamoBancario when !string.IsNullOrEmpty(numeroExpediente) => CategoriaDeduccion.EmbargoJudicial,
+            _ => CategoriaDeduccion.Voluntaria
+        };
+    }
+
     private static DeduccionFijaDto MapToDto(DeduccionFija deduccion)
     {
         var nombreCompleto = deduccion.Empleado != null
@@ -322,24 +391,44 @@ public class DeduccionesController : ControllerBase
             FechaFin: deduccion.FechaFin,
             EstaActivo: deduccion.EstaActivo,
             Referencia: deduccion.Referencia,
-            Prioridad: deduccion.Prioridad
+            Prioridad: deduccion.Prioridad,
+            NombreAcreedor: deduccion.NombreAcreedor,
+            IdentificacionAcreedor: deduccion.IdentificacionAcreedor,
+            CuentaBancariaAcreedor: deduccion.CuentaBancariaAcreedor,
+            BancoAcreedor: deduccion.BancoAcreedor,
+            NumeroExpediente: deduccion.NumeroExpediente,
+            Juzgado: deduccion.Juzgado,
+            FechaOrdenJudicial: deduccion.FechaOrdenJudicial,
+            NombreJuez: deduccion.NombreJuez,
+            EstadoOrdenJudicial: deduccion.EstadoOrdenJudicial,
+            FechaLevantamiento: deduccion.FechaLevantamiento,
+            MotivoLevantamiento: deduccion.MotivoLevantamiento,
+            BaseCalculo: deduccion.BaseCalculo,
+            Categoria: deduccion.Categoria,
+            MontoTotalACobrar: deduccion.MontoTotalACobrar,
+            MontoCobradoAcumulado: deduccion.MontoCobradoAcumulado,
+            TieneAutorizacionEscrita: deduccion.TieneAutorizacionEscrita,
+            FechaAutorizacion: deduccion.FechaAutorizacion,
+            DocumentoAutorizacionRef: deduccion.DocumentoAutorizacionRef,
+            AplicaADecimoTercerMes: deduccion.AplicaADecimoTercerMes,
+            AplicaAPrestaciones: deduccion.AplicaAPrestaciones,
+            AcreedorId: deduccion.AcreedorId,
+            AcreedorNombre: deduccion.Acreedor?.Nombre ?? deduccion.NombreAcreedor
         );
     }
 
-    /// <summary>
-    /// Obtiene el nombre legible del tipo de deducción.
-    /// </summary>
     private static string GetTipoDeduccionNombre(TipoDeduccion tipo)
     {
         return tipo switch
         {
-            TipoDeduccion.PrestamoInterno => "Préstamo Interno",
-            TipoDeduccion.PrestamoBancario => "Préstamo Bancario",
-            TipoDeduccion.PensionAlimenticia => "Pensión Alimenticia",
+            TipoDeduccion.PrestamoInterno => "Prestamo Interno",
+            TipoDeduccion.PrestamoBancario => "Prestamo Bancario",
+            TipoDeduccion.PensionAlimenticia => "Pension Alimenticia",
             TipoDeduccion.Embargo => "Embargo",
-            TipoDeduccion.SeguroMedico => "Seguro Médico",
+            TipoDeduccion.SeguroMedico => "Seguro Medico",
             TipoDeduccion.AhorroVoluntario => "Ahorro Voluntario",
             TipoDeduccion.Sindicato => "Sindicato",
+            TipoDeduccion.Cooperativa => "Cooperativa",
             TipoDeduccion.Otro => "Otro",
             _ => tipo.ToString()
         };

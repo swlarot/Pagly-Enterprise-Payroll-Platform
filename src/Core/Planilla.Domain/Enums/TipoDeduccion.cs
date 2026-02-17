@@ -41,6 +41,11 @@ public enum TipoDeduccion
     Sindicato = 7,
 
     /// <summary>
+    /// Descuentos de cooperativas (Ley 17 de 1997)
+    /// </summary>
+    Cooperativa = 8,
+
+    /// <summary>
     /// Otro tipo de deducción no clasificada
     /// </summary>
     Otro = 99

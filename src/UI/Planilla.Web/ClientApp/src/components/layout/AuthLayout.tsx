@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { TenantRole } from '../../types/api';
 import { canAccessModule } from '../../services/permissionService';
 import { PaglyLogo } from '../ui/PaglyLogo';
+import { Building2 } from 'lucide-react';
 
 interface AuthLayoutProps {
   children: ReactNode;
@@ -60,6 +61,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       '/posiciones': 'Gestión de Posiciones',
       '/prestamos': 'Gestión de Préstamos',
       '/deducciones': 'Gestión de Deducciones',
+      '/acreedores': 'Catálogo de Acreedores',
       '/anticipos': 'Gestión de Anticipos',
       '/horas-extra': 'Gestión de Horas Extra',
       '/ausencias': 'Gestión de Ausencias',
@@ -210,6 +212,10 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                         d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     Deducciones
+                  </NavLink>
+                  <NavLink to="/acreedores" className={novedadesTileClass}>
+                    <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
+                    Acreedores
                   </NavLink>
                 </div>
               )}

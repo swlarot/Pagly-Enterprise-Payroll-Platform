@@ -31,12 +31,14 @@ import DepartamentosPage from './pages/DepartamentosPage.jsx';
 import PosicionesPage from './pages/PosicionesPage.jsx';
 import PrestamosPage from './pages/PrestamosPage.jsx';
 import DeduccionesPage from './pages/DeduccionesPage.jsx';
+import AcreedoresPage from './pages/AcreedoresPage.jsx';
 import AnticiposPage from './pages/AnticiposPage.jsx';
 import HorasExtraPage from './pages/HorasExtraPage.jsx';
 import AusenciasPage from './pages/AusenciasPage.jsx';
 import VacacionesPage from './pages/VacacionesPage.jsx';
 import PlanillasPage from './pages/PlanillasPage.jsx';
 import ConfiguracionPage from './pages/ConfiguracionPage.jsx';
+import SalarioMinimoPage from './pages/SalarioMinimoPage.jsx';
 import ReportesPage from './pages/ReportesPage.jsx';
 
 function App() {
@@ -276,6 +278,17 @@ function App() {
         />
 
         <Route
+          path="/acreedores"
+          element={
+            <ProtectedRoute>
+              <AuthLayout>
+                <AcreedoresPage />
+              </AuthLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/anticipos"
           element={
             <ProtectedRoute>
@@ -348,6 +361,19 @@ function App() {
               <AuthLayout>
                 <ConfiguracionPage />
               </AuthLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/configuracion/salario-minimo"
+          element={
+            <ProtectedRoute>
+              <RoleGuard allowedRoles={[TenantRole.Owner]}>
+                <AuthLayout>
+                  <SalarioMinimoPage />
+                </AuthLayout>
+              </RoleGuard>
             </ProtectedRoute>
           }
         />

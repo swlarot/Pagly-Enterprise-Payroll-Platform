@@ -10,7 +10,7 @@ public record DeduccionFijaDto(
     int EmpleadoId,
     string EmpleadoNombre,
     TipoDeduccion TipoDeduccion,
-    string TipoDeduccionNombre,  // Nombre legible
+    string TipoDeduccionNombre,
     string Descripcion,
     decimal Monto,
     decimal? Porcentaje,
@@ -19,5 +19,33 @@ public record DeduccionFijaDto(
     DateTime? FechaFin,
     bool EstaActivo,
     string? Referencia,
-    int Prioridad
+    int Prioridad,
+    // Acreedor
+    string? NombreAcreedor = null,
+    string? IdentificacionAcreedor = null,
+    string? CuentaBancariaAcreedor = null,
+    string? BancoAcreedor = null,
+    // Orden Judicial
+    string? NumeroExpediente = null,
+    string? Juzgado = null,
+    DateTime? FechaOrdenJudicial = null,
+    string? NombreJuez = null,
+    EstadoOrdenJudicial? EstadoOrdenJudicial = null,
+    DateTime? FechaLevantamiento = null,
+    string? MotivoLevantamiento = null,
+    // Control de calculo
+    BaseCalculoDeduccion BaseCalculo = BaseCalculoDeduccion.SalarioBruto,
+    CategoriaDeduccion Categoria = CategoriaDeduccion.Voluntaria,
+    decimal? MontoTotalACobrar = null,
+    decimal MontoCobradoAcumulado = 0,
+    // Autorizacion
+    bool TieneAutorizacionEscrita = false,
+    DateTime? FechaAutorizacion = null,
+    string? DocumentoAutorizacionRef = null,
+    // Aplicacion especial
+    bool AplicaADecimoTercerMes = false,
+    bool AplicaAPrestaciones = false,
+    // Referencia al catalogo de acreedores
+    int? AcreedorId = null,
+    string? AcreedorNombre = null
 );

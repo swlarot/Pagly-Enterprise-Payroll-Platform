@@ -145,6 +145,54 @@ public class ReportesController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Obtiene el reporte consolidado de acreedores en formato JSON.
+    /// Agrupa todas las deducciones aplicadas por beneficiario para facilitar
+    /// la conciliación y transferencia bancaria a cada acreedor.
+    /// </summary>
+    [HttpGet("consolidado-acreedor/{planillaId}")]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    public async Task<ActionResult<ReporteConsolidadoAcreedorDto>> GetReporteConsolidadoAcreedor(int planillaId)
+    {
+        try
+        {
+            var reporte = await _reportesService.GenerarReporteConsolidadoAcreedor(planillaId);
+            return Ok(reporte);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Error al generar reporte: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
+    /// Obtiene el reporte de deducciones adicionales por empleado en formato JSON.
+    /// Muestra la cascada de prelación (pensiones, embargos, voluntarias) con
+    /// saldos disponibles y razones de limitación por salario mínimo.
+    /// </summary>
+    [HttpGet("deducciones-empleado/{planillaId}")]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    public async Task<ActionResult<ReporteDeduccionesEmpleadoDto>> GetReporteDeduccionesEmpleado(int planillaId)
+    {
+        try
+        {
+            var reporte = await _reportesService.GenerarReporteDeduccionesEmpleado(planillaId);
+            return Ok(reporte);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Error al generar reporte: {ex.Message}" });
+        }
+    }
+
     #endregion
 
     #region Exportación Excel
@@ -188,6 +236,86 @@ public class ReportesController : ControllerBase
             var fileName = $"SeguroEducativo_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
 
             return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Error al exportar: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
+    /// Exporta el reporte consolidado de acreedores a Excel.
+    /// Sheet 1: resumen por acreedor con datos bancarios para transferencias.
+    /// Sheet 2: detalle por acreedor mostrando el desglose por empleado.
+    /// </summary>
+    [HttpGet("consolidado-acreedor/{planillaId}/excel")]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [PlanLimits(PlanLimitType.ExportExcel)]
+    public async Task<IActionResult> ExportarConsolidadoAcreedorExcel(int planillaId)
+    {
+        try
+        {
+            var reporte = await _reportesService.GenerarReporteConsolidadoAcreedor(planillaId);
+            var bytes = _exportacionService.ExportarExcelConsolidadoAcreedor(reporte);
+            var fileName = $"ConsolidadoAcreedores_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+
+            return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Error al exportar: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
+    /// Exporta el reporte de deducciones adicionales por empleado a Excel.
+    /// Genera un bloque por empleado mostrando la cascada de prelación
+    /// con saldos disponibles antes/después de cada deducción.
+    /// </summary>
+    [HttpGet("deducciones-empleado/{planillaId}/excel")]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [PlanLimits(PlanLimitType.ExportExcel)]
+    public async Task<IActionResult> ExportarDeduccionesEmpleadoExcel(int planillaId)
+    {
+        try
+        {
+            var reporte = await _reportesService.GenerarReporteDeduccionesEmpleado(planillaId);
+            var bytes = _exportacionService.ExportarExcelDeduccionesEmpleado(reporte);
+            var fileName = $"DeduccionesEmpleado_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+
+            return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Error al exportar: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
+    /// Exporta el reporte de horas extra a Excel
+    /// </summary>
+    [HttpGet("horas-extra/{planillaId}/excel")]
+    [PlanLimits(PlanLimitType.ExportExcel)]
+    public async Task<IActionResult> ExportarHorasExtraExcel(int planillaId)
+    {
+        try
+        {
+            var reporte = await _reportesService.GenerarReporteHorasExtra(planillaId);
+            // TODO: Implementar ExportarExcelHorasExtra en ExportacionService
+            // Por ahora retornar JSON como placeholder
+            return Ok(new { message = "Exportación Excel de horas extra pendiente de implementación", reporte });
         }
         catch (InvalidOperationException ex)
         {
@@ -254,18 +382,48 @@ public class ReportesController : ControllerBase
     }
 
     /// <summary>
-    /// Exporta el reporte de horas extra a Excel
+    /// Exporta el reporte consolidado de acreedores a PDF.
+    /// Incluye tabla resumen y detalle por acreedor con desglose por empleado.
     /// </summary>
-    [HttpGet("horas-extra/{planillaId}/excel")]
-    [PlanLimits(PlanLimitType.ExportExcel)]
-    public async Task<IActionResult> ExportarHorasExtraExcel(int planillaId)
+    [HttpGet("consolidado-acreedor/{planillaId}/pdf")]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [PlanLimits(PlanLimitType.ExportPdf)]
+    public async Task<IActionResult> ExportarConsolidadoAcreedorPdf(int planillaId)
     {
         try
         {
-            var reporte = await _reportesService.GenerarReporteHorasExtra(planillaId);
-            // TODO: Implementar ExportarExcelHorasExtra en ExportacionService
-            // Por ahora retornar JSON como placeholder
-            return Ok(new { message = "Exportación Excel de horas extra pendiente de implementación", reporte });
+            var reporte = await _reportesService.GenerarReporteConsolidadoAcreedor(planillaId);
+            var bytes = _exportacionService.ExportarPdfConsolidadoAcreedor(reporte);
+            var fileName = $"ConsolidadoAcreedores_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+
+            return File(bytes, "application/pdf", fileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Error al exportar: {ex.Message}" });
+        }
+    }
+
+    /// <summary>
+    /// Exporta el reporte de deducciones adicionales por empleado a PDF.
+    /// Muestra la cascada de prelación con resaltado de limitaciones por salario mínimo.
+    /// </summary>
+    [HttpGet("deducciones-empleado/{planillaId}/pdf")]
+    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [PlanLimits(PlanLimitType.ExportPdf)]
+    public async Task<IActionResult> ExportarDeduccionesEmpleadoPdf(int planillaId)
+    {
+        try
+        {
+            var reporte = await _reportesService.GenerarReporteDeduccionesEmpleado(planillaId);
+            var bytes = _exportacionService.ExportarPdfDeduccionesEmpleado(reporte);
+            var fileName = $"DeduccionesEmpleado_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+
+            return File(bytes, "application/pdf", fileName);
         }
         catch (InvalidOperationException ex)
         {

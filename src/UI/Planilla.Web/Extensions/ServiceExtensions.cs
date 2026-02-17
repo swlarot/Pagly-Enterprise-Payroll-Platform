@@ -8,29 +8,29 @@ using Vorluno.Planilla.Web.Services;
 namespace Vorluno.Planilla.Web.Extensions
 {
     /// <summary>
-    /// Clase estática que contiene métodos de extensión para configurar los servicios de la aplicación.
+    /// Clase estï¿½tica que contiene mï¿½todos de extensiï¿½n para configurar los servicios de la aplicaciï¿½n.
     /// </summary>
     public static class ServiceExtensions
     {
         /// <summary>
-        /// Registra los servicios de la capa de aplicación e infraestructura en el contenedor de dependencias.
+        /// Registra los servicios de la capa de aplicaciï¿½n e infraestructura en el contenedor de dependencias.
         /// </summary>
-        /// <param name="services">La colección de servicios a la que se agregarán los registros.</param>
+        /// <param name="services">La colecciï¿½n de servicios a la que se agregarï¿½n los registros.</param>
         public static void ConfigureApplicationServices(this IServiceCollection services)
         {
             // Registra la IUnitOfWork. Cuando una clase pida una IUnitOfWork,
-            // el sistema le entregará una instancia de nuestra clase UnitOfWork.
-            // Se registra como 'Scoped', lo que significa que se crea una nueva instancia por cada petición HTTP.
+            // el sistema le entregarï¿½ una instancia de nuestra clase UnitOfWork.
+            // Se registra como 'Scoped', lo que significa que se crea una nueva instancia por cada peticiï¿½n HTTP.
 
             services.AddScoped<IUnitOfWork, UnitOfWork>();
 
             // REGISTRAR NUESTRO NUEVO SERVICIO
             services.AddScoped<PlanillaService>();
 
-            // Phase A: Proveedor de configuración de planilla (tasas CSS, SE, ISR)
+            // Phase A: Proveedor de configuraciï¿½n de planilla (tasas CSS, SE, ISR)
             services.AddScoped<IPayrollConfigProvider, PayrollConfigProvider>();
 
-            // Phase B: Servicios de cálculo de planilla (CSS, SE, ISR)
+            // Phase B: Servicios de cï¿½lculo de planilla (CSS, SE, ISR)
             services.AddScoped<CssCalculationServicePortable>();
             services.AddScoped<EducationalInsuranceServicePortable>();
             services.AddScoped<IncomeTaxCalculationServicePortable>();
@@ -38,15 +38,16 @@ namespace Vorluno.Planilla.Web.Extensions
             // Phase D: Workflow de planilla y orquestador
             services.AddScoped<PayrollStateMachine>();
             services.AddScoped<PayrollCalculationOrchestratorPortable>();
+            services.AddScoped<DeduccionPrioridadEngine>();
             services.AddScoped<PayrollProcessingService>();
 
-            // Phase E: Multi-tenancy y auditoría
+            // Phase E: Multi-tenancy y auditorï¿½a
             services.AddScoped<ICurrentUserService, CurrentUserService>();
 
             // Phase F: Asistencia (horas extra, ausencias, vacaciones)
             services.AddScoped<AsistenciaCalculationService>();
 
-            // Phase G: Reportes y exportación
+            // Phase G: Reportes y exportaciï¿½n
             services.AddScoped<ReportesService>();
             services.AddScoped<ExportacionService>();
 

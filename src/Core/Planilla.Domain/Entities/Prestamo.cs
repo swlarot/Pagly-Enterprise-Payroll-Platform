@@ -81,6 +81,14 @@ public class Prestamo : ITenantEntity
     /// </summary>
     public string? Observaciones { get; set; }
 
+    // ====================================================================
+    // Referencia al Catálogo de Acreedores (opcional)
+    // ====================================================================
+
+    /// <summary>FK al catálogo de acreedores (útil para préstamos bancarios)</summary>
+    public int? AcreedorId { get; set; }
+    public virtual Acreedor? Acreedor { get; set; }
+
     // Auditoría
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
