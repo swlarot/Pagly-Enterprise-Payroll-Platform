@@ -260,7 +260,13 @@ public class ReportesService
                 d.CssEmployer,
                 d.EducationalInsuranceEmployer,
                 d.RiskContribution,
-                d.EmployerCost
+                d.EmployerCost,
+
+                // Desglose deducciones adicionales
+                d.PensionAlimenticia,
+                d.Embargos,
+                d.DeduccionesVoluntarias,
+                d.TuvoLimitacionSalarioMinimo
             ))
             .OrderBy(e => e.Departamento)
             .ThenBy(e => e.NombreCompleto)
@@ -314,6 +320,207 @@ public class ReportesService
 
             // Por departamento
             resumenPorDepartamento.Any() ? resumenPorDepartamento : null
+        );
+    }
+
+    /// <summary>
+    /// Genera el reporte consolidado de acreedores para una planilla.
+    /// Agrupa las DeduccionesAplicadas por NombreAcreedor y enriquece con datos
+    /// bancarios del catálogo Acreedor cuando está disponible.
+    /// </summary>
+    public async Task<ReporteConsolidadoAcreedorDto> GenerarReporteConsolidadoAcreedor(int planillaId)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        // SEGURIDAD CRÍTICA: Filtrar por TenantId para aislar datos entre tenants
+        var planilla = await _context.PayrollHeaders
+            .Where(p => p.Id == planillaId && p.TenantId == tenantId)
+            .Include(p => p.Details)
+                .ThenInclude(d => d.Empleado)
+            .Include(p => p.Details)
+                .ThenInclude(d => d.DeduccionesAplicadas)
+                    .ThenInclude(da => da.DeduccionFija)
+                        .ThenInclude(df => df!.Acreedor)
+            .FirstOrDefaultAsync();
+
+        if (planilla == null)
+            throw new InvalidOperationException($"Planilla {planillaId} no encontrada o no autorizada");
+
+        var tenant = await _tenantContext.GetCurrentTenantAsync();
+
+        // Recopilar todas las deducciones aplicadas con datos del empleado
+        var todasDeducciones = planilla.Details
+            .Where(d => d.Empleado != null)
+            .SelectMany(d => d.DeduccionesAplicadas.Select(da => new
+            {
+                EmpleadoNombre = $"{d.Empleado!.Nombre} {d.Empleado.Apellido}",
+                EmpleadoCedula = d.Empleado.NumeroIdentificacion,
+                da.NombreAcreedor,
+                da.AnticipoId,
+                da.PrestamoId,
+                da.DeduccionFijaId,
+                Acreedor = da.DeduccionFija?.Acreedor,
+                DeduccionFija = da.DeduccionFija,
+                da.TipoDeduccion,
+                da.Categoria,
+                da.Descripcion,
+                da.MontoSolicitado,
+                da.MontoAplicado,
+                da.MontoLimitado,
+                da.RazonLimitacion
+            }))
+            .ToList();
+
+        // Agrupar por nombre del acreedor (campo snapshot en DeduccionAplicada)
+        var gruposAcreedor = todasDeducciones
+            .GroupBy(x => x.NombreAcreedor ?? "Sin Acreedor")
+            .Select(g =>
+            {
+                // Intentar obtener datos bancarios del catálogo si existe la referencia
+                var primeraConAcreedor = g.FirstOrDefault(x => x.Acreedor != null);
+                var acreedor = primeraConAcreedor?.Acreedor;
+
+                // Fallback a campos embebidos en DeduccionFija si no hay catálogo
+                var primeraConDf = g.FirstOrDefault(x => x.DeduccionFija != null);
+                var df = primeraConDf?.DeduccionFija;
+
+                var identificacion = acreedor?.Identificacion ?? df?.IdentificacionAcreedor;
+                var banco = acreedor?.Banco ?? df?.BancoAcreedor;
+                var numeroCuenta = acreedor?.NumeroCuenta ?? df?.CuentaBancariaAcreedor;
+                var tipoAcreedor = acreedor?.TipoAcreedor.ToString();
+
+                var detalle = g
+                    .Select(x => new DeduccionAcreedorDetalle(
+                        x.EmpleadoNombre,
+                        x.EmpleadoCedula,
+                        x.TipoDeduccion.ToString(),
+                        x.Descripcion,
+                        x.MontoSolicitado,
+                        x.MontoAplicado,
+                        x.MontoLimitado,
+                        x.RazonLimitacion
+                    ))
+                    .ToList();
+
+                return new AcreedorConsolidadoItem(
+                    acreedor?.Id,
+                    g.Key,
+                    identificacion,
+                    banco,
+                    numeroCuenta,
+                    tipoAcreedor,
+                    g.Select(x => x.EmpleadoCedula).Distinct().Count(),
+                    g.Sum(x => x.MontoSolicitado),
+                    g.Sum(x => x.MontoAplicado),
+                    g.Sum(x => x.MontoLimitado),
+                    detalle
+                );
+            })
+            .OrderByDescending(a => a.TotalAplicado)
+            .ToList();
+
+        return new ReporteConsolidadoAcreedorDto(
+            tenant?.Name ?? "Sin nombre",
+            tenant != null && !string.IsNullOrEmpty(tenant.RUC) && !string.IsNullOrEmpty(tenant.DV)
+                ? $"{tenant.RUC}-{tenant.DV}"
+                : "Sin RUC",
+            $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
+            DateTime.Now,
+            gruposAcreedor,
+            gruposAcreedor.Sum(a => a.TotalSolicitado),
+            gruposAcreedor.Sum(a => a.TotalAplicado),
+            gruposAcreedor.Sum(a => a.TotalLimitado),
+            gruposAcreedor.Count
+        );
+    }
+
+    /// <summary>
+    /// Genera el reporte de deducciones adicionales por empleado para una planilla.
+    /// Muestra la cascada de prelación con saldos disponibles y razones de limitación,
+    /// cumpliendo los requisitos de auditoría de la Ley 462 de la CSS.
+    /// </summary>
+    public async Task<ReporteDeduccionesEmpleadoDto> GenerarReporteDeduccionesEmpleado(int planillaId)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        // SEGURIDAD CRÍTICA: Filtrar por TenantId para aislar datos entre tenants
+        var planilla = await _context.PayrollHeaders
+            .Where(p => p.Id == planillaId && p.TenantId == tenantId)
+            .Include(p => p.Details)
+                .ThenInclude(d => d.Empleado)
+                    .ThenInclude(e => e!.Departamento)
+            .Include(p => p.Details)
+                .ThenInclude(d => d.Empleado)
+                    .ThenInclude(e => e!.Posicion)
+            .Include(p => p.Details)
+                .ThenInclude(d => d.DeduccionesAplicadas)
+            .FirstOrDefaultAsync();
+
+        if (planilla == null)
+            throw new InvalidOperationException($"Planilla {planillaId} no encontrada o no autorizada");
+
+        var tenant = await _tenantContext.GetCurrentTenantAsync();
+
+        // Solo empleados que tienen al menos una DeduccionAplicada
+        var empleadosConDeducciones = planilla.Details
+            .Where(d => d.Empleado != null && d.DeduccionesAplicadas.Any())
+            .Select(d =>
+            {
+                var deduccionesLegales = d.CssEmployee + d.EducationalInsuranceEmployee + d.IncomeTax;
+                var netoPostLegal = d.GrossPay - deduccionesLegales;
+
+                var detalles = d.DeduccionesAplicadas
+                    .OrderBy(da => da.OrdenAplicacion)
+                    .Select(da => new DeduccionEmpleadoDetalle(
+                        da.OrdenAplicacion,
+                        da.Categoria.ToString(),
+                        da.TipoDeduccion.ToString(),
+                        da.Descripcion,
+                        da.NombreAcreedor,
+                        da.MontoSolicitado,
+                        da.MontoAplicado,
+                        da.MontoLimitado,
+                        da.RazonLimitacion,
+                        da.SaldoDisponibleAntes,
+                        da.SaldoDisponibleDespues
+                    ))
+                    .ToList();
+
+                var totalDeduccionesAdicionales = detalles.Sum(x => x.MontoAplicado);
+
+                return new EmpleadoDeduccionesItem(
+                    d.EmpleadoId,
+                    $"{d.Empleado!.Nombre} {d.Empleado.Apellido}",
+                    d.Empleado.NumeroIdentificacion,
+                    d.Empleado.Departamento?.Nombre,
+                    d.Empleado.Posicion?.Nombre,
+                    d.GrossPay,
+                    deduccionesLegales,
+                    netoPostLegal,
+                    d.SalarioMinimoLegalAplicado,
+                    detalles,
+                    totalDeduccionesAdicionales,
+                    d.NetPay,
+                    d.TuvoLimitacionSalarioMinimo
+                );
+            })
+            .OrderBy(e => e.Nombre)
+            .ToList();
+
+        return new ReporteDeduccionesEmpleadoDto(
+            tenant?.Name ?? "Sin nombre",
+            tenant != null && !string.IsNullOrEmpty(tenant.RUC) && !string.IsNullOrEmpty(tenant.DV)
+                ? $"{tenant.RUC}-{tenant.DV}"
+                : "Sin RUC",
+            $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
+            DateTime.Now,
+            empleadosConDeducciones,
+            empleadosConDeducciones.Count,
+            empleadosConDeducciones.Count(e => e.TuvoLimitacion),
+            planilla.Details.Sum(d => d.PensionAlimenticia),
+            planilla.Details.Sum(d => d.Embargos),
+            planilla.Details.Sum(d => d.DeduccionesVoluntarias),
+            empleadosConDeducciones.SelectMany(e => e.Deducciones).Sum(x => x.MontoLimitado)
         );
     }
 

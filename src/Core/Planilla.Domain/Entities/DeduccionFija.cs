@@ -77,6 +77,94 @@ public class DeduccionFija : ITenantEntity
     /// </summary>
     public string? Observaciones { get; set; }
 
+    // ====================================================================
+    // Referencia al Catálogo de Acreedores
+    // ====================================================================
+
+    /// <summary>FK al catálogo de acreedores (nullable para backward compatibility)</summary>
+    public int? AcreedorId { get; set; }
+    public virtual Acreedor? Acreedor { get; set; }
+
+    // ====================================================================
+    // Información del Acreedor (campos embebidos - auto-llenados desde catálogo)
+    // ====================================================================
+
+    /// <summary>Nombre del beneficiario/acreedor</summary>
+    public string? NombreAcreedor { get; set; }
+
+    /// <summary>RUC/Cédula del acreedor</summary>
+    public string? IdentificacionAcreedor { get; set; }
+
+    /// <summary>Cuenta bancaria para transferencia al acreedor</summary>
+    public string? CuentaBancariaAcreedor { get; set; }
+
+    /// <summary>Banco destino del acreedor</summary>
+    public string? BancoAcreedor { get; set; }
+
+    // ====================================================================
+    // Orden Judicial (para PensionAlimenticia y Embargo)
+    // ====================================================================
+
+    /// <summary>Número de expediente judicial</summary>
+    public string? NumeroExpediente { get; set; }
+
+    /// <summary>Juzgado emisor de la orden</summary>
+    public string? Juzgado { get; set; }
+
+    /// <summary>Fecha de la orden judicial</summary>
+    public DateTime? FechaOrdenJudicial { get; set; }
+
+    /// <summary>Juez firmante de la orden</summary>
+    public string? NombreJuez { get; set; }
+
+    /// <summary>Estado de la orden judicial: Vigente/Suspendida/Levantada</summary>
+    public EstadoOrdenJudicial? EstadoOrdenJudicial { get; set; }
+
+    /// <summary>Fecha en que se levantó la orden</summary>
+    public DateTime? FechaLevantamiento { get; set; }
+
+    /// <summary>Razón del levantamiento (cumplimiento total, orden judicial, etc.)</summary>
+    public string? MotivoLevantamiento { get; set; }
+
+    // ====================================================================
+    // Control de Cálculo
+    // ====================================================================
+
+    /// <summary>Base de cálculo: sobre bruto o sobre neto post-legales</summary>
+    public BaseCalculoDeduccion BaseCalculo { get; set; } = BaseCalculoDeduccion.SalarioBruto;
+
+    /// <summary>Categoría de prelación (se infiere del TipoDeduccion si no se establece)</summary>
+    public CategoriaDeduccion Categoria { get; set; } = CategoriaDeduccion.Voluntaria;
+
+    /// <summary>Para embargos con monto total definido por el juzgado</summary>
+    public decimal? MontoTotalACobrar { get; set; }
+
+    /// <summary>Acumulado ya cobrado hacia MontoTotalACobrar</summary>
+    public decimal MontoCobradoAcumulado { get; set; }
+
+    // ====================================================================
+    // Autorización del Trabajador (para voluntarias)
+    // ====================================================================
+
+    /// <summary>Indica si tiene autorización escrita del trabajador</summary>
+    public bool TieneAutorizacionEscrita { get; set; }
+
+    /// <summary>Fecha en que el trabajador firmó la autorización</summary>
+    public DateTime? FechaAutorizacion { get; set; }
+
+    /// <summary>Referencia al documento de autorización</summary>
+    public string? DocumentoAutorizacionRef { get; set; }
+
+    // ====================================================================
+    // Aplicación Especial
+    // ====================================================================
+
+    /// <summary>Si aplica al décimo tercer mes (por orden judicial)</summary>
+    public bool AplicaADecimoTercerMes { get; set; }
+
+    /// <summary>Si aplica a prestaciones laborales (por orden judicial)</summary>
+    public bool AplicaAPrestaciones { get; set; }
+
     // Auditoría
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }

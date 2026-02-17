@@ -143,6 +143,36 @@ public class PayrollDetail : ITenantEntity
     public decimal Anticipos { get; set; }
 
     /// <summary>
+    /// Total de pensiones alimenticias aplicadas en este período
+    /// </summary>
+    public decimal PensionAlimenticia { get; set; }
+
+    /// <summary>
+    /// Total de embargos judiciales aplicados en este período
+    /// </summary>
+    public decimal Embargos { get; set; }
+
+    /// <summary>
+    /// Total de deducciones voluntarias aplicadas en este período
+    /// </summary>
+    public decimal DeduccionesVoluntarias { get; set; }
+
+    /// <summary>
+    /// Salario mínimo legal del período usado para protección
+    /// </summary>
+    public decimal SalarioMinimoLegalAplicado { get; set; }
+
+    /// <summary>
+    /// Total de montos limitados por protección de salario mínimo
+    /// </summary>
+    public decimal MontoLimitadoPorSalarioMinimo { get; set; }
+
+    /// <summary>
+    /// Indica si alguna deducción fue limitada por salario mínimo
+    /// </summary>
+    public bool TuvoLimitacionSalarioMinimo { get; set; }
+
+    /// <summary>
     /// Desglose detallado de otras deducciones en formato JSON (opcional)
     /// </summary>
     public string? OtrasDeduccionesDetalle { get; set; }
@@ -252,4 +282,9 @@ public class PayrollDetail : ITenantEntity
     /// Tenant al que pertenece este detalle
     /// </summary>
     public virtual Tenant? Tenant { get; set; }
+
+    /// <summary>
+    /// Deducciones aplicadas con auditoría detallada
+    /// </summary>
+    public virtual ICollection<DeduccionAplicada> DeduccionesAplicadas { get; set; } = new List<DeduccionAplicada>();
 }

@@ -60,6 +60,12 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     public DbSet<Anticipo> Anticipos { get; set; }
     public DbSet<PagoPrestamo> PagosPrestamos { get; set; }
 
+    // Auditoría de deducciones aplicadas
+    public DbSet<DeduccionAplicada> DeduccionesAplicadas { get; set; }
+
+    // Catálogo de acreedores
+    public DbSet<Acreedor> Acreedores { get; set; }
+
     // Asistencia: Horas Extra, Ausencias y Vacaciones
     public DbSet<HoraExtra> HorasExtra { get; set; }
     public DbSet<Ausencia> Ausencias { get; set; }
@@ -146,6 +152,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             entity.Property(p => p.EducationalInsuranceEmployeeRate).HasPrecision(5, 2);
             entity.Property(p => p.EducationalInsuranceEmployerRate).HasPrecision(5, 2);
             entity.Property(p => p.DependentDeductionAmount).HasPrecision(18, 2);
+            entity.Property(p => p.SalarioMinimoLegal).HasPrecision(18, 2);
 
             // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
@@ -223,6 +230,11 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             entity.Property(d => d.DeduccionesFijas).HasPrecision(18, 2);
             entity.Property(d => d.Prestamos).HasPrecision(18, 2);
             entity.Property(d => d.Anticipos).HasPrecision(18, 2);
+            entity.Property(d => d.PensionAlimenticia).HasPrecision(18, 2);
+            entity.Property(d => d.Embargos).HasPrecision(18, 2);
+            entity.Property(d => d.DeduccionesVoluntarias).HasPrecision(18, 2);
+            entity.Property(d => d.SalarioMinimoLegalAplicado).HasPrecision(18, 2);
+            entity.Property(d => d.MontoLimitadoPorSalarioMinimo).HasPrecision(18, 2);
             entity.Property(d => d.TotalDeductions).HasPrecision(18, 2);
             entity.Property(d => d.NetPay).HasPrecision(18, 2);
             entity.Property(d => d.EmployerCost).HasPrecision(18, 2);
@@ -349,6 +361,33 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
         });
 
+        // Catálogo de Acreedores
+        modelBuilder.Entity<Acreedor>(entity =>
+        {
+            entity.Property(a => a.Nombre).HasMaxLength(200).IsRequired();
+            entity.Property(a => a.Identificacion).HasMaxLength(50);
+            entity.Property(a => a.TipoIdentificacion).HasMaxLength(20);
+            entity.Property(a => a.Banco).HasMaxLength(100);
+            entity.Property(a => a.TipoCuenta).HasMaxLength(30);
+            entity.Property(a => a.NumeroCuenta).HasMaxLength(50);
+            entity.Property(a => a.IBAN).HasMaxLength(50);
+            entity.Property(a => a.Telefono).HasMaxLength(30);
+            entity.Property(a => a.Email).HasMaxLength(100);
+            entity.Property(a => a.Direccion).HasMaxLength(300);
+            entity.Property(a => a.ContactoNombre).HasMaxLength(200);
+            entity.Property(a => a.Observaciones).HasMaxLength(500);
+            entity.Property(a => a.CreatedBy).HasMaxLength(100);
+
+            entity.HasIndex(a => new { a.TenantId, a.Nombre })
+                .HasDatabaseName("IX_Acreedor_TenantId_Nombre");
+
+            entity.HasIndex(a => new { a.TenantId, a.TipoAcreedor })
+                .HasDatabaseName("IX_Acreedor_TenantId_TipoAcreedor");
+
+            entity.HasIndex(a => new { a.TenantId, a.Identificacion })
+                .HasDatabaseName("IX_Acreedor_TenantId_Identificacion");
+        });
+
         // Conceptos de N�mina: Configuraci�n de Prestamo
         modelBuilder.Entity<Prestamo>(entity =>
         {
@@ -374,8 +413,11 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .HasForeignKey(pp => pp.PrestamoId)
                 .OnDelete(DeleteBehavior.Cascade); // Borrar pagos si se borra el pr�stamo
 
-            // Global query filter para multi-tenancy
-            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
+            // Relación N:1 con Acreedor (opcional)
+            entity.HasOne(p => p.Acreedor)
+                .WithMany(a => a.Prestamos)
+                .HasForeignKey(p => p.AcreedorId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Conceptos de N�mina: Configuraci�n de DeduccionFija
@@ -392,6 +434,8 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             // Configuraci�n de precisi�n para campos decimales
             entity.Property(d => d.Monto).HasPrecision(18, 2);
             entity.Property(d => d.Porcentaje).HasPrecision(5, 2);
+            entity.Property(d => d.MontoTotalACobrar).HasPrecision(18, 2);
+            entity.Property(d => d.MontoCobradoAcumulado).HasPrecision(18, 2);
 
             // Relaci�n N:1 con Empleado
             entity.HasOne(d => d.Empleado)
@@ -399,8 +443,50 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .HasForeignKey(d => d.EmpleadoId)
                 .OnDelete(DeleteBehavior.Restrict); // NO borrar empleado si tiene deducciones
 
-            // Global query filter para multi-tenancy
-            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
+            // Relación N:1 con Acreedor (opcional)
+            entity.HasOne(d => d.Acreedor)
+                .WithMany(a => a.Deducciones)
+                .HasForeignKey(d => d.AcreedorId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // Auditoría: Configuración de DeduccionAplicada
+        modelBuilder.Entity<DeduccionAplicada>(entity =>
+        {
+            entity.HasIndex(da => da.PayrollDetailId)
+                .HasDatabaseName("IX_DeduccionAplicada_PayrollDetailId");
+
+            entity.HasIndex(da => da.DeduccionFijaId)
+                .HasDatabaseName("IX_DeduccionAplicada_DeduccionFijaId");
+
+            entity.HasIndex(da => new { da.TenantId, da.PayrollDetailId })
+                .HasDatabaseName("IX_DeduccionAplicada_TenantId_PayrollDetailId");
+
+            entity.Property(da => da.MontoSolicitado).HasPrecision(18, 2);
+            entity.Property(da => da.MontoAplicado).HasPrecision(18, 2);
+            entity.Property(da => da.MontoLimitado).HasPrecision(18, 2);
+            entity.Property(da => da.SaldoDisponibleAntes).HasPrecision(18, 2);
+            entity.Property(da => da.SaldoDisponibleDespues).HasPrecision(18, 2);
+
+            entity.HasOne(da => da.PayrollDetail)
+                .WithMany(pd => pd.DeduccionesAplicadas)
+                .HasForeignKey(da => da.PayrollDetailId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(da => da.DeduccionFija)
+                .WithMany()
+                .HasForeignKey(da => da.DeduccionFijaId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(da => da.Prestamo)
+                .WithMany()
+                .HasForeignKey(da => da.PrestamoId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(da => da.Anticipo)
+                .WithMany()
+                .HasForeignKey(da => da.AnticipoId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         // Conceptos de N�mina: Configuraci�n de Anticipo

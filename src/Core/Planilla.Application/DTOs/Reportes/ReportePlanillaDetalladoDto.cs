@@ -66,7 +66,13 @@ public record EmpleadoPlanillaDetalladoDto(
     decimal CssPatrono,
     decimal SePatrono,
     decimal RiesgoProfesional,
-    decimal CostoPatronal
+    decimal CostoPatronal,
+
+    // Desglose deducciones adicionales
+    decimal PensionAlimenticia = 0,
+    decimal Embargos = 0,
+    decimal DeduccionesVoluntarias = 0,
+    bool TuvoLimitacionSalarioMinimo = false
 );
 
 /// <summary>

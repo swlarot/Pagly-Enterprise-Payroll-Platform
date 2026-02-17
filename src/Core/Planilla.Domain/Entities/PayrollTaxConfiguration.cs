@@ -168,6 +168,20 @@ public class PayrollTaxConfiguration : ITenantEntity
     [Range(0, int.MaxValue)]
     public int MaxDependents { get; set; }
 
+    // ========== SALARIO MÍNIMO LEGAL ==========
+
+    /// <summary>
+    /// Salario mínimo mensual legal vigente (para protección de deducciones)
+    /// </summary>
+    [Range(0, double.MaxValue)]
+    public decimal SalarioMinimoLegal { get; set; } = 700.00m;
+
+    /// <summary>
+    /// Descripción de la actividad económica del tenant (para determinar salario mínimo aplicable)
+    /// </summary>
+    [MaxLength(300)]
+    public string? ActividadEconomica { get; set; }
+
     /// <summary>
     /// Indica si esta configuración está activa
     /// </summary>
