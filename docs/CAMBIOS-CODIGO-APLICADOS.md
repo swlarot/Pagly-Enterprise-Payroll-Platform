@@ -318,7 +318,38 @@ if (enrichedPlanillas.length > 0) {
 
 ---
 
-## PENDIENTE — C-010: Dashboard desglose CSS/SE/Riesgo Patronal (backend)
+## Cambio C-010: PayrollHeadersController.cs — Fix redondeo RegularPay (BUG-008)
+
+**Archivo:** `src/UI/Planilla.Web/Controllers/PayrollHeadersController.cs` (~línea 340)
+
+**Problema:** Al usar Auto-llenar Regulares y luego Calcular Planilla, el Salario Bruto mostraba B/.6,000.01 en lugar de B/.6,000.00. Causa: `HourlyRate` almacenado con 4 decimales → `208 × 19.2308 = 4000.0064`, acumulado en 3 empleados = `6000.0096`.
+
+**Fix:**
+```csharp
+// ANTES:
+hours.RegularPay = hours.RegularHours * hourlyRate;
+hours.SundayPay = hours.SundayHours * hourlyRate * 1.50m;
+
+// DESPUÉS:
+hours.RegularPay = hours.RegularHours * hourlyRate;
+// BUG-008 FIX: Evitar artefactos de redondeo de tasa horaria en pago regular.
+// Ej: 208h × 19.2308 = 4,000.0064 → se redondea a B/.4,000.01 en lugar de B/.4,000.00.
+// Si la diferencia con el salario exacto del período es trivial (< B/.0.05), usar el exacto.
+var salarioPeriodoExacto = employee.GetSalarioPeriodo();
+if (Math.Abs(hours.RegularPay - salarioPeriodoExacto) < 0.05m)
+{
+    hours.RegularPay = salarioPeriodoExacto;
+}
+hours.SundayPay = hours.SundayHours * hourlyRate * 1.50m;
+```
+
+**Impacto:** Cualquier planilla calculada con `PayrollEmployeeHours` (vía Auto-llenar Regulares) ahora muestra el salario base exacto sin el centavo fantasma.
+
+**Verificación:** Planilla 2026-003 recalculada → Bruto=B/.6,000.00 ✅ | Neto=B/.4,505.00 ✅
+
+---
+
+## PENDIENTE — C-011: Dashboard desglose CSS/SE/Riesgo Patronal (backend)
 
 **Estado**: ❌ PENDIENTE (próxima sesión)
 
@@ -329,4 +360,4 @@ if (enrichedPlanillas.length > 0) {
 
 **Archivo frontend**: `AdminDashboardPage.tsx` — leer los nuevos campos en el panel de "Costo Total Empleador".
 
-**Referencia**: PENDIENTE-001 en BUGS-ENCONTRADOS.md
+**Referencia**: PENDIENTE-001 en BUGS-ENCONTRADOS.md (renumerado a C-011 en esta sesión)

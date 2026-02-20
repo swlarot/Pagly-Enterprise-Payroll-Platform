@@ -338,6 +338,14 @@ public class PayrollHeadersController : ControllerBase
                         : Empleado.ComputeHourlyRateFromMonthly(employee.SalarioBase, employee.HoursPerWeek);
 
                     hours.RegularPay = hours.RegularHours * hourlyRate;
+                    // BUG-008 FIX: Evitar artefactos de redondeo de tasa horaria en pago regular.
+                    // Ej: 208h × 19.2308 = 4,000.0064 → se redondea a B/.4,000.01 en lugar de B/.4,000.00.
+                    // Si la diferencia con el salario exacto del período es trivial (< B/.0.05), usar el exacto.
+                    var salarioPeriodoExacto = employee.GetSalarioPeriodo();
+                    if (Math.Abs(hours.RegularPay - salarioPeriodoExacto) < 0.05m)
+                    {
+                        hours.RegularPay = salarioPeriodoExacto;
+                    }
                     hours.SundayPay = hours.SundayHours * hourlyRate * 1.50m;
                     hours.HolidayPay = hours.HolidayHours * hourlyRate * 1.50m;
                     hours.OvertimeDayPay = hours.OvertimeDayHours * hourlyRate * 1.25m;

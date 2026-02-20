@@ -176,3 +176,31 @@
     - ISR: B/.531.25 ✅
   - Botones cambiaron a "Aprobar Planilla" / "Recalcular" ✅
   - "Ver Detalles" mostró 3 empleados con valores correctos ✅
+
+---
+
+## BUG-008: RegularPay con artefacto B/.0.01 al usar Auto-llenar Regulares [BAJO] ✅ CORREGIDO
+- **Archivo corregido**: `src/UI/Planilla.Web/Controllers/PayrollHeadersController.cs` (línea ~340)
+- **Descripción**: Al usar el flujo correcto de planilla (Auto-llenar Regulares → Calcular), el Salario Bruto total mostraba B/.6,000.01 en lugar de B/.6,000.00. Sin Auto-llenar (cálculo directo por salario exacto), no había problema.
+- **Causa raíz**: Cuando `PayrollEmployeeHours` existen, el controller calcula `RegularPay = RegularHours × HourlyRate`. El `HourlyRate` se almacena con 4 decimales: `Math.Round(4000/208, 4) = 19.2308`. Al multiplicar: `208 × 19.2308 = 4000.0064`, que al acumularse con los otros empleados (`1000.0016` Carlos + `1000.0016` Ana + `4000.0064` Roberto) suma `6000.0096` → mostrado como `B/.6,000.01`.
+- **Flujo sin bug**: Sin `PayrollEmployeeHours`, el sistema usa `GetSalarioPeriodo()` = `Math.Round(4000 × 12 / 12, 2) = 4000.00` — exacto, sin error.
+- **Fix aplicado** en `PayrollHeadersController.cs` (después de calcular `hours.RegularPay`):
+  ```csharp
+  hours.RegularPay = hours.RegularHours * hourlyRate;
+  // BUG-008 FIX: Evitar artefactos de redondeo de tasa horaria en pago regular.
+  // Ej: 208h × 19.2308 = 4,000.0064 → se redondea a B/.4,000.01 en lugar de B/.4,000.00.
+  // Si la diferencia con el salario exacto del período es trivial (< B/.0.05), usar el exacto.
+  var salarioPeriodoExacto = employee.GetSalarioPeriodo();
+  if (Math.Abs(hours.RegularPay - salarioPeriodoExacto) < 0.05m)
+  {
+      hours.RegularPay = salarioPeriodoExacto;
+  }
+  ```
+- **Lógica del fix**: Si las horas regulares representan el período completo (sin ausencias/extras que cambien el monto), la diferencia entre `RegularHours × HourlyRate` y `GetSalarioPeriodo()` siempre será < B/.0.05. El umbral de B/.0.05 es suficientemente seguro: ningún error de redondeo de tasa horaria con 4 decimales puede llegar a ese valor.
+- **Verificación**: Planilla 2026-003 recalculada tras fix (binario recompilado):
+  - Bruto total: B/.6,000.00 ✅ (era B/.6,000.01)
+  - Carlos (EmpID=16): grossPay=B/.1,000.00 ✅
+  - Ana (EmpID=17): grossPay=B/.1,000.00 ✅
+  - Roberto (EmpID=18): grossPay=B/.4,000.00 ✅
+  - Neto total: B/.4,505.00 ✅
+
