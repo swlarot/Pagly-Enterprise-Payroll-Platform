@@ -1,334 +1,49 @@
 // ====================================================================
-// Planilla - ReportesService
-// Creado: 2025-12-28
-// Descripción: Servicio para generar reportes de planilla
-// (CSS, Seguro Educativo, ISR, Planilla Detallada)
+// Planilla - ReportesService (Rediseño C-012)
+// Actualizado: 2026-02-20
+// 5 reportes: PlanillaRegular, Mensual, Acreedores, SIP, Comprobantes
 // ====================================================================
 
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs.Reportes;
 using Vorluno.Planilla.Application.Interfaces;
+using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
 
 namespace Vorluno.Planilla.Infrastructure.Services;
 
-/// <summary>
-/// Servicio para generar diferentes tipos de reportes de planilla
-/// </summary>
 public class ReportesService
 {
     private readonly ApplicationDbContext _context;
     private readonly ITenantContext _tenantContext;
 
-    public ReportesService(
-        ApplicationDbContext context,
-        ITenantContext tenantContext)
+    public ReportesService(ApplicationDbContext context, ITenantContext tenantContext)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
     }
 
-    /// <summary>
-    /// Genera el reporte de CSS (Caja de Seguro Social)
-    /// </summary>
-    public async Task<ReporteCssDto> GenerarReporteCss(int planillaId)
+    private async Task<(string Nombre, string Ruc)> GetTenantInfo()
     {
-        var tenantId = _tenantContext.TenantId;
-
-        // SEGURIDAD CRÍTICA: Filtrar por TenantId para aislar datos entre tenants
-        var planilla = await _context.PayrollHeaders
-            .Where(p => p.Id == planillaId && p.TenantId == tenantId)
-            .Include(p => p.Details)
-                .ThenInclude(d => d.Empleado)
-            .FirstOrDefaultAsync();
-
-        if (planilla == null)
-            throw new InvalidOperationException($"Planilla {planillaId} no encontrada o no autorizada");
-
-        // Obtener información del tenant para datos de la empresa
         var tenant = await _tenantContext.GetCurrentTenantAsync();
-
-        var empleados = planilla.Details
-            .Where(d => d.Empleado != null)
-            .Select(d => {
-                // Calcular base CSS real (reversa del cálculo de 9.75%)
-                // El orquestador ya aplicó los topes correctos según Ley 462
-                decimal baseCss = d.CssEmployee > 0 ? d.CssEmployee / 0.0975m : 0;
-
-                return new EmpleadoCssDto(
-                    d.Empleado!.NumeroIdentificacion,
-                    $"{d.Empleado.Nombre} {d.Empleado.Apellido}",
-                    d.GrossPay,
-                    baseCss, // Base CSS real con topes aplicados por el orquestador
-                    d.CssEmployee,
-                    d.CssEmployer,
-                    d.RiskContribution,
-                    d.CssEmployee + d.CssEmployer + d.RiskContribution
-                );
-            })
-            .OrderBy(e => e.NombreCompleto)
-            .ToList();
-
-        var totales = new TotalesCssDto(
-            empleados.Sum(e => e.SalarioBruto),
-            empleados.Sum(e => e.CssEmpleado),
-            empleados.Sum(e => e.CssPatrono),
-            empleados.Sum(e => e.RiesgoProfesional),
-            empleados.Sum(e => e.TotalCss)
-        );
-
-        return new ReporteCssDto(
-            tenant?.Name ?? "Sin nombre",
-            tenant != null && !string.IsNullOrEmpty(tenant.RUC) && !string.IsNullOrEmpty(tenant.DV)
-                ? $"{tenant.RUC}-{tenant.DV}"
-                : "Sin RUC",
-            $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
-            DateTime.Now,
-            empleados,
-            totales
-        );
+        var nombre = tenant?.Name ?? "Sin nombre";
+        var ruc = tenant != null && !string.IsNullOrEmpty(tenant.RUC) && !string.IsNullOrEmpty(tenant.DV)
+            ? $"{tenant.RUC}-{tenant.DV}" : "Sin RUC";
+        return (nombre, ruc);
     }
 
-    /// <summary>
-    /// Genera el reporte de Seguro Educativo
-    /// </summary>
-    public async Task<ReporteSeDto> GenerarReporteSe(int planillaId)
+    private string GetEstadoTexto(PayrollStatus status) => status switch
     {
-        var tenantId = _tenantContext.TenantId;
+        PayrollStatus.Draft => "Borrador",
+        PayrollStatus.Calculated => "Calculada",
+        PayrollStatus.Approved => "Aprobada",
+        PayrollStatus.Paid => "Pagada",
+        _ => "Desconocido"
+    };
 
-        // SEGURIDAD CRÍTICA: Filtrar por TenantId para aislar datos entre tenants
-        var planilla = await _context.PayrollHeaders
-            .Where(p => p.Id == planillaId && p.TenantId == tenantId)
-            .Include(p => p.Details)
-                .ThenInclude(d => d.Empleado)
-            .FirstOrDefaultAsync();
-
-        if (planilla == null)
-            throw new InvalidOperationException($"Planilla {planillaId} no encontrada o no autorizada");
-
-        // Obtener información del tenant para datos de la empresa
-        var tenant = await _tenantContext.GetCurrentTenantAsync();
-
-        var empleados = planilla.Details
-            .Where(d => d.Empleado != null)
-            .Select(d => new EmpleadoSeDto(
-                d.Empleado!.NumeroIdentificacion,
-                $"{d.Empleado.Nombre} {d.Empleado.Apellido}",
-                d.GrossPay,
-                d.EducationalInsuranceEmployee,
-                d.EducationalInsuranceEmployer,
-                d.EducationalInsuranceEmployee + d.EducationalInsuranceEmployer
-            ))
-            .OrderBy(e => e.NombreCompleto)
-            .ToList();
-
-        var totales = new TotalesSeDto(
-            empleados.Sum(e => e.SalarioBruto),
-            empleados.Sum(e => e.SeEmpleado),
-            empleados.Sum(e => e.SePatrono),
-            empleados.Sum(e => e.TotalSe)
-        );
-
-        return new ReporteSeDto(
-            tenant?.Name ?? "Sin nombre",
-            tenant != null && !string.IsNullOrEmpty(tenant.RUC) && !string.IsNullOrEmpty(tenant.DV)
-                ? $"{tenant.RUC}-{tenant.DV}"
-                : "Sin RUC",
-            $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
-            DateTime.Now,
-            empleados,
-            totales
-        );
-    }
-
-    /// <summary>
-    /// Genera el reporte de ISR (Impuesto Sobre la Renta)
-    /// </summary>
-    public async Task<ReporteIsrDto> GenerarReporteIsr(int planillaId)
-    {
-        var tenantId = _tenantContext.TenantId;
-
-        // SEGURIDAD CRÍTICA: Filtrar por TenantId para aislar datos entre tenants
-        var planilla = await _context.PayrollHeaders
-            .Where(p => p.Id == planillaId && p.TenantId == tenantId)
-            .Include(p => p.Details)
-                .ThenInclude(d => d.Empleado)
-            .FirstOrDefaultAsync();
-
-        if (planilla == null)
-            throw new InvalidOperationException($"Planilla {planillaId} no encontrada o no autorizada");
-
-        // Obtener información del tenant para datos de la empresa
-        var tenant = await _tenantContext.GetCurrentTenantAsync();
-
-        var empleados = planilla.Details
-            .Where(d => d.Empleado != null)
-            .Select(d => {
-                // Proyección anual (asumiendo quincenal: 24 períodos)
-                decimal ingresoAnualProyectado = d.GrossPay * 24;
-                int dependientes = d.Empleado!.Dependents; // Obtener dependientes reales del empleado
-                decimal deduccionDependientes = dependientes * 800m; // $800 por dependiente
-
-                return new EmpleadoIsrDto(
-                    d.Empleado!.NumeroIdentificacion,
-                    $"{d.Empleado.Nombre} {d.Empleado.Apellido}",
-                    ingresoAnualProyectado,
-                    dependientes,
-                    deduccionDependientes,
-                    Math.Max(0, ingresoAnualProyectado - deduccionDependientes),
-                    d.IncomeTax * 24, // ISR anual proyectado
-                    d.IncomeTax
-                );
-            })
-            .OrderBy(e => e.NombreCompleto)
-            .ToList();
-
-        var totales = new TotalesIsrDto(
-            empleados.Sum(e => e.IngresoAnualProyectado),
-            empleados.Sum(e => e.DeduccionDependientes),
-            empleados.Sum(e => e.IsrAnual),
-            empleados.Sum(e => e.IsrPeriodo)
-        );
-
-        return new ReporteIsrDto(
-            tenant?.Name ?? "Sin nombre",
-            tenant != null && !string.IsNullOrEmpty(tenant.RUC) && !string.IsNullOrEmpty(tenant.DV)
-                ? $"{tenant.RUC}-{tenant.DV}"
-                : "Sin RUC",
-            $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
-            planilla.PeriodStartDate.Year,
-            DateTime.Now,
-            empleados,
-            totales
-        );
-    }
-
-    /// <summary>
-    /// Genera el reporte de planilla detallado completo
-    /// </summary>
-    public async Task<ReportePlanillaDetalladoDto> GenerarReportePlanillaDetallada(int planillaId)
-    {
-        var tenantId = _tenantContext.TenantId;
-
-        // SEGURIDAD CRÍTICA: Filtrar por TenantId para aislar datos entre tenants
-        var planilla = await _context.PayrollHeaders
-            .Where(p => p.Id == planillaId && p.TenantId == tenantId)
-            .Include(p => p.Details)
-                .ThenInclude(d => d.Empleado)
-                    .ThenInclude(e => e!.Departamento)
-            .Include(p => p.Details)
-                .ThenInclude(d => d.Empleado)
-                    .ThenInclude(e => e!.Posicion)
-            .FirstOrDefaultAsync();
-
-        if (planilla == null)
-            throw new InvalidOperationException($"Planilla {planillaId} no encontrada o no autorizada");
-
-        // Obtener información del tenant para datos de la empresa
-        var tenant = await _tenantContext.GetCurrentTenantAsync();
-
-        var empleados = planilla.Details
-            .Where(d => d.Empleado != null)
-            .Select(d => new EmpleadoPlanillaDetalladoDto(
-                d.Empleado!.NumeroIdentificacion,
-                $"{d.Empleado.Nombre} {d.Empleado.Apellido}",
-                d.Empleado.Departamento?.Nombre,
-                d.Empleado.Posicion?.Nombre,
-
-                // Ingresos
-                d.BaseSalary,
-                d.MontoHorasExtra,
-                d.Bonuses,
-                d.GrossPay,
-
-                // Deducciones
-                d.CssEmployee,
-                d.EducationalInsuranceEmployee,
-                d.IncomeTax,
-                d.Prestamos,
-                d.Anticipos,
-                d.DeduccionesFijas,
-                d.MontoDescuentoAusencias,
-                d.OtherDeductions,
-                d.TotalDeductions,
-
-                // Neto
-                d.NetPay,
-
-                // Costos patronales
-                d.CssEmployer,
-                d.EducationalInsuranceEmployer,
-                d.RiskContribution,
-                d.EmployerCost,
-
-                // Desglose deducciones adicionales
-                d.PensionAlimenticia,
-                d.Embargos,
-                d.DeduccionesVoluntarias,
-                d.TuvoLimitacionSalarioMinimo
-            ))
-            .OrderBy(e => e.Departamento)
-            .ThenBy(e => e.NombreCompleto)
-            .ToList();
-
-        // Resumen por departamento
-        var resumenPorDepartamento = empleados
-            .Where(e => !string.IsNullOrEmpty(e.Departamento))
-            .GroupBy(e => e.Departamento!)
-            .Select(g => new ResumenDepartamentoDto(
-                g.Key,
-                g.Count(),
-                g.Sum(e => e.SalarioBruto),
-                g.Sum(e => e.TotalDeducciones),
-                g.Sum(e => e.SalarioNeto),
-                g.Sum(e => e.CostoPatronal)
-            ))
-            .OrderBy(r => r.NombreDepartamento)
-            .ToList();
-
-        var estadoTexto = planilla.Status switch
-        {
-            PayrollStatus.Draft => "Borrador",
-            PayrollStatus.Calculated => "Calculada",
-            PayrollStatus.Approved => "Aprobada",
-            PayrollStatus.Paid => "Pagada",
-            _ => "Desconocido"
-        };
-
-        return new ReportePlanillaDetalladoDto(
-            // Encabezado
-            tenant?.Name ?? "Sin nombre",
-            tenant != null && !string.IsNullOrEmpty(tenant.RUC) && !string.IsNullOrEmpty(tenant.DV)
-                ? $"{tenant.RUC}-{tenant.DV}"
-                : "Sin RUC",
-            $"PL-{planilla.Id:D6}",
-            $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
-            planilla.PayDate,
-            estadoTexto,
-            DateTime.Now,
-
-            // Resumen
-            empleados.Count,
-            empleados.Sum(e => e.SalarioBruto),
-            empleados.Sum(e => e.TotalDeducciones),
-            empleados.Sum(e => e.SalarioNeto),
-            empleados.Sum(e => e.CostoPatronal),
-
-            // Detalle
-            empleados,
-
-            // Por departamento
-            resumenPorDepartamento.Any() ? resumenPorDepartamento : null
-        );
-    }
-
-    /// <summary>
-    /// Genera el reporte consolidado de acreedores para una planilla.
-    /// Agrupa las DeduccionesAplicadas por NombreAcreedor y enriquece con datos
-    /// bancarios del catálogo Acreedor cuando está disponible.
-    /// </summary>
-    public async Task<ReporteConsolidadoAcreedorDto> GenerarReporteConsolidadoAcreedor(int planillaId)
+    /// <summary>Reporte 1: Planilla Regular — borrador operativo por período</summary>
+    public async Task<ReportePlanillaRegularDto> GenerarReportePlanillaRegular(int planillaId)
     {
         var tenantId = _tenantContext.TenantId;
 
@@ -346,100 +61,139 @@ public class ReportesService
         if (planilla == null)
             throw new InvalidOperationException($"Planilla {planillaId} no encontrada o no autorizada");
 
-        var tenant = await _tenantContext.GetCurrentTenantAsync();
+        // LEFT JOIN con PayrollEmployeeHours: empleados mensuales pueden no tenerlo
+        var horasPorEmpleado = await _context.PayrollEmployeeHours
+            .Where(h => h.PayrollHeaderId == planillaId && h.TenantId == tenantId)
+            .ToListAsync();
 
-        // Recopilar todas las deducciones aplicadas con datos del empleado
-        var todasDeducciones = planilla.Details
+        var (nombre, ruc) = await GetTenantInfo();
+
+        var empleados = planilla.Details
             .Where(d => d.Empleado != null)
-            .SelectMany(d => d.DeduccionesAplicadas.Select(da => new
+            .Select(d =>
             {
-                EmpleadoNombre = $"{d.Empleado!.Nombre} {d.Empleado.Apellido}",
-                EmpleadoCedula = d.Empleado.NumeroIdentificacion,
-                da.NombreAcreedor,
-                da.AnticipoId,
-                da.PrestamoId,
-                da.DeduccionFijaId,
-                Acreedor = da.DeduccionFija?.Acreedor,
-                DeduccionFija = da.DeduccionFija,
-                da.TipoDeduccion,
-                da.Categoria,
-                da.Descripcion,
-                da.MontoSolicitado,
-                da.MontoAplicado,
-                da.MontoLimitado,
-                da.RazonLimitacion
-            }))
-            .ToList();
+                var horas = horasPorEmpleado.FirstOrDefault(h => h.EmpleadoId == d.EmpleadoId);
+                var horasExtra = horas != null
+                    ? horas.OvertimeDayHours + horas.OvertimeNightHours + horas.OvertimeHolidayHours
+                      + horas.OvertimeMixedHours + horas.OvertimeExcessHours
+                    : 0m;
 
-        // Agrupar por nombre del acreedor (campo snapshot en DeduccionAplicada)
-        var gruposAcreedor = todasDeducciones
-            .GroupBy(x => x.NombreAcreedor ?? "Sin Acreedor")
-            .Select(g =>
-            {
-                // Intentar obtener datos bancarios del catálogo si existe la referencia
-                var primeraConAcreedor = g.FirstOrDefault(x => x.Acreedor != null);
-                var acreedor = primeraConAcreedor?.Acreedor;
+                var totalAcreedores = d.DeduccionesAplicadas.Sum(da => da.MontoAplicado);
+                var razonLimitacion = d.TuvoLimitacionSalarioMinimo
+                    ? d.DeduccionesAplicadas.FirstOrDefault(da => da.MontoLimitado > 0)?.RazonLimitacion
+                    : null;
 
-                // Fallback a campos embebidos en DeduccionFija si no hay catálogo
-                var primeraConDf = g.FirstOrDefault(x => x.DeduccionFija != null);
-                var df = primeraConDf?.DeduccionFija;
-
-                var identificacion = acreedor?.Identificacion ?? df?.IdentificacionAcreedor;
-                var banco = acreedor?.Banco ?? df?.BancoAcreedor;
-                var numeroCuenta = acreedor?.NumeroCuenta ?? df?.CuentaBancariaAcreedor;
-                var tipoAcreedor = acreedor?.TipoAcreedor.ToString();
-
-                var detalle = g
-                    .Select(x => new DeduccionAcreedorDetalle(
-                        x.EmpleadoNombre,
-                        x.EmpleadoCedula,
-                        x.TipoDeduccion.ToString(),
-                        x.Descripcion,
-                        x.MontoSolicitado,
-                        x.MontoAplicado,
-                        x.MontoLimitado,
-                        x.RazonLimitacion
-                    ))
-                    .ToList();
-
-                return new AcreedorConsolidadoItem(
-                    acreedor?.Id,
-                    g.Key,
-                    identificacion,
-                    banco,
-                    numeroCuenta,
-                    tipoAcreedor,
-                    g.Select(x => x.EmpleadoCedula).Distinct().Count(),
-                    g.Sum(x => x.MontoSolicitado),
-                    g.Sum(x => x.MontoAplicado),
-                    g.Sum(x => x.MontoLimitado),
-                    detalle
+                return new EmpleadoPlanillaRegularItem(
+                    d.Empleado!.NumeroIdentificacion,
+                    $"{d.Empleado.Nombre} {d.Empleado.Apellido}",
+                    horas?.RegularHours ?? 0,
+                    horas?.SundayHours ?? 0,
+                    horas?.HolidayHours ?? 0,
+                    horasExtra,
+                    d.GrossPay,
+                    d.CssEmployee,
+                    d.EducationalInsuranceEmployee,
+                    d.IncomeTax,
+                    totalAcreedores,
+                    d.NetPay,
+                    d.TuvoLimitacionSalarioMinimo,
+                    razonLimitacion
                 );
             })
-            .OrderByDescending(a => a.TotalAplicado)
+            .OrderBy(e => e.NombreCompleto)
             .ToList();
 
-        return new ReporteConsolidadoAcreedorDto(
-            tenant?.Name ?? "Sin nombre",
-            tenant != null && !string.IsNullOrEmpty(tenant.RUC) && !string.IsNullOrEmpty(tenant.DV)
-                ? $"{tenant.RUC}-{tenant.DV}"
-                : "Sin RUC",
+        var totales = new TotalesPlanillaRegular(
+            empleados.Count,
+            empleados.Sum(e => e.SalarioBruto),
+            empleados.Sum(e => e.CssEmpleado),
+            empleados.Sum(e => e.SeEmpleado),
+            empleados.Sum(e => e.Isr),
+            empleados.Sum(e => e.TotalAcreedores),
+            empleados.Sum(e => e.SalarioNeto)
+        );
+
+        return new ReportePlanillaRegularDto(
+            nombre, ruc,
+            planilla.PayrollNumber,
             $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
-            DateTime.Now,
-            gruposAcreedor,
-            gruposAcreedor.Sum(a => a.TotalSolicitado),
-            gruposAcreedor.Sum(a => a.TotalAplicado),
-            gruposAcreedor.Sum(a => a.TotalLimitado),
-            gruposAcreedor.Count
+            planilla.PayDate,
+            GetEstadoTexto(planilla.Status),
+            empleados, totales
         );
     }
 
-    /// <summary>
-    /// Genera el reporte de deducciones adicionales por empleado para una planilla.
-    /// Muestra la cascada de prelación con saldos disponibles y razones de limitación,
-    /// cumpliendo los requisitos de auditoría de la Ley 462 de la CSS.
-    /// </summary>
-    public async Task<ReporteDeduccionesEmpleadoDto> GenerarReporteDeduccionesEmpleado(int planillaId)
+    /// <summary>Reporte 2: Mensual — consolida todas las planillas del mes</summary>
+    public async Task<ReporteMensualDto> GenerarReporteMensual(int mes, int anio)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        // SEGURIDAD CRÍTICA: Filtrar por TenantId para aislar datos entre tenants
+        var planillas = await _context.PayrollHeaders
+            .Where(p => p.TenantId == tenantId
+                && p.PeriodStartDate.Month == mes
+                && p.PeriodStartDate.Year == anio
+                && p.Status >= PayrollStatus.Calculated)
+            .Include(p => p.Details)
+                .ThenInclude(d => d.Empleado)
+            .Include(p => p.Details)
+                .ThenInclude(d => d.DeduccionesAplicadas)
+            .ToListAsync();
+
+        var (nombre, ruc) = await GetTenantInfo();
+
+        var periodosIncluidos = planillas
+            .OrderBy(p => p.PeriodStartDate)
+            .Select(p => p.PayrollNumber)
+            .ToList();
+
+        // Agrupar todos los details por empleado y sumar
+        var todosDetails = planillas.SelectMany(p => p.Details).ToList();
+
+        var empleados = todosDetails
+            .Where(d => d.Empleado != null)
+            .GroupBy(d => d.EmpleadoId)
+            .Select(g =>
+            {
+                var primer = g.First();
+                return new EmpleadoMensualItem(
+                    primer.Empleado!.NumeroIdentificacion,
+                    $"{primer.Empleado.Nombre} {primer.Empleado.Apellido}",
+                    g.Sum(d => d.GrossPay),
+                    g.Sum(d => d.CssEmployee),
+                    g.Sum(d => d.EducationalInsuranceEmployee),
+                    g.Sum(d => d.IncomeTax),
+                    g.Sum(d => d.DeduccionesAplicadas.Sum(da => da.MontoAplicado)),
+                    g.Sum(d => d.NetPay)
+                );
+            })
+            .OrderBy(e => e.NombreCompleto)
+            .ToList();
+
+        var nombresDesMeses = new[] { "", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre" };
+
+        var totales = new TotalesMensual(
+            empleados.Select(e => e.Cedula).Distinct().Count(),
+            empleados.Sum(e => e.TotalBruto),
+            empleados.Sum(e => e.TotalCss),
+            empleados.Sum(e => e.TotalSe),
+            empleados.Sum(e => e.TotalIsr),
+            empleados.Sum(e => e.TotalAcreedores),
+            empleados.Sum(e => e.TotalNeto)
+        );
+
+        return new ReporteMensualDto(
+            nombre, ruc,
+            mes, anio,
+            mes >= 1 && mes <= 12 ? nombresDesMeses[mes] : mes.ToString(),
+            periodosIncluidos,
+            empleados, totales
+        );
+    }
+
+    /// <summary>Reporte 3: Acreedores — para que RRHH entregue a contabilidad</summary>
+    public async Task<ReporteAcreedoresDto> GenerarReporteAcreedores(int planillaId)
     {
         var tenantId = _tenantContext.TenantId;
 
@@ -448,10 +202,165 @@ public class ReportesService
             .Where(p => p.Id == planillaId && p.TenantId == tenantId)
             .Include(p => p.Details)
                 .ThenInclude(d => d.Empleado)
-                    .ThenInclude(e => e!.Departamento)
+            .Include(p => p.Details)
+                .ThenInclude(d => d.DeduccionesAplicadas)
+                    .ThenInclude(da => da.DeduccionFija)
+                        .ThenInclude(df => df!.Acreedor)
+            .FirstOrDefaultAsync();
+
+        if (planilla == null)
+            throw new InvalidOperationException($"Planilla {planillaId} no encontrada o no autorizada");
+
+        var (nombre, ruc) = await GetTenantInfo();
+
+        // Recopilar todas las deducciones de acreedores (excluir CSS/SE/ISR que no tienen NombreAcreedor)
+        var todasDeducciones = planilla.Details
+            .Where(d => d.Empleado != null)
+            .SelectMany(d => d.DeduccionesAplicadas
+                .Where(da => !string.IsNullOrEmpty(da.NombreAcreedor))
+                .Select(da => new
+                {
+                    EmpleadoNombre = $"{d.Empleado!.Nombre} {d.Empleado.Apellido}",
+                    EmpleadoCedula = d.Empleado.NumeroIdentificacion,
+                    da.NombreAcreedor,
+                    Acreedor = da.DeduccionFija?.Acreedor,
+                    DeduccionFija = da.DeduccionFija,
+                    da.TipoDeduccion,
+                    da.Descripcion,
+                    da.MontoSolicitado,
+                    da.MontoAplicado,
+                    da.MontoLimitado,
+                    da.RazonLimitacion
+                }))
+            .ToList();
+
+        var gruposAcreedor = todasDeducciones
+            .GroupBy(x => x.NombreAcreedor!)
+            .Select(g =>
+            {
+                var primeraConAcreedor = g.FirstOrDefault(x => x.Acreedor != null);
+                var acreedor = primeraConAcreedor?.Acreedor;
+                var primeraConDf = g.FirstOrDefault(x => x.DeduccionFija != null);
+                var df = primeraConDf?.DeduccionFija;
+
+                // Priorizar datos del catálogo Acreedor; fallback a campos embebidos en DeduccionFija
+                var identificacion = acreedor?.Identificacion ?? df?.IdentificacionAcreedor;
+                var banco = acreedor?.Banco ?? df?.BancoAcreedor;
+                var numeroCuenta = acreedor?.NumeroCuenta ?? df?.CuentaBancariaAcreedor;
+                var tipoAcreedor = acreedor?.TipoAcreedor.ToString();
+
+                var detalle = g.Select(x => new EmpleadoAcreedorDetalle(
+                    x.EmpleadoNombre,
+                    x.EmpleadoCedula,
+                    x.TipoDeduccion.ToString(),
+                    x.Descripcion,
+                    x.MontoSolicitado,
+                    x.MontoAplicado,
+                    x.MontoLimitado > 0,
+                    x.RazonLimitacion
+                )).ToList();
+
+                return new AcreedorPagoItem(
+                    g.Key,
+                    tipoAcreedor,
+                    identificacion,
+                    banco,
+                    numeroCuenta,
+                    g.Sum(x => x.MontoAplicado),
+                    g.Select(x => x.EmpleadoCedula).Distinct().Count(),
+                    detalle
+                );
+            })
+            .OrderByDescending(a => a.TotalATransferir)
+            .ToList();
+
+        return new ReporteAcreedoresDto(
+            nombre, ruc,
+            $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
+            DateTime.Now,
+            gruposAcreedor,
+            gruposAcreedor.Sum(a => a.TotalATransferir),
+            gruposAcreedor.Count
+        );
+    }
+
+    /// <summary>Reporte 4: SIP — para la plataforma CSS de Panamá</summary>
+    public async Task<ReporteSipDto> GenerarReporteSip(int planillaId)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        // SEGURIDAD CRÍTICA: Filtrar por TenantId para aislar datos entre tenants
+        var planilla = await _context.PayrollHeaders
+            .Where(p => p.Id == planillaId && p.TenantId == tenantId)
+            .Include(p => p.Details)
+                .ThenInclude(d => d.Empleado)
+            .FirstOrDefaultAsync();
+
+        if (planilla == null)
+            throw new InvalidOperationException($"Planilla {planillaId} no encontrada o no autorizada");
+
+        var (nombre, ruc) = await GetTenantInfo();
+
+        var empleados = planilla.Details
+            .Where(d => d.Empleado != null)
+            .Select(d =>
+            {
+                // Recalcular base CSS desde el monto employee (reversa del 9.75%)
+                var baseCss = d.CssEmployee > 0 ? Math.Round(d.CssEmployee / 0.0975m, 2) : d.GrossPay;
+                var totalSip = d.CssEmployee + d.CssEmployer
+                    + d.EducationalInsuranceEmployee + d.EducationalInsuranceEmployer
+                    + d.RiskContribution;
+
+                return new EmpleadoSipItem(
+                    d.Empleado!.NumeroIdentificacion,
+                    $"{d.Empleado.Nombre} {d.Empleado.Apellido}",
+                    d.GrossPay,
+                    baseCss,
+                    d.CssEmployee,
+                    d.CssEmployer,
+                    d.EducationalInsuranceEmployee,
+                    d.EducationalInsuranceEmployer,
+                    d.RiskContribution,
+                    totalSip
+                );
+            })
+            .OrderBy(e => e.NombreCompleto)
+            .ToList();
+
+        var totales = new TotalesSip(
+            empleados.Sum(e => e.SalarioBruto),
+            empleados.Sum(e => e.BaseCss),
+            empleados.Sum(e => e.CssEmpleado),
+            empleados.Sum(e => e.CssPatronal),
+            empleados.Sum(e => e.SeEmpleado),
+            empleados.Sum(e => e.SePatronal),
+            empleados.Sum(e => e.RiesgoProfesional),
+            empleados.Sum(e => e.TotalSip)
+        );
+
+        return new ReporteSipDto(
+            nombre, ruc,
+            planilla.PayrollNumber,
+            $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
+            DateTime.Now,
+            empleados, totales
+        );
+    }
+
+    /// <summary>Reporte 5: Comprobantes de Pago — recibos individuales por empleado</summary>
+    public async Task<ReporteComprobantesDto> GenerarReporteComprobantes(int planillaId)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        // SEGURIDAD CRÍTICA: Filtrar por TenantId para aislar datos entre tenants
+        var planilla = await _context.PayrollHeaders
+            .Where(p => p.Id == planillaId && p.TenantId == tenantId)
             .Include(p => p.Details)
                 .ThenInclude(d => d.Empleado)
                     .ThenInclude(e => e!.Posicion)
+            .Include(p => p.Details)
+                .ThenInclude(d => d.Empleado)
+                    .ThenInclude(e => e!.Departamento)
             .Include(p => p.Details)
                 .ThenInclude(d => d.DeduccionesAplicadas)
             .FirstOrDefaultAsync();
@@ -459,214 +368,65 @@ public class ReportesService
         if (planilla == null)
             throw new InvalidOperationException($"Planilla {planillaId} no encontrada o no autorizada");
 
-        var tenant = await _tenantContext.GetCurrentTenantAsync();
+        // LEFT JOIN con horas: empleados mensuales pueden no tener registro de horas
+        var horasPorEmpleado = await _context.PayrollEmployeeHours
+            .Where(h => h.PayrollHeaderId == planillaId && h.TenantId == tenantId)
+            .ToListAsync();
 
-        // Empleados con cualquier tipo de deducción adicional
-        var empleadosConDeducciones = planilla.Details
-            .Where(d => d.Empleado != null && (
-                d.DeduccionesAplicadas.Any() ||
-                d.PensionAlimenticia > 0 ||
-                d.Embargos > 0 ||
-                d.DeduccionesVoluntarias > 0))
+        var (nombre, ruc) = await GetTenantInfo();
+
+        var comprobantes = planilla.Details
+            .Where(d => d.Empleado != null)
             .Select(d =>
             {
-                var deduccionesLegales = d.CssEmployee + d.EducationalInsuranceEmployee + d.IncomeTax;
-                var netoPostLegal = d.GrossPay - deduccionesLegales;
+                var horas = horasPorEmpleado.FirstOrDefault(h => h.EmpleadoId == d.EmpleadoId);
 
-                var detalles = d.DeduccionesAplicadas
+                var lineasAcreedores = d.DeduccionesAplicadas
+                    .Where(da => !string.IsNullOrEmpty(da.NombreAcreedor))
                     .OrderBy(da => da.OrdenAplicacion)
-                    .Select(da => new DeduccionEmpleadoDetalle(
-                        da.OrdenAplicacion,
-                        da.Categoria.ToString(),
+                    .Select(da => new LineaDeduccionComprobante(
+                        da.NombreAcreedor ?? "Sin nombre",
                         da.TipoDeduccion.ToString(),
                         da.Descripcion,
-                        da.NombreAcreedor,
-                        da.MontoSolicitado,
-                        da.MontoAplicado,
-                        da.MontoLimitado,
-                        da.RazonLimitacion,
-                        da.SaldoDisponibleAntes,
-                        da.SaldoDisponibleDespues
+                        da.MontoAplicado
                     ))
                     .ToList();
 
-                var totalDeduccionesAdicionales = detalles.Sum(x => x.MontoAplicado);
+                var totalAcreedores = lineasAcreedores.Sum(l => l.Monto);
 
-                return new EmpleadoDeduccionesItem(
-                    d.EmpleadoId,
-                    $"{d.Empleado!.Nombre} {d.Empleado.Apellido}",
-                    d.Empleado.NumeroIdentificacion,
-                    d.Empleado.Departamento?.Nombre,
-                    d.Empleado.Posicion?.Nombre,
-                    d.GrossPay,
-                    deduccionesLegales,
-                    netoPostLegal,
-                    d.SalarioMinimoLegalAplicado,
-                    detalles,
-                    totalDeduccionesAdicionales,
-                    d.NetPay,
-                    d.TuvoLimitacionSalarioMinimo,
-                    d.PensionAlimenticia,
-                    d.Embargos,
-                    d.DeduccionesVoluntarias
-                );
-            })
-            .OrderBy(e => e.Nombre)
-            .ToList();
+                // Reserva décimo = 1/12 del salario bruto (referencial, no deducción)
+                var reservaDecimo = Math.Round(d.GrossPay / 12m, 2);
 
-        return new ReporteDeduccionesEmpleadoDto(
-            tenant?.Name ?? "Sin nombre",
-            tenant != null && !string.IsNullOrEmpty(tenant.RUC) && !string.IsNullOrEmpty(tenant.DV)
-                ? $"{tenant.RUC}-{tenant.DV}"
-                : "Sin RUC",
-            $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
-            DateTime.Now,
-            empleadosConDeducciones,
-            empleadosConDeducciones.Count,
-            empleadosConDeducciones.Count(e => e.TuvoLimitacion),
-            planilla.Details.Sum(d => d.PensionAlimenticia),
-            planilla.Details.Sum(d => d.Embargos),
-            planilla.Details.Sum(d => d.DeduccionesVoluntarias),
-            empleadosConDeducciones.SelectMany(e => e.Deducciones).Sum(x => x.MontoLimitado)
-        );
-    }
-
-    /// <summary>
-    /// Genera el reporte detallado de horas extra de una planilla
-    /// </summary>
-    public async Task<ReporteHorasExtraDto> GenerarReporteHorasExtra(int planillaId)
-    {
-        var tenantId = _tenantContext.TenantId;
-
-        // SEGURIDAD CRÍTICA: Filtrar por TenantId para aislar datos entre tenants
-        var planilla = await _context.PayrollHeaders
-            .Where(p => p.Id == planillaId && p.TenantId == tenantId)
-            .Include(p => p.Details)
-                .ThenInclude(d => d.Empleado)
-            .FirstOrDefaultAsync();
-
-        if (planilla == null)
-            throw new InvalidOperationException($"Planilla {planillaId} no encontrada o no autorizada");
-
-        // Obtener información del tenant para datos de la empresa
-        var tenant = await _tenantContext.GetCurrentTenantAsync();
-
-        // Obtener horas extra aprobadas del período de la planilla
-        var horasExtra = await _context.HorasExtra
-            .Where(h => h.TenantId == tenantId
-                && h.EstaAprobada
-                && h.Fecha >= planilla.PeriodStartDate
-                && h.Fecha <= planilla.PeriodEndDate)
-            .Include(h => h.Empleado)
-            .ToListAsync();
-
-        // Agrupar por empleado
-        var empleados = planilla.Details
-            .Where(d => d.Empleado != null)
-            .Select(d => {
-                var horasDelEmpleado = horasExtra.Where(h => h.EmpleadoId == d.EmpleadoId).ToList();
-
-                decimal horasDiurnas = horasDelEmpleado
-                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.Diurna)
-                    .Sum(h => h.CantidadHoras);
-
-                decimal horasNocturnas = horasDelEmpleado
-                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.Nocturna)
-                    .Sum(h => h.CantidadHoras);
-
-                decimal horasDomingoFeriado = horasDelEmpleado
-                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.DomingoFeriado || h.TipoHoraExtra == TipoHoraExtra.NocturnaDomingoFeriado)
-                    .Sum(h => h.CantidadHoras);
-
-                decimal horasFestivos = horasDelEmpleado
-                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.FiestaNacionalDiurna || h.TipoHoraExtra == TipoHoraExtra.FiestaNacionalNocturna)
-                    .Sum(h => h.CantidadHoras);
-
-                decimal horasMixtas = horasDelEmpleado
-                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.MixtaDiurnaNocturna || h.TipoHoraExtra == TipoHoraExtra.MixtaNocturnaDiurna)
-                    .Sum(h => h.CantidadHoras);
-
-                decimal horasExceso = horasDelEmpleado
-                    .Where(h => h.EsExceso)
-                    .Sum(h => h.CantidadHoras);
-
-                decimal totalHoras = horasDelEmpleado.Sum(h => h.CantidadHoras);
-
-                decimal montoDiurnas = horasDelEmpleado
-                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.Diurna)
-                    .Sum(h => h.MontoCalculado ?? 0);
-
-                decimal montoNocturnas = horasDelEmpleado
-                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.Nocturna)
-                    .Sum(h => h.MontoCalculado ?? 0);
-
-                decimal montoDomingoFeriado = horasDelEmpleado
-                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.DomingoFeriado || h.TipoHoraExtra == TipoHoraExtra.NocturnaDomingoFeriado)
-                    .Sum(h => h.MontoCalculado ?? 0);
-
-                decimal montoFestivos = horasDelEmpleado
-                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.FiestaNacionalDiurna || h.TipoHoraExtra == TipoHoraExtra.FiestaNacionalNocturna)
-                    .Sum(h => h.MontoCalculado ?? 0);
-
-                decimal montoMixtas = horasDelEmpleado
-                    .Where(h => h.TipoHoraExtra == TipoHoraExtra.MixtaDiurnaNocturna || h.TipoHoraExtra == TipoHoraExtra.MixtaNocturnaDiurna)
-                    .Sum(h => h.MontoCalculado ?? 0);
-
-                decimal montoExceso = horasDelEmpleado
-                    .Where(h => h.EsExceso)
-                    .Sum(h => h.MontoCalculado ?? 0);
-
-                decimal montoTotal = horasDelEmpleado.Sum(h => h.MontoCalculado ?? 0);
-
-                return new EmpleadoHorasExtraDto(
+                return new ComprobanteEmpleado(
                     d.Empleado!.NumeroIdentificacion,
                     $"{d.Empleado.Nombre} {d.Empleado.Apellido}",
-                    horasDiurnas,
-                    horasNocturnas,
-                    horasDomingoFeriado,
-                    horasFestivos,
-                    horasMixtas,
-                    horasExceso,
-                    totalHoras,
-                    montoDiurnas,
-                    montoNocturnas,
-                    montoDomingoFeriado,
-                    montoFestivos,
-                    montoMixtas,
-                    montoExceso,
-                    montoTotal
+                    d.Empleado.Posicion?.Nombre,
+                    d.Empleado.Departamento?.Nombre,
+                    d.BaseSalary,
+                    horas?.SundayPay ?? 0,
+                    horas?.HolidayPay ?? 0,
+                    d.MontoHorasExtra,
+                    d.GrossPay,
+                    d.CssEmployee,
+                    d.EducationalInsuranceEmployee,
+                    d.IncomeTax,
+                    lineasAcreedores,
+                    totalAcreedores,
+                    d.TotalDeductions,
+                    d.NetPay,
+                    reservaDecimo,
+                    d.TuvoLimitacionSalarioMinimo
                 );
             })
-            .Where(e => e.TotalHoras > 0) // Solo empleados con horas extra
-            .OrderBy(e => e.NombreCompleto)
+            .OrderBy(c => c.NombreCompleto)
             .ToList();
 
-        var totales = new TotalesHorasExtraDto(
-            empleados.Sum(e => e.HorasDiurnas),
-            empleados.Sum(e => e.HorasNocturnas),
-            empleados.Sum(e => e.HorasDomingoFeriado),
-            empleados.Sum(e => e.HorasFestivos),
-            empleados.Sum(e => e.HorasMixtas),
-            empleados.Sum(e => e.HorasExceso),
-            empleados.Sum(e => e.TotalHoras),
-            empleados.Sum(e => e.MontoDiurnas),
-            empleados.Sum(e => e.MontoNocturnas),
-            empleados.Sum(e => e.MontoDomingoFeriado),
-            empleados.Sum(e => e.MontoFestivos),
-            empleados.Sum(e => e.MontoMixtas),
-            empleados.Sum(e => e.MontoExceso),
-            empleados.Sum(e => e.MontoTotal)
-        );
-
-        return new ReporteHorasExtraDto(
-            tenant?.Name ?? "Sin nombre",
-            tenant != null && !string.IsNullOrEmpty(tenant.RUC) && !string.IsNullOrEmpty(tenant.DV)
-                ? $"{tenant.RUC}-{tenant.DV}"
-                : "Sin RUC",
+        return new ReporteComprobantesDto(
+            nombre, ruc,
+            planilla.PayrollNumber,
             $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
-            DateTime.Now,
-            empleados,
-            totales
+            planilla.PayDate,
+            comprobantes
         );
     }
 }
