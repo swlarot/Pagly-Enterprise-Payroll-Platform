@@ -65,6 +65,7 @@ public class PayrollCalculationOrchestratorPortable
         var cssResult = await _cssService.CalculateFullCssAsync(
             companyId,
             grossPay,
+            payFrequency,
             yearsCotized,
             averageSalaryLast10Years,
             cssRiskPercentage,

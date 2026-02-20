@@ -43,7 +43,10 @@ public record EmpleadoDeduccionesItem(
     List<DeduccionEmpleadoDetalle> Deducciones,
     decimal TotalDeduccionesAdicionales,
     decimal NetPayFinal,
-    bool TuvoLimitacion
+    bool TuvoLimitacion,
+    decimal PensionAlimenticia,
+    decimal Embargos,
+    decimal DeduccionesVoluntarias
 );
 
 /// <summary>

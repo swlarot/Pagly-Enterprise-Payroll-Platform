@@ -82,7 +82,37 @@ public static class PayrollConfigSeeder
 
         if (existingConfig != null)
         {
-            logger?.LogInformation("Tenant {TenantId} ya tiene configuración. Saltando.", tenantId);
+            // Actualizar tasas si quedaron desactualizadas (ej: Reforma CSS 13.25%)
+            bool updated = false;
+            if (existingConfig.CssEmployerBaseRate < 13.25m)
+            {
+                logger?.LogInformation("Tenant {TenantId}: actualizando CssEmployerBaseRate {Old}% → 13.25% (Reforma CSS)", tenantId, existingConfig.CssEmployerBaseRate);
+                existingConfig.CssEmployerBaseRate = 13.25m;
+                updated = true;
+            }
+            // Actualizar umbrales CSS para topes variables (Ley 462)
+            if (existingConfig.CssHighMinYears != 10 || existingConfig.CssIntermediateMinYears != 5)
+            {
+                existingConfig.CssHighMinYears = 10;
+                existingConfig.CssHighMinAvgSalary = 1200.00m;
+                existingConfig.CssIntermediateMinYears = 5;
+                existingConfig.CssIntermediateMinAvgSalary = 850.00m;
+                existingConfig.CssMaxContributionBaseStandard = 1000.00m;
+                existingConfig.CssMaxContributionBaseIntermediate = 1500.00m;
+                existingConfig.CssMaxContributionBaseHigh = 2500.00m;
+                updated = true;
+                logger?.LogInformation("Tenant {TenantId}: actualizando umbrales CSS → IntermMinYears=5, HighMinYears=10", tenantId);
+            }
+            if (updated)
+            {
+                existingConfig.UpdatedAt = DateTime.UtcNow;
+                await context.SaveChangesAsync();
+                logger?.LogInformation("✓ Configuración actualizada para Tenant {TenantId}", tenantId);
+            }
+            else
+            {
+                logger?.LogInformation("Tenant {TenantId} ya tiene configuración actualizada. Saltando.", tenantId);
+            }
             return;
         }
 

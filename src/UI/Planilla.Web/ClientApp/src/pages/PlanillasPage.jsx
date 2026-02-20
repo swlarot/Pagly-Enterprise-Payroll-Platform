@@ -323,20 +323,19 @@ const PlanillasPage = () => {
     };
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-PA', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 2
+        return 'B/. ' + new Intl.NumberFormat('es-PA', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
         }).format(amount || 0);
     };
 
     const getStatusBadge = (status) => {
         const statuses = {
-            0: { label: 'Draft', bg: 'bg-amber-500/15', text: 'text-amber-400', dot: 'bg-amber-600' },
-            1: { label: 'Calculated', bg: 'bg-blue-500/15', text: 'text-blue-400', dot: 'bg-blue-600' },
-            2: { label: 'Approved', bg: 'bg-green-500/15', text: 'text-green-400', dot: 'bg-green-600' },
-            3: { label: 'Paid', bg: 'bg-emerald-500/15', text: 'text-emerald-400', dot: 'bg-emerald-600' },
-            4: { label: 'Cancelled', bg: 'bg-red-500/15', text: 'text-red-400', dot: 'bg-red-600' }
+            0: { label: 'Borrador', bg: 'bg-amber-500/15', text: 'text-amber-400', dot: 'bg-amber-600' },
+            1: { label: 'Calculado', bg: 'bg-blue-500/15', text: 'text-blue-400', dot: 'bg-blue-600' },
+            2: { label: 'Aprobado', bg: 'bg-green-500/15', text: 'text-green-400', dot: 'bg-green-600' },
+            3: { label: 'Pagado', bg: 'bg-emerald-500/15', text: 'text-emerald-400', dot: 'bg-emerald-600' },
+            4: { label: 'Cancelado', bg: 'bg-red-500/15', text: 'text-red-400', dot: 'bg-red-600' }
         };
         const s = statuses[status] || statuses[0];
         return (
@@ -1508,37 +1507,53 @@ const PlanillasPage = () => {
                                 <table className="w-full">
                                     <thead className="bg-navy-950 border-b border-navy-700">
                                         <tr>
-                                            <th className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase">Empleado</th>
-                                            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">Bruto</th>
-                                            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">CSS</th>
-                                            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">SE</th>
-                                            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">ISR</th>
-                                            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">Total Ded.</th>
-                                            <th className="text-right py-3 px-4 text-xs font-medium text-gray-500 uppercase">Neto</th>
+                                            <th className="text-left py-3 px-3 text-xs font-medium text-gray-500 uppercase">Empleado</th>
+                                            <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">Bruto</th>
+                                            <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">CSS</th>
+                                            <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">SE</th>
+                                            <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">ISR</th>
+                                            <th className="text-right py-3 px-3 text-xs font-medium text-red-400 uppercase">Pensión</th>
+                                            <th className="text-right py-3 px-3 text-xs font-medium text-orange-400 uppercase">Embargos</th>
+                                            <th className="text-right py-3 px-3 text-xs font-medium text-blue-400 uppercase">Volunt.</th>
+                                            <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">Total Ded.</th>
+                                            <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">Neto</th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-navy-900 divide-y divide-navy-700">
                                         {planillaDetails.details.map((detail) => (
                                             <tr key={detail.id} className="hover:bg-navy-800">
-                                                <td className="py-3 px-4 text-sm text-gray-100">{detail.empleado?.nombre} {detail.empleado?.apellido}</td>
-                                                <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.grossPay)}</td>
-                                                <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.cssEmployee)}</td>
-                                                <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.educationalInsuranceEmployee)}</td>
-                                                <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.incomeTax)}</td>
-                                                <td className="py-3 px-4 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.totalDeductions)}</td>
-                                                <td className="py-3 px-4 text-sm text-right font-medium text-gray-100 font-mono">{formatCurrency(detail.netPay)}</td>
+                                                <td className="py-3 px-3 text-sm text-gray-100">{detail.empleado?.nombre} {detail.empleado?.apellido}</td>
+                                                <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.grossPay)}</td>
+                                                <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.cssEmployee)}</td>
+                                                <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.educationalInsuranceEmployee)}</td>
+                                                <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.incomeTax)}</td>
+                                                <td className="py-3 px-3 text-sm text-right text-red-400 font-mono">{formatCurrency(detail.pensionAlimenticia || 0)}</td>
+                                                <td className="py-3 px-3 text-sm text-right text-orange-400 font-mono">{formatCurrency(detail.embargos || 0)}</td>
+                                                <td className="py-3 px-3 text-sm text-right text-blue-400 font-mono">{formatCurrency(detail.deduccionesVoluntarias || 0)}</td>
+                                                <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.totalDeductions)}</td>
+                                                <td className="py-3 px-3 text-sm text-right font-medium font-mono">
+                                                    <span className="text-gray-100">{formatCurrency(detail.netPay)}</span>
+                                                    {detail.tuvoLimitacionSalarioMinimo && (
+                                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-400" title="Deducción limitada por salario mínimo">
+                                                            SM
+                                                        </span>
+                                                    )}
+                                                </td>
                                             </tr>
                                         ))}
                                     </tbody>
                                     <tfoot className="bg-navy-950 border-t-2 border-navy-600">
                                         <tr>
-                                            <td className="py-3 px-4 text-sm font-bold text-gray-100">TOTALES</td>
-                                            <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalGrossPay)}</td>
-                                            <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.cssEmployee || 0), 0) || 0)}</td>
-                                            <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.educationalInsuranceEmployee || 0), 0) || 0)}</td>
-                                            <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.incomeTax || 0), 0) || 0)}</td>
-                                            <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalDeductions)}</td>
-                                            <td className="py-3 px-4 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalNetPay)}</td>
+                                            <td className="py-3 px-3 text-sm font-bold text-gray-100">TOTALES</td>
+                                            <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalGrossPay)}</td>
+                                            <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.cssEmployee || 0), 0) || 0)}</td>
+                                            <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.educationalInsuranceEmployee || 0), 0) || 0)}</td>
+                                            <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.incomeTax || 0), 0) || 0)}</td>
+                                            <td className="py-3 px-3 text-sm text-right font-bold text-red-400 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.pensionAlimenticia || 0), 0) || 0)}</td>
+                                            <td className="py-3 px-3 text-sm text-right font-bold text-orange-400 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.embargos || 0), 0) || 0)}</td>
+                                            <td className="py-3 px-3 text-sm text-right font-bold text-blue-400 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.deduccionesVoluntarias || 0), 0) || 0)}</td>
+                                            <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalDeductions)}</td>
+                                            <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalNetPay)}</td>
                                         </tr>
                                     </tfoot>
                                 </table>

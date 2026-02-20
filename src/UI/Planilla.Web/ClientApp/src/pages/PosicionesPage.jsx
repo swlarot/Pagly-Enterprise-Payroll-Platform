@@ -166,11 +166,10 @@ const PosicionesPage = () => {
     };
 
     const formatCurrency = (value) => {
-        return new Intl.NumberFormat('es-PA', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 2
-        }).format(value);
+        return 'B/. ' + new Intl.NumberFormat('es-PA', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(value || 0);
     };
 
     const filteredPosiciones = selectedDeptId

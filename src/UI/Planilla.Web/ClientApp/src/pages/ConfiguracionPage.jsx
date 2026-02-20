@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { UsageDashboard } from '../components/UsageDashboard';
 import { TenantRole } from '../types/api';
 import { api } from '../services/api';
+import { Save, Building2, Loader2 } from 'lucide-react';
 
 const ConfiguracionPage = () => {
     const { hasRole } = useAuth();
@@ -12,6 +13,12 @@ const ConfiguracionPage = () => {
     const [taxConfig, setTaxConfig] = useState(null);
     const [taxConfigLoading, setTaxConfigLoading] = useState(false);
     const [ensureTaxConfigLoading, setEnsureTaxConfigLoading] = useState(false);
+
+    // Salario Mínimo state
+    const [salarioMinimo, setSalarioMinimo] = useState('');
+    const [actividadEconomica, setActividadEconomica] = useState('');
+    const [salarioMinimoLoading, setSalarioMinimoLoading] = useState(false);
+    const [salarioMinimoSaving, setSalarioMinimoSaving] = useState(false);
 
     const fetchTaxConfig = async () => {
         setTaxConfigLoading(true);
@@ -26,8 +33,47 @@ const ConfiguracionPage = () => {
         }
     };
 
+    const fetchSalarioMinimo = async () => {
+        setSalarioMinimoLoading(true);
+        try {
+            const data = await api.get('/api/configuracion/salario-minimo');
+            setSalarioMinimo(data.salarioMinimoLegal?.toString() || '700');
+            setActividadEconomica(data.actividadEconomica || '');
+        } catch (err) {
+            if (err.statusCode === 404) {
+                toast.error('No existe configuración de planilla. Cree una primero en la pestaña Tasas CSS/SE.');
+            } else {
+                toast.error(err.message || 'Error al cargar salario mínimo');
+            }
+        } finally {
+            setSalarioMinimoLoading(false);
+        }
+    };
+
+    const handleSaveSalarioMinimo = async (e) => {
+        e.preventDefault();
+        const valor = parseFloat(salarioMinimo);
+        if (isNaN(valor) || valor <= 0) {
+            toast.error('El salario mínimo debe ser mayor a cero');
+            return;
+        }
+        try {
+            setSalarioMinimoSaving(true);
+            await api.put('/api/configuracion/salario-minimo', {
+                salarioMinimoLegal: valor,
+                actividadEconomica: actividadEconomica || null,
+            });
+            toast.success('Salario mínimo actualizado correctamente');
+        } catch (err) {
+            toast.error(err.message || 'Error al guardar');
+        } finally {
+            setSalarioMinimoSaving(false);
+        }
+    };
+
     useEffect(() => {
         if (activeTab === 'tasas') fetchTaxConfig();
+        if (activeTab === 'salario-minimo') fetchSalarioMinimo();
     }, [activeTab]);
 
     const handleEnsureTaxConfig = async () => {
@@ -48,6 +94,7 @@ const ConfiguracionPage = () => {
     const allTabs = [
         { id: 'tasas', label: 'Tasas CSS/SE', icon: 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z', visible: true },
         { id: 'isr', label: 'Tabla ISR', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', visible: true },
+        { id: 'salario-minimo', label: 'Salario Mínimo', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', visible: true },
         { id: 'audit', label: 'Audit Log', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', visible: hasRole ? hasRole(TenantRole.Owner) : false },
         { id: 'plan', label: 'Uso del Plan', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', visible: true },
         { id: 'soporte', label: 'Soporte', icon: 'M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z', visible: true }
@@ -147,7 +194,7 @@ const ConfiguracionPage = () => {
                                                             {Number(taxConfig.cssEmployerBaseRate).toFixed(2)}%
                                                         </span>
                                                     </td>
-                                                    <td className="py-3 px-4 text-sm text-gray-500">Topes: ${Number(taxConfig.cssMaxContributionBaseStandard).toFixed(0)} / {Number(taxConfig.cssMaxContributionBaseIntermediate).toFixed(0)} / {Number(taxConfig.cssMaxContributionBaseHigh).toFixed(0)}</td>
+                                                    <td className="py-3 px-4 text-sm text-gray-500">Topes: B/.{Number(taxConfig.cssMaxContributionBaseStandard).toFixed(0)} / B/.{Number(taxConfig.cssMaxContributionBaseIntermediate).toFixed(0)} / B/.{Number(taxConfig.cssMaxContributionBaseHigh).toFixed(0)}</td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -222,7 +269,7 @@ const ConfiguracionPage = () => {
                                         <h4 className="text-sm font-semibold text-gray-100 mb-2">Notas:</h4>
                                         <ul className="text-sm text-gray-400 space-y-1 list-disc list-inside">
                                             <li>Topes CSS según años cotizados y salario promedio (configuración actual en uso)</li>
-                                            <li>Deducción ISR por dependiente: ${Number(taxConfig.dependentDeductionAmount).toFixed(0)} (máx. {taxConfig.maxDependents} dependientes)</li>
+                                            <li>Deducción ISR por dependiente: B/.{Number(taxConfig.dependentDeductionAmount).toFixed(0)} (máx. {taxConfig.maxDependents} dependientes)</li>
                                         </ul>
                                     </div>
                                 </>
@@ -239,7 +286,7 @@ const ConfiguracionPage = () => {
                                     <svg className="w-4 h-4 text-green-400 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
-                                    <span className="text-sm text-green-400 font-medium">Según DGI Panamá - Año fiscal 2025</span>
+                                    <span className="text-sm text-green-400 font-medium">Según DGI Panamá - Año fiscal {new Date().getFullYear()}</span>
                                 </div>
                             </div>
 
@@ -254,7 +301,7 @@ const ConfiguracionPage = () => {
                                     </thead>
                                     <tbody className="bg-navy-900 divide-y divide-navy-700">
                                         <tr className="bg-green-500/5">
-                                            <td className="py-3 px-4 text-sm font-medium text-gray-100 font-mono">$0 - $11,000</td>
+                                            <td className="py-3 px-4 text-sm font-medium text-gray-100 font-mono">B/.0 - B/.11,000</td>
                                             <td className="py-3 px-4 text-sm text-center">
                                                 <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-500/15 text-green-400">
                                                     Exento (0%)
@@ -263,22 +310,22 @@ const ConfiguracionPage = () => {
                                             <td className="py-3 px-4 text-sm text-gray-400">No paga impuesto</td>
                                         </tr>
                                         <tr>
-                                            <td className="py-3 px-4 text-sm font-medium text-gray-100 font-mono">$11,001 - $50,000</td>
+                                            <td className="py-3 px-4 text-sm font-medium text-gray-100 font-mono">B/.11,001 - B/.50,000</td>
                                             <td className="py-3 px-4 text-sm text-center">
                                                 <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-amber-500/15 text-amber-400">
                                                     15%
                                                 </span>
                                             </td>
-                                            <td className="py-3 px-4 text-sm text-gray-400">Sobre el exceso de $11,000</td>
+                                            <td className="py-3 px-4 text-sm text-gray-400">Sobre el exceso de B/.11,000</td>
                                         </tr>
                                         <tr>
-                                            <td className="py-3 px-4 text-sm font-medium text-gray-100 font-mono">Más de $50,000</td>
+                                            <td className="py-3 px-4 text-sm font-medium text-gray-100 font-mono">Más de B/.50,000</td>
                                             <td className="py-3 px-4 text-sm text-center">
                                                 <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-500/15 text-red-400">
                                                     25%
                                                 </span>
                                             </td>
-                                            <td className="py-3 px-4 text-sm text-gray-400">Sobre el exceso de $50,000</td>
+                                            <td className="py-3 px-4 text-sm text-gray-400">Sobre el exceso de B/.50,000</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -288,23 +335,114 @@ const ConfiguracionPage = () => {
                                 <div className="p-4 bg-primary-500/10 rounded-lg border border-primary-500">
                                     <h4 className="text-sm font-semibold text-primary-300 mb-2">Ejemplo de Cálculo:</h4>
                                     <div className="text-sm text-primary-400 space-y-1">
-                                        <p>Salario anual: <strong className="font-mono">$30,000</strong></p>
-                                        <p>Exento: <span className="font-mono">$11,000</span> (0%)</p>
-                                        <p>Gravable: <span className="font-mono">$19,000</span> × 15% = <strong className="font-mono">$2,850</strong></p>
-                                        <p className="pt-2 border-t border-primary-400">ISR anual total: <strong className="font-mono">$2,850</strong></p>
+                                        <p>Salario anual: <strong className="font-mono">B/.30,000</strong></p>
+                                        <p>Exento: <span className="font-mono">B/.11,000</span> (0%)</p>
+                                        <p>Gravable: <span className="font-mono">B/.19,000</span> × 15% = <strong className="font-mono">B/.2,850</strong></p>
+                                        <p className="pt-2 border-t border-primary-400">ISR anual total: <strong className="font-mono">B/.2,850</strong></p>
                                     </div>
                                 </div>
 
                                 <div className="p-4 bg-navy-950 rounded-lg border border-navy-700">
                                     <h4 className="text-sm font-semibold text-gray-100 mb-2">Deducciones Permitidas:</h4>
                                     <ul className="text-sm text-gray-400 space-y-1 list-disc list-inside">
-                                        <li>Gastos educativos: <span className="font-mono">hasta $5,000/año</span></li>
-                                        <li>Intereses hipotecarios: <span className="font-mono">hasta $15,000/año</span></li>
-                                        <li>Dependientes: <span className="font-mono">$800/año</span> por dependiente</li>
+                                        <li>Gastos educativos: <span className="font-mono">hasta B/.5,000/año</span></li>
+                                        <li>Intereses hipotecarios: <span className="font-mono">hasta B/.15,000/año</span></li>
+                                        <li>Dependientes: <span className="font-mono">B/.800/año</span> por dependiente</li>
                                         <li>Aportes jubilatorios voluntarios</li>
                                     </ul>
                                 </div>
                             </div>
+                        </div>
+                    )}
+
+                    {/* Tab: Salario Mínimo */}
+                    {activeTab === 'salario-minimo' && (
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-100 mb-2">Salario Mínimo Legal</h3>
+                            <p className="text-sm text-gray-400 mb-6">
+                                Configure el salario mínimo legal vigente. Este valor protege el salario mínimo inembargable al aplicar deducciones.
+                            </p>
+
+                            {salarioMinimoLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+                                </div>
+                            ) : (
+                                <form onSubmit={handleSaveSalarioMinimo} className="max-w-lg space-y-5">
+                                    <div>
+                                        <label htmlFor="salarioMinimo" className="block text-sm font-medium text-gray-300 mb-1">
+                                            Salario Mínimo Mensual (B/.)
+                                        </label>
+                                        <div className="relative rounded-lg">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <span className="text-gray-500 text-sm font-medium">B/.</span>
+                                            </div>
+                                            <input
+                                                type="number"
+                                                id="salarioMinimo"
+                                                step="0.01"
+                                                min="0.01"
+                                                value={salarioMinimo}
+                                                onChange={(e) => setSalarioMinimo(e.target.value)}
+                                                className="block w-full pl-10 pr-4 py-2.5 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                                                placeholder="700.00"
+                                                required
+                                            />
+                                        </div>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            Salario mínimo legal mensual vigente según actividad económica (Decreto Ejecutivo).
+                                        </p>
+                                    </div>
+
+                                    <div>
+                                        <label htmlFor="actividadEconomica" className="block text-sm font-medium text-gray-300 mb-1">
+                                            Actividad Económica
+                                        </label>
+                                        <div className="relative rounded-lg">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <Building2 className="h-5 w-5 text-gray-500" />
+                                            </div>
+                                            <input
+                                                type="text"
+                                                id="actividadEconomica"
+                                                value={actividadEconomica}
+                                                onChange={(e) => setActividadEconomica(e.target.value)}
+                                                className="block w-full pl-10 pr-4 py-2.5 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                                                placeholder="Ej: Comercio al por menor"
+                                                maxLength={300}
+                                            />
+                                        </div>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            Descripción de la actividad económica principal de la empresa (opcional).
+                                        </p>
+                                    </div>
+
+                                    <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                                        <h4 className="text-sm font-semibold text-amber-300 mb-2">Importante</h4>
+                                        <ul className="text-xs text-amber-400/80 list-disc list-inside space-y-1">
+                                            <li>El salario mínimo se usa para calcular el piso inembargable en deducciones.</li>
+                                            <li>Las pensiones alimenticias por orden judicial SI pueden reducir por debajo del salario mínimo.</li>
+                                            <li>Los embargos judiciales y deducciones voluntarias solo aplican sobre el excedente.</li>
+                                            <li>El monto se prorratea automáticamente según el período de pago.</li>
+                                        </ul>
+                                    </div>
+
+                                    <div className="flex justify-end">
+                                        <button
+                                            type="submit"
+                                            disabled={salarioMinimoSaving}
+                                            className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {salarioMinimoSaving ? (
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                                <Save className="w-4 h-4" />
+                                            )}
+                                            Guardar
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
                         </div>
                     )}
 

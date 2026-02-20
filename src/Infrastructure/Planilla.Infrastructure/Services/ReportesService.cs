@@ -461,9 +461,13 @@ public class ReportesService
 
         var tenant = await _tenantContext.GetCurrentTenantAsync();
 
-        // Solo empleados que tienen al menos una DeduccionAplicada
+        // Empleados con cualquier tipo de deducción adicional
         var empleadosConDeducciones = planilla.Details
-            .Where(d => d.Empleado != null && d.DeduccionesAplicadas.Any())
+            .Where(d => d.Empleado != null && (
+                d.DeduccionesAplicadas.Any() ||
+                d.PensionAlimenticia > 0 ||
+                d.Embargos > 0 ||
+                d.DeduccionesVoluntarias > 0))
             .Select(d =>
             {
                 var deduccionesLegales = d.CssEmployee + d.EducationalInsuranceEmployee + d.IncomeTax;
@@ -501,7 +505,10 @@ public class ReportesService
                     detalles,
                     totalDeduccionesAdicionales,
                     d.NetPay,
-                    d.TuvoLimitacionSalarioMinimo
+                    d.TuvoLimitacionSalarioMinimo,
+                    d.PensionAlimenticia,
+                    d.Embargos,
+                    d.DeduccionesVoluntarias
                 );
             })
             .OrderBy(e => e.Nombre)

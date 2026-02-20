@@ -279,10 +279,9 @@ const HorasExtraPage = () => {
     });
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-PA', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 2
+        return 'B/. ' + new Intl.NumberFormat('es-PA', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
         }).format(amount || 0);
     };
 

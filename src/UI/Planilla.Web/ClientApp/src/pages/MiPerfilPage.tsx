@@ -49,7 +49,7 @@ interface Vacacion {
 // ============================================================
 
 const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat('es-PA', { style: 'currency', currency: 'USD' }).format(amount);
+  'B/. ' + new Intl.NumberFormat('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
 
 const formatDate = (dateString: string) =>
   new Date(dateString).toLocaleDateString('es-PA', { day: '2-digit', month: 'short', year: 'numeric' });

@@ -110,16 +110,15 @@ export default function AdminDashboardPage() {
 
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-PA', {
-      style: 'currency',
-      currency: 'USD',
+    return 'B/. ' + new Intl.NumberFormat('es-PA', {
       minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount || 0);
   };
 
   const formatCurrencyShort = (amount: number) => {
     if (amount >= 1000) {
-      return `$${(amount / 1000).toFixed(1)}k`;
+      return `B/.${(amount / 1000).toFixed(1)}k`;
     }
     return formatCurrency(amount);
   };
