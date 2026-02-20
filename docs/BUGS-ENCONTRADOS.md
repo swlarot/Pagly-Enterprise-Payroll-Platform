@@ -137,3 +137,42 @@
 - **Fix requerido (frontend)**: Leer los nuevos campos en AdminDashboardPage.tsx y mostrarlos en el desglose.
 - **Estado**: Pendiente de implementación en próxima sesión.
 - **Impacto**: Solo visual — el total es correcto, pero el desglose no se puede ver.
+
+---
+
+## Sesión 2026-02-20 — Bugs adicionales encontrados y corregidos
+
+## BUG-007: Al calcular planilla la UI no se actualiza hasta refrescar la página [MEDIO] ✅ CORREGIDO
+- **Archivo corregido**: `src/UI/Planilla.Web/ClientApp/src/pages/PlanillasPage.jsx` (línea 135)
+- **Descripción**: Al hacer clic en "Calcular Planilla" (desde estado Borrador), el backend calculaba correctamente y retornaba éxito, pero la UI seguía mostrando los guiones "—" en las tarjetas resumen (Salario Bruto, Neto, CSS, SE, ISR). Solo después de refrescar la página con F5 aparecían los datos calculados.
+- **Causa raíz**: En la función `fetchData()`, el bloque de actualización de `selectedPlanilla` tenía la condición `if (!selectedPlanilla)` — es decir, solo se asignaba si no había ninguna planilla seleccionada. Cuando el usuario ya tenía una planilla seleccionada (Borrador), `fetchData()` actualizaba el array `planillas` con datos frescos pero **nunca actualizaba `selectedPlanilla`**, que es la variable que alimenta todas las tarjetas resumen y el stepper de estado.
+- **Fix aplicado**:
+  ```js
+  // ANTES — solo asignaba si no había selección:
+  if (enrichedPlanillas.length > 0 && !selectedPlanilla) {
+      setSelectedPlanilla(enrichedPlanillas[0]);
+  }
+
+  // DESPUÉS — siempre sincroniza con datos frescos:
+  if (enrichedPlanillas.length > 0) {
+      if (!selectedPlanilla) {
+          setSelectedPlanilla(enrichedPlanillas[0]);
+      } else {
+          // Sincronizar selectedPlanilla con la versión fresca del servidor
+          const updated = enrichedPlanillas.find(p => p.id === selectedPlanilla.id);
+          if (updated) setSelectedPlanilla(updated);
+      }
+  }
+  ```
+- **Impacto del fix**: Afecta también el botón "Aprobar Planilla" y cualquier otra acción que llame `fetchData()` (misma causa raíz).
+- **Verificación**:
+  - Planilla 2026-003 (abr 2026, Mensual) creada en Borrador
+  - Click "Calcular Planilla" → inmediatamente mostró:
+    - Estado: Calculado ✅ (sin refresh)
+    - Salario Bruto: B/.6,000.00 ✅
+    - Neto a Pagar: B/.4,505.00 ✅
+    - CSS: B/.1,035.00 ✅
+    - SE: B/.165.00 ✅
+    - ISR: B/.531.25 ✅
+  - Botones cambiaron a "Aprobar Planilla" / "Recalcular" ✅
+  - "Ver Detalles" mostró 3 empleados con valores correctos ✅
