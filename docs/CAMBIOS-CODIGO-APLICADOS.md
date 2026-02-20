@@ -349,15 +349,39 @@ hours.SundayPay = hours.SundayHours * hourlyRate * 1.50m;
 
 ---
 
-## PENDIENTE — C-011: Dashboard desglose CSS/SE/Riesgo Patronal (backend)
+## Cambio C-011: PayrollHeader + Controller + Migración — Desglose patronal Dashboard
 
-**Estado**: ❌ PENDIENTE (próxima sesión)
+**Estado**: ✅ IMPLEMENTADO
 
-**Archivo backend**: Agregar campos a `PayrollHeaderDto`:
-- `TotalEmployerCss` (decimal)
-- `TotalEmployerSe` (decimal)
-- `TotalRiskInsurance` (decimal)
+**Archivos modificados**:
 
-**Archivo frontend**: `AdminDashboardPage.tsx` — leer los nuevos campos en el panel de "Costo Total Empleador".
+1. `src/Core/Planilla.Domain/Entities/PayrollHeader.cs` — 3 propiedades nuevas:
+```csharp
+public decimal TotalEmployerCss { get; set; }
+public decimal TotalEmployerSe { get; set; }
+public decimal TotalRiskInsurance { get; set; }
+```
 
-**Referencia**: PENDIENTE-001 en BUGS-ENCONTRADOS.md (renumerado a C-011 en esta sesión)
+2. `src/UI/Planilla.Web/Controllers/PayrollHeadersController.cs` — acumuladores en loop de cálculo:
+```csharp
+decimal totalEmployerCss = 0;
+decimal totalEmployerSe = 0;
+decimal totalRiskInsurance = 0;
+// ... dentro del loop por empleado:
+totalEmployerCss += calculationResult.CssEmployer;
+totalEmployerSe += calculationResult.EducationalInsuranceEmployer;
+totalRiskInsurance += calculationResult.RiskContribution;
+// ... después del loop:
+payrollHeader.TotalEmployerCss = totalEmployerCss;
+payrollHeader.TotalEmployerSe = totalEmployerSe;
+payrollHeader.TotalRiskInsurance = totalRiskInsurance;
+```
+
+3. Migración: `20260220171856_AddPayrollHeaderEmployerBreakdown` — añade 3 columnas `numeric(18,2) DEFAULT 0` a `PayrollHeaders`.
+
+**Frontend**: `AdminDashboardPage.tsx` ya leía `totalEmployerCss`, `totalEmployerSe`, `totalRiskInsurance` — sin cambios requeridos.
+
+**Verificación** (planilla 2026-003):
+- CSS Patronal: B/.596.25 ✅ | SE Patronal: B/.90.00 ✅ | Riesgo: B/.35.45 ✅ | Total: B/.721.70 ✅
+
+**Referencia**: PENDIENTE-001 en BUGS-ENCONTRADOS.md

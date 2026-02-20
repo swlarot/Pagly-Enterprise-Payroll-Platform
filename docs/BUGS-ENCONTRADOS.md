@@ -129,14 +129,23 @@
 
 ---
 
-## PENDIENTE-001: Dashboard muestra B/.0.00 en desglose CSS/SE/Riesgo Patronal [BAJO] ❌ PENDIENTE
-- **Archivo**: `src/UI/Planilla.Web/ClientApp/src/pages/AdminDashboardPage.tsx`
-- **Descripción**: El panel de Dashboard muestra el "Costo Total Empleador" correcto (B/.721.70), pero el desglose detallado muestra B/.0.00 para los 3 sub-items: CSS Patronal, Seguro Educativo Patronal, y Riesgo Profesional.
-- **Causa raíz**: El endpoint `/api/payrollheaders` (lista) solo retorna el campo agregado `totalEmployerCost`, pero NO retorna los campos de desglose: `totalEmployerCss`, `totalEmployerSe`, `totalRiskInsurance`.
-- **Fix requerido (backend)**: Agregar esos campos al `PayrollHeaderDto` o crear un endpoint adicional de resumen.
-- **Fix requerido (frontend)**: Leer los nuevos campos en AdminDashboardPage.tsx y mostrarlos en el desglose.
-- **Estado**: Pendiente de implementación en próxima sesión.
-- **Impacto**: Solo visual — el total es correcto, pero el desglose no se puede ver.
+## PENDIENTE-001: Dashboard muestra B/.0.00 en desglose CSS/SE/Riesgo Patronal [BAJO] ✅ CORREGIDO
+- **Archivos corregidos**:
+  - `src/Core/Planilla.Domain/Entities/PayrollHeader.cs`
+  - `src/UI/Planilla.Web/Controllers/PayrollHeadersController.cs`
+  - Migración: `20260220171856_AddPayrollHeaderEmployerBreakdown`
+- **Descripción**: El panel del Dashboard mostraba el "Costo Total Empleador" correcto (B/.721.70), pero los 3 sub-items (CSS Patronal, SE Patronal, Riesgo Profesional) mostraban B/.0.00.
+- **Causa raíz**: La entidad `PayrollHeader` no tenía los campos de desglose (`TotalEmployerCss`, `TotalEmployerSe`, `TotalRiskInsurance`), y el controller no los calculaba ni persistía.
+- **Fix aplicado**:
+  - Agregadas 3 propiedades a `PayrollHeader`: `TotalEmployerCss`, `TotalEmployerSe`, `TotalRiskInsurance`
+  - Agregados 3 acumuladores en el loop de cálculo del controller, usando `calculationResult.CssEmployer`, `calculationResult.EducationalInsuranceEmployer`, `calculationResult.RiskContribution`
+  - Migración EF Core agrega 3 columnas `numeric(18,2)` con DEFAULT 0 a la tabla `PayrollHeaders`
+  - `AdminDashboardPage.tsx` ya leía los campos correctamente — no requirió cambios en frontend
+- **Verificación** (planilla 2026-003, 3 empleados):
+  - TotalEmployerCss:   B/.596.25 ✅ (132.50 + 132.50 + 331.25)
+  - TotalEmployerSe:    B/.90.00 ✅ (15.00 + 15.00 + 60.00)
+  - TotalRiskInsurance: B/.35.45 ✅ (4.10 + 4.10 + 27.25)
+  - TotalEmployerCost:  B/.721.70 ✅ (suma correcta)
 
 ---
 

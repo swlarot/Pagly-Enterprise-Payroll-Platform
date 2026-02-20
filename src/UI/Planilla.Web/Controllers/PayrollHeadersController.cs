@@ -318,6 +318,9 @@ public class PayrollHeadersController : ControllerBase
             decimal totalDeductions = 0;
             decimal totalNetPay = 0;
             decimal totalEmployerCost = 0;
+            decimal totalEmployerCss = 0;
+            decimal totalEmployerSe = 0;
+            decimal totalRiskInsurance = 0;
 
             // Obtener horas registradas para esta planilla (si existen)
             var employeeHoursMap = await _context.PayrollEmployeeHours
@@ -554,6 +557,9 @@ public class PayrollHeadersController : ControllerBase
                 totalDeductions += totalDedsForEmployee;
                 totalNetPay += netPayForEmployee;
                 totalEmployerCost += calculationResult.TotalEmployerCost;
+                totalEmployerCss += calculationResult.CssEmployer;
+                totalEmployerSe += calculationResult.EducationalInsuranceEmployer;
+                totalRiskInsurance += calculationResult.RiskContribution;
             }
 
             // ====================================================================
@@ -563,6 +569,9 @@ public class PayrollHeadersController : ControllerBase
             payrollHeader.TotalDeductions = totalDeductions;
             payrollHeader.TotalNetPay = totalNetPay;
             payrollHeader.TotalEmployerCost = totalEmployerCost;
+            payrollHeader.TotalEmployerCss = totalEmployerCss;
+            payrollHeader.TotalEmployerSe = totalEmployerSe;
+            payrollHeader.TotalRiskInsurance = totalRiskInsurance;
             payrollHeader.Status = PayrollStatus.Calculated;
             payrollHeader.ProcessedDate = DateTime.UtcNow;
             payrollHeader.ProcessedBy = _tenantContext.UserId ?? "system";
