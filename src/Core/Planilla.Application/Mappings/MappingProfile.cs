@@ -19,9 +19,14 @@ namespace Vorluno.Planilla.Application.Mappings
                 .ForMember(dest => dest.TieneAccesoSistema, opt => opt.MapFrom(src => !string.IsNullOrEmpty(src.UserId)))
                 .ForMember(dest => dest.RolSistema, opt => opt.Ignore())
                 .ForMember(dest => dest.PayPeriodTypeName, opt => opt.MapFrom(src => src.PayPeriodType.ToString()))
+                .ForMember(dest => dest.PayPeriodTypeValue, opt => opt.MapFrom(src => (int)src.PayPeriodType))
                 .ForMember(dest => dest.HoursPerWeek, opt => opt.MapFrom(src => src.HoursPerWeek))
                 .ForMember(dest => dest.HoursPerPeriod, opt => opt.MapFrom(src => src.HoursPerPeriod))
-                .ForMember(dest => dest.HourlyRate, opt => opt.MapFrom(src => src.HourlyRate));
+                .ForMember(dest => dest.HourlyRate, opt => opt.MapFrom(src => src.HourlyRate))
+                .ForMember(dest => dest.YearsCotized, opt => opt.MapFrom(src => src.YearsCotized))
+                .ForMember(dest => dest.AverageSalaryLast10Years, opt => opt.MapFrom(src => src.AverageSalaryLast10Years))
+                .ForMember(dest => dest.Dependents, opt => opt.MapFrom(src => src.Dependents))
+                .ForMember(dest => dest.CssRiskPercentage, opt => opt.MapFrom(src => src.CssRiskPercentage));
 
             // Mapeo de DTO a Entidad (para operaciones de escritura/actualización)
             CreateMap<EmpleadoCrearDto, Empleado>()
@@ -43,6 +48,9 @@ namespace Vorluno.Planilla.Application.Mappings
 
             CreateMap<EmpleadoActualizarDto, Empleado>()
                 .ForMember(dest => dest.HoursPerPeriod, opt => opt.Ignore())
+                // FechaContratacion: solo se actualiza si viene un valor en el DTO
+                .ForMember(dest => dest.FechaContratacion, opt => opt.Condition((src, dest, srcMember) => src.FechaContratacion.HasValue))
+                .ForMember(dest => dest.FechaContratacion, opt => opt.MapFrom(src => src.FechaContratacion!.Value))
                 .AfterMap((src, dest) =>
                 {
                     if (src.HoursPerPeriod == null || src.HoursPerPeriod == 0)

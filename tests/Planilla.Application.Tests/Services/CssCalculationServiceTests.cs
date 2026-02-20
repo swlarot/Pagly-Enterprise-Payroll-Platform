@@ -37,6 +37,7 @@ public class CssCalculationServiceTests
         var result = await service.CalculateEmployeeCssAsync(
             DefaultCompanyId,
             grossPay,
+            "Mensual",
             yearsCotized,
             avgSalary,
             isSubject,
@@ -67,6 +68,7 @@ public class CssCalculationServiceTests
         var result = await service.CalculateEmployeeCssAsync(
             DefaultCompanyId,
             grossPay,
+            "Mensual",
             yearsCotized,
             avgSalary,
             isSubject,
@@ -97,6 +99,7 @@ public class CssCalculationServiceTests
         var result = await service.CalculateEmployeeCssAsync(
             DefaultCompanyId,
             grossPay,
+            "Mensual",
             yearsCotized,
             avgSalary,
             isSubject,
@@ -127,6 +130,7 @@ public class CssCalculationServiceTests
         var result = await service.CalculateEmployerCssAsync(
             DefaultCompanyId,
             grossPay,
+            "Mensual",
             yearsCotized,
             avgSalary,
             isSubject,
@@ -161,6 +165,7 @@ public class CssCalculationServiceTests
         var (amount, rate) = await service.CalculateRiskContributionAsync(
             DefaultCompanyId,
             grossPay,
+            "Mensual",
             yearsCotized,
             avgSalary,
             cssRiskPercentage,
@@ -189,6 +194,7 @@ public class CssCalculationServiceTests
         var result = await service.CalculateEmployeeCssAsync(
             DefaultCompanyId,
             grossPay,
+            "Mensual",
             yearsCotized,
             avgSalary,
             isSubject,
@@ -219,6 +225,7 @@ public class CssCalculationServiceTests
         Func<Task> act = async () => await service.CalculateEmployeeCssAsync(
             DefaultCompanyId,
             grossPay,
+            "Mensual",
             yearsCotized,
             avgSalary,
             isSubject,
@@ -246,6 +253,7 @@ public class CssCalculationServiceTests
         var result = await service.CalculateEmployeeCssAsync(
             DefaultCompanyId,
             grossPay,
+            "Mensual",
             yearsCotized,
             avgSalary,
             isSubject,

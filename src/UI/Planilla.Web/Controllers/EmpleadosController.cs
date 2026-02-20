@@ -142,7 +142,12 @@ namespace Vorluno.Planilla.Web.Controllers
                     e.Empleado.HoursPerPeriod,
                     hourlyRate,
                     e.Empleado.IsDeleted,
-                    e.UsuarioVinculadoEmail
+                    e.UsuarioVinculadoEmail,
+                    e.Empleado.YearsCotized,
+                    e.Empleado.AverageSalaryLast10Years,
+                    e.Empleado.Dependents,
+                    e.Empleado.CssRiskPercentage,
+                    (int)e.Empleado.PayPeriodType
                 );
             }).ToList();
 
@@ -224,7 +229,12 @@ namespace Vorluno.Planilla.Web.Controllers
                 result.Empleado.HoursPerPeriod,
                 hourlyRate,
                 result.Empleado.IsDeleted,
-                result.UsuarioVinculadoEmail
+                result.UsuarioVinculadoEmail,
+                result.Empleado.YearsCotized,
+                result.Empleado.AverageSalaryLast10Years,
+                result.Empleado.Dependents,
+                result.Empleado.CssRiskPercentage,
+                (int)result.Empleado.PayPeriodType
             );
 
             return Ok(empleadoDto);
@@ -337,7 +347,12 @@ namespace Vorluno.Planilla.Web.Controllers
                 empleado.HoursPerPeriod,
                 hourlyRate,
                 false,
-                result.UsuarioVinculadoEmail
+                result.UsuarioVinculadoEmail,
+                empleado.YearsCotized,
+                empleado.AverageSalaryLast10Years,
+                empleado.Dependents,
+                empleado.CssRiskPercentage,
+                (int)empleado.PayPeriodType
             );
 
             // ✅ AUDIT LOG: Registrar creación de empleado

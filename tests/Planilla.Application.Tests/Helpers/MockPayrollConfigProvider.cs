@@ -155,6 +155,7 @@ public class MockPayrollConfigProvider : IPayrollConfigProvider
             ),
 
             // Tramo 3: 25% (B/. 50,001+)
+            // FixedAmount = 5,850 = ISR acumulado del tramo 2: (50,000 - 11,000) * 15%
             new TaxBracketDto(
                 Id: 3,
                 TenantId: 1,
@@ -164,7 +165,7 @@ public class MockPayrollConfigProvider : IPayrollConfigProvider
                 MinIncome: 50000m,
                 MaxIncome: null, // Sin límite superior (último tramo)
                 Rate: 25m,
-                FixedAmount: 0m // El servicio calcula el impuesto progresivamente
+                FixedAmount: 5850m
             )
         };
     }
