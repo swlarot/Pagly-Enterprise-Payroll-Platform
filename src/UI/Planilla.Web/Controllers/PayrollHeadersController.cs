@@ -11,6 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
 using Vorluno.Planilla.Application.Interfaces;
+using Vorluno.Planilla.Application.Results;
 using Vorluno.Planilla.Application.Services;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
@@ -323,6 +324,8 @@ public class PayrollHeadersController : ControllerBase
                 .Where(h => h.PayrollHeaderId == payrollHeader.Id && h.TenantId == tenantId)
                 .ToDictionaryAsync(h => h.EmpleadoId);
 
+            var detailDeduccionPairs = new List<(PayrollDetail detail, DeduccionesResult dedResult)>();
+
             foreach (var employee in activeEmployees)
             {
                 // Determinar grossPay: si hay horas registradas, calcular basado en horas
@@ -356,7 +359,7 @@ public class PayrollHeadersController : ControllerBase
                 var calculationResult = await _orchestrator.CalculateEmployeePayrollAsync(
                     companyId: tenantId,
                     grossPay: grossPay,
-                    payFrequency: payrollHeader.PayPeriodType.ToString(),
+                    payFrequency: employee.PayFrequency,
                     yearsCotized: employee.YearsCotized,
                     averageSalaryLast10Years: employee.AverageSalaryLast10Years,
                     cssRiskPercentage: employee.CssRiskPercentage,
@@ -536,6 +539,7 @@ public class PayrollHeadersController : ControllerBase
                 };
 
                 _context.PayrollDetails.Add(detail);
+                detailDeduccionPairs.Add((detail, deduccionesResult));
 
                 // Acumular totales
                 totalGrossPay += calculationResult.GrossPay;
@@ -557,6 +561,13 @@ public class PayrollHeadersController : ControllerBase
             payrollHeader.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
+
+            // Persistir auditoría de deducciones aplicadas (para reportes de acreedor y prelación)
+            foreach (var (det, dedRes) in detailDeduccionPairs)
+            {
+                await _processingService.CreateDeduccionesAplicadasAsync(det, dedRes);
+            }
+
             await transaction.CommitAsync();
 
             // ✅ AUDIT LOG: Registrar cálculo de planilla

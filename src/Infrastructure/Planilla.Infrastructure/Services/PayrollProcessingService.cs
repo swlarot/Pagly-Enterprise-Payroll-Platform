@@ -44,7 +44,7 @@ public class PayrollProcessingService
     /// Calcula la planilla para un empleado específico incluyendo deducciones adicionales
     /// con prelacion legal, proteccion de salario minimo, y conceptos de asistencia.
     /// </summary>
-    public async Task<(PayrollDetail detail, List<int> prestamoIds, List<int> anticipoIds, List<HoraExtra> horasExtra, List<Ausencia> ausencias, List<SolicitudVacaciones> vacaciones)> CalculateForEmployeeAsync(
+    public async Task<(PayrollDetail detail, List<int> prestamoIds, List<int> anticipoIds, List<HoraExtra> horasExtra, List<Ausencia> ausencias, List<SolicitudVacaciones> vacaciones, DeduccionesResult deduccionesResult)> CalculateForEmployeeAsync(
         int companyId,
         Empleado empleado,
         DateTime payrollPeriodStart,
@@ -176,7 +176,7 @@ public class PayrollProcessingService
             CreatedAt = DateTime.UtcNow
         };
 
-        return (detail, deduccionesResult.PrestamoIds, deduccionesResult.AnticipoIds, horasExtra, ausencias, vacaciones);
+        return (detail, deduccionesResult.PrestamoIds, deduccionesResult.AnticipoIds, horasExtra, ausencias, vacaciones, deduccionesResult);
     }
 
     /// <summary>
@@ -426,7 +426,7 @@ public class PayrollProcessingService
         DateTime payrollPeriodEnd,
         int payrollHeaderId)
     {
-        var (detail, prestamoIds, anticipoIds, horasExtra, ausencias, vacaciones) = await CalculateForEmployeeAsync(
+        var (detail, prestamoIds, anticipoIds, horasExtra, ausencias, vacaciones, deduccionesResult) = await CalculateForEmployeeAsync(
             companyId,
             empleado,
             payrollPeriodStart,
@@ -437,6 +437,9 @@ public class PayrollProcessingService
         // Guardar el detalle de planilla
         _context.PayrollDetails.Add(detail);
         await _context.SaveChangesAsync();
+
+        // Persistir auditoría de deducciones aplicadas (para reportes)
+        await CreateDeduccionesAplicadasAsync(detail, deduccionesResult);
 
         // Procesar préstamos y anticipos
         await ProcessPrestamosAsync(prestamoIds, detail.Id, payrollHeaderId);

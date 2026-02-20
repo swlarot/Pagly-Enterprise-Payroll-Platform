@@ -80,7 +80,7 @@ const ReportesPage = () => {
     };
 
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-PA', { style: 'currency', currency: 'USD' }).format(amount);
+        return 'B/. ' + new Intl.NumberFormat('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
     };
 
     const formatDate = (dateString) => {
@@ -387,6 +387,88 @@ const ReportesPage = () => {
             );
         }
 
+        if (modalType === 'consolidado-acreedor') {
+            const items = reporteData.acreedores || reporteData.items || reporteData.empleados || [];
+            return (
+                <div className="overflow-x-auto">
+                    <table className="w-full">
+                        <thead className="bg-navy-800">
+                            <tr>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acreedor</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Empleados</th>
+                                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Monto Total</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-navy-700">
+                            {items.map((item, idx) => (
+                                <tr key={idx} className="hover:bg-navy-800">
+                                    <td className="px-4 py-3 text-sm text-gray-300">{item.nombreAcreedor || item.nombre || item.acreedor}</td>
+                                    <td className="px-4 py-3 text-sm text-gray-300">{item.tipoAcreedor || item.tipo || '-'}</td>
+                                    <td className="px-4 py-3 text-sm text-right text-gray-300">{item.cantidadEmpleados || item.empleados || 0}</td>
+                                    <td className="px-4 py-3 text-sm text-right font-medium font-mono text-gray-100">{formatCurrency(item.totalAplicado ?? item.montoTotal ?? item.monto ?? 0)}</td>
+                                </tr>
+                            ))}
+                            {(reporteData.granTotalAplicado != null || reporteData.totales) && (
+                                <tr className="bg-amber-500/15 font-bold">
+                                    <td className="px-4 py-3 text-sm text-amber-400" colSpan="2">TOTALES</td>
+                                    <td className="px-4 py-3 text-sm text-right text-amber-400">{reporteData.totalAcreedores || reporteData.totales?.totalEmpleados || ''}</td>
+                                    <td className="px-4 py-3 text-sm text-right font-mono text-amber-400">{formatCurrency(reporteData.granTotalAplicado ?? reporteData.totales?.granTotal ?? reporteData.totales?.totalMonto ?? 0)}</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
+        if (modalType === 'deducciones-empleado') {
+            const items = reporteData.empleados || reporteData.items || [];
+            return (
+                <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                        <thead className="bg-navy-800">
+                            <tr>
+                                <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Cédula</th>
+                                <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Nombre</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Bruto</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">CSS+SE+ISR</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Pensión</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Embargos</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Voluntarias</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Total Ded.</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Neto</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-navy-700">
+                            {items.map((emp, idx) => (
+                                <tr key={idx} className="hover:bg-navy-800">
+                                    <td className="px-3 py-2 text-gray-300">{emp.cedula || emp.numeroIdentificacion}</td>
+                                    <td className="px-3 py-2 text-gray-300">{emp.nombreCompleto || emp.nombre}</td>
+                                    <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.salarioBruto || emp.bruto || 0)}</td>
+                                    <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.deduccionesLegales || (emp.cssEmpleado || 0) + (emp.seEmpleado || 0) + (emp.isr || 0))}</td>
+                                    <td className="px-3 py-2 text-right font-mono text-red-400">{formatCurrency(emp.pensionAlimenticia || 0)}</td>
+                                    <td className="px-3 py-2 text-right font-mono text-orange-400">{formatCurrency(emp.embargos || 0)}</td>
+                                    <td className="px-3 py-2 text-right font-mono text-blue-400">{formatCurrency(emp.deduccionesVoluntarias || 0)}</td>
+                                    <td className="px-3 py-2 text-right font-medium font-mono text-gray-100">{formatCurrency((emp.deduccionesLegales || 0) + (emp.pensionAlimenticia || 0) + (emp.embargos || 0) + (emp.deduccionesVoluntarias || 0))}</td>
+                                    <td className="px-3 py-2 text-right font-bold font-mono text-green-400">{formatCurrency(emp.netPayFinal || emp.salarioNeto || emp.neto || 0)}</td>
+                                </tr>
+                            ))}
+                            {reporteData.totales && (
+                                <tr className="bg-amber-500/15 font-bold">
+                                    <td className="px-3 py-2 text-amber-400" colSpan="2">TOTALES</td>
+                                    <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales.totalBruto || reporteData.totales.totalSalarios || 0)}</td>
+                                    <td className="px-3 py-2" colSpan="4"></td>
+                                    <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales.totalDeducciones || 0)}</td>
+                                    <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales.totalNeto || 0)}</td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            );
+        }
+
         return null;
     };
 
@@ -396,7 +478,9 @@ const ReportesPage = () => {
             'seguro-educativo': 'Reporte Seguro Educativo',
             'isr': 'Reporte Impuesto Sobre la Renta',
             'planilla-detallada': 'Planilla Detallada Completa',
-            'horas-extra': 'Reporte de Horas Extra'
+            'horas-extra': 'Reporte de Horas Extra',
+            'consolidado-acreedor': 'Consolidado por Acreedor',
+            'deducciones-empleado': 'Deducciones por Empleado'
         };
         return titles[modalType] || 'Reporte';
     };
@@ -471,6 +555,30 @@ const ReportesPage = () => {
                     }
                     accentClass="bg-gradient-to-br from-orange-600/20 to-orange-500/10 border-orange-500/20"
                     tipo="horas-extra"
+                />
+
+                <ReporteCard
+                    title="Consolidado por Acreedor"
+                    description="Montos totales a transferir por acreedor con datos bancarios"
+                    icon={
+                        <svg className="w-6 h-6 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                    }
+                    accentClass="bg-gradient-to-br from-emerald-600/20 to-emerald-500/10 border-emerald-500/20"
+                    tipo="consolidado-acreedor"
+                />
+
+                <ReporteCard
+                    title="Deducciones por Empleado"
+                    description="Cascada de prelación con montos solicitados vs aplicados"
+                    icon={
+                        <svg className="w-6 h-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                    }
+                    accentClass="bg-gradient-to-br from-blue-600/20 to-blue-500/10 border-blue-500/20"
+                    tipo="deducciones-empleado"
                 />
 
                 {/* Banner Coming Soon — único, ocupa todo el ancho */}

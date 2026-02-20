@@ -151,11 +151,8 @@ public class IncomeTaxCalculationServicePortable
         decimal taxableIncome,
         int year)
     {
-        // Obtener brackets de ISR activos para el año fiscal
         var brackets = await _configProvider.GetTaxBracketsAsync(companyId, year);
 
-        // CRÍTICO: NO hay fallback silencioso (eliminado de Core360)
-        // Si no existen brackets, la planilla NO puede procesarse
         if (brackets == null || brackets.Count == 0)
         {
             throw new PayrollConfigurationException(
@@ -163,49 +160,29 @@ public class IncomeTaxCalculationServicePortable
                 "Configure los tramos en la tabla TaxBrackets antes de calcular la planilla.");
         }
 
-        // Ordenar brackets por ingreso mínimo (ascendente)
         var orderedBrackets = brackets.OrderBy(b => b.MinIncome).ToList();
 
-        decimal totalTax = 0;
-
+        // Encontrar el tramo aplicable (el último donde MinIncome < taxableIncome)
+        TaxBracketDto? applicableBracket = null;
         foreach (var bracket in orderedBrackets)
         {
-            // Si el ingreso gravable es menor al mínimo del tramo, no aplica
-            if (taxableIncome <= bracket.MinIncome)
-                continue;
-
-            decimal bracketIncome;
-
-            if (bracket.MaxIncome.HasValue)
+            if (taxableIncome > bracket.MinIncome)
             {
-                // Tramo con límite superior
-                if (taxableIncome > bracket.MaxIncome.Value)
-                {
-                    // Ingreso excede el tope del tramo - aplicar tasa al rango completo del tramo
-                    bracketIncome = bracket.MaxIncome.Value - bracket.MinIncome;
-                }
-                else
-                {
-                    // Ingreso cae dentro de este tramo - aplicar tasa al excedente sobre el mínimo
-                    bracketIncome = taxableIncome - bracket.MinIncome;
-                }
+                applicableBracket = bracket;
             }
             else
             {
-                // Último tramo sin límite superior - aplicar tasa al excedente sobre el mínimo
-                bracketIncome = taxableIncome - bracket.MinIncome;
-            }
-
-            // Calcular impuesto del tramo
-            var bracketTax = RoundingPolicy.CalculatePercentage(bracketIncome, bracket.Rate);
-
-            // Agregar impuesto fijo acumulado de tramos anteriores (si aplica)
-            totalTax += bracketTax + bracket.FixedAmount;
-
-            // Si el ingreso cae dentro de este tramo (no lo excede), terminar
-            if (bracket.MaxIncome.HasValue && taxableIncome <= bracket.MaxIncome.Value)
                 break;
+            }
         }
+
+        if (applicableBracket == null)
+            return 0m;
+
+        // ISR = FixedAmount (acumulado de tramos anteriores) + excedente × tasa del tramo
+        var excess = taxableIncome - applicableBracket.MinIncome;
+        var bracketTax = RoundingPolicy.CalculatePercentage(excess, applicableBracket.Rate);
+        var totalTax = applicableBracket.FixedAmount + bracketTax;
 
         return RoundingPolicy.Round(totalTax, 2);
     }
