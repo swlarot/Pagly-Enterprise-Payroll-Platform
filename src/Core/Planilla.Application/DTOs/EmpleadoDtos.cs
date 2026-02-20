@@ -28,7 +28,14 @@ namespace Vorluno.Planilla.Application.DTOs
         decimal HourlyRate = 0,
         // === Campos existentes con default ===
         bool IsDeleted = false,
-        string? UsuarioVinculadoEmail = null
+        string? UsuarioVinculadoEmail = null,
+        // === CSS e ISR ===
+        int YearsCotized = 0,
+        decimal AverageSalaryLast10Years = 0,
+        int Dependents = 0,
+        decimal CssRiskPercentage = 0.41m,
+        // === Pay Period numeric value para edición ===
+        int PayPeriodTypeValue = 2
     );
 
     /// <summary>
@@ -61,7 +68,20 @@ namespace Vorluno.Planilla.Application.DTOs
         // === Pay Info ===
         PayPeriodType PayPeriodType = PayPeriodType.Quincenal,
         int HoursPerWeek = 48,
-        decimal? HoursPerPeriod = null
+        decimal? HoursPerPeriod = null,
+
+        // === CSS e ISR ===
+        [Range(0, 100)]
+        int YearsCotized = 0,
+
+        [Range(0, double.MaxValue)]
+        decimal AverageSalaryLast10Years = 0,
+
+        [Range(0, 3)]
+        int Dependents = 0,
+
+        [Range(0, 100)]
+        decimal CssRiskPercentage = 0.41m
     );
 
     /// <summary>
@@ -92,7 +112,23 @@ namespace Vorluno.Planilla.Application.DTOs
         // === Pay Info ===
         PayPeriodType PayPeriodType = PayPeriodType.Quincenal,
         int HoursPerWeek = 48,
-        decimal? HoursPerPeriod = null
+        decimal? HoursPerPeriod = null,
+
+        // === CSS e ISR ===
+        [Range(0, 100)]
+        int YearsCotized = 0,
+
+        [Range(0, double.MaxValue)]
+        decimal AverageSalaryLast10Years = 0,
+
+        [Range(0, 3)]
+        int Dependents = 0,
+
+        [Range(0, 100)]
+        decimal CssRiskPercentage = 0.41m,
+
+        // === Fecha de Contratación (editable) ===
+        DateTime? FechaContratacion = null
     );
 
     /// <summary>

@@ -13,6 +13,13 @@ const PAY_PERIOD_CONFIG = {
     3: { name: 'Mensual',    periodsPerYear: 12,    weekMultiplier: 52 / 12 },
 };
 
+// Opciones de riesgo CSS según tabla patronal panameña
+const CSS_RISK_OPTIONS = [
+    { value: 0.41,  label: '0.41% — Bajo (Riesgo Profesional Mínimo)' },
+    { value: 1.09,  label: '1.09% — Medio (Riesgo Profesional Intermedio)' },
+    { value: 2.31,  label: '2.31% — Alto (Riesgo Profesional Máximo)' },
+];
+
 const EmpleadosPage = () => {
     // Auth context for permissions
     const { canWrite, canDelete, isReadOnly } = useAuth();
@@ -42,6 +49,11 @@ const EmpleadosPage = () => {
         payPeriodType: 2,       // Quincenal por defecto
         hoursPerWeek: 48,
         hoursPerPeriod: 104,
+        // Campos CSS e ISR
+        yearsCotized: 0,
+        averageSalaryLast10Years: '',
+        dependents: 0,
+        cssRiskPercentage: 0.41,
     });
 
     // Fetch employees and departments on mount
@@ -128,13 +140,9 @@ const EmpleadosPage = () => {
     const activeEmpleados = empleados.filter(emp => emp.estaActivo);
     const totalNomina = activeEmpleados.reduce((sum, emp) => sum + emp.salarioBase, 0);
 
-    // Format currency
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-PA', {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 2
-        }).format(amount || 0);
+    // Formatear moneda en Balboas panameños (B/.)
+    const formatBalboas = (amount) => {
+        return `B/. ${Number(amount || 0).toLocaleString('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
     // Handle form submission (Create/Update)
@@ -154,7 +162,16 @@ const EmpleadosPage = () => {
                 payPeriodType: parseInt(formData.payPeriodType),
                 hoursPerWeek: parseFloat(formData.hoursPerWeek),
                 hoursPerPeriod: parseFloat(formData.hoursPerPeriod),
-                ...(editingId ? { estaActivo: true } : {
+                // Campos CSS e ISR
+                yearsCotized: parseInt(formData.yearsCotized) || 0,
+                averageSalaryLast10Years: parseFloat(formData.averageSalaryLast10Years) || 0,
+                dependents: parseInt(formData.dependents) || 0,
+                cssRiskPercentage: parseFloat(formData.cssRiskPercentage) || 0.41,
+                ...(editingId ? {
+                    estaActivo: true,
+                    // Fecha de contratación editable al actualizar
+                    ...(formData.fechaContratacion ? { fechaContratacion: formData.fechaContratacion } : {})
+                } : {
                     numeroIdentificacion: formData.numeroIdentificacion,
                     fechaContratacion: formData.fechaContratacion || new Date().toISOString().split('T')[0],
                     email: formData.email || null
@@ -182,7 +199,7 @@ const EmpleadosPage = () => {
         }
     };
 
-    // Handle edit
+    // Handle edit — pre-carga TODOS los campos del empleado existente
     const handleEdit = (empleado) => {
         setFormData({
             nombre: empleado.nombre,
@@ -190,12 +207,22 @@ const EmpleadosPage = () => {
             numeroIdentificacion: empleado.numeroIdentificacion,
             email: empleado.usuarioVinculadoEmail ?? empleado.email ?? '',
             salarioBase: empleado.salarioBase.toString(),
-            fechaContratacion: empleado.fechaContratacion ? new Date(empleado.fechaContratacion).toISOString().split('T')[0] : '',
+            fechaContratacion: empleado.fechaContratacion
+                ? new Date(empleado.fechaContratacion).toISOString().split('T')[0]
+                : '',
             departamentoId: empleado.departamentoId ? empleado.departamentoId.toString() : '',
             posicionId: empleado.posicionId ? empleado.posicionId.toString() : '',
-            payPeriodType: empleado.payPeriodType ?? 2,
+            // payPeriodTypeValue es el int del enum enviado por el backend
+            payPeriodType: empleado.payPeriodTypeValue ?? empleado.payPeriodType ?? 2,
             hoursPerWeek: empleado.hoursPerWeek ?? 48,
             hoursPerPeriod: empleado.hoursPerPeriod ?? 104,
+            // Campos CSS e ISR — usar los valores del empleado con fallback a defaults
+            yearsCotized: empleado.yearsCotized ?? 0,
+            averageSalaryLast10Years: empleado.averageSalaryLast10Years
+                ? empleado.averageSalaryLast10Years.toString()
+                : '',
+            dependents: empleado.dependents ?? 0,
+            cssRiskPercentage: empleado.cssRiskPercentage ?? 0.41,
         });
         setEditingId(empleado.id);
         setShowModal(true);
@@ -281,6 +308,10 @@ const EmpleadosPage = () => {
             payPeriodType: 2,
             hoursPerWeek: 48,
             hoursPerPeriod: 104,
+            yearsCotized: 0,
+            averageSalaryLast10Years: '',
+            dependents: 0,
+            cssRiskPercentage: 0.41,
         });
     };
 
@@ -362,7 +393,7 @@ const EmpleadosPage = () => {
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-navy-800 border border-navy-700 rounded-lg">
                             <div className="w-2 h-2 rounded-full bg-purple-400" />
                             <span className="text-sm font-mono text-gray-300 font-medium">
-                                {formatCurrency(totalNomina)} <span className="text-gray-500 font-normal font-sans">nómina est.</span>
+                                {formatBalboas(totalNomina)} <span className="text-gray-500 font-normal font-sans">nómina est.</span>
                             </span>
                         </div>
                     </div>
@@ -476,19 +507,19 @@ const EmpleadosPage = () => {
                                             B/. {Number(empleado.salarioBase || 0).toLocaleString('es-PA', { minimumFractionDigits: 2 })}
                                         </span>
                                     </td>
+                                    {/* Tasa por hora — B/. en lugar de USD */}
                                     <td className="py-3 px-4 text-sm font-mono text-gray-300">
                                         {(() => {
                                             // Usar hourlyRate del backend si está disponible y > 0
                                             if (empleado.hourlyRate && empleado.hourlyRate > 0) {
-                                                return formatCurrency(empleado.hourlyRate);
+                                                return `B/. ${Number(empleado.hourlyRate).toLocaleString('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                                             }
-                                            // Fallback: calcular usando la fórmula correcta (mensual)
-                                            // Tasa = SalarioBase (mensual) / (HoursPerWeek × 4.3333)
+                                            // Fallback: calcular usando la fórmula mensual
                                             const hoursPerWeek = empleado.hoursPerWeek || 48;
                                             const weeksPerMonth = 52 / 12; // 4.3333...
                                             const hoursPerMonth = hoursPerWeek * weeksPerMonth;
                                             const rate = hoursPerMonth > 0 ? empleado.salarioBase / hoursPerMonth : 0;
-                                            return formatCurrency(rate);
+                                            return `B/. ${Number(rate).toLocaleString('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
                                         })()}
                                     </td>
                                     <td className="py-3 px-4 text-sm text-gray-500">
@@ -718,7 +749,7 @@ const EmpleadosPage = () => {
                                                     placeholder="empleado@empresa.com"
                                                 />
                                                 <p className="text-xs text-gray-500 mt-1">
-                                                    💡 Si incluyes un email, se creará automáticamente acceso al sistema con rol "Employee".
+                                                    Si incluyes un email, se creará automáticamente acceso al sistema con rol "Employee".
                                                     El empleado recibirá un correo para configurar su contraseña.
                                                 </p>
                                             </>
@@ -738,7 +769,7 @@ const EmpleadosPage = () => {
                                                 placeholder="empleado@empresa.com"
                                             />
                                             <p className="text-xs text-gray-500 mt-1">
-                                                💡 Si incluyes un email, se creará automáticamente acceso al sistema con rol "Employee".
+                                                Si incluyes un email, se creará automáticamente acceso al sistema con rol "Employee".
                                                 El empleado recibirá un correo para configurar su contraseña.
                                             </p>
                                         </>
@@ -750,7 +781,7 @@ const EmpleadosPage = () => {
                                         Salario Base (Mensual) <span className="text-red-400">*</span>
                                     </label>
                                     <div className="relative">
-                                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
+                                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm font-medium">B/.</span>
                                         <input
                                             type="number"
                                             step="0.01"
@@ -758,13 +789,28 @@ const EmpleadosPage = () => {
                                             required
                                             value={formData.salarioBase}
                                             onChange={(e) => setFormData({ ...formData, salarioBase: e.target.value })}
-                                            className="w-full pl-8 pr-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                            className="w-full pl-10 pr-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                             placeholder="1500.00"
                                         />
                                     </div>
                                     <p className="text-xs text-gray-500 mt-1">
                                         El salario mensual del empleado (independiente del período de pago)
                                     </p>
+                                </div>
+
+                                {/* Fecha de Contratación - visible tanto en creación como en edición */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Fecha de Contratación {!editingId && <span className="text-red-400">*</span>}
+                                        {editingId && <span className="text-gray-400 font-normal ml-2 text-xs">(opcional — se mantiene si no se cambia)</span>}
+                                    </label>
+                                    <input
+                                        type="date"
+                                        required={!editingId}
+                                        value={formData.fechaContratacion}
+                                        onChange={(e) => setFormData({ ...formData, fechaContratacion: e.target.value })}
+                                        className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                    />
                                 </div>
 
                                 {/* Sección: Información de Pago */}
@@ -839,7 +885,7 @@ const EmpleadosPage = () => {
                                                 </label>
                                                 <div className="w-full px-3 py-2 border border-navy-700 bg-navy-950 text-blue-400 rounded-lg font-mono font-semibold">
                                                     {formData.salarioBase && PAY_PERIOD_CONFIG[formData.payPeriodType]
-                                                        ? formatCurrency(parseFloat(formData.salarioBase) * 12 / PAY_PERIOD_CONFIG[formData.payPeriodType].periodsPerYear)
+                                                        ? formatBalboas(parseFloat(formData.salarioBase) * 12 / PAY_PERIOD_CONFIG[formData.payPeriodType].periodsPerYear)
                                                         : <span className="text-gray-600">—</span>
                                                     }
                                                 </div>
@@ -856,7 +902,7 @@ const EmpleadosPage = () => {
                                                 </label>
                                                 <div className="w-full px-3 py-2 border border-navy-700 bg-navy-950 text-emerald-400 rounded-lg font-mono font-semibold">
                                                     {formData.salarioBase && formData.hoursPerWeek && parseFloat(formData.hoursPerWeek) > 0
-                                                        ? formatCurrency(parseFloat(formData.salarioBase) / (parseFloat(formData.hoursPerWeek) * 4.3333))
+                                                        ? formatBalboas(parseFloat(formData.salarioBase) / (parseFloat(formData.hoursPerWeek) * 4.3333))
                                                         : <span className="text-gray-600">—</span>
                                                     }
                                                 </div>
@@ -875,6 +921,102 @@ const EmpleadosPage = () => {
                                                 {PAY_PERIOD_CONFIG[formData.payPeriodType]?.name}
                                             </span>
                                             &mdash; {PAY_PERIOD_CONFIG[formData.payPeriodType]?.periodsPerYear} períodos al año
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Sección: Configuración CSS e ISR */}
+                                <div className="md:col-span-2">
+                                    <div className="border border-navy-600 rounded-lg p-4 bg-navy-950/50">
+                                        <h4 className="text-sm font-semibold text-amber-400 mb-4 flex items-center gap-2">
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                                            </svg>
+                                            Configuración CSS e ISR
+                                        </h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {/* Años Cotizados CSS */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                                    Años Cotizados CSS
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="50"
+                                                    step="1"
+                                                    value={formData.yearsCotized}
+                                                    onChange={(e) => setFormData({ ...formData, yearsCotized: e.target.value })}
+                                                    className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                                    placeholder="0"
+                                                />
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Afecta tope de cotización CSS (25 años: tope intermedio, 30 años: tope máximo)
+                                                </p>
+                                            </div>
+
+                                            {/* Promedio Salarial últimos 10 años */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                                    Promedio Salarial (últimos 10 años)
+                                                </label>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-sm font-medium">B/.</span>
+                                                    <input
+                                                        type="number"
+                                                        step="0.01"
+                                                        min="0"
+                                                        value={formData.averageSalaryLast10Years}
+                                                        onChange={(e) => setFormData({ ...formData, averageSalaryLast10Years: e.target.value })}
+                                                        className="w-full pl-10 pr-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                                        placeholder="0.00"
+                                                    />
+                                                </div>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Usado para determinar el tope alto de cotización CSS
+                                                </p>
+                                            </div>
+
+                                            {/* Dependientes ISR */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                                    Dependientes (ISR)
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    max="3"
+                                                    step="1"
+                                                    value={formData.dependents}
+                                                    onChange={(e) => setFormData({ ...formData, dependents: e.target.value })}
+                                                    className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                                    placeholder="0"
+                                                />
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Máximo 3 dependientes para deducción ISR (B/. 100 c/u al año)
+                                                </p>
+                                            </div>
+
+                                            {/* Riesgo Profesional CSS */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-300 mb-2">
+                                                    Riesgo Profesional CSS
+                                                </label>
+                                                <select
+                                                    value={formData.cssRiskPercentage}
+                                                    onChange={(e) => setFormData({ ...formData, cssRiskPercentage: parseFloat(e.target.value) })}
+                                                    className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                                >
+                                                    {CSS_RISK_OPTIONS.map(opt => (
+                                                        <option key={opt.value} value={opt.value}>
+                                                            {opt.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Tasa de riesgo profesional patronal según actividad económica
+                                                </p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -919,25 +1061,10 @@ const EmpleadosPage = () => {
                                     )}
                                     {formData.posicionId && getSelectedPositionSalaryRange() && (
                                         <p className="text-xs text-primary-400 mt-1">
-                                            Rango salarial: {formatCurrency(getSelectedPositionSalaryRange().min)} - {formatCurrency(getSelectedPositionSalaryRange().max)}
+                                            Rango salarial: {formatBalboas(getSelectedPositionSalaryRange().min)} - {formatBalboas(getSelectedPositionSalaryRange().max)}
                                         </p>
                                     )}
                                 </div>
-
-                                {!editingId && (
-                                    <div className="md:col-span-2">
-                                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                                            Fecha de Contratación <span className="text-red-400">*</span>
-                                        </label>
-                                        <input
-                                            type="date"
-                                            required={!editingId}
-                                            value={formData.fechaContratacion}
-                                            onChange={(e) => setFormData({ ...formData, fechaContratacion: e.target.value })}
-                                            className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                                        />
-                                    </div>
-                                )}
                             </div>
 
                             {/* Modal Footer */}

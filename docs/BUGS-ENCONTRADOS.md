@@ -38,25 +38,102 @@
   - Banco Nacional de Panamá: B/.100 ✅
   - Sin Acreedor (ahorro voluntario): B/.200 ✅
 
-## BUG-003: ISR proyección anual hardcoded × 24 [MEDIO] ⚠️ CONOCIDO/ACEPTADO
-- **Archivo**: src/Infrastructure/Planilla.Infrastructure/Services/ReportesService.cs (~línea 169)
-- **Descripción**: En el reporte ISR, la proyección anual usa `d.GrossPay * 24` para todos los empleados, independientemente de su frecuencia de pago. Para empleados mensuales (12 períodos/año) esto es incorrecto.
-- **Impacto**: Solo visual en el reporte ISR. Los cálculos reales de retención son correctos.
-- **Estado**: El usuario decidió NO corregirlo. Se eliminará ese reporte.
-- **Fix correcto sería**: Usar `PayrollConstants.GetPeriodsPerYear(d.Empleado!.PayFrequency)` en lugar de `24`.
+---
 
-## BUG-004: Moneda mostrada como "USD" en lugar de "B/." [BAJO] ❌ PENDIENTE
-- **Archivos**: Múltiples reportes en ReportesPage.jsx y modales
-- **Descripción**: Los montos en los reportes (Horas Extra, etc.) se muestran como "USD X.XX" en lugar de "B/. X.XX".
-- **Impacto**: Solo visual, pero incorrecto para Panamá donde la moneda local es el Balboa (B/.).
-- **Fix**: Buscar en ReportesPage.jsx y los modales de reporte donde se formatea el currency, cambiar "USD" por "B/."
+## FASE 8 — Bugs de UX/UI encontrados y corregidos (2026-02-19)
 
-## BUG-005: Comentario desactualizado en CssCalculationServicePortable.cs [BAJO]
-- **Archivo**: src/Core/Planilla.Application/Services/CssCalculationServicePortable.cs
-- **Descripción**: Un comentario en el código dice "25/30 años" pero la configuración actual usa 5/10 años para los umbrales de topes CSS.
-- **Impacto**: Solo confusión para desarrolladores.
+## BUG-003: Moneda mostrada como "USD" en lugar de "B/." en todas las páginas [BAJO] ✅ CORREGIDO
+- **Archivos corregidos**: 10 archivos React (ver lista completa abajo)
+- **Descripción**: Todas las páginas del frontend definían su función `formatCurrency` usando `{style: 'currency', currency: 'USD'}` que producía "USD 1,000.00" en lugar de "B/. 1,000.00".
+- **Impacto**: Visual — incorrecto para Panamá donde la moneda es el Balboa (B/.). Potencialmente confuso para usuarios.
+- **Archivos afectados y corregidos**:
+  - `ReportesPage.jsx` (línea 82)
+  - `PlanillasPage.jsx` (línea 325)
+  - `PrestamosPage.jsx` (línea 82)
+  - `AnticiposPage.jsx` (línea 65)
+  - `DeduccionesPage.jsx` (línea 178)
+  - `HorasExtraPage.jsx` (línea 281)
+  - `AusenciasPage.jsx` (línea 84)
+  - `PosicionesPage.jsx` (línea 168) — también agregó `|| 0` guard
+  - `MiPerfilPage.tsx` (línea 51)
+  - `AdminDashboardPage.tsx` (líneas 112-120) — también corrigió `formatCurrencyShort` de `$Xk` a `B/.Xk`
+- **Fix aplicado** (mismo patrón en todos):
+  ```js
+  // ANTES:
+  return new Intl.NumberFormat('es-PA', { style: 'currency', currency: 'USD' }).format(amount);
+  // DESPUÉS:
+  return 'B/. ' + new Intl.NumberFormat('es-PA', {
+    minimumFractionDigits: 2, maximumFractionDigits: 2
+  }).format(amount || 0);
+  ```
 
-## BUG-006: Backend se cae al cargar Planilla Detallada [MEDIO] ❓ INTERMITENTE
-- **Descripción**: Durante las pruebas, el backend se cayó (503) al intentar generar el reporte de Planilla Detallada. Se recuperó al reiniciar.
-- **Causa probable**: Fuga de memoria o excepción no manejada en la generación del reporte PDF/Excel.
-- **Estado**: Intermitente, necesita más investigación.
+## BUG-004: Reporte "Consolidado por Acreedor" mostraba B/.0.00 en todos los montos [MEDIO] ✅ CORREGIDO
+- **Archivo corregido**: `src/UI/Planilla.Web/ClientApp/src/pages/ReportesPage.jsx` (líneas ~409, ~430)
+- **Descripción**: El reporte Consolidado por Acreedor mostraba USD 0.00 para todos los acreedores, aunque los cálculos en DB eran correctos.
+- **Causa raíz**: La API retorna el campo `totalAplicado` pero el frontend leía `item.montoTotal || item.monto`. También, el total general estaba en `reporteData.granTotalAplicado` (root del response), no en `reporteData.totales.granTotal`.
+- **Evidencia** — Response real de `/api/reportes/consolidado-acreedor/9`:
+  ```json
+  { "acreedores": [{ "totalAplicado": 200.0, ... }, ...], "granTotalAplicado": 450.0 }
+  ```
+- **Fix aplicado** (línea ~409):
+  ```js
+  // ANTES:
+  {formatCurrency(item.montoTotal || item.monto || 0)}
+  // DESPUÉS:
+  {formatCurrency(item.totalAplicado ?? item.montoTotal ?? item.monto ?? 0)}
+  ```
+- **Fix en totales** (línea ~430):
+  ```js
+  // ANTES:
+  {reporteData.totales && (
+    <td>{formatCurrency(reporteData.totales.granTotal || reporteData.totales.totalMonto || 0)}</td>
+  )}
+  // DESPUÉS:
+  {(reporteData.granTotalAplicado != null || reporteData.totales) && (
+    <td>{formatCurrency(reporteData.granTotalAplicado ?? reporteData.totales?.granTotal ?? 0)}</td>
+  )}
+  ```
+- **Verificación**: Reporte muestra correctamente: Juzgado B/.150, Banco B/.100, Sin Acreedor B/.200, Total B/.450 ✅
+
+## BUG-005: Badges de estado de planilla en inglés [BAJO] ✅ CORREGIDO
+- **Archivo corregido**: `src/UI/Planilla.Web/ClientApp/src/pages/PlanillasPage.jsx` (línea ~332)
+- **Descripción**: La función `getStatusBadge()` tenía etiquetas en inglés: "Draft", "Calculated", "Approved", "Paid", "Cancelled".
+- **Impacto**: Visual — inconsistente con el idioma español de la aplicación.
+- **Fix aplicado**:
+  ```js
+  // ANTES → DESPUÉS
+  0: { label: 'Draft', ... }      → { label: 'Borrador', ... }
+  1: { label: 'Calculated', ... } → { label: 'Calculado', ... }
+  2: { label: 'Approved', ... }   → { label: 'Aprobado', ... }
+  3: { label: 'Paid', ... }       → { label: 'Pagado', ... }
+  4: { label: 'Cancelled', ... }  → { label: 'Cancelado', ... }
+  ```
+- **Verificación**: Badge de planilla 2026-002 muestra "Calculado" en color azul ✅
+
+## BUG-006: Símbolo "$" en lugar de "B/." en ConfiguracionPage [BAJO] ✅ CORREGIDO
+- **Archivo corregido**: `src/UI/Planilla.Web/ClientApp/src/pages/ConfiguracionPage.jsx`
+- **Descripción**: La página de Configuración mostraba el símbolo dólar (`$`) en múltiples lugares: tabla ISR, topes CSS, ejemplos de cálculo, deducciones permitidas, e icono DollarSign de Lucide.
+- **Impacto**: Visual — incorrecto para Panamá.
+- **Ocurrencias corregidas**:
+  - Topes CSS en template literals: `${Number(...)}` → `B/.{Number(...)}`
+  - Tabla ISR brackets: `$0 - $11,000` → `B/.0 - B/.11,000`, `$11,001 - $50,000` → `B/.11,001 - B/.50,000`, `$50,001+` → `B/.50,001+`
+  - Ejemplo de cálculo: `$30,000` → `B/.30,000`, `$11,000` → `B/.11,000`
+  - Deducciones permitidas: `hasta $5,000` → `hasta B/.5,000`, `hasta $20,000` → `hasta B/.20,000`
+  - Icono DollarSign Lucide reemplazado por texto:
+    ```jsx
+    // ANTES: <DollarSign className="h-5 w-5 text-gray-500" />
+    // DESPUÉS: <span className="text-gray-500 text-sm font-medium">B/.</span>
+    ```
+  - Import de `DollarSign` eliminado de la lista de imports de lucide-react
+- **Verificación**: Configuración → Salario Mínimo muestra "B/." en el campo, tabla ISR con "B/." ✅
+
+---
+
+## PENDIENTE-001: Dashboard muestra B/.0.00 en desglose CSS/SE/Riesgo Patronal [BAJO] ❌ PENDIENTE
+- **Archivo**: `src/UI/Planilla.Web/ClientApp/src/pages/AdminDashboardPage.tsx`
+- **Descripción**: El panel de Dashboard muestra el "Costo Total Empleador" correcto (B/.721.70), pero el desglose detallado muestra B/.0.00 para los 3 sub-items: CSS Patronal, Seguro Educativo Patronal, y Riesgo Profesional.
+- **Causa raíz**: El endpoint `/api/payrollheaders` (lista) solo retorna el campo agregado `totalEmployerCost`, pero NO retorna los campos de desglose: `totalEmployerCss`, `totalEmployerSe`, `totalRiskInsurance`.
+- **Fix requerido (backend)**: Agregar esos campos al `PayrollHeaderDto` o crear un endpoint adicional de resumen.
+- **Fix requerido (frontend)**: Leer los nuevos campos en AdminDashboardPage.tsx y mostrarlos en el desglose.
+- **Estado**: Pendiente de implementación en próxima sesión.
+- **Impacto**: Solo visual — el total es correcto, pero el desglose no se puede ver.
