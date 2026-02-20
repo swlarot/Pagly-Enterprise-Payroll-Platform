@@ -90,6 +90,21 @@ public class PayrollHeader : ITenantEntity
     /// </summary>
     public decimal TotalEmployerCost { get; set; }
 
+    /// <summary>
+    /// Total de aporte CSS patronal acumulado de todos los empleados en esta planilla.
+    /// </summary>
+    public decimal TotalEmployerCss { get; set; }
+
+    /// <summary>
+    /// Total de aporte Seguro Educativo patronal acumulado de todos los empleados en esta planilla.
+    /// </summary>
+    public decimal TotalEmployerSe { get; set; }
+
+    /// <summary>
+    /// Total de aporte de Riesgo Profesional patronal acumulado de todos los empleados en esta planilla.
+    /// </summary>
+    public decimal TotalRiskInsurance { get; set; }
+
     // ====================================================================
     // Campos de workflow: Calculated
     // ====================================================================
