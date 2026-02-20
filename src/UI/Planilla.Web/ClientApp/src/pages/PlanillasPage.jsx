@@ -131,9 +131,16 @@ const PlanillasPage = () => {
             const enrichedPlanillas = planillasData.map(enrichPlanillaWithTotals);
             setPlanillas(enrichedPlanillas);
 
-            // Seleccionar primera planilla por defecto
-            if (enrichedPlanillas.length > 0 && !selectedPlanilla) {
-                setSelectedPlanilla(enrichedPlanillas[0]);
+            // Seleccionar planilla por defecto o sincronizar la seleccionada con datos frescos
+            if (enrichedPlanillas.length > 0) {
+                if (!selectedPlanilla) {
+                    setSelectedPlanilla(enrichedPlanillas[0]);
+                } else {
+                    // BUG-007 FIX: Sincronizar selectedPlanilla con la versión fresca del servidor.
+                    // Sin esto, después de Calcular/Aprobar la UI muestra datos viejos hasta refrescar.
+                    const updated = enrichedPlanillas.find(p => p.id === selectedPlanilla.id);
+                    if (updated) setSelectedPlanilla(updated);
+                }
             }
 
             // Fetch empleados activos

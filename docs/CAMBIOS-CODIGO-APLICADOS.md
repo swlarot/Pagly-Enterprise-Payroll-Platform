@@ -284,7 +284,41 @@ M src/UI/Planilla.Web/wwwroot/app.js
 
 ---
 
-## PENDIENTE — C-009: Dashboard desglose CSS/SE/Riesgo Patronal (backend)
+---
+
+## Sesión 2026-02-20 — Cambios adicionales
+
+## Cambio C-009: PlanillasPage.jsx — Sincronizar selectedPlanilla tras fetchData (BUG-007)
+
+**Archivo:** `src/UI/Planilla.Web/ClientApp/src/pages/PlanillasPage.jsx` (línea 134)
+
+**Problema:** Después de Calcular/Aprobar/Recalcular, `fetchData()` actualizaba el array `planillas` pero `selectedPlanilla` (fuente de datos de todas las tarjetas resumen) quedaba con la versión vieja. El usuario tenía que refrescar la página para ver los resultados.
+
+**Fix aplicado:**
+```js
+// ANTES:
+if (enrichedPlanillas.length > 0 && !selectedPlanilla) {
+    setSelectedPlanilla(enrichedPlanillas[0]);
+}
+
+// DESPUÉS:
+if (enrichedPlanillas.length > 0) {
+    if (!selectedPlanilla) {
+        setSelectedPlanilla(enrichedPlanillas[0]);
+    } else {
+        // BUG-007 FIX: Sincronizar selectedPlanilla con la versión fresca del servidor.
+        // Sin esto, después de Calcular/Aprobar la UI muestra datos viejos hasta refrescar.
+        const updated = enrichedPlanillas.find(p => p.id === selectedPlanilla.id);
+        if (updated) setSelectedPlanilla(updated);
+    }
+}
+```
+
+**Verificación:** Planilla 2026-003 calculada → datos aparecen inmediatamente sin refresh.
+
+---
+
+## PENDIENTE — C-010: Dashboard desglose CSS/SE/Riesgo Patronal (backend)
 
 **Estado**: ❌ PENDIENTE (próxima sesión)
 
