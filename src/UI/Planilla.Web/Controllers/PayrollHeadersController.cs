@@ -1279,6 +1279,87 @@ public class PayrollHeadersController : ControllerBase
             return StatusCode(500, new { message = "No se pudo crear la configuración. Contacte al administrador." });
         }
     }
+
+    /// <summary>
+    /// Elimina una planilla completamente (cualquier estado).
+    /// Para planillas con cálculos (Calculated/Approved/Paid): revierte el estado
+    /// de préstamos y anticipos antes de borrar para mantener la integridad de datos.
+    /// Las cascadas EF Core eliminan PayrollDetails, DeduccionesAplicadas y PayrollEmployeeHours.
+    /// DELETE /api/payrollheaders/{id}
+    /// </summary>
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Owner,Admin")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        var payrollHeader = await _context.PayrollHeaders
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
+
+        if (payrollHeader == null)
+            return NotFound(new { message = "Planilla no encontrada." });
+
+        // Para planillas con datos calculados, revertir préstamos y anticipos
+        if (payrollHeader.Status >= PayrollStatus.Calculated)
+        {
+            var payrollDetailIds = await _context.PayrollDetails
+                .Where(pd => pd.PayrollHeaderId == id)
+                .Select(pd => pd.Id)
+                .ToListAsync();
+
+            var deduccionesAplicadas = await _context.DeduccionesAplicadas
+                .Where(d => d.TenantId == tenantId && payrollDetailIds.Contains(d.PayrollDetailId))
+                .ToListAsync();
+
+            // Revertir préstamos
+            var prestamoIds = deduccionesAplicadas
+                .Where(d => d.PrestamoId != null)
+                .Select(d => d.PrestamoId!.Value)
+                .Distinct()
+                .ToList();
+
+            if (prestamoIds.Any())
+            {
+                var prestamos = await _context.Prestamos
+                    .Where(p => prestamoIds.Contains(p.Id) && p.TenantId == tenantId)
+                    .ToListAsync();
+
+                foreach (var prestamo in prestamos)
+                {
+                    var montoRevertir = deduccionesAplicadas
+                        .Where(d => d.PrestamoId == prestamo.Id)
+                        .Sum(d => d.MontoAplicado);
+                    prestamo.MontoPendiente += montoRevertir;
+                    if (prestamo.CuotasPagadas > 0)
+                        prestamo.CuotasPagadas -= 1;
+                }
+            }
+
+            // Revertir anticipos
+            var anticipoIds = deduccionesAplicadas
+                .Where(d => d.AnticipoId != null)
+                .Select(d => d.AnticipoId!.Value)
+                .Distinct()
+                .ToList();
+
+            if (anticipoIds.Any())
+            {
+                var anticipos = await _context.Anticipos
+                    .Where(a => anticipoIds.Contains(a.Id) && a.TenantId == tenantId)
+                    .ToListAsync();
+
+                foreach (var anticipo in anticipos)
+                {
+                    anticipo.Estado = EstadoAnticipo.Pendiente;
+                }
+            }
+        }
+
+        _context.PayrollHeaders.Remove(payrollHeader);
+        await _context.SaveChangesAsync();
+
+        return NoContent();
+    }
 }
 
 /// <summary>

@@ -272,21 +272,22 @@ public class AcreedoresController : ControllerBase
     }
 
     /// <summary>
-    /// Desactiva un acreedor (soft delete).
+    /// Elimina un acreedor permanentemente (hard delete).
+    /// Requiere que no tenga DeduccionFijas vinculadas (FK Restrict en BD).
     /// DELETE /api/acreedores/{id}
     /// </summary>
     [HttpDelete("{id}")]
     [Authorize(Roles = "Owner,Admin")]
-    public async Task<IActionResult> Desactivar(int id)
+    public async Task<IActionResult> Eliminar(int id)
     {
         var acreedor = await _context.Acreedores
-            .Include(a => a.Deducciones.Where(d => d.EstaActivo))
+            .Include(a => a.Deducciones)
             .FirstOrDefaultAsync(a => a.Id == id);
 
         if (acreedor == null)
             return NotFound(new { message = "Acreedor no encontrado" });
 
-        // No desactivar si tiene deducciones con orden judicial vigente
+        // No eliminar si tiene deducciones con orden judicial vigente
         var deduccionesJudiciales = acreedor.Deducciones
             .Where(d => d.EstadoOrdenJudicial == Domain.Enums.EstadoOrdenJudicial.Vigente)
             .ToList();
@@ -294,24 +295,22 @@ public class AcreedoresController : ControllerBase
         if (deduccionesJudiciales.Any())
             return BadRequest(new
             {
-                message = "No se puede desactivar un acreedor con deducciones judiciales vigentes",
+                message = "No se puede eliminar un acreedor con deducciones judiciales vigentes",
                 deducciones = deduccionesJudiciales.Select(d => new { d.Id, d.Descripcion, d.NumeroExpediente })
             });
 
-        // Validar si tiene deducciones activas (warning)
+        // Validar si tiene deducciones vinculadas (FK Restrict bloquearía en BD)
         if (acreedor.Deducciones.Any())
             return BadRequest(new
             {
-                message = "Este acreedor tiene deducciones activas vinculadas. Desvinculelas primero.",
+                message = "Este acreedor tiene deducciones vinculadas. Elimínelas primero.",
                 deducciones = acreedor.Deducciones.Select(d => new { d.Id, d.Descripcion })
             });
 
-        acreedor.EstaActivo = false;
-        acreedor.UpdatedAt = DateTime.UtcNow;
-
+        _context.Acreedores.Remove(acreedor);
         await _context.SaveChangesAsync();
 
-        return Ok(new { message = "Acreedor desactivado exitosamente" });
+        return Ok(new { message = "Acreedor eliminado exitosamente" });
     }
 
     // ====================================================================

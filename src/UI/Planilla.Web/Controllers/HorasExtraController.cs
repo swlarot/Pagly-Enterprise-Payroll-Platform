@@ -526,7 +526,8 @@ public class HorasExtraController : ControllerBase
             horaExtra.EstaAprobada,
             horaExtra.AprobadoPor,
             horaExtra.Motivo,
-            horaExtra.Observaciones
+            horaExtra.Observaciones,
+            horaExtra.PlanillaDetailId
         );
     }
 

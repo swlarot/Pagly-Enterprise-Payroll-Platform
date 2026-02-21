@@ -420,11 +420,11 @@ const DeduccionesPage = () => {
         try {
             await api.delete(`/api/deducciones/${deduccionToDelete.id}`);
             await fetchDeducciones();
-            toast.success('Deducción desactivada exitosamente');
+            toast.success('Deducción eliminada exitosamente');
             setShowConfirmDelete(false);
             setDeduccionToDelete(null);
         } catch (err) {
-            toast.error(`Error al desactivar deducción: ${err.message}`);
+            toast.error(`Error al eliminar deducción: ${err.message}`);
         }
     };
 
@@ -694,9 +694,9 @@ const DeduccionesPage = () => {
                                                         className="inline-flex items-center gap-1 text-red-400 hover:text-red-300 font-medium text-sm"
                                                     >
                                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                                         </svg>
-                                                        Desactivar
+                                                        Eliminar
                                                     </button>
                                                 )}
                                             </div>
@@ -1304,7 +1304,7 @@ const DeduccionesPage = () => {
                 </div>
             )}
 
-            {/* Modal Confirmacion Desactivar */}
+            {/* Modal Confirmacion Eliminar */}
             {showConfirmDelete && deduccionToDelete && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
                     <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-md w-full">
@@ -1315,10 +1315,10 @@ const DeduccionesPage = () => {
                                 </svg>
                             </div>
                             <h3 className="text-lg font-semibold text-gray-100 text-center mb-2">
-                                Desactivar Deducción
+                                Eliminar Deducción
                             </h3>
                             <p className="text-gray-400 text-center mb-6">
-                                ¿Está seguro de que desea desactivar esta deducción? Esta acción marcará la deducción como inactiva.
+                                ¿Está seguro de que desea eliminar esta deducción permanentemente? Esta acción no se puede deshacer.
                             </p>
                             <div className="flex gap-3">
                                 <button
@@ -1334,7 +1334,7 @@ const DeduccionesPage = () => {
                                     onClick={handleDelete}
                                     className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
                                 >
-                                    Desactivar
+                                    Eliminar
                                 </button>
                             </div>
                         </div>
