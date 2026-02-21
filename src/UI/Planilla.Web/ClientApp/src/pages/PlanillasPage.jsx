@@ -17,12 +17,14 @@ import {
     Save,
     AlertTriangle,
     X,
+    Trash2,
 } from 'lucide-react';
 import { SkeletonCard, SkeletonTable } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import { Modal } from '../components/ui/Modal';
 import { Button } from '../components/ui/Button';
 import { api } from '../services/api';
+import ConfirmModal from '../components/ConfirmModal';
 
 // Configuración de tipos de período de pago
 const PAY_PERIOD_CONFIG = {
@@ -72,6 +74,11 @@ const PlanillasPage = () => {
     const [importNovedadesLoading, setImportNovedadesLoading] = useState(false);
     const [showImportConfirmModal, setShowImportConfirmModal] = useState(false);
     const [importConfirmData, setImportConfirmData] = useState(null);
+
+    // Estados para eliminar planilla
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [planillaToDelete, setPlanillaToDelete] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -153,6 +160,27 @@ const PlanillasPage = () => {
             toast.error(err.message || 'Error al cargar datos');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeletePlanilla = async () => {
+        if (!planillaToDelete) return;
+        try {
+            setIsDeleting(true);
+            await api.delete(`/api/payrollheaders/${planillaToDelete.id}`);
+            toast.success(`Planilla ${planillaToDelete.payrollNumber} eliminada`);
+            setShowDeleteModal(false);
+            setPlanillaToDelete(null);
+            // Si era la seleccionada, deseleccionar
+            if (selectedPlanilla?.id === planillaToDelete.id) {
+                setSelectedPlanilla(null);
+                setShowHoursPanel(false);
+            }
+            await fetchData();
+        } catch (error) {
+            toast.error(error.message || 'Error al eliminar la planilla');
+        } finally {
+            setIsDeleting(false);
         }
     };
 
@@ -1357,6 +1385,13 @@ const PlanillasPage = () => {
                                                     <Eye className="w-4 h-4" />
                                                     Ver
                                                 </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setPlanillaToDelete(planilla); setShowDeleteModal(true); }}
+                                                    className="p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-colors"
+                                                    title="Eliminar planilla"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
                                             </div>
                                         </td>
                                     </tr>
@@ -1573,6 +1608,21 @@ const PlanillasPage = () => {
                     </div>
                 )}
             </Modal>
+
+            <ConfirmModal
+                isOpen={showDeleteModal}
+                onClose={() => { setShowDeleteModal(false); setPlanillaToDelete(null); }}
+                onConfirm={handleDeletePlanilla}
+                title="Eliminar Planilla"
+                message={
+                    planillaToDelete?.status >= 1
+                        ? `⚠️ La planilla "${planillaToDelete?.payrollNumber}" tiene datos calculados. Al eliminarla se revertirán los préstamos y anticipos del período. Esta acción no se puede deshacer.`
+                        : `¿Está seguro de eliminar la planilla "${planillaToDelete?.payrollNumber}"? Esta acción no se puede deshacer.`
+                }
+                confirmText="Eliminar"
+                variant="danger"
+                isLoading={isDeleting}
+            />
 
         </div>
     );

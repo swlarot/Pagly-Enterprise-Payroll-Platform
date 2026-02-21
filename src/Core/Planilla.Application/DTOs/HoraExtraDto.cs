@@ -19,5 +19,6 @@ public record HoraExtraDto(
     bool EstaAprobada,
     string? AprobadoPor,
     string Motivo,
-    string? Observaciones
+    string? Observaciones,
+    int? PlanillaDetailId
 );

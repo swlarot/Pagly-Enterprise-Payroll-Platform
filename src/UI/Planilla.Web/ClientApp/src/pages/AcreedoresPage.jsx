@@ -204,13 +204,13 @@ const AcreedoresPage = () => {
         if (!acreedorToDelete) return;
         try {
             await api.delete(`/api/acreedores/${acreedorToDelete.id}`);
-            toast.success('Acreedor desactivado exitosamente');
+            toast.success('Acreedor eliminado exitosamente');
             await fetchAcreedores();
             setShowConfirmDelete(false);
             setAcreedorToDelete(null);
             setDeleteWarningDeducciones([]);
         } catch (err) {
-            // El backend puede devolver 400 con lista de deducciones activas
+            // El backend puede devolver 400 con lista de deducciones vinculadas
             try {
                 const parsed = JSON.parse(err.message);
                 if (parsed?.deducciones) {
@@ -220,7 +220,7 @@ const AcreedoresPage = () => {
             } catch {
                 // mensaje plano
             }
-            toast.error(`Error al desactivar acreedor: ${err.message}`);
+            toast.error(`Error al eliminar acreedor: ${err.message}`);
         }
     };
 
@@ -438,7 +438,7 @@ const AcreedoresPage = () => {
                                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                                     </svg>
-                                                    Desactivar
+                                                    Eliminar
                                                 </button>
                                             )}
                                         </div>
@@ -684,7 +684,7 @@ const AcreedoresPage = () => {
                 </div>
             )}
 
-            {/* ── MODAL CONFIRMAR DESACTIVACIÓN ── */}
+            {/* ── MODAL CONFIRMAR ELIMINACIÓN ── */}
             {showConfirmDelete && acreedorToDelete && (
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
                     <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-md w-full">
@@ -695,28 +695,25 @@ const AcreedoresPage = () => {
                                 </svg>
                             </div>
                             <h3 className="text-lg font-semibold text-gray-100 text-center mb-2">
-                                Desactivar Acreedor
+                                Eliminar Acreedor
                             </h3>
                             <p className="text-gray-400 text-center mb-4">
-                                ¿Está seguro de que desea desactivar a <strong className="text-gray-200">{acreedorToDelete.nombre}</strong>?
+                                ¿Está seguro de que desea eliminar a <strong className="text-gray-200">{acreedorToDelete.nombre}</strong> permanentemente? Esta acción no se puede deshacer.
                             </p>
 
-                            {/* Advertencia si tiene deducciones activas */}
+                            {/* Error si tiene deducciones vinculadas */}
                             {deleteWarningDeducciones.length > 0 && (
-                                <div className="mb-4 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
-                                    <p className="text-sm text-amber-400 font-medium mb-2">
-                                        Este acreedor tiene {deleteWarningDeducciones.length} deducción(es) activa(s):
+                                <div className="mb-4 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                                    <p className="text-sm text-red-400 font-medium mb-2">
+                                        Este acreedor tiene {deleteWarningDeducciones.length} deducción(es) vinculada(s). Elimínelas primero:
                                     </p>
                                     <ul className="space-y-1">
                                         {deleteWarningDeducciones.map((d, idx) => (
-                                            <li key={idx} className="text-xs text-amber-300/80">
+                                            <li key={idx} className="text-xs text-red-300/80">
                                                 - {d.descripcion || d.nombre || `Deducción #${d.id}`}
                                             </li>
                                         ))}
                                     </ul>
-                                    <p className="text-xs text-amber-400/70 mt-2">
-                                        Al continuar, el acreedor quedará desvinculado de estas deducciones.
-                                    </p>
                                 </div>
                             )}
 
@@ -734,8 +731,9 @@ const AcreedoresPage = () => {
                                 <button
                                     onClick={handleDelete}
                                     className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+                                    disabled={deleteWarningDeducciones.length > 0}
                                 >
-                                    Desactivar
+                                    Eliminar
                                 </button>
                             </div>
                         </div>

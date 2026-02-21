@@ -325,11 +325,12 @@ public class DeduccionesController : ControllerBase
     }
 
     /// <summary>
-    /// Desactiva una deducción (soft delete). Si tiene orden judicial vigente, rechaza sin motivo.
+    /// Elimina una deducción permanentemente (hard delete). Si tiene orden judicial vigente, rechaza sin motivo.
+    /// El historial en DeduccionAplicada se preserva (DeduccionFijaId queda en null por cascade SetNull).
     /// </summary>
     [HttpDelete("{id}")]
     [Authorize(Roles = "Owner,Admin")]
-    public async Task<IActionResult> Desactivar(int id, [FromQuery] string? motivo = null)
+    public async Task<IActionResult> Eliminar(int id, [FromQuery] string? motivo = null)
     {
         var tenantId = _tenantContext.TenantId;
         var deduccion = await _context.DeduccionesFijas
@@ -341,19 +342,11 @@ public class DeduccionesController : ControllerBase
         // Si tiene orden judicial vigente, requerir motivo
         if (deduccion.EstadoOrdenJudicial == EstadoOrdenJudicial.Vigente && string.IsNullOrWhiteSpace(motivo))
         {
-            return BadRequest(new { message = "No se puede desactivar una deduccion con orden judicial vigente sin proporcionar un motivo. Use ?motivo=..." });
+            return BadRequest(new { message = "No se puede eliminar una deduccion con orden judicial vigente sin proporcionar un motivo. Use ?motivo=..." });
         }
 
-        deduccion.EstaActivo = false;
-        deduccion.UpdatedAt = DateTime.UtcNow;
-
-        if (!string.IsNullOrWhiteSpace(motivo) && deduccion.EstadoOrdenJudicial.HasValue)
-        {
-            deduccion.MotivoLevantamiento = motivo;
-            deduccion.FechaLevantamiento = DateTime.UtcNow;
-        }
-
-        await _unitOfWork.CompleteAsync();
+        _context.DeduccionesFijas.Remove(deduccion);
+        await _context.SaveChangesAsync();
         return NoContent();
     }
 

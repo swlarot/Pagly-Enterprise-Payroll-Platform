@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import ConfirmModal from '../components/ConfirmModal';
 
 const OvertimeByTypeBarChart = lazy(() => import('../components/charts/OvertimeByTypeBarChart'));
 const OvertimeCostDistributionPieChart = lazy(() => import('../components/charts/OvertimeCostDistributionPieChart'));
@@ -24,6 +25,11 @@ const HorasExtraPage = () => {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingId, setEditingId] = useState(null);
+
+    // Estados para eliminar hora extra
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [horaExtraToDelete, setHoraExtraToDelete] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Filters
     const [filters, setFilters] = useState({
@@ -349,6 +355,22 @@ const HorasExtraPage = () => {
         }
     };
 
+    const handleDeleteHoraExtra = async () => {
+        if (!horaExtraToDelete) return;
+        try {
+            setIsDeleting(true);
+            await api.delete(`/api/horasextra/${horaExtraToDelete.id}`);
+            toast.success('Hora extra eliminada');
+            setShowDeleteModal(false);
+            setHoraExtraToDelete(null);
+            await fetchHorasExtra();
+        } catch (error) {
+            toast.error(error.message || 'Error al eliminar');
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     const handleEdit = (horaExtra) => {
         setFormData({
             empleadoId: horaExtra.empleadoId.toString(),
@@ -668,6 +690,17 @@ const HorasExtraPage = () => {
                                                     Aprobado por {he.aprobadoPor}
                                                 </span>
                                             )}
+                                            {!he.planillaDetailId && (
+                                                <button
+                                                    onClick={() => { setHoraExtraToDelete(he); setShowDeleteModal(true); }}
+                                                    className="p-1.5 rounded text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+                                                    title="Eliminar hora extra"
+                                                >
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                    </svg>
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -907,6 +940,17 @@ const HorasExtraPage = () => {
                     </div>
                 </div>
             )}
+
+            <ConfirmModal
+                isOpen={showDeleteModal}
+                onClose={() => { setShowDeleteModal(false); setHoraExtraToDelete(null); }}
+                onConfirm={handleDeleteHoraExtra}
+                title="Eliminar Hora Extra"
+                message="¿Está seguro de eliminar esta hora extra? Esta acción no se puede deshacer."
+                confirmText="Eliminar"
+                variant="danger"
+                isLoading={isDeleting}
+            />
         </div>
     );
 };
