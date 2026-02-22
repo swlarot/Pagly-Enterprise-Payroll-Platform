@@ -1,9 +1,10 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { TenantRole } from '../../types/api';
 import { canAccessModule } from '../../services/permissionService';
 import { PaglyLogo } from '../ui/PaglyLogo';
+import { GlobalSearch } from '../ui/GlobalSearch';
 import { useState } from 'react';
 import {
   LayoutDashboard, Users, Users2, User, Building2, Building, Briefcase,
@@ -23,6 +24,20 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
   const { user, tenant, logout, hasRole, isSystemAdmin, permissions } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  // Shortcut global Ctrl+K / ⌘K para abrir búsqueda
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setSearchOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, []);
 
   // Ambos grupos expandidos por defecto
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
@@ -147,6 +162,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
 
   return (
     <div className="flex h-screen bg-navy-950 flex-col">
+      <GlobalSearch open={searchOpen} onClose={() => setSearchOpen(false)} />
 
       {/* System Admin Banner */}
       {isSystemAdmin && (
@@ -216,9 +232,12 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         <div className="flex items-center gap-1.5 pr-4 flex-shrink-0">
 
           {/* Search pill ⌘K */}
-          <button className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-gray-500 text-[12px] hover:bg-white/[0.06] transition-all duration-150">
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.06] text-gray-500 text-[12px] hover:bg-white/[0.06] hover:text-gray-300 hover:border-white/[0.10] transition-all duration-150"
+          >
             <Search className="w-3.5 h-3.5 flex-shrink-0" />
-            <span className="text-gray-600">Buscar...</span>
+            <span>Buscar...</span>
             <kbd className="text-[10px] text-gray-600 bg-white/[0.06] px-1.5 py-0.5 rounded">⌘K</kbd>
           </button>
 
