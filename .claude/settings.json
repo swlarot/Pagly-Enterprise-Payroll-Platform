@@ -31,8 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/route_prompt.py"
-          }
+            "command": "python C:/Planilla/.claude/hooks/route_prompt.py"          }
         ]
       }
     ]
