@@ -497,7 +497,7 @@ const ConfiguracionPage = () => {
                                 ¿Necesitas ayuda? Estamos aquí para asistirte con cualquier duda o problema técnico.
                             </p>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 {/* Email de Soporte */}
                                 <div className="group bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 hover:border-primary-500/40 p-6 hover:-translate-y-0.5 transition-all cursor-pointer">
                                     <div className="flex items-center gap-4 mb-4">
@@ -512,10 +512,10 @@ const ConfiguracionPage = () => {
                                         </div>
                                     </div>
                                     <a
-                                        href="mailto:soporte@pagly.app"
+                                        href="mailto:contacto@vorluno.dev"
                                         className="inline-flex items-center px-4 py-2 bg-primary-500/10 hover:bg-primary-500/15 text-primary-300 font-medium rounded-lg transition-colors"
                                     >
-                                        soporte@pagly.app
+                                        contacto@vorluno.dev
                                     </a>
                                 </div>
 
@@ -533,16 +533,49 @@ const ConfiguracionPage = () => {
                                         </div>
                                     </div>
                                     <a
-                                        href="https://pagly.app"
+                                        href="https://vorluno.dev"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="inline-flex items-center px-4 py-2 bg-green-500/15 hover:bg-green-500/20 text-green-300 font-medium rounded-lg transition-colors"
                                     >
-                                        pagly.app
+                                        vorluno.dev
                                         <svg className="w-4 h-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                         </svg>
                                     </a>
+                                </div>
+
+                                {/* Conecta en LinkedIn */}
+                                <div className="group bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 hover:border-primary-500/40 p-6 hover:-translate-y-0.5 transition-all cursor-pointer">
+                                    <div className="flex items-center gap-4 mb-4">
+                                        <div className="w-12 h-12 bg-[#0a66c2]/20 rounded-lg flex items-center justify-center">
+                                            <svg className="w-6 h-6 text-[#0a66c2]" viewBox="0 0 24 24" fill="currentColor">
+                                                <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                                            </svg>
+                                        </div>
+                                        <div>
+                                            <h4 className="font-semibold text-gray-100">Conecta en LinkedIn</h4>
+                                            <p className="text-sm text-gray-500">Sígueme para novedades y soporte</p>
+                                        </div>
+                                    </div>
+                                    <div
+                                        className="badge-base LI-profile-badge inline-block"
+                                        data-locale="es_ES"
+                                        data-size="medium"
+                                        data-theme="dark"
+                                        data-type="VERTICAL"
+                                        data-vanity="josé-gonzález-323b74248"
+                                        data-version="v1"
+                                    >
+                                        <a
+                                            className="badge-base__link LI-simple-link"
+                                            href="https://pa.linkedin.com/in/jos%C3%A9-gonz%C3%A1lez-323b74248?trk=profile-badge"
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            José González
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
 
