@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   Search, LayoutDashboard, Users, Building2, Briefcase,
@@ -169,11 +170,11 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
   // Agrupar ítems de nav por grupo (solo cuando no hay query, para mostrar separadores)
   const showGroupLabels = !query.trim();
 
-  return (
+  const content = (
     <>
-      {/* Overlay */}
+      {/* Overlay - en body para cubrir todo el viewport */}
       <div
-        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-[100] bg-black bg-opacity-60 backdrop-blur-sm"
         onClick={onClose}
       />
 
@@ -340,4 +341,6 @@ export function GlobalSearch({ open, onClose }: GlobalSearchProps) {
       </div>
     </>
   );
+
+  return createPortal(content, document.body);
 }

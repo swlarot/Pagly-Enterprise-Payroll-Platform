@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { tenantService } from '../../services/tenantService';
 import { roleService } from '../../services/roleService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -461,8 +462,8 @@ export function UsersManagementTab() {
       </div>
 
       {/* Invite Modal */}
-      {isInviteModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      {isInviteModalOpen && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-navy-900 rounded-xl shadow-xl border border-navy-700 max-w-md w-full mx-4">
             <div className="flex items-center justify-between px-6 py-4 border-b border-navy-700">
               <h3 className="text-lg font-semibold text-gray-100">Invitar Usuario</h3>
@@ -635,12 +636,13 @@ export function UsersManagementTab() {
               )}
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Role Change Modal */}
-      {isRoleModalOpen && selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      {isRoleModalOpen && selectedUser && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-navy-900 rounded-xl shadow-xl border border-navy-700 max-w-md w-full mx-4">
             <div className="flex items-center justify-between px-6 py-4 border-b border-navy-700">
               <h3 className="text-lg font-semibold text-gray-100">Cambiar Rol de Usuario</h3>
@@ -717,7 +719,8 @@ export function UsersManagementTab() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Confirm Modal */}

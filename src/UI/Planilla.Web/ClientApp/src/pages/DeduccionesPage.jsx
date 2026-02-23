@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { api } from '../services/api';
@@ -721,7 +722,7 @@ const DeduccionesPage = () => {
             </div>
 
             {/* Modal Crear/Editar */}
-            {showModal && (
+            {showModal && createPortal(
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
                     <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/40 max-w-2xl w-full max-h-[92vh] overflow-y-auto">
                         {/* Cabecera sticky */}
@@ -1301,11 +1302,12 @@ const DeduccionesPage = () => {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Modal Confirmacion Eliminar */}
-            {showConfirmDelete && deduccionToDelete && (
+            {showConfirmDelete && deduccionToDelete && createPortal(
                 <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
                     <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-md w-full">
                         <div className="p-6">
@@ -1339,7 +1341,8 @@ const DeduccionesPage = () => {
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
