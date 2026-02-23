@@ -1,4 +1,5 @@
 import { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 export interface ConfirmModalProps {
   isOpen: boolean;
@@ -60,8 +61,8 @@ export default function ConfirmModal({
 
   const style = variantConfig[variant] ?? variantConfig.danger;
 
-  return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+  const content = (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
       <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-2xl max-w-md w-full">
         <div className="p-6">
           <div className={`w-12 h-12 ${style.bgIcon} rounded-full flex items-center justify-center mx-auto mb-4`}>
@@ -112,4 +113,6 @@ export default function ConfirmModal({
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 }

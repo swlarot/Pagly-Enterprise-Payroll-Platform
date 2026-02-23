@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, Loader2, UserCheck, AlertCircle } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
@@ -105,7 +106,7 @@ export function LinkUserModal({
 
   if (!isOpen) return null;
 
-  return (
+  const content = (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-navy-900 border border-navy-700 rounded-lg shadow-2xl shadow-black/30 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
@@ -225,4 +226,6 @@ export function LinkUserModal({
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 }

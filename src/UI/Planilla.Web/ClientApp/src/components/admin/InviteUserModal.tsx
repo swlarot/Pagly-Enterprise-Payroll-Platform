@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, Loader2 } from 'lucide-react';
 import { Select } from '../ui/Select';
 import { Button } from '../ui/Button';
@@ -115,7 +116,7 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
 
   if (!isOpen) return null;
 
-  return (
+  const content = (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-navy-900 border border-navy-700 rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
@@ -283,4 +284,6 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
       </div>
     </div>
   );
+
+  return createPortal(content, document.body);
 }

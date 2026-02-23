@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
 
@@ -584,8 +585,8 @@ const ReportesPage = () => {
             </div>
 
             {/* Modal */}
-            {modalOpen && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setModalOpen(false)}>
+            {modalOpen && createPortal(
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => setModalOpen(false)}>
                     <div className="bg-navy-900 rounded-2xl shadow-2xl shadow-black/30 max-w-6xl w-full max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                         {/* Header */}
                         <div className="px-6 py-4 border-b border-navy-700 flex items-center justify-between">
@@ -646,7 +647,8 @@ const ReportesPage = () => {
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

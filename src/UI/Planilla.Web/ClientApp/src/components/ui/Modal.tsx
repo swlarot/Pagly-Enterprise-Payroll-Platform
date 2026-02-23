@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -31,10 +32,10 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 
   if (!isOpen) return null;
 
-  return (
+  const overlay = (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      {/* Backdrop - en body, fixed cubre todo el viewport */}
+      <div className="absolute inset-0 bg-black bg-opacity-60" onClick={onClose} aria-hidden />
 
       {/* Modal Content */}
       <div
@@ -56,4 +57,6 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
       </div>
     </div>
   );
+
+  return createPortal(overlay, document.body);
 }

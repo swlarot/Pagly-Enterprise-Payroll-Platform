@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { SystemAdminLayout } from '../components/layout/SystemAdminLayout';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -270,8 +271,8 @@ export default function SystemUsersPage() {
       </div>
 
       {/* Modal de creación */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      {showModal && createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-xl shadow-black/25 p-6 w-full max-w-md">
             <h2 className="text-xl font-bold text-gray-100 mb-4">Crear Nuevo Usuario</h2>
 
@@ -344,7 +345,8 @@ export default function SystemUsersPage() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </SystemAdminLayout>
   );

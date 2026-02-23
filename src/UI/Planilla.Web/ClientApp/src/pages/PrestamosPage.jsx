@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -492,7 +493,7 @@ const PrestamosPage = () => {
             </div>
 
             {/* Create/Edit Modal */}
-            {showModal && (
+            {showModal && createPortal(
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                     <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-2xl w-full max-h-[90vh] overflow-y-auto">
                         <div className="px-6 py-4 border-b border-navy-700 flex items-center justify-between sticky top-0 bg-navy-900">
@@ -666,11 +667,12 @@ const PrestamosPage = () => {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Detail Modal */}
-            {showDetailModal && selectedPrestamo && (
+            {showDetailModal && selectedPrestamo && createPortal(
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                     <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
                         <div className="px-6 py-4 border-b border-navy-700 flex items-center justify-between sticky top-0 bg-navy-900">
@@ -768,11 +770,12 @@ const PrestamosPage = () => {
                             )}
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Confirm Action Modal */}
-            {showConfirmModal && selectedPrestamo && confirmAction && (
+            {showConfirmModal && selectedPrestamo && confirmAction && createPortal(
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
                     <div className="bg-navy-900 rounded-xl shadow-2xl shadow-black/30 max-w-md w-full">
                         <div className="p-6">
@@ -807,7 +810,8 @@ const PrestamosPage = () => {
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
