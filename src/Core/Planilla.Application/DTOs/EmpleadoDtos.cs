@@ -33,7 +33,7 @@ namespace Vorluno.Planilla.Application.DTOs
         int YearsCotized = 0,
         decimal AverageSalaryLast10Years = 0,
         int Dependents = 0,
-        decimal CssRiskPercentage = 0.41m,
+        decimal CssRiskPercentage = 0.56m,
         // === Pay Period numeric value para edición ===
         int PayPeriodTypeValue = 2
     );
@@ -81,7 +81,7 @@ namespace Vorluno.Planilla.Application.DTOs
         int Dependents = 0,
 
         [Range(0, 100)]
-        decimal CssRiskPercentage = 0.41m
+        decimal CssRiskPercentage = 0.56m
     );
 
     /// <summary>
@@ -125,7 +125,7 @@ namespace Vorluno.Planilla.Application.DTOs
         int Dependents = 0,
 
         [Range(0, 100)]
-        decimal CssRiskPercentage = 0.41m,
+        decimal CssRiskPercentage = 0.56m,
 
         // === Fecha de Contratación (editable) ===
         DateTime? FechaContratacion = null
