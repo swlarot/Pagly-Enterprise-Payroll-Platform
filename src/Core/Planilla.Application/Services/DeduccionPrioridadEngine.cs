@@ -120,9 +120,12 @@ public class DeduccionPrioridadEngine
 
         // ================================================================
         // GRUPO 3: Voluntarias (prestamos, sindicato, cooperativas, etc.)
-        // No puede reducir bajo salario minimo
+        // Ley panameña: no pueden superar el 50% del salario bruto del período
         // ================================================================
-        decimal disponibleVoluntarias = Math.Max(0, saldoDisponible - salarioMinimoPeriodo);
+        // Ley panameña: acreedores voluntarios no pueden superar el 50% del salario del período
+        // El neto disponible se limita al menor entre: lo que queda y el 50% del bruto
+        decimal limiteVoluntarias50Pct = RoundingPolicy.Round(grossPay * 0.50m);
+        decimal disponibleVoluntarias = Math.Min(Math.Max(0, saldoDisponible), limiteVoluntarias50Pct);
 
         foreach (var deduccion in voluntarias)
         {
@@ -142,8 +145,8 @@ public class DeduccionPrioridadEngine
             if (montoCalculado > montoAplicado)
             {
                 item.RazonLimitacion = disponibleVoluntarias <= 0
-                    ? "Salario minimo alcanzado"
-                    : "Proteccion salario minimo";
+                    ? "Saldo insuficiente"
+                    : "Límite 50% salario";
                 result.MontoLimitadoPorSalarioMinimo += (montoCalculado - montoAplicado);
                 result.TuvoLimitacion = true;
             }
