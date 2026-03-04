@@ -14,11 +14,11 @@ const PAY_PERIOD_CONFIG = {
     3: { name: 'Mensual',    periodsPerYear: 12,    weekMultiplier: 52 / 12 },
 };
 
-// Opciones de riesgo CSS según tabla patronal panameña
+// Opciones de riesgo CSS según tasas oficiales CSS Panamá (Decreto 53 de 1971)
 const CSS_RISK_OPTIONS = [
-    { value: 0.41,  label: '0.41% — Bajo (Riesgo Profesional Mínimo)' },
-    { value: 1.09,  label: '1.09% — Medio (Riesgo Profesional Intermedio)' },
-    { value: 2.31,  label: '2.31% — Alto (Riesgo Profesional Máximo)' },
+    { value: 0.56,  label: '0.56% — Bajo (Oficinas, administración, comercio)' },
+    { value: 2.50,  label: '2.50% — Medio (Transporte, manufactura)' },
+    { value: 5.39,  label: '5.39% — Alto (Construcción, maquinaria, minería)' },
 ];
 
 const EmpleadosPage = () => {
@@ -54,7 +54,7 @@ const EmpleadosPage = () => {
         yearsCotized: 0,
         averageSalaryLast10Years: '',
         dependents: 0,
-        cssRiskPercentage: 0.41,
+        cssRiskPercentage: 0.56,
     });
 
     // Fetch employees and departments on mount
@@ -167,7 +167,7 @@ const EmpleadosPage = () => {
                 yearsCotized: parseInt(formData.yearsCotized) || 0,
                 averageSalaryLast10Years: parseFloat(formData.averageSalaryLast10Years) || 0,
                 dependents: parseInt(formData.dependents) || 0,
-                cssRiskPercentage: parseFloat(formData.cssRiskPercentage) || 0.41,
+                cssRiskPercentage: parseFloat(formData.cssRiskPercentage) || 0.56,
                 ...(editingId ? {
                     estaActivo: true,
                     // Fecha de contratación editable al actualizar
@@ -223,7 +223,7 @@ const EmpleadosPage = () => {
                 ? empleado.averageSalaryLast10Years.toString()
                 : '',
             dependents: empleado.dependents ?? 0,
-            cssRiskPercentage: empleado.cssRiskPercentage ?? 0.41,
+            cssRiskPercentage: empleado.cssRiskPercentage ?? 0.56,
         });
         setEditingId(empleado.id);
         setShowModal(true);
@@ -312,7 +312,7 @@ const EmpleadosPage = () => {
             yearsCotized: 0,
             averageSalaryLast10Years: '',
             dependents: 0,
-            cssRiskPercentage: 0.41,
+            cssRiskPercentage: 0.56,
         });
     };
 
