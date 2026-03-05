@@ -39,5 +39,8 @@ public record PayrollTaxConfigDto(
 
     // Deducciones ISR
     decimal DependentDeductionAmount,
-    int MaxDependents
+    int MaxDependents,
+
+    // DEV-28: Salario mínimo legal vigente (varía por sector — Decreto Ejecutivo 74 de 2023)
+    decimal SalarioMinimoLegal
 );

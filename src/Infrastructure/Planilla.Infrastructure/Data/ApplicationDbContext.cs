@@ -71,6 +71,11 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     public DbSet<Ausencia> Ausencias { get; set; }
     public DbSet<SolicitudVacaciones> SolicitudesVacaciones { get; set; }
     public DbSet<SaldoVacaciones> SaldosVacaciones { get; set; }
+    public DbSet<SaldoInicialEmpleado> SaldosInicialesEmpleados { get; set; }
+
+    // DEV-26: Planilla de Décimo Tercer Mes
+    public DbSet<PlanillaDecimo> PlanillasDecimo { get; set; }
+    public DbSet<DetalleDecimo> DetallesDecimo { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

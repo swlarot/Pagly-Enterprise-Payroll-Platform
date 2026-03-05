@@ -32,12 +32,34 @@ Design, validate, and implement all payroll calculation logic ensuring 100% comp
 
 ### Panamanian Labor Legislation (Current 2024-2026)
 
-**Caja de Seguro Social (CSS) - Reforma CSS:**
+**Caja de Seguro Social (CSS) - Reforma CSS (Ley 462 de 2024):**
+
+> **CRÍTICO**: NO existe tope de cotización CSS. Los valores B/.1,000/1,500/2,500 son topes de **pensión**, no de cotización (Art. 178 Ley 462).
+
+**Fases escalonadas de tasa patronal:**
+
+| Fase | Período | Tasa Patronal |
+|------|---------|---------------|
+| Fase 1 | Hasta 28/02/2027 | **13.25%** |
+| Fase 2 | 01/03/2027 — 28/02/2029 | **14.25%** |
+| Fase 3 | Desde 01/03/2029 | **15.25%** |
 
 | Concepto | Empleado | Patrono | Tope |
 |----------|----------|---------|------|
-| CSS Regular | 9.75% | 13.25% (hasta feb. 2027) | B/.1,500.00 mensual |
-| Riesgo Profesional | 0% | 0.98% - 5.67% | Sin tope |
+| CSS | 9.75% | 13.25% / 14.25% / 15.25% (según fase) | **Sin tope de cotización** |
+| Riesgo Profesional | 0% | Ver 5 clases abajo | Sin tope |
+
+**Cinco Clases de Riesgo Profesional (Acuerdo N°2 de 1995):**
+
+| Clase | Tasa | Actividades |
+|-------|------|-------------|
+| I — Mínimo | **0.56%** | Oficinas, administración, comercio, servicios financieros |
+| II | **0.98%** | — |
+| III — Medio | **2.10%** | Transporte, manufactura, industria ligera |
+| IV | **3.64%** | — |
+| V — Máximo | **5.67%** | Construcción, maquinaria pesada, minería |
+
+La tasa se almacena directamente en `Empleado.CssRiskPercentage` (default: 0.56%). El cálculo usa ese valor sin lookup en BD.
 
 **Seguro Educativo (SE):**
 
@@ -146,15 +168,26 @@ decimal hourlyRate = salarioBase / hoursPerPeriod; // 4 decimales
 ```csharp
 private decimal CalculateCssEmployee(decimal grossPay, TaxConfiguration config)
 {
-    // CSS tiene tope de B/.1,500 mensual
-    var cappedAmount = Math.Min(grossPay, config.CssCap);
-    return Math.Round(cappedAmount * config.CssEmployeeRate, 2);
+    // NO existe tope de cotización CSS (Art. 178 Ley 462)
+    // Los topes B/.1,000/1,500/2,500 son topes de PENSIÓN, no de cotización
+    var contributionBase = grossPay;
+    return RoundingPolicy.CalculatePercentage(contributionBase, config.CssEmployeeRate);
 }
 
 private decimal CalculateCssEmployer(decimal grossPay, TaxConfiguration config)
 {
-    var cappedAmount = Math.Min(grossPay, config.CssCap);
-    return Math.Round(cappedAmount * config.CssEmployerRate, 2);
+    // Tasa patronal según fase activa de Reforma CSS (Ley 462):
+    // Fase 1 (hasta feb 2027): 13.25% | Fase 2 (2027-2029): 14.25% | Fase 3 (2029+): 15.25%
+    // El sistema selecciona la fase por fecha de la planilla desde PayrollTaxConfigurations
+    var contributionBase = grossPay;
+    return RoundingPolicy.CalculatePercentage(contributionBase, config.CssEmployerRate);
+}
+
+private decimal CalculateCssRisk(decimal grossPay, decimal cssRiskPercentage)
+{
+    // Tasa almacenada en Empleado.CssRiskPercentage (Acuerdo N°2 de 1995)
+    // 0.56=ClaseI | 0.98=ClaseII | 2.10=ClaseIII | 3.64=ClaseIV | 5.67=ClaseV
+    return RoundingPolicy.CalculatePercentage(grossPay, cssRiskPercentage);
 }
 ```
 
@@ -344,12 +377,13 @@ public async Task<ValidationResult> ValidateBeforeApprovalAsync(int payrollId)
         errors.Add($"{missingCss.Count()} empleados sin cálculo de CSS");
     }
 
-    // 2. Verificar tope CSS aplicado correctamente
-    var incorrectCap = payroll.Details.Where(d =>
-        d.GrossPay > 1500 && d.CssEmployee > 1500 * 0.0975m);
-    if (incorrectCap.Any())
+    // 2. Verificar CSS calculado sobre salario bruto completo (sin tope)
+    // Tolerancia de ±0.01 por redondeo
+    var incorrectCss = payroll.Details.Where(d =>
+        Math.Abs(d.CssEmployee - Math.Round(d.GrossPay * 0.0975m, 2)) > 0.01m);
+    if (incorrectCss.Any())
     {
-        errors.Add("CSS mal calculado: tope no aplicado correctamente");
+        errors.Add("CSS mal calculado: debe ser 9.75% sobre salario bruto completo sin tope (Ley 462)");
     }
 
     // 3. Verificar salarios negativos
@@ -375,7 +409,9 @@ public async Task<ValidationResult> ValidateBeforeApprovalAsync(int payrollId)
 
 Before delivering payroll code, verify:
 
-✓ **CSS con tope**: Aplicar B/.1,500 de tope mensual
+✓ **CSS sin tope**: 9.75% empleado sobre salario bruto completo (Ley 462 — sin tope de cotización)
+✓ **Patronal CSS por fase**: 13.25% (hasta feb 2027) → 14.25% (2027-2029) → 15.25% (2029+)
+✓ **Riesgo profesional**: 5 clases (0.56/0.98/2.10/3.64/5.67%) almacenado en Empleado.CssRiskPercentage
 ✓ **SE sin tope**: Seguro Educativo se calcula sobre el total
 ✓ **ISR proyectado**: Proyectar anualmente, dividir por períodos
 ✓ **Horas extra**: 8 tipos con factores correctos (1.25x a 3.75x)

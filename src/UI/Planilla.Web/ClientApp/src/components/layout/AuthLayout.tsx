@@ -80,6 +80,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       '/ausencias': 'Gestión de Ausencias',
       '/vacaciones': 'Gestión de Vacaciones',
       '/planillas': 'Gestión de Planillas',
+      '/decimo': 'Planilla de Décimo Tercer Mes',
       '/reportes': 'Reportes de Planilla',
       '/configuracion': 'Configuración del Sistema',
       '/roles': 'Roles y Permisos',
@@ -389,6 +390,20 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
               <NavLink to="/planillas" className={prominentPlanillasClass}>
                 <ClipboardList className="w-[19px] h-[19px] flex-shrink-0 text-blue-400" />
                 <span>Planillas</span>
+              </NavLink>
+            )}
+
+            {/* Décimo Tercer Mes */}
+            {canAccessModuleCheck('planillas') && (
+              <NavLink to="/decimo" className={({ isActive }) =>
+                `flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-semibold text-[13px] transition-all duration-150 border-l-2 ${
+                  isActive
+                    ? 'bg-white/[0.08] border-amber-400 text-white'
+                    : 'border-transparent text-gray-400 hover:bg-white/[0.04] hover:text-gray-100 hover:border-amber-500/40'
+                }`}
+              >
+                <Banknote className="w-[19px] h-[19px] flex-shrink-0 text-amber-400" />
+                <span>Décimo 13°</span>
               </NavLink>
             )}
 

@@ -66,6 +66,10 @@ public class PayrollEmployeeHours : ITenantEntity
     [Column(TypeName = "decimal(8, 2)")]
     public decimal DisabilityHours { get; set; } = 0;
 
+    /// <summary>Comisiones del período (monto en balboas, no horas)</summary>
+    [Column(TypeName = "decimal(18, 2)")]
+    public decimal Commissions { get; set; } = 0;
+
     // ====================================================================
     // Montos calculados (se llenan al calcular planilla)
     // ====================================================================

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Vorluno.Planilla.Infrastructure.Data;
@@ -11,9 +12,11 @@ using Vorluno.Planilla.Infrastructure.Data;
 namespace Vorluno.Planilla.Infrastructure.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260305190405_DEV41_AddSaldoInicialEmpleado")]
+    partial class DEV41_AddSaldoInicialEmpleado
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -851,68 +854,6 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.ToTable("Departamentos");
                 });
 
-            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.DetalleDecimo", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("CssEmpleado")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("CssPatrono")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<string>("DesgloseMensualJson")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("EmpleadoId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("ISR")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("MontoDecimo")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("NetoPago")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int>("PlanillaDecimoId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("SeEmpleado")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("SePatrono")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int>("TenantId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("TotalDeducciones")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("TotalDevengado")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("EmpleadoId");
-
-                    b.HasIndex("PlanillaDecimoId");
-
-                    b.HasIndex("TenantId");
-
-                    b.ToTable("DetallesDecimo");
-                });
-
             modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.Empleado", b =>
                 {
                     b.Property<int>("Id")
@@ -1668,70 +1609,6 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.ToTable("PayrollTaxConfigurations");
                 });
 
-            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.PlanillaDecimo", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Estado")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("FechaPago")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Numero")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("PeriodoDesde")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime>("PeriodoHasta")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("TenantId")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal>("TotalCssEmpleado")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("TotalCssPatrono")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("TotalDecimo")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("TotalDevengado")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("TotalISR")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("TotalNetoPago")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("TotalSeEmpleado")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<decimal>("TotalSePatrono")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TenantId");
-
-                    b.ToTable("PlanillasDecimo");
-                });
-
             modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.Posicion", b =>
                 {
                     b.Property<int>("Id")
@@ -2154,29 +2031,17 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.Property<DateTime>("FechaSolicitud")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<decimal?>("MontoVacaciones")
-                        .HasColumnType("numeric");
-
                     b.Property<string>("MotivoRechazo")
                         .HasColumnType("text");
 
                     b.Property<string>("Observaciones")
                         .HasColumnType("text");
 
-                    b.Property<DateTime?>("PeriodoReferenciaDesde")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("PeriodoReferenciaHasta")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<int?>("PlanillaDetailId")
                         .HasColumnType("integer");
 
                     b.Property<string>("RechazadoPor")
                         .HasColumnType("text");
-
-                    b.Property<decimal?>("SalarioVacacional")
-                        .HasColumnType("numeric");
 
                     b.Property<int>("TenantId")
                         .HasColumnType("integer");
@@ -2811,33 +2676,6 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.Navigation("Tenant");
                 });
 
-            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.DetalleDecimo", b =>
-                {
-                    b.HasOne("Vorluno.Planilla.Domain.Entities.Empleado", "Empleado")
-                        .WithMany()
-                        .HasForeignKey("EmpleadoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Vorluno.Planilla.Domain.Entities.PlanillaDecimo", "PlanillaDecimo")
-                        .WithMany("Detalles")
-                        .HasForeignKey("PlanillaDecimoId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Vorluno.Planilla.Domain.Entities.Tenant", "Tenant")
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Empleado");
-
-                    b.Navigation("PlanillaDecimo");
-
-                    b.Navigation("Tenant");
-                });
-
             modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.Empleado", b =>
                 {
                     b.HasOne("Vorluno.Planilla.Domain.Entities.Departamento", "Departamento")
@@ -2973,17 +2811,6 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.PayrollTaxConfiguration", b =>
-                {
-                    b.HasOne("Vorluno.Planilla.Domain.Entities.Tenant", "Tenant")
-                        .WithMany()
-                        .HasForeignKey("TenantId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Tenant");
-                });
-
-            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.PlanillaDecimo", b =>
                 {
                     b.HasOne("Vorluno.Planilla.Domain.Entities.Tenant", "Tenant")
                         .WithMany()
@@ -3263,11 +3090,6 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
             modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.PayrollHeader", b =>
                 {
                     b.Navigation("Details");
-                });
-
-            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.PlanillaDecimo", b =>
-                {
-                    b.Navigation("Detalles");
                 });
 
             modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.Posicion", b =>

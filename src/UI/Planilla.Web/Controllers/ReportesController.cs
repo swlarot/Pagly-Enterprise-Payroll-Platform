@@ -7,7 +7,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Vorluno.Planilla.Application.Interfaces;
+using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Services;
+using Vorluno.Planilla.Web.Authorization;
 using Vorluno.Planilla.Web.Filters;
 
 namespace Vorluno.Planilla.Web.Controllers;
@@ -17,7 +19,7 @@ namespace Vorluno.Planilla.Web.Controllers;
 /// Todos los endpoints requieren autenticación y rol Accountant o superior.
 /// Los endpoints de exportación verifican los límites del plan de suscripción.
 /// </summary>
-[Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+[RequirePermission(SystemPermission.ReportsView)]
 [ApiController]
 [Route("api/[controller]")]
 public class ReportesController : ControllerBase

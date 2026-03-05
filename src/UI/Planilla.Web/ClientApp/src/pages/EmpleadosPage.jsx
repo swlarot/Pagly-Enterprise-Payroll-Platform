@@ -25,6 +25,14 @@ const EmpleadosPage = () => {
     const [editingId, setEditingId] = useState(null);
     const [showLinkUserModal, setShowLinkUserModal] = useState(false);
     const [empleadoToLink, setEmpleadoToLink] = useState(null);
+    const [showSaldoInicialModal, setShowSaldoInicialModal] = useState(false);
+    const [empleadoSaldoInicial, setEmpleadoSaldoInicial] = useState(null);
+    const [saldoInicialData, setSaldoInicialData] = useState(null);
+    const [saldoInicialForm, setSaldoInicialForm] = useState({
+        fechaCorte: '', diasVacacionesAcumulados: 0, diasVacacionesTomados: 0,
+        montoDecimoAcumulado: 0, notas: ''
+    });
+    const [savingSaldoInicial, setSavingSaldoInicial] = useState(false);
     const [formData, setFormData] = useState({
         nombre: '',
         apellido: '',
@@ -247,6 +255,46 @@ const EmpleadosPage = () => {
         await fetchEmpleados();
         setShowLinkUserModal(false);
         setEmpleadoToLink(null);
+    };
+
+    const handleSaldoInicial = async (empleado) => {
+        setEmpleadoSaldoInicial(empleado);
+        try {
+            const data = await api.get(`/api/empleados/${empleado.id}/saldo-inicial`);
+            setSaldoInicialData(data);
+            setSaldoInicialForm({
+                fechaCorte: data.fechaCorte ? data.fechaCorte.split('T')[0] : '',
+                diasVacacionesAcumulados: data.diasVacacionesAcumulados || 0,
+                diasVacacionesTomados: data.diasVacacionesTomados || 0,
+                montoDecimoAcumulado: data.montoDecimoAcumulado || 0,
+                notas: data.notas || ''
+            });
+        } catch {
+            setSaldoInicialData(null);
+            setSaldoInicialForm({ fechaCorte: '', diasVacacionesAcumulados: 0, diasVacacionesTomados: 0, montoDecimoAcumulado: 0, notas: '' });
+        }
+        setShowSaldoInicialModal(true);
+    };
+
+    const handleSaveSaldoInicial = async (e) => {
+        e.preventDefault();
+        if (!saldoInicialForm.fechaCorte) { toast.error('La fecha de corte es obligatoria'); return; }
+        setSavingSaldoInicial(true);
+        try {
+            await api.post(`/api/empleados/${empleadoSaldoInicial.id}/saldo-inicial`, {
+                fechaCorte: saldoInicialForm.fechaCorte,
+                diasVacacionesAcumulados: Number(saldoInicialForm.diasVacacionesAcumulados),
+                diasVacacionesTomados: Number(saldoInicialForm.diasVacacionesTomados),
+                montoDecimoAcumulado: Number(saldoInicialForm.montoDecimoAcumulado),
+                notas: saldoInicialForm.notas || null
+            });
+            toast.success('Saldos iniciales guardados correctamente');
+            setShowSaldoInicialModal(false);
+        } catch (err) {
+            toast.error(err.message || 'Error al guardar saldos');
+        } finally {
+            setSavingSaldoInicial(false);
+        }
     };
 
     // Desvincular usuario de empleado
@@ -570,6 +618,18 @@ const EmpleadosPage = () => {
                                                             </button>
                                                         ) : null}
                                                     </>
+                                                )}
+                                                {/* Saldos Iniciales */}
+                                                {canWrite() && !empleado.isDeleted && (
+                                                    <button
+                                                        onClick={() => handleSaldoInicial(empleado)}
+                                                        title="Saldos Iniciales (migración)"
+                                                        className="p-1.5 text-gray-400 hover:text-yellow-400 hover:bg-yellow-500/10 rounded-lg transition-all"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                                        </svg>
+                                                    </button>
                                                 )}
                                                 {/* Reactivar / Eliminar */}
                                                 {empleado.isDeleted ? (
@@ -1098,6 +1158,80 @@ const EmpleadosPage = () => {
                     }}
                     onSuccess={handleLinkUserSuccess}
                 />
+            )}
+
+            {/* Modal: Saldos Iniciales */}
+            {showSaldoInicialModal && empleadoSaldoInicial && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-navy-900 border border-navy-700 rounded-2xl shadow-2xl w-full max-w-lg">
+                        <div className="px-6 py-4 border-b border-navy-700 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-lg font-semibold text-gray-100">Saldos Iniciales</h2>
+                                <p className="text-xs text-gray-400 mt-0.5">{empleadoSaldoInicial.nombre} {empleadoSaldoInicial.apellido} — saldos previos a la migración al sistema</p>
+                            </div>
+                            <button onClick={() => setShowSaldoInicialModal(false)} className="text-gray-400 hover:text-gray-200 transition-colors">✕</button>
+                        </div>
+                        <form onSubmit={handleSaveSaldoInicial} className="p-6 space-y-5">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-300 mb-1">Fecha de Corte <span className="text-red-400">*</span></label>
+                                <input type="date" value={saldoInicialForm.fechaCorte}
+                                    onChange={e => setSaldoInicialForm(p => ({ ...p, fechaCorte: e.target.value }))}
+                                    className="w-full px-3 py-2 bg-navy-800 border border-navy-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                                    required
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Fecha desde la cual el sistema lleva el control</p>
+                            </div>
+                            <div className="border-t border-navy-700 pt-4">
+                                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Vacaciones</p>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-400 mb-1">Días acumulados</label>
+                                        <input type="number" min="0" step="0.5" value={saldoInicialForm.diasVacacionesAcumulados}
+                                            onChange={e => setSaldoInicialForm(p => ({ ...p, diasVacacionesAcumulados: e.target.value }))}
+                                            className="w-full px-3 py-2 bg-navy-800 border border-navy-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-400 mb-1">Días ya tomados</label>
+                                        <input type="number" min="0" step="0.5" value={saldoInicialForm.diasVacacionesTomados}
+                                            onChange={e => setSaldoInicialForm(p => ({ ...p, diasVacacionesTomados: e.target.value }))}
+                                            className="w-full px-3 py-2 bg-navy-800 border border-navy-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="border-t border-navy-700 pt-4">
+                                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Décimo Tercer Mes</p>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-400 mb-1">Monto acumulado (B/.)</label>
+                                    <input type="number" min="0" step="0.01" value={saldoInicialForm.montoDecimoAcumulado}
+                                        onChange={e => setSaldoInicialForm(p => ({ ...p, montoDecimoAcumulado: e.target.value }))}
+                                        className="w-full px-3 py-2 bg-navy-800 border border-navy-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Monto generado antes de usar el sistema; se suma al primer cálculo de décimo</p>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-400 mb-1">Notas</label>
+                                <textarea rows={2} value={saldoInicialForm.notas}
+                                    onChange={e => setSaldoInicialForm(p => ({ ...p, notas: e.target.value }))}
+                                    className="w-full px-3 py-2 bg-navy-800 border border-navy-600 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm resize-none"
+                                    placeholder="Contexto adicional sobre estos saldos..."
+                                />
+                            </div>
+                            <div className="flex justify-end gap-3 pt-2 border-t border-navy-700">
+                                <button type="button" onClick={() => setShowSaldoInicialModal(false)}
+                                    className="px-4 py-2 border border-navy-600 rounded-lg text-gray-300 hover:bg-navy-800 font-medium transition-colors text-sm">
+                                    Cancelar
+                                </button>
+                                <button type="submit" disabled={savingSaldoInicial}
+                                    className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors text-sm disabled:opacity-50">
+                                    {savingSaldoInicial ? 'Guardando...' : 'Guardar Saldos'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             )}
         </div>
     );

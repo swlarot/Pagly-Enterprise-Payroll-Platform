@@ -6,6 +6,7 @@ using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Infrastructure.Services;
 using Vorluno.Planilla.Web.Authorization;
 
 namespace Vorluno.Planilla.Web.Controllers;
@@ -104,7 +105,7 @@ public class VacacionesController : ControllerBase
     /// Obtiene solicitudes de un empleado
     /// </summary>
     [HttpGet("empleado/{empleadoId}")]
-    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [RequirePermission(SystemPermission.VacationsManage, SystemPermission.VacationsRequestSelf)]
     public async Task<IActionResult> GetByEmpleado(int empleadoId)
     {
         var tenantId = _tenantContext.TenantId;
@@ -123,7 +124,7 @@ public class VacacionesController : ControllerBase
     /// Obtiene solicitudes pendientes de aprobar
     /// </summary>
     [HttpGet("pendientes")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.VacationsManage)]
     public async Task<IActionResult> GetPendientes()
     {
         var tenantId = _tenantContext.TenantId;
@@ -142,7 +143,7 @@ public class VacacionesController : ControllerBase
     /// Obtiene saldo de vacaciones de un empleado
     /// </summary>
     [HttpGet("saldo/{empleadoId}")]
-    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [RequirePermission(SystemPermission.VacationsManage, SystemPermission.VacationsRequestSelf)]
     public async Task<IActionResult> GetSaldo(int empleadoId)
     {
         var tenantId = _tenantContext.TenantId;
@@ -183,7 +184,7 @@ public class VacacionesController : ControllerBase
     /// Obtiene calendario de vacaciones aprobadas
     /// </summary>
     [HttpGet("calendario")]
-    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [RequirePermission(SystemPermission.VacationsManage, SystemPermission.VacationsRequestSelf)]
     public async Task<IActionResult> GetCalendario([FromQuery] DateTime? fecha = null)
     {
         var tenantId = _tenantContext.TenantId;
@@ -209,7 +210,7 @@ public class VacacionesController : ControllerBase
     /// Crea una nueva solicitud de vacaciones
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.VacationsManage)]
     public async Task<IActionResult> Create(CreateVacacionesRequest request)
     {
         var tenantId = _tenantContext.TenantId;
@@ -269,7 +270,7 @@ public class VacacionesController : ControllerBase
     /// Aprueba una solicitud de vacaciones
     /// </summary>
     [HttpPost("{id}/aprobar")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.VacationsManage)]
     public async Task<IActionResult> Aprobar(int id)
     {
         var tenantId = _tenantContext.TenantId;
@@ -297,7 +298,7 @@ public class VacacionesController : ControllerBase
     /// Rechaza una solicitud de vacaciones
     /// </summary>
     [HttpPost("{id}/rechazar")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.VacationsManage)]
     public async Task<IActionResult> Rechazar(int id, [FromBody] RechazarVacacionesRequest request)
     {
         var tenantId = _tenantContext.TenantId;
@@ -326,7 +327,7 @@ public class VacacionesController : ControllerBase
     /// Cancela una solicitud de vacaciones
     /// </summary>
     [HttpDelete("{id}/cancelar")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.VacationsManage)]
     public async Task<IActionResult> Cancelar(int id)
     {
         var tenantId = _tenantContext.TenantId;
@@ -352,11 +353,17 @@ public class VacacionesController : ControllerBase
     }
 
     // Métodos privados
+    // DEV-32: Código de Trabajo Art. 177 — vacaciones se cuentan excluyendo domingos y feriados nacionales.
+    // Los sábados cuentan como día hábil en la jornada panameña de 6 días.
     private int CalcularDiasHabiles(DateTime inicio, DateTime fin)
     {
-        // Simplificado: cuenta todos los días (incluye sábados y domingos)
-        // TODO: Implementar cálculo excluyendo fines de semana y feriados
-        var dias = (fin.Date - inicio.Date).Days + 1;
+        var holidayService = HttpContext.RequestServices.GetRequiredService<PanamaHolidayService>();
+        var dias = 0;
+        for (var fecha = inicio.Date; fecha <= fin.Date; fecha = fecha.AddDays(1))
+        {
+            if (fecha.DayOfWeek != DayOfWeek.Sunday && !holidayService.IsNationalHoliday(fecha))
+                dias++;
+        }
         return dias;
     }
 
@@ -426,7 +433,115 @@ public class VacacionesController : ControllerBase
             vacacion.MotivoRechazo
         );
     }
+
+    /// <summary>
+    /// Calcula el salario vacacional de un empleado basado en sus últimos N períodos de planilla.
+    /// GET /api/vacaciones/calcular-salario?empleadoId=&fechaInicio=&diasVacaciones=&numPeriodos=
+    /// </summary>
+    [HttpGet("calcular-salario")]
+    [RequirePermission(SystemPermission.VacationsManage)]
+    public async Task<ActionResult<CalculoVacacionalDto>> CalcularSalarioVacacional(
+        [FromQuery] int empleadoId,
+        [FromQuery] DateTime fechaInicio,
+        [FromQuery] int diasVacaciones,
+        [FromQuery] int? numPeriodos = null)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        var empleado = await _context.Empleados
+            .FirstOrDefaultAsync(e => e.Id == empleadoId && e.TenantId == tenantId && !e.IsDeleted);
+
+        if (empleado == null)
+            return NotFound(new { message = $"Empleado {empleadoId} no encontrado" });
+
+        // Determinar número de períodos según frecuencia si no se especifica
+        if (numPeriodos == null || numPeriodos <= 0)
+        {
+            numPeriodos = empleado.PayFrequency switch
+            {
+                "Semanal" => 48,
+                "Bisemanal" => 24,
+                "Quincenal" => 22,
+                "Mensual" => 11,
+                _ => 22
+            };
+        }
+
+        // Obtener los últimos N períodos de planilla del empleado (excluir planillas futuras)
+        var periodos = await _context.PayrollDetails
+            .Include(d => d.PayrollHeader)
+            .Where(d => d.EmpleadoId == empleadoId
+                     && d.TenantId == tenantId
+                     && d.PayrollHeader != null
+                     && d.PayrollHeader.PeriodEndDate < fechaInicio)
+            .OrderByDescending(d => d.PayrollHeader!.PeriodEndDate)
+            .Take(numPeriodos.Value)
+            .Select(d => new
+            {
+                d.PayrollHeader!.PayrollNumber,
+                d.PayrollHeader.PeriodStartDate,
+                d.PayrollHeader.PeriodEndDate,
+                GrossPay = d.GrossPay - d.Bonuses // Excluir bonificaciones/décimo
+            })
+            .ToListAsync();
+
+        if (!periodos.Any())
+            return BadRequest(new { message = "No hay períodos de planilla registrados para calcular el salario vacacional" });
+
+        // Calcular días calendario cubiertos y total devengado
+        var detalle = periodos.Select(p =>
+        {
+            int dias = (p.PeriodEndDate - p.PeriodStartDate).Days + 1;
+            return new PeriodoVacacionalResumen(p.PayrollNumber, p.PeriodStartDate, p.PeriodEndDate, p.GrossPay, dias);
+        }).ToList();
+
+        decimal totalDevengado = detalle.Sum(d => d.GrossPay);
+        int totalDias = detalle.Sum(d => d.DiasCalendario);
+
+        if (totalDias <= 0)
+            return BadRequest(new { message = "No se puede calcular el salario diario: días calendario = 0" });
+
+        decimal salarioDiario = Math.Round(totalDevengado / totalDias, 2);
+        decimal montoVacaciones = Math.Round(salarioDiario * diasVacaciones, 2);
+
+        return Ok(new CalculoVacacionalDto(
+            EmpleadoId: empleadoId,
+            NumPeriodosUsados: periodos.Count,
+            PeriodoDesde: detalle.Min(d => d.FechaInicio),
+            PeriodoHasta: detalle.Max(d => d.FechaFin),
+            TotalDevengado: totalDevengado,
+            DiasCalendarioCubiertos: totalDias,
+            SalarioDiario: salarioDiario,
+            MontoVacaciones: montoVacaciones,
+            DiasVacaciones: diasVacaciones,
+            Detalle: detalle
+        ));
+    }
 }
 
 // DTO auxiliar para rechazar
 public record RechazarVacacionesRequest(string Motivo);
+
+/// <summary>
+/// Resultado del cálculo de salario vacacional
+/// </summary>
+public record CalculoVacacionalDto(
+    int EmpleadoId,
+    int NumPeriodosUsados,
+    DateTime PeriodoDesde,
+    DateTime PeriodoHasta,
+    decimal TotalDevengado,
+    int DiasCalendarioCubiertos,
+    decimal SalarioDiario,
+    decimal MontoVacaciones,
+    int DiasVacaciones,
+    List<PeriodoVacacionalResumen> Detalle
+);
+
+public record PeriodoVacacionalResumen(
+    string NumeroPlanilla,
+    DateTime FechaInicio,
+    DateTime FechaFin,
+    decimal GrossPay,
+    int DiasCalendario
+);

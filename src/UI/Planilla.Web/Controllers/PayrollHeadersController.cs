@@ -16,6 +16,7 @@ using Vorluno.Planilla.Application.Services;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Application.Helpers;
 using Vorluno.Planilla.Infrastructure.Services;
 using Vorluno.Planilla.Web.Authorization;
 
@@ -162,7 +163,7 @@ public class PayrollHeadersController : ControllerBase
     /// POST /api/payrollheaders
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.PayrollCalculate)]
     public async Task<ActionResult<PayrollHeader>> CreatePayrollHeader([FromBody] CreatePayrollHeaderRequest request)
     {
         var tenantId = _tenantContext.TenantId;
@@ -259,7 +260,7 @@ public class PayrollHeadersController : ControllerBase
     /// POST /api/payrollheaders/{id}/calculate
     /// </summary>
     [HttpPost("{id}/calculate")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.PayrollCalculate)]
     public async Task<ActionResult> CalculatePayroll(int id, [FromServices] ILogger<PayrollHeadersController> logger)
     {
         var tenantId = _tenantContext.TenantId;
@@ -329,237 +330,66 @@ public class PayrollHeadersController : ControllerBase
 
             var detailDeduccionPairs = new List<(PayrollDetail detail, DeduccionesResult dedResult)>();
 
+            // DEV-31: Pre-cargar datos compartidos UNA sola vez antes del loop (evita N+1)
+            var employeeIds = activeEmployees.Select(e => e.Id).ToList();
+
+            var taxConfigPreload = await _context.PayrollTaxConfigurations
+                .Where(c => c.IsActive && c.TenantId == tenantId &&
+                            c.EffectiveStartDate <= DateTime.UtcNow &&
+                            (c.EffectiveEndDate == null || c.EffectiveEndDate >= DateTime.UtcNow))
+                .OrderByDescending(c => c.EffectiveStartDate)
+                .FirstOrDefaultAsync();
+            decimal salarioMinimoMensual = taxConfigPreload?.SalarioMinimoLegal ?? 700.00m;
+            decimal salarioMinimoPeriodo = DeduccionPrioridadEngine.ProrratearSalarioMinimo(
+                salarioMinimoMensual, payrollHeader.PayPeriodType);
+
+            var deduccionesMap = (await _context.DeduccionesFijas
+                .Where(d => employeeIds.Contains(d.EmpleadoId) && d.EstaActivo &&
+                            d.FechaInicio <= payrollHeader.PeriodStartDate &&
+                            (d.FechaFin == null || d.FechaFin >= payrollHeader.PeriodStartDate) &&
+                            (d.EstadoOrdenJudicial == null || d.EstadoOrdenJudicial != EstadoOrdenJudicial.Levantada))
+                .OrderBy(d => d.Prioridad)
+                .ToListAsync())
+                .GroupBy(d => d.EmpleadoId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            var prestamosMap = (await _context.Prestamos
+                .Where(p => employeeIds.Contains(p.EmpleadoId) && p.Estado == EstadoPrestamo.Activo && p.CuotasPagadas < p.NumeroCuotas)
+                .ToListAsync())
+                .GroupBy(p => p.EmpleadoId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            var anticiposMap = (await _context.Anticipos
+                .Where(a => employeeIds.Contains(a.EmpleadoId) && a.Estado == EstadoAnticipo.Aprobado &&
+                            a.FechaDescuento.Date == payrollHeader.PeriodStartDate.Date)
+                .ToListAsync())
+                .GroupBy(a => a.EmpleadoId)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            // DEV-35: Delegar cálculo por empleado al servicio (elimina duplicación con PayrollProcessingService)
             foreach (var employee in activeEmployees)
             {
-                // Determinar grossPay: si hay horas registradas, calcular basado en horas
-                decimal grossPay = employee.GetSalarioPeriodo();
+                var hoursForEmployee = employeeHoursMap.TryGetValue(employee.Id, out var h) ? h : null;
+                var dfForEmployee = deduccionesMap.TryGetValue(employee.Id, out var dfList) ? dfList : new List<DeduccionFija>();
+                var prForEmployee = prestamosMap.TryGetValue(employee.Id, out var prList) ? prList : new List<Prestamo>();
+                var antForEmployee = anticiposMap.TryGetValue(employee.Id, out var antList) ? antList : new List<Anticipo>();
 
-                if (employeeHoursMap.TryGetValue(employee.Id, out var hours))
-                {
-                    var hourlyRate = employee.HourlyRate > 0
-                        ? employee.HourlyRate
-                        : Empleado.ComputeHourlyRateFromMonthly(employee.SalarioBase, employee.HoursPerWeek);
-
-                    hours.RegularPay = hours.RegularHours * hourlyRate;
-                    // BUG-008 FIX: Evitar artefactos de redondeo de tasa horaria en pago regular.
-                    // Ej: 208h × 19.2308 = 4,000.0064 → se redondea a B/.4,000.01 en lugar de B/.4,000.00.
-                    // Si la diferencia con el salario exacto del período es trivial (< B/.0.05), usar el exacto.
-                    var salarioPeriodoExacto = employee.GetSalarioPeriodo();
-                    if (Math.Abs(hours.RegularPay - salarioPeriodoExacto) < 0.05m)
-                    {
-                        hours.RegularPay = salarioPeriodoExacto;
-                    }
-                    hours.SundayPay = hours.SundayHours * hourlyRate * 1.50m;
-                    hours.HolidayPay = hours.HolidayHours * hourlyRate * 1.50m;
-                    hours.OvertimeDayPay = hours.OvertimeDayHours * hourlyRate * 1.25m;
-                    hours.OvertimeNightPay = hours.OvertimeNightHours * hourlyRate * 1.50m;
-                    hours.OvertimeHolidayPay = hours.OvertimeHolidayHours * hourlyRate * 3.4375m;
-                    hours.OvertimeMixedPay = hours.OvertimeMixedHours * hourlyRate * 1.625m;
-                    hours.OvertimeExcessPay = hours.OvertimeExcessHours * hourlyRate * 2.40625m;
-                    hours.AbsenceDeduction = hours.AbsenceHours * hourlyRate;
-                    hours.TotalHoursPay = hours.RegularPay + hours.SundayPay + hours.HolidayPay
-                        + hours.OvertimeDayPay + hours.OvertimeNightPay
-                        + hours.OvertimeHolidayPay + hours.OvertimeMixedPay + hours.OvertimeExcessPay
-                        - hours.AbsenceDeduction;
-                    hours.UpdatedAt = DateTime.UtcNow;
-
-                    grossPay = hours.TotalHoursPay;
-                }
-
-                // Calcular usando el orquestador — CSS+SE+ISR
-                var calculationResult = await _orchestrator.CalculateEmployeePayrollAsync(
-                    companyId: tenantId,
-                    grossPay: grossPay,
-                    payFrequency: employee.PayFrequency,
-                    yearsCotized: employee.YearsCotized,
-                    averageSalaryLast10Years: employee.AverageSalaryLast10Years,
-                    cssRiskPercentage: employee.CssRiskPercentage,
-                    dependents: employee.Dependents,
-                    isSubjectToCss: employee.IsSubjectToCss,
-                    isSubjectToEducationalInsurance: employee.IsSubjectToEducationalInsurance,
-                    isSubjectToIncomeTax: employee.IsSubjectToIncomeTax,
-                    calculationDate: DateTime.UtcNow
-                );
-
-                // Calcular deducciones adicionales con motor de prelacion
-                decimal netoPostLegal = grossPay
-                    - calculationResult.CssEmployee
-                    - calculationResult.EducationalInsuranceEmployee
-                    - calculationResult.IncomeTax;
-
-                var deduccionEngine = HttpContext.RequestServices.GetRequiredService<IDeduccionPrioridadEngine>();
-
-                // Cargar salario minimo legal vigente
-                var taxConfig = await _context.PayrollTaxConfigurations
-                    .Where(c => c.IsActive && c.TenantId == tenantId &&
-                                c.EffectiveStartDate <= DateTime.UtcNow &&
-                                (c.EffectiveEndDate == null || c.EffectiveEndDate >= DateTime.UtcNow))
-                    .OrderByDescending(c => c.EffectiveStartDate)
-                    .FirstOrDefaultAsync();
-                decimal salarioMinimoMensual = taxConfig?.SalarioMinimoLegal ?? 700.00m;
-                decimal salarioMinimoPeriodo = DeduccionPrioridadEngine.ProrratearSalarioMinimo(
-                    salarioMinimoMensual, payrollHeader.PayPeriodType);
-
-                // Cargar deducciones fijas, prestamos y anticipos para el empleado
-                var deduccionesPendientes = new List<DeduccionPendiente>();
-
-                var deduccionesFijas = await _context.DeduccionesFijas
-                    .Where(d => d.EmpleadoId == employee.Id && d.EstaActivo &&
-                                d.FechaInicio <= payrollHeader.PeriodStartDate &&
-                                (d.FechaFin == null || d.FechaFin >= payrollHeader.PeriodStartDate) &&
-                                (d.EstadoOrdenJudicial == null || d.EstadoOrdenJudicial != EstadoOrdenJudicial.Levantada))
-                    .OrderBy(d => d.Prioridad)
-                    .ToListAsync();
-
-                foreach (var df in deduccionesFijas)
-                {
-                    var categoria = df.TipoDeduccion switch
-                    {
-                        TipoDeduccion.PensionAlimenticia => CategoriaDeduccion.PensionAlimenticia,
-                        TipoDeduccion.Embargo => CategoriaDeduccion.EmbargoJudicial,
-                        TipoDeduccion.PrestamoBancario when df.NumeroExpediente != null => CategoriaDeduccion.EmbargoJudicial,
-                        _ => df.Categoria
-                    };
-
-                    deduccionesPendientes.Add(new DeduccionPendiente
-                    {
-                        OrigenDeduccionFijaId = df.Id,
-                        TipoDeduccion = df.TipoDeduccion,
-                        Categoria = categoria,
-                        Descripcion = df.Descripcion,
-                        MontoFijo = df.Monto,
-                        Porcentaje = df.Porcentaje,
-                        EsPorcentaje = df.EsPorcentaje,
-                        BaseCalculo = df.BaseCalculo,
-                        Prioridad = df.Prioridad,
-                        NombreAcreedor = df.NombreAcreedor,
-                        MontoTotalACobrar = df.MontoTotalACobrar,
-                        MontoCobradoAcumulado = df.MontoCobradoAcumulado
-                    });
-                }
-
-                var prestamosActivos = await _context.Prestamos
-                    .Where(p => p.EmpleadoId == employee.Id && p.Estado == EstadoPrestamo.Activo && p.CuotasPagadas < p.NumeroCuotas)
-                    .ToListAsync();
-
-                foreach (var prestamo in prestamosActivos)
-                {
-                    deduccionesPendientes.Add(new DeduccionPendiente
-                    {
-                        OrigenPrestamoId = prestamo.Id,
-                        TipoDeduccion = TipoDeduccion.PrestamoInterno,
-                        Categoria = CategoriaDeduccion.Voluntaria,
-                        Descripcion = $"Prestamo #{prestamo.Id} - Cuota {prestamo.CuotasPagadas + 1}/{prestamo.NumeroCuotas}",
-                        MontoFijo = prestamo.CuotaMensual,
-                        EsPorcentaje = false,
-                        BaseCalculo = BaseCalculoDeduccion.SalarioBruto,
-                        Prioridad = 100
-                    });
-                }
-
-                var anticiposAprobados = await _context.Anticipos
-                    .Where(a => a.EmpleadoId == employee.Id && a.Estado == EstadoAnticipo.Aprobado &&
-                                a.FechaDescuento.Date == payrollHeader.PeriodStartDate.Date)
-                    .ToListAsync();
-
-                foreach (var anticipo in anticiposAprobados)
-                {
-                    deduccionesPendientes.Add(new DeduccionPendiente
-                    {
-                        OrigenAnticipoId = anticipo.Id,
-                        TipoDeduccion = TipoDeduccion.Otro,
-                        Categoria = CategoriaDeduccion.Voluntaria,
-                        Descripcion = $"Anticipo #{anticipo.Id} - {anticipo.Motivo}",
-                        MontoFijo = anticipo.Monto,
-                        EsPorcentaje = false,
-                        BaseCalculo = BaseCalculoDeduccion.SalarioBruto,
-                        Prioridad = 200
-                    });
-                }
-
-                var deduccionesResult = deduccionEngine.AplicarDeduccionesConPrelacion(
-                    grossPay, netoPostLegal, salarioMinimoPeriodo, deduccionesPendientes);
-
-                // Calcular horas extra aprobadas del período
-                decimal overtimePay = 0m;
-                decimal horasExtraDiurnas = 0m;
-                decimal horasExtraNocturnas = 0m;
-                decimal horasExtraDomingoFeriado = 0m;
-
-                var horasExtraAprobadas = await _asistenciaService.GetHorasExtraAprobadas(
-                    employee.Id, payrollHeader.PeriodStartDate, payrollHeader.PeriodEndDate);
-
-                if (horasExtraAprobadas.Any())
-                {
-                    var salarioHora = employee.HourlyRate > 0
-                        ? employee.HourlyRate
-                        : Empleado.ComputeHourlyRateFromMonthly(employee.SalarioBase, employee.HoursPerWeek);
-
-                    var (montoHorasExtra, horasDiurnas, horasNocturnas, horasDomingoFeriado) =
-                        await _asistenciaService.CalcularMontoHorasExtra(
-                            employee.Id, salarioHora, payrollHeader.PeriodStartDate, payrollHeader.PeriodEndDate);
-
-                    overtimePay = montoHorasExtra;
-                    horasExtraDiurnas = horasDiurnas;
-                    horasExtraNocturnas = horasNocturnas;
-                    horasExtraDomingoFeriado = horasDomingoFeriado;
-                }
-                else if (employeeHoursMap.ContainsKey(employee.Id))
-                {
-                    overtimePay = employeeHoursMap[employee.Id].OvertimeDayPay + employeeHoursMap[employee.Id].OvertimeNightPay;
-                    horasExtraDiurnas = employeeHoursMap[employee.Id].OvertimeDayHours;
-                    horasExtraNocturnas = employeeHoursMap[employee.Id].OvertimeNightHours;
-                }
-
-                decimal totalDedsForEmployee = calculationResult.TotalDeductions + deduccionesResult.TotalDeduccionesAdicionales;
-                decimal netPayForEmployee = calculationResult.NetPay - deduccionesResult.TotalDeduccionesAdicionales;
-
-                var detail = new PayrollDetail
-                {
-                    PayrollHeaderId = payrollHeader.Id,
-                    EmpleadoId = employee.Id,
-                    GrossPay = calculationResult.GrossPay,
-                    BaseSalary = employee.SalarioBase,
-                    OvertimePay = overtimePay,
-                    Bonuses = 0,
-                    Commissions = 0,
-                    HorasExtraDiurnas = horasExtraDiurnas,
-                    HorasExtraNocturnas = horasExtraNocturnas,
-                    HorasExtraDomingoFeriado = horasExtraDomingoFeriado,
-                    MontoHorasExtra = overtimePay,
-                    CssEmployee = calculationResult.CssEmployee,
-                    CssEmployer = calculationResult.CssEmployer,
-                    RiskContribution = calculationResult.RiskContribution,
-                    EducationalInsuranceEmployee = calculationResult.EducationalInsuranceEmployee,
-                    EducationalInsuranceEmployer = calculationResult.EducationalInsuranceEmployer,
-                    IncomeTax = calculationResult.IncomeTax,
-                    OtherDeductions = 0,
-                    DeduccionesFijas = deduccionesResult.TotalDeduccionesAdicionales - deduccionesResult.TotalPrestamos - deduccionesResult.TotalAnticipos,
-                    Prestamos = deduccionesResult.TotalPrestamos,
-                    Anticipos = deduccionesResult.TotalAnticipos,
-                    PensionAlimenticia = deduccionesResult.TotalPensionAlimenticia,
-                    Embargos = deduccionesResult.TotalEmbargos,
-                    DeduccionesVoluntarias = deduccionesResult.TotalVoluntarias,
-                    SalarioMinimoLegalAplicado = deduccionesResult.SalarioMinimoAplicado,
-                    MontoLimitadoPorSalarioMinimo = deduccionesResult.MontoLimitadoPorSalarioMinimo,
-                    TuvoLimitacionSalarioMinimo = deduccionesResult.TuvoLimitacion,
-                    TotalDeductions = totalDedsForEmployee,
-                    NetPay = netPayForEmployee,
-                    EmployerCost = calculationResult.TotalEmployerCost,
-                    TenantId = tenantId
-                };
+                var (detail, deduccionesResult) = await _processingService.CalculateFromPreloadedDataAsync(
+                    tenantId, employee, payrollHeader,
+                    hoursForEmployee, dfForEmployee, prForEmployee, antForEmployee,
+                    salarioMinimoPeriodo);
 
                 _context.PayrollDetails.Add(detail);
                 detailDeduccionPairs.Add((detail, deduccionesResult));
 
                 // Acumular totales
-                totalGrossPay += calculationResult.GrossPay;
-                totalDeductions += totalDedsForEmployee;
-                totalNetPay += netPayForEmployee;
-                totalEmployerCost += calculationResult.TotalEmployerCost;
-                totalEmployerCss += calculationResult.CssEmployer;
-                totalEmployerSe += calculationResult.EducationalInsuranceEmployer;
-                totalRiskInsurance += calculationResult.RiskContribution;
+                totalGrossPay += detail.GrossPay;
+                totalDeductions += detail.TotalDeductions;
+                totalNetPay += detail.NetPay;
+                totalEmployerCost += detail.EmployerCost;
+                totalEmployerCss += detail.CssEmployer;
+                totalEmployerSe += detail.EducationalInsuranceEmployer;
+                totalRiskInsurance += detail.RiskContribution;
             }
 
             // ====================================================================
@@ -643,11 +473,11 @@ public class PayrollHeadersController : ControllerBase
         {
             await transaction.RollbackAsync();
             logger.LogError(ex, "Unexpected error calculating payroll {PayrollId}: {Message}", id, ex.Message);
-            return StatusCode(500, new {
-                message = "Error al calcular la planilla",
-                detail = ex.Message,
-                innerError = ex.InnerException?.Message
-            });
+            // DEV-33: Solo exponer detalles técnicos en Development, nunca en Production
+            var env = HttpContext.RequestServices.GetRequiredService<IHostEnvironment>();
+            return StatusCode(500, env.IsDevelopment()
+                ? (object)new { message = "Error al calcular la planilla", detail = ex.Message, innerError = ex.InnerException?.Message }
+                : new { message = "Error al calcular la planilla. Consulte los logs del servidor." });
         }
     }
 
@@ -656,7 +486,7 @@ public class PayrollHeadersController : ControllerBase
     /// POST /api/payrollheaders/{id}/approve
     /// </summary>
     [HttpPost("{id}/approve")]
-    [Authorize(Roles = "Owner,Admin")]
+    [RequirePermission(SystemPermission.PayrollApprove)]
     public async Task<ActionResult> ApprovePayroll(int id)
     {
         var tenantId = _tenantContext.TenantId;
@@ -730,8 +560,8 @@ public class PayrollHeadersController : ControllerBase
     /// NOTA: Stub - integración bancaria pendiente
     /// </summary>
     [HttpPost("{id}/pay")]
-    [Authorize(Roles = "Owner,Admin")]
-    public async Task<ActionResult> PayPayroll(int id)
+    [RequirePermission(SystemPermission.PayrollApprove)]
+    public async Task<ActionResult> PayPayroll(int id, [FromServices] ILogger<PayrollHeadersController> logger)
     {
         var tenantId = _tenantContext.TenantId;
         var payrollHeader = await _context.PayrollHeaders
@@ -752,15 +582,66 @@ public class PayrollHeadersController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
 
-        // TODO: Integración bancaria pendiente
-        return StatusCode(501, new
+        // DEV-25: Marcar planilla como Paid y actualizar estados de préstamos/anticipos
+        await using var payTransaction = await _context.Database.BeginTransactionAsync();
+        try
         {
-            message = "Integración bancaria pendiente",
-            detail = "El endpoint de pago requiere integración con el sistema bancario. " +
-                     "Funcionalidad disponible en próxima fase (Phase E).",
-            payrollHeaderId = payrollHeader.Id,
-            totalNetPay = payrollHeader.TotalNetPay
-        });
+            // 1. Obtener todos los detalles de la planilla
+            var details = await _context.PayrollDetails
+                .Where(d => d.PayrollHeaderId == payrollHeader.Id && d.TenantId == tenantId)
+                .ToListAsync();
+
+            // 2. Para cada detalle, procesar préstamos y anticipos descontados
+            foreach (var detail in details)
+            {
+                // Obtener deducciones aplicadas de esta línea
+                var deducciones = await _context.DeduccionesAplicadas
+                    .Where(d => d.PayrollDetailId == detail.Id)
+                    .ToListAsync();
+
+                var prestamoIds = deducciones
+                    .Where(d => d.PrestamoId.HasValue)
+                    .Select(d => d.PrestamoId!.Value)
+                    .Distinct()
+                    .ToList();
+
+                var anticipoIds = deducciones
+                    .Where(d => d.AnticipoId.HasValue)
+                    .Select(d => d.AnticipoId!.Value)
+                    .Distinct()
+                    .ToList();
+
+                if (prestamoIds.Count > 0)
+                    await _processingService.ProcessPrestamosAsync(prestamoIds, detail.Id, payrollHeader.Id);
+
+                if (anticipoIds.Count > 0)
+                    await _processingService.ProcessAnticiposAsync(anticipoIds, detail.Id, payrollHeader.Id);
+            }
+
+            // 3. Marcar planilla como Pagada
+            payrollHeader.Status = PayrollStatus.Paid;
+            payrollHeader.UpdatedAt = DateTime.UtcNow;
+            _context.PayrollHeaders.Update(payrollHeader);
+            await _context.SaveChangesAsync();
+
+            await payTransaction.CommitAsync();
+
+            return Ok(new
+            {
+                message = "Planilla marcada como pagada y préstamos/anticipos actualizados",
+                payrollHeaderId = payrollHeader.Id,
+                totalNetPay = payrollHeader.TotalNetPay
+            });
+        }
+        catch (Exception ex)
+        {
+            await payTransaction.RollbackAsync();
+            var env = HttpContext.RequestServices.GetRequiredService<IHostEnvironment>();
+            logger.LogError(ex, "Error marking payroll {PayrollId} as paid", id);
+            return StatusCode(500, env.IsDevelopment()
+                ? (object)new { message = "Error al marcar la planilla como pagada", detail = ex.Message }
+                : new { message = "Error al marcar la planilla como pagada. Consulte los logs del servidor." });
+        }
     }
 
     /// <summary>
@@ -768,7 +649,7 @@ public class PayrollHeadersController : ControllerBase
     /// POST /api/payrollheaders/{id}/cancel
     /// </summary>
     [HttpPost("{id}/cancel")]
-    [Authorize(Roles = "Owner,Admin")]
+    [RequirePermission(SystemPermission.PayrollApprove)]
     public async Task<ActionResult> CancelPayroll(int id)
     {
         var tenantId = _tenantContext.TenantId;
@@ -839,7 +720,7 @@ public class PayrollHeadersController : ControllerBase
     /// GET /api/payrollheaders/{id}/hours
     /// </summary>
     [HttpGet("{id}/hours")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.PayrollView)]
     public async Task<ActionResult> GetPayrollHours(int id)
     {
         var tenantId = _tenantContext.TenantId;
@@ -864,7 +745,7 @@ public class PayrollHeadersController : ControllerBase
     /// PUT /api/payrollheaders/{payrollId}/hours/{empleadoId}
     /// </summary>
     [HttpPut("{payrollId}/hours/{empleadoId}")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.PayrollCalculate)]
     public async Task<ActionResult> UpsertEmployeeHours(
         int payrollId, int empleadoId, [FromBody] UpsertEmployeeHoursRequest request)
     {
@@ -900,6 +781,7 @@ public class PayrollHeadersController : ControllerBase
             existing.OvertimeExcessHours = request.OvertimeExcessHours;
             existing.AbsenceHours = request.AbsenceHours;
             existing.DisabilityHours = request.DisabilityHours;
+            existing.Commissions = request.Commissions;
             existing.UpdatedAt = DateTime.UtcNow;
         }
         else
@@ -918,7 +800,8 @@ public class PayrollHeadersController : ControllerBase
                 OvertimeMixedHours = request.OvertimeMixedHours,
                 OvertimeExcessHours = request.OvertimeExcessHours,
                 AbsenceHours = request.AbsenceHours,
-                DisabilityHours = request.DisabilityHours
+                DisabilityHours = request.DisabilityHours,
+                Commissions = request.Commissions
             };
             _context.PayrollEmployeeHours.Add(newHours);
         }
@@ -932,7 +815,7 @@ public class PayrollHeadersController : ControllerBase
     /// POST /api/payrollheaders/{id}/hours/generate-defaults
     /// </summary>
     [HttpPost("{id}/hours/generate-defaults")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.PayrollCalculate)]
     public async Task<ActionResult> GenerateDefaultHours(int id)
     {
         var tenantId = _tenantContext.TenantId;
@@ -979,7 +862,7 @@ public class PayrollHeadersController : ControllerBase
     /// POST /api/payrollheaders/{id}/hours/import-novedades?mode=overwrite|sum
     /// </summary>
     [HttpPost("{id}/hours/import-novedades")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.PayrollCalculate)]
     public async Task<ActionResult> ImportNovedades(int id, [FromQuery] string mode = "overwrite")
     {
         var tenantId = _tenantContext.TenantId;
@@ -1238,7 +1121,7 @@ public class PayrollHeadersController : ControllerBase
     /// PUT /api/payrollheaders/deducciones-aplicadas/{id}/transferencia
     /// </summary>
     [HttpPut("deducciones-aplicadas/{deduccionAplicadaId}/transferencia")]
-    [Authorize(Roles = "Owner,Admin")]
+    [RequirePermission(SystemPermission.PayrollApprove)]
     public async Task<ActionResult> MarcarTransferencia(int deduccionAplicadaId, [FromBody] MarcarTransferenciaRequest request)
     {
         var tenantId = _tenantContext.TenantId;
@@ -1262,7 +1145,7 @@ public class PayrollHeadersController : ControllerBase
     /// POST /api/payrollheaders/ensure-tax-config
     /// </summary>
     [HttpPost("ensure-tax-config")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.PayrollCalculate)]
     public async Task<ActionResult> EnsureTaxConfig([FromServices] ILogger<PayrollHeadersController> logger)
     {
         var tenantId = _tenantContext.TenantId;
@@ -1288,7 +1171,7 @@ public class PayrollHeadersController : ControllerBase
     /// DELETE /api/payrollheaders/{id}
     /// </summary>
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Owner,Admin")]
+    [RequirePermission(SystemPermission.PayrollDelete)]
     public async Task<IActionResult> Delete(int id)
     {
         var tenantId = _tenantContext.TenantId;
@@ -1360,6 +1243,107 @@ public class PayrollHeadersController : ControllerBase
 
         return NoContent();
     }
+
+    /// <summary>
+    /// Retorna el desglose detallado del cálculo de planilla para un empleado específico.
+    /// GET /api/payrollheaders/{id}/details/{detailId}/breakdown
+    /// </summary>
+    [HttpGet("{id}/details/{detailId}/breakdown")]
+    [RequirePermission(SystemPermission.PayrollView, SystemPermission.PayrollViewSelf)]
+    public async Task<ActionResult<PayrollBreakdownDto>> GetDetailBreakdown(int id, int detailId)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        var detail = await _context.PayrollDetails
+            .Include(d => d.DeduccionesAplicadas)
+            .Include(d => d.PayrollHeader)
+            .FirstOrDefaultAsync(d => d.Id == detailId && d.PayrollHeaderId == id && d.TenantId == tenantId);
+
+        if (detail == null)
+            return NotFound(new { message = "Detalle no encontrado" });
+
+        // Cargar horas del empleado para este período
+        var horasEmpleado = await _context.PayrollEmployeeHours
+            .FirstOrDefaultAsync(h => h.PayrollHeaderId == id && h.EmpleadoId == detail.EmpleadoId && h.TenantId == tenantId);
+
+        // --- Ingresos ---
+        var ingresos = new IngresosBreakdown(
+            SalarioBase: detail.BaseSalary,
+            HorasRegulares: horasEmpleado?.RegularPay ?? detail.BaseSalary,
+            HorasDomingo: horasEmpleado?.SundayPay ?? 0,
+            HorasFeriado: horasEmpleado?.HolidayPay ?? 0,
+            HorasExtraDiurnas: horasEmpleado?.OvertimeDayPay ?? 0,
+            HorasExtraNocturnas: horasEmpleado?.OvertimeNightPay ?? 0,
+            HorasExtraFestivos: horasEmpleado?.OvertimeHolidayPay ?? 0,
+            HorasExtraMixtas: horasEmpleado?.OvertimeMixedPay ?? 0,
+            HorasExtraExceso: horasEmpleado?.OvertimeExcessPay ?? 0,
+            Comisiones: detail.Commissions,
+            Bonos: detail.Bonuses,
+            GrossPay: detail.GrossPay
+        );
+
+        // --- CSS ---
+        // Derivar base usada: si se aplicó tope, cssBase < grossPay
+        const decimal CSS_TASA = 0.0975m;
+        decimal cssBase = detail.CssEmployee > 0 ? Math.Round(detail.CssEmployee / CSS_TASA, 2) : detail.GrossPay;
+        bool seAplicoTope = cssBase < detail.GrossPay - 0.01m;
+
+        var css = new CssBreakdownDto(
+            BaseUsada: cssBase,
+            TopeSalarial: seAplicoTope ? cssBase : 0,
+            SeAplicoTope: seAplicoTope,
+            Tasa: CSS_TASA * 100,
+            Monto: detail.CssEmployee
+        );
+
+        // --- Seguro Educativo ---
+        var se = new SeBreakdownDto(
+            Base: detail.GrossPay,
+            Tasa: 1.25m,
+            Monto: detail.EducationalInsuranceEmployee
+        );
+
+        // --- ISR ---
+        var payPeriodType = detail.PayrollHeader?.PayPeriodType ?? Vorluno.Planilla.Domain.Enums.PayPeriodType.Quincenal;
+        int periodosAlAno = Vorluno.Planilla.Application.Helpers.PayrollConstants.GetPeriodsPerYear(payPeriodType);
+        decimal salarioAnualizado = detail.GrossPay * periodosAlAno;
+        decimal isrAnual = detail.IncomeTax * periodosAlAno;
+
+        var isr = new IsrBreakdownDto(
+            SalarioPeriodo: detail.GrossPay,
+            PeriodosAlAno: periodosAlAno,
+            SalarioAnualizado: salarioAnualizado,
+            DeduccionDependientes: 0, // No almacenado actualmente
+            IngresoNetoGravable: salarioAnualizado,
+            IsrAnual: isrAnual,
+            IsrPeriodo: detail.IncomeTax
+        );
+
+        // --- Acreedores ---
+        var acreedores = detail.DeduccionesAplicadas
+            .OrderBy(d => d.OrdenAplicacion)
+            .Select(d => new AcreedorItemDto(
+                Descripcion: d.Descripcion,
+                Categoria: d.Categoria.ToString(),
+                MontoSolicitado: d.MontoSolicitado,
+                MontoAplicado: d.MontoAplicado,
+                FueLimitado: d.MontoLimitado > 0,
+                RazonLimitacion: d.RazonLimitacion
+            ))
+            .ToList();
+
+        var breakdown = new PayrollBreakdownDto(
+            Ingresos: ingresos,
+            Css: css,
+            Se: se,
+            Isr: isr,
+            Acreedores: acreedores,
+            TotalDeducciones: detail.TotalDeductions,
+            NetPay: detail.NetPay
+        );
+
+        return Ok(breakdown);
+    }
 }
 
 /// <summary>
@@ -1383,7 +1367,8 @@ public record UpsertEmployeeHoursRequest(
     decimal OvertimeMixedHours = 0,
     decimal OvertimeExcessHours = 0,
     decimal AbsenceHours = 0,
-    decimal DisabilityHours = 0
+    decimal DisabilityHours = 0,
+    decimal Commissions = 0
 );
 
 public record MarcarTransferenciaRequest(

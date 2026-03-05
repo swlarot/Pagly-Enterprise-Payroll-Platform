@@ -8,7 +8,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
 using Vorluno.Planilla.Application.Interfaces;
+using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Web.Authorization;
 
 namespace Vorluno.Planilla.Web.Controllers;
 
@@ -39,7 +41,7 @@ public class ConfiguracionController : ControllerBase
     /// GET /api/configuracion/tax-config
     /// </summary>
     [HttpGet("tax-config")]
-    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [RequirePermission(SystemPermission.SettingsTaxes)]
     public async Task<ActionResult<PayrollTaxConfigDto>> GetTaxConfig()
     {
         var tenantId = _tenantContext.TenantId;
@@ -58,7 +60,7 @@ public class ConfiguracionController : ControllerBase
     /// POST /api/configuracion/ensure-tax-config
     /// </summary>
     [HttpPost("ensure-tax-config")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.SettingsTaxes)]
     public async Task<ActionResult> EnsureTaxConfig()
     {
         var tenantId = _tenantContext.TenantId;
@@ -82,7 +84,7 @@ public class ConfiguracionController : ControllerBase
     /// GET /api/configuracion/salario-minimo
     /// </summary>
     [HttpGet("salario-minimo")]
-    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [RequirePermission(SystemPermission.SettingsTaxes)]
     public async Task<ActionResult> GetSalarioMinimo()
     {
         var tenantId = _tenantContext.TenantId;
@@ -110,7 +112,7 @@ public class ConfiguracionController : ControllerBase
     /// PUT /api/configuracion/salario-minimo
     /// </summary>
     [HttpPut("salario-minimo")]
-    [Authorize(Roles = "Owner,Admin")]
+    [RequirePermission(SystemPermission.SettingsTaxes)]
     public async Task<ActionResult> UpdateSalarioMinimo([FromBody] UpdateSalarioMinimoRequest request)
     {
         var tenantId = _tenantContext.TenantId;

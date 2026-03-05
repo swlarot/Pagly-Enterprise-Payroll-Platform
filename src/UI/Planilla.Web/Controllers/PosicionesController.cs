@@ -5,7 +5,9 @@ using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
+using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Web.Authorization;
 
 namespace Vorluno.Planilla.Web.Controllers;
 
@@ -108,7 +110,7 @@ public class PosicionesController : ControllerBase
     /// Crea una nueva posición.
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.PositionsManage)]
     public async Task<IActionResult> Create(PosicionCrearDto posicionDto)
     {
         var tenantId = _tenantContext.TenantId;
@@ -179,7 +181,7 @@ public class PosicionesController : ControllerBase
     /// Actualiza una posición existente.
     /// </summary>
     [HttpPut("{id}")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.PositionsManage)]
     public async Task<IActionResult> Update(int id, PosicionActualizarDto posicionDto)
     {
         var tenantId = _tenantContext.TenantId;
@@ -234,7 +236,7 @@ public class PosicionesController : ControllerBase
     /// Elimina (desactiva) una posición.
     /// </summary>
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Owner,Admin")]
+    [RequirePermission(SystemPermission.PositionsManage)]
     public async Task<IActionResult> Delete(int id)
     {
         var tenantId = _tenantContext.TenantId;

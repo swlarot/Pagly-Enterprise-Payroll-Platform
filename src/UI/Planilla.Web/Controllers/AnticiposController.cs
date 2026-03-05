@@ -4,7 +4,9 @@ using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
+using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Web.Authorization;
 
 namespace Vorluno.Planilla.Web.Controllers;
 
@@ -107,7 +109,7 @@ public class AnticiposController : ControllerBase
     /// <param name="request">Datos del anticipo a crear.</param>
     /// <returns>Anticipo creado.</returns>
     [HttpPost]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.AdvancesManage)]
     public async Task<IActionResult> Create(CreateAnticipoRequest request)
     {
         var tenantId = _tenantContext.TenantId;
@@ -180,7 +182,7 @@ public class AnticiposController : ControllerBase
     /// <param name="request">Datos de aprobación (aprobador).</param>
     /// <returns>NoContent si fue exitoso.</returns>
     [HttpPost("{id}/aprobar")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.AdvancesManage)]
     public async Task<IActionResult> Aprobar(int id, [FromBody] AprobarAnticipoRequest request)
     {
         var tenantId = _tenantContext.TenantId;
@@ -213,7 +215,7 @@ public class AnticiposController : ControllerBase
     /// <param name="request">Datos de rechazo (motivo).</param>
     /// <returns>NoContent si fue exitoso.</returns>
     [HttpPost("{id}/rechazar")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.AdvancesManage)]
     public async Task<IActionResult> Rechazar(int id, [FromBody] RechazarAnticipoRequest request)
     {
         var tenantId = _tenantContext.TenantId;
@@ -244,7 +246,7 @@ public class AnticiposController : ControllerBase
     /// <param name="id">ID del anticipo.</param>
     /// <returns>NoContent si fue exitoso.</returns>
     [HttpDelete("{id}/cancelar")]
-    [Authorize(Roles = "Owner,Admin")]
+    [RequirePermission(SystemPermission.AdvancesManage)]
     public async Task<IActionResult> Cancelar(int id)
     {
         var tenantId = _tenantContext.TenantId;

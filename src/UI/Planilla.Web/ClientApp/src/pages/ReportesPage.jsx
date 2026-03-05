@@ -39,6 +39,15 @@ const ReportesPage = () => {
     const [modalType, setModalType] = useState('');
     const [modalTitle, setModalTitle] = useState('');
     const [reporteData, setReporteData] = useState(null);
+    const [expandedRows, setExpandedRows] = useState(new Set());
+
+    const toggleRow = (idx) => {
+        setExpandedRows(prev => {
+            const next = new Set(prev);
+            next.has(idx) ? next.delete(idx) : next.add(idx);
+            return next;
+        });
+    };
 
     useEffect(() => {
         fetchPlanillas();
@@ -91,6 +100,7 @@ const ReportesPage = () => {
             setReporteData(data);
             setModalType(tipo);
             setModalTitle(titulo);
+            setExpandedRows(new Set());
             setModalOpen(true);
         } catch (error) {
             toast.error(error.message || 'Error al obtener reporte');
@@ -195,6 +205,7 @@ const ReportesPage = () => {
                     <table className="w-full text-xs">
                         <thead className="bg-navy-800">
                             <tr>
+                                <th className="px-2 py-2 w-6"></th>
                                 <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Cédula</th>
                                 <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Nombre</th>
                                 <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Hs. Reg.</th>
@@ -210,26 +221,68 @@ const ReportesPage = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-navy-700">
-                            {(reporteData.empleados || []).map((emp, idx) => (
-                                <tr key={idx} className={`hover:bg-navy-800 ${emp.tuvoLimitacion ? 'bg-orange-500/5' : ''}`}>
-                                    <td className="px-3 py-2 text-gray-300">{emp.cedula}</td>
-                                    <td className="px-3 py-2 text-gray-300">
-                                        {emp.nombreCompleto}
-                                        {emp.tuvoLimitacion && <span className="ml-1 text-orange-400 text-xs">⚠</span>}
-                                    </td>
-                                    <td className="px-3 py-2 text-right font-mono text-gray-400">{formatHoras(emp.horasRegulares)}</td>
-                                    <td className="px-3 py-2 text-right font-mono text-gray-400">{formatHoras(emp.horasDomingo)}</td>
-                                    <td className="px-3 py-2 text-right font-mono text-gray-400">{formatHoras(emp.horasFeriado)}</td>
-                                    <td className="px-3 py-2 text-right font-mono text-gray-400">{formatHoras(emp.horasExtra)}</td>
-                                    <td className="px-3 py-2 text-right font-mono text-gray-100">{formatCurrency(emp.salarioBruto)}</td>
-                                    <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.cssEmpleado)}</td>
-                                    <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.seEmpleado)}</td>
-                                    <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.isr)}</td>
-                                    <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.totalAcreedores)}</td>
-                                    <td className="px-3 py-2 text-right font-bold font-mono text-green-400">{formatCurrency(emp.salarioNeto)}</td>
-                                </tr>
-                            ))}
+                            {(reporteData.empleados || []).map((emp, idx) => {
+                                const hasDesglose = (emp.desgloseHoras || []).length > 0;
+                                const isExpanded = expandedRows.has(idx);
+                                return (
+                                    <React.Fragment key={idx}>
+                                        <tr className={`hover:bg-navy-800 ${emp.tuvoLimitacion ? 'bg-orange-500/5' : ''}`}>
+                                            <td className="px-2 py-2">
+                                                {hasDesglose && (
+                                                    <button onClick={() => toggleRow(idx)} className="text-gray-500 hover:text-emerald-400 transition-colors">
+                                                        {isExpanded ? '▾' : '▸'}
+                                                    </button>
+                                                )}
+                                            </td>
+                                            <td className="px-3 py-2 text-gray-300">{emp.cedula}</td>
+                                            <td className="px-3 py-2 text-gray-300">
+                                                {emp.nombreCompleto}
+                                                {emp.tuvoLimitacion && <span className="ml-1 text-orange-400 text-xs">⚠</span>}
+                                            </td>
+                                            <td className="px-3 py-2 text-right font-mono text-gray-400">{formatHoras(emp.horasRegulares)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-gray-400">{formatHoras(emp.horasDomingo)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-gray-400">{formatHoras(emp.horasFeriado)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-gray-400">{formatHoras(emp.horasExtra)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-gray-100">{formatCurrency(emp.salarioBruto)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.cssEmpleado)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.seEmpleado)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.isr)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.totalAcreedores)}</td>
+                                            <td className="px-3 py-2 text-right font-bold font-mono text-green-400">{formatCurrency(emp.salarioNeto)}</td>
+                                        </tr>
+                                        {isExpanded && hasDesglose && (
+                                            <tr>
+                                                <td colSpan="13" className="px-0 py-0 bg-navy-900/60">
+                                                    <div className="ml-10 mr-4 my-1">
+                                                        <table className="w-full text-xs border border-navy-700 rounded">
+                                                            <thead>
+                                                                <tr className="bg-navy-700">
+                                                                    <th className="px-3 py-1 text-left text-gray-400 font-medium uppercase">Tipo / Concepto</th>
+                                                                    <th className="px-3 py-1 text-right text-gray-400 font-medium uppercase">Horas</th>
+                                                                    <th className="px-3 py-1 text-right text-gray-400 font-medium uppercase">Tarifa x Hora</th>
+                                                                    <th className="px-3 py-1 text-right text-gray-400 font-medium uppercase">Valor</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {emp.desgloseHoras.map((linea, li) => (
+                                                                    <tr key={li} className="border-t border-navy-700">
+                                                                        <td className="px-3 py-1 text-gray-300">{linea.tipoConcepto}</td>
+                                                                        <td className="px-3 py-1 text-right font-mono text-gray-400">{linea.horas.toFixed(2)}</td>
+                                                                        <td className="px-3 py-1 text-right font-mono text-gray-400">{formatCurrency(linea.tarifaPorHora)}</td>
+                                                                        <td className="px-3 py-1 text-right font-mono text-emerald-400">{formatCurrency(linea.valor)}</td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </React.Fragment>
+                                );
+                            })}
                             <tr className="bg-amber-500/15 font-bold">
+                                <td className="px-2 py-2"></td>
                                 <td className="px-3 py-2 text-amber-400" colSpan="6">TOTALES ({reporteData.totales?.totalEmpleados} empleados)</td>
                                 <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.totalBruto)}</td>
                                 <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.totalCss)}</td>

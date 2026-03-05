@@ -6,6 +6,7 @@ using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Web.Authorization;
 
 namespace Vorluno.Planilla.Web.Controllers;
 
@@ -166,7 +167,7 @@ public class AcreedoresController : ControllerBase
     /// POST /api/acreedores
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.DeductionsManage)]
     public async Task<IActionResult> Create([FromBody] CreateAcreedorRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Nombre))
@@ -218,7 +219,7 @@ public class AcreedoresController : ControllerBase
     /// PUT /api/acreedores/{id}
     /// </summary>
     [HttpPut("{id}")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.DeductionsManage)]
     public async Task<IActionResult> Update(int id, [FromBody] CreateAcreedorRequest request)
     {
         var acreedor = await _context.Acreedores
@@ -277,7 +278,7 @@ public class AcreedoresController : ControllerBase
     /// DELETE /api/acreedores/{id}
     /// </summary>
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Owner,Admin")]
+    [RequirePermission(SystemPermission.DeductionsManage)]
     public async Task<IActionResult> Eliminar(int id)
     {
         var acreedor = await _context.Acreedores

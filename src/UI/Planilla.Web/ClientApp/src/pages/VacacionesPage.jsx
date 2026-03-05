@@ -27,6 +27,11 @@ const VacacionesPage = () => {
         observaciones: ''
     });
 
+    // Cálculo vacacional automático
+    const [calculoVacacional, setCalculoVacacional] = useState(null);
+    const [calculandoSalario, setCalculandoSalario] = useState(false);
+    const [numPeriodosCalculo, setNumPeriodosCalculo] = useState('');
+
     useEffect(() => {
         fetchVacaciones();
         fetchEmpleados();
@@ -186,6 +191,30 @@ const VacacionesPage = () => {
             fechaFin: new Date().toISOString().split('T')[0],
             observaciones: ''
         });
+        setCalculoVacacional(null);
+        setNumPeriodosCalculo('');
+    };
+
+    const calcularSalarioVacacional = async (empleadoId, fechaInicio, fechaFin, periodos) => {
+        if (!empleadoId || !fechaInicio || !fechaFin) return;
+        const dias = Math.ceil((new Date(fechaFin) - new Date(fechaInicio)) / (1000 * 60 * 60 * 24)) + 1;
+        if (dias <= 0) return;
+
+        setCalculandoSalario(true);
+        try {
+            const params = new URLSearchParams({
+                empleadoId,
+                fechaInicio,
+                diasVacaciones: dias,
+                ...(periodos ? { numPeriodos: periodos } : {})
+            });
+            const data = await api.get(`/api/vacaciones/calcular-salario?${params}`);
+            setCalculoVacacional(data);
+        } catch {
+            setCalculoVacacional(null);
+        } finally {
+            setCalculandoSalario(false);
+        }
     };
 
     if (loading) {
@@ -533,7 +562,10 @@ const VacacionesPage = () => {
                                     <select
                                         required
                                         value={formData.empleadoId}
-                                        onChange={(e) => setFormData({ ...formData, empleadoId: e.target.value })}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, empleadoId: e.target.value });
+                                            setCalculoVacacional(null);
+                                        }}
                                         className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-navy-800 text-gray-100"
                                     >
                                         <option value="">Seleccionar empleado...</option>
@@ -553,7 +585,10 @@ const VacacionesPage = () => {
                                         type="date"
                                         required
                                         value={formData.fechaInicio}
-                                        onChange={(e) => setFormData({ ...formData, fechaInicio: e.target.value })}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, fechaInicio: e.target.value });
+                                            setCalculoVacacional(null);
+                                        }}
                                         className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-navy-800 text-gray-100"
                                     />
                                 </div>
@@ -566,9 +601,72 @@ const VacacionesPage = () => {
                                         type="date"
                                         required
                                         value={formData.fechaFin}
-                                        onChange={(e) => setFormData({ ...formData, fechaFin: e.target.value })}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, fechaFin: e.target.value });
+                                            setCalculoVacacional(null);
+                                        }}
                                         className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-navy-800 text-gray-100"
                                     />
+                                </div>
+
+                                {/* Panel de cálculo vacacional automático */}
+                                <div className="md:col-span-2">
+                                    <div className="bg-navy-800/60 border border-navy-600/50 rounded-xl p-4">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <p className="text-sm font-semibold text-emerald-400">Salario Vacacional</p>
+                                            <div className="flex items-center gap-2">
+                                                <label className="text-xs text-gray-400">Períodos:</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    max="100"
+                                                    value={numPeriodosCalculo}
+                                                    onChange={e => setNumPeriodosCalculo(e.target.value)}
+                                                    placeholder="Auto"
+                                                    className="w-16 px-2 py-1 bg-navy-700 border border-navy-600 rounded text-gray-100 text-xs text-center focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => calcularSalarioVacacional(formData.empleadoId, formData.fechaInicio, formData.fechaFin, numPeriodosCalculo || undefined)}
+                                                    disabled={!formData.empleadoId || !formData.fechaInicio || !formData.fechaFin || calculandoSalario}
+                                                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-medium transition-colors disabled:opacity-40"
+                                                >
+                                                    {calculandoSalario ? 'Calculando...' : 'Calcular'}
+                                                </button>
+                                            </div>
+                                        </div>
+                                        {calculoVacacional ? (
+                                            <div className="space-y-2">
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                                                    <div className="bg-navy-700/50 rounded-lg p-2.5">
+                                                        <p className="text-gray-400 mb-0.5">Períodos usados</p>
+                                                        <p className="text-gray-100 font-semibold">{calculoVacacional.numPeriodosUsados}</p>
+                                                    </div>
+                                                    <div className="bg-navy-700/50 rounded-lg p-2.5">
+                                                        <p className="text-gray-400 mb-0.5">Total devengado</p>
+                                                        <p className="text-gray-100 font-semibold font-mono">B/. {calculoVacacional.totalDevengado?.toFixed(2)}</p>
+                                                    </div>
+                                                    <div className="bg-navy-700/50 rounded-lg p-2.5">
+                                                        <p className="text-gray-400 mb-0.5">Salario diario</p>
+                                                        <p className="text-emerald-400 font-semibold font-mono">B/. {calculoVacacional.salarioDiario?.toFixed(2)}</p>
+                                                    </div>
+                                                    <div className="bg-emerald-600/20 border border-emerald-500/30 rounded-lg p-2.5">
+                                                        <p className="text-emerald-400 mb-0.5">Monto vacaciones</p>
+                                                        <p className="text-emerald-300 font-bold font-mono text-sm">B/. {calculoVacacional.montoVacaciones?.toFixed(2)}</p>
+                                                    </div>
+                                                </div>
+                                                <p className="text-xs text-gray-500">
+                                                    Período ref: {calculoVacacional.periodoDesde ? new Date(calculoVacacional.periodoDesde).toLocaleDateString('es-PA') : '—'} — {calculoVacacional.periodoHasta ? new Date(calculoVacacional.periodoHasta).toLocaleDateString('es-PA') : '—'} ({calculoVacacional.diasCalendarioCubiertos} días calendario)
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-gray-500">
+                                                {!formData.empleadoId ? 'Selecciona un empleado para calcular el salario vacacional' :
+                                                 !formData.fechaFin ? 'Completa las fechas para calcular' :
+                                                 'Haz clic en "Calcular" para ver el salario vacacional estimado'}
+                                            </p>
+                                        )}
+                                    </div>
                                 </div>
 
                                 <div className="md:col-span-2">
