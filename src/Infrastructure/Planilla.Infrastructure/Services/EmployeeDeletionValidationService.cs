@@ -191,12 +191,6 @@ public class EmployeeDeletionValidationService : IEmployeeDeletionValidationServ
             });
         }
 
-        // 4. VACACIONES PENDIENTES (si existe la entidad - futuro)
-        // var vacacionesPendientes = await _context.Vacaciones
-        //     .Where(v => v.EmpleadoId == empleadoId && v.TenantId == tenantId && v.Estado == EstadoVacacion.Pendiente)
-        //     .CountAsync();
-        // if (vacacionesPendientes > 0) { ... }
-
         // ===================================================================
         // DETERMINAR SI PUEDE ELIMINAR
         // ===================================================================

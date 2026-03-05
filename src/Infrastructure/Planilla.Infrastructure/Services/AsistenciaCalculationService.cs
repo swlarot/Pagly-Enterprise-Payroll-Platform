@@ -6,6 +6,7 @@
 // ====================================================================
 
 using Microsoft.EntityFrameworkCore;
+using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
@@ -16,7 +17,7 @@ namespace Vorluno.Planilla.Infrastructure.Services;
 /// Servicio para calcular montos relacionados con asistencia del empleado:
 /// horas extra, ausencias y vacaciones.
 /// </summary>
-public class AsistenciaCalculationService
+public class AsistenciaCalculationService : IAsistenciaCalculationService
 {
     private readonly ApplicationDbContext _context;
 

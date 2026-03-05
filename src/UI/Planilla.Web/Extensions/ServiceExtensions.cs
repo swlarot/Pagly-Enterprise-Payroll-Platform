@@ -38,14 +38,14 @@ namespace Vorluno.Planilla.Web.Extensions
             // Phase D: Workflow de planilla y orquestador
             services.AddScoped<PayrollStateMachine>();
             services.AddScoped<PayrollCalculationOrchestratorPortable>();
-            services.AddScoped<DeduccionPrioridadEngine>();
+            services.AddScoped<Vorluno.Planilla.Application.Interfaces.IDeduccionPrioridadEngine, DeduccionPrioridadEngine>();
             services.AddScoped<PayrollProcessingService>();
 
             // Phase E: Multi-tenancy y auditor�a
             services.AddScoped<ICurrentUserService, CurrentUserService>();
 
-            // Phase F: Asistencia (horas extra, ausencias, vacaciones)
-            services.AddScoped<AsistenciaCalculationService>();
+            // Phase F: Asistencia (horas extra, ausencias, vacaciones) — registradas en Program.cs con interfaz
+
 
             // Phase G: Reportes y exportaci�n
             services.AddScoped<ReportesService>();

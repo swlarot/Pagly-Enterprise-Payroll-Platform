@@ -1,5 +1,6 @@
 using Vorluno.Planilla.Application.DTOs;
 using Vorluno.Planilla.Application.Helpers;
+using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Application.Results;
 using Vorluno.Planilla.Domain.Enums;
 
@@ -15,7 +16,7 @@ namespace Vorluno.Planilla.Application.Services;
 ///   3. Embargos Judiciales - Solo excedente sobre salario minimo
 ///   4. Voluntarias (prestamos, sindicato, cooperativas, etc.) - Solo excedente sobre salario minimo
 /// </summary>
-public class DeduccionPrioridadEngine
+public class DeduccionPrioridadEngine : IDeduccionPrioridadEngine
 {
     /// <summary>
     /// Aplica deducciones con prelacion legal y proteccion de salario minimo.
