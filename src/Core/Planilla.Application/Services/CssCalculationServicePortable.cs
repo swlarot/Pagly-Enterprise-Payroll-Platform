@@ -115,7 +115,7 @@ public class CssCalculationServicePortable
         var periodsPerYear = PayrollConstants.GetPeriodsPerYear(payFrequency);
         var periodCap = RoundingPolicy.Round(cap * 12m / periodsPerYear, 2);
 
-        var contributionBase = Math.Min(grossPay, periodCap);
+        var contributionBase = grossPay; // No existe tope de cotización CSS (Art. 178 Ley 462 — tope aplica solo a pensión)
         var rate = config.CssEmployeeRate;
         var amount = RoundingPolicy.CalculatePercentage(contributionBase, rate);
 
@@ -173,7 +173,7 @@ public class CssCalculationServicePortable
         var periodsPerYear = PayrollConstants.GetPeriodsPerYear(payFrequency);
         var periodCap = RoundingPolicy.Round(cap * 12m / periodsPerYear, 2);
 
-        var contributionBase = Math.Min(grossPay, periodCap);
+        var contributionBase = grossPay; // No existe tope de cotización CSS (Art. 178 Ley 462 — tope aplica solo a pensión)
         var rate = config.CssEmployerBaseRate;
         var amount = RoundingPolicy.CalculatePercentage(contributionBase, rate);
 
@@ -227,21 +227,12 @@ public class CssCalculationServicePortable
         var periodsPerYear = PayrollConstants.GetPeriodsPerYear(payFrequency);
         var periodCap = RoundingPolicy.Round(cap * 12m / periodsPerYear, 2);
 
-        var contributionBase = Math.Min(grossPay, periodCap);
+        // No existe tope de cotización CSS — solo aplica a pensión (Art. 178 Ley 462)
+        var contributionBase = grossPay;
 
-        decimal riskRate;
-        if (cssRiskPercentage <= 0.56m)
-        {
-            riskRate = config.CssRiskRateLow;
-        }
-        else if (cssRiskPercentage <= 2.50m)
-        {
-            riskRate = config.CssRiskRateMedium;
-        }
-        else
-        {
-            riskRate = config.CssRiskRateHigh;
-        }
+        // Usar la tasa del empleado directamente (Acuerdo N°2 de 1995: 0.56/0.98/2.10/3.64/5.67%)
+        // El campo CssRiskPercentage almacena el valor como porcentaje (ej: 2.10 = 2.10%)
+        decimal riskRate = cssRiskPercentage;
 
         var amount = RoundingPolicy.CalculatePercentage(contributionBase, riskRate);
 

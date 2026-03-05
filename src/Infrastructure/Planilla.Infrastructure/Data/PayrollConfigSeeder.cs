@@ -50,6 +50,8 @@ public static class PayrollConfigSeeder
                     tenant.Id, tenant.Name);
 
                 await SeedPayrollConfigForTenantAsync(context, tenant.Id, logger);
+                await SeedPayrollConfigPhase2ForTenantAsync(context, tenant.Id, logger);
+                await SeedPayrollConfigPhase3ForTenantAsync(context, tenant.Id, logger);
                 await SeedTaxBracketsForTenantAsync(context, tenant.Id, logger);
             }
 
@@ -90,18 +92,21 @@ public static class PayrollConfigSeeder
                 existingConfig.CssEmployerBaseRate = 13.25m;
                 updated = true;
             }
-            // Actualizar umbrales CSS para topes variables (Ley 462)
-            if (existingConfig.CssHighMinYears != 10 || existingConfig.CssIntermediateMinYears != 5)
+            // Actualizar tasas de riesgo profesional a valores correctos (Acuerdo N°2 de 1995)
+            if (existingConfig.CssRiskRateLow != 0.56m || existingConfig.CssRiskRateMedium != 2.10m || existingConfig.CssRiskRateHigh != 5.67m)
             {
-                existingConfig.CssHighMinYears = 10;
-                existingConfig.CssHighMinAvgSalary = 1200.00m;
-                existingConfig.CssIntermediateMinYears = 5;
-                existingConfig.CssIntermediateMinAvgSalary = 850.00m;
-                existingConfig.CssMaxContributionBaseStandard = 1000.00m;
-                existingConfig.CssMaxContributionBaseIntermediate = 1500.00m;
-                existingConfig.CssMaxContributionBaseHigh = 2500.00m;
+                existingConfig.CssRiskRateLow = 0.56m;
+                existingConfig.CssRiskRateMedium = 2.10m;
+                existingConfig.CssRiskRateHigh = 5.67m;
                 updated = true;
-                logger?.LogInformation("Tenant {TenantId}: actualizando umbrales CSS → IntermMinYears=5, HighMinYears=10", tenantId);
+                logger?.LogInformation("Tenant {TenantId}: actualizando tasas riesgo → 0.56%/2.10%/5.67% (Acuerdo N°2 de 1995)", tenantId);
+            }
+            // Corregir MaxDependents: Ley 37/2018 + Decreto 368/2018 no establece límite
+            if (existingConfig.MaxDependents < 99)
+            {
+                existingConfig.MaxDependents = 99;
+                updated = true;
+                logger?.LogInformation("Tenant {TenantId}: actualizando MaxDependents → 99 (sin límite legal)", tenantId);
             }
             if (updated)
             {
@@ -132,21 +137,23 @@ public static class PayrollConfigSeeder
             CssEmployeeRate = 9.75m,      // Empleado: 9.75%
             CssEmployerBaseRate = 13.25m,  // Empleador base: 13.25% (vigente hasta feb. 2027, reforma CSS)
 
-            // Tasas de riesgo profesional
-            CssRiskRateLow = 0.41m,        // Riesgo bajo: 0.41%
-            CssRiskRateMedium = 1.09m,     // Riesgo medio: 1.09%
-            CssRiskRateHigh = 2.31m,       // Riesgo alto: 2.31%
+            // Tasas de riesgo profesional (Acuerdo N°2 de 1995 — 5 clases)
+            // Nota: el empleado almacena su clase directamente; estos campos son referencia
+            CssRiskRateLow = 0.56m,        // Clase I — Riesgo Mínimo (oficinas, administración)
+            CssRiskRateMedium = 2.10m,     // Clase III — Riesgo Medio (transporte, manufactura)
+            CssRiskRateHigh = 5.67m,       // Clase V — Riesgo Máximo (construcción, minería)
 
-            // Topes de cotización CSS (Ley 462)
-            CssMaxContributionBaseStandard = 1000.00m,      // Estándar: $1,000
-            CssMaxContributionBaseIntermediate = 1500.00m,  // Intermedio: $1,500
-            CssMaxContributionBaseHigh = 2500.00m,          // Alto: $2,500
+            // Tope de pensión CSS (Art. 178 Ley 462) — NO es tope de cotización
+            // La cotización CSS se calcula sobre el salario bruto completo
+            CssMaxContributionBaseStandard = 1500.00m,      // Tope pensión: $1,500
+            CssMaxContributionBaseIntermediate = 2000.00m,  // Tope pensión intermedio: $2,000
+            CssMaxContributionBaseHigh = 2500.00m,          // Tope pensión alto: $2,500
 
-            // Requisitos para topes superiores
-            CssIntermediateMinYears = 5,
-            CssIntermediateMinAvgSalary = 850.00m,
-            CssHighMinYears = 10,
-            CssHighMinAvgSalary = 1200.00m,
+            // Requisitos para topes de pensión superiores (años mínimos cotizados)
+            CssIntermediateMinYears = 25,
+            CssIntermediateMinAvgSalary = 2000.00m,
+            CssHighMinYears = 30,
+            CssHighMinAvgSalary = 2500.00m,
 
             // Seguro Educativo
             EducationalInsuranceEmployeeRate = 1.25m,   // Empleado: 1.25%
@@ -154,7 +161,7 @@ public static class PayrollConfigSeeder
 
             // ISR (Impuesto Sobre la Renta)
             DependentDeductionAmount = 800.00m,  // $800 por dependiente
-            MaxDependents = 5,
+            MaxDependents = 99,  // Sin límite legal (Ley 37/2018 + Decreto 368/2018)
 
             IsActive = true,
             CreatedAt = DateTime.UtcNow,
@@ -165,6 +172,112 @@ public static class PayrollConfigSeeder
         await context.SaveChangesAsync();
 
         logger?.LogInformation("✓ Configuración creada para Tenant {TenantId}", tenantId);
+    }
+
+    /// <summary>
+    /// Seed de PayrollTaxConfiguration Fase 2 (mar 2027 – feb 2029): cuota patronal 14.25%.
+    /// Reforma CSS Ley 462 — segunda fase escalonada.
+    /// </summary>
+    private static async Task SeedPayrollConfigPhase2ForTenantAsync(
+        ApplicationDbContext context,
+        int tenantId,
+        ILogger? logger)
+    {
+        var phase2Start = new DateTime(2027, 3, 1, 0, 0, 0, DateTimeKind.Utc);
+        var exists = await context.PayrollTaxConfigurations
+            .IgnoreQueryFilters()
+            .AnyAsync(c => c.TenantId == tenantId && c.EffectiveStartDate == phase2Start);
+
+        if (exists)
+        {
+            logger?.LogInformation("Tenant {TenantId} ya tiene configuración Fase 2 (2027). Saltando.", tenantId);
+            return;
+        }
+
+        var config = new PayrollTaxConfiguration
+        {
+            TenantId = tenantId,
+            EffectiveStartDate = phase2Start,
+            EffectiveEndDate = new DateTime(2029, 2, 28, 23, 59, 59, DateTimeKind.Utc),
+            Description = "Configuración Panamá — Reforma CSS Fase 2 (14.25% patronal, mar 2027 – feb 2029)",
+            CssEmployeeRate = 9.75m,
+            CssEmployerBaseRate = 14.25m,
+            CssRiskRateLow = 0.56m,
+            CssRiskRateMedium = 2.10m,
+            CssRiskRateHigh = 5.67m,
+            CssMaxContributionBaseStandard = 1500.00m,
+            CssMaxContributionBaseIntermediate = 2000.00m,
+            CssMaxContributionBaseHigh = 2500.00m,
+            CssIntermediateMinYears = 25,
+            CssIntermediateMinAvgSalary = 2000.00m,
+            CssHighMinYears = 30,
+            CssHighMinAvgSalary = 2500.00m,
+            EducationalInsuranceEmployeeRate = 1.25m,
+            EducationalInsuranceEmployerRate = 1.50m,
+            DependentDeductionAmount = 800.00m,
+            MaxDependents = 99,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        context.PayrollTaxConfigurations.Add(config);
+        await context.SaveChangesAsync();
+
+        logger?.LogInformation("✓ Configuración Fase 2 (2027) creada para Tenant {TenantId}", tenantId);
+    }
+
+    /// <summary>
+    /// Seed de PayrollTaxConfiguration Fase 3 (desde mar 2029): cuota patronal 15.25%.
+    /// Reforma CSS Ley 462 — tercera fase escalonada (vigente indefinidamente).
+    /// </summary>
+    private static async Task SeedPayrollConfigPhase3ForTenantAsync(
+        ApplicationDbContext context,
+        int tenantId,
+        ILogger? logger)
+    {
+        var phase3Start = new DateTime(2029, 3, 1, 0, 0, 0, DateTimeKind.Utc);
+        var exists = await context.PayrollTaxConfigurations
+            .IgnoreQueryFilters()
+            .AnyAsync(c => c.TenantId == tenantId && c.EffectiveStartDate == phase3Start);
+
+        if (exists)
+        {
+            logger?.LogInformation("Tenant {TenantId} ya tiene configuración Fase 3 (2029). Saltando.", tenantId);
+            return;
+        }
+
+        var config = new PayrollTaxConfiguration
+        {
+            TenantId = tenantId,
+            EffectiveStartDate = phase3Start,
+            EffectiveEndDate = null, // Vigente indefinidamente
+            Description = "Configuración Panamá — Reforma CSS Fase 3 (15.25% patronal, desde mar 2029)",
+            CssEmployeeRate = 9.75m,
+            CssEmployerBaseRate = 15.25m,
+            CssRiskRateLow = 0.56m,
+            CssRiskRateMedium = 2.10m,
+            CssRiskRateHigh = 5.67m,
+            CssMaxContributionBaseStandard = 1500.00m,
+            CssMaxContributionBaseIntermediate = 2000.00m,
+            CssMaxContributionBaseHigh = 2500.00m,
+            CssIntermediateMinYears = 25,
+            CssIntermediateMinAvgSalary = 2000.00m,
+            CssHighMinYears = 30,
+            CssHighMinAvgSalary = 2500.00m,
+            EducationalInsuranceEmployeeRate = 1.25m,
+            EducationalInsuranceEmployerRate = 1.50m,
+            DependentDeductionAmount = 800.00m,
+            MaxDependents = 99,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        context.PayrollTaxConfigurations.Add(config);
+        await context.SaveChangesAsync();
+
+        logger?.LogInformation("✓ Configuración Fase 3 (2029) creada para Tenant {TenantId}", tenantId);
     }
 
     /// <summary>
@@ -251,6 +364,8 @@ public static class PayrollConfigSeeder
         logger?.LogInformation("Seeding configuración para nuevo Tenant {TenantId}...", tenantId);
 
         await SeedPayrollConfigForTenantAsync(context, tenantId, logger);
+        await SeedPayrollConfigPhase2ForTenantAsync(context, tenantId, logger);
+        await SeedPayrollConfigPhase3ForTenantAsync(context, tenantId, logger);
         await SeedTaxBracketsForTenantAsync(context, tenantId, logger);
 
         logger?.LogInformation("✓ Seed completado para nuevo Tenant {TenantId}", tenantId);
