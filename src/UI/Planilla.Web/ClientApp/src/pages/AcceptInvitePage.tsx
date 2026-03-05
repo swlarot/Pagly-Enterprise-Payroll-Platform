@@ -49,8 +49,9 @@ export default function AcceptInvitePage() {
       }
 
       setInviteInfo(validation);
-    } catch (error: any) {
-      toast.error(error.message || 'Error al validar la invitación');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al validar la invitación';
+      toast.error(message);
       setTimeout(() => navigate('/login'), 2000);
     } finally {
       setIsValidating(false);
@@ -86,8 +87,9 @@ export default function AcceptInvitePage() {
       await acceptInvite(token, password, confirmPassword);
       toast.success('Invitación aceptada. Bienvenido a Pagly');
       navigate('/dashboard', { replace: true });
-    } catch (error: any) {
-      toast.error(error.message || 'Error al aceptar la invitación');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al aceptar la invitación';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }

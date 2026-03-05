@@ -25,14 +25,8 @@ import { Modal } from '../components/ui/Modal';
 import { Button } from '../components/ui/Button';
 import { api } from '../services/api';
 import ConfirmModal from '../components/ConfirmModal';
-
-// Configuración de tipos de período de pago
-const PAY_PERIOD_CONFIG = {
-    0: { name: 'Semanal', periodsPerYear: 52 },
-    1: { name: 'Bisemanal', periodsPerYear: 26 },
-    2: { name: 'Quincenal', periodsPerYear: 24 },
-    3: { name: 'Mensual', periodsPerYear: 12 },
-};
+import { formatCurrency } from '../utils/currency';
+import { PAY_PERIOD_CONFIG } from '../constants/payroll';
 
 // Pasos del workflow de la planilla
 const WORKFLOW_STEPS = [
@@ -46,8 +40,9 @@ const PlanillasPage = () => {
     const [planillas, setPlanillas] = useState([]);
     const [empleados, setEmpleados] = useState([]);
     const [empleadosCount, setEmpleadosCount] = useState(0);
-    const [loading, setLoading] = useState(true);
-    const [processingAction, setProcessingAction] = useState(null);
+    // Una sola fuente de verdad para el estado de carga asíncrona:
+    // 'init' | 'calculating' | 'approving' | 'hours' | 'taxConfig' | 'importing' | 'deleting' | null
+    const [loadingAction, setLoadingAction] = useState('init');
     const [selectedPlanilla, setSelectedPlanilla] = useState(null);
     const [showNewModal, setShowNewModal] = useState(false);
     const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -65,20 +60,16 @@ const PlanillasPage = () => {
     // Estado del panel de horas trabajadas
     const [showHoursPanel, setShowHoursPanel] = useState(false);
     const [employeeHours, setEmployeeHours] = useState([]);
-    const [hoursLoading, setHoursLoading] = useState(false);
     // Ref para rastrear timers de debounce por empleadoId
     const debounceTimers = useRef({});
     // Ref para rastrear si estamos abriendo el panel desde la tabla
     const openingFromTable = useRef(false);
-    const [ensureTaxConfigLoading, setEnsureTaxConfigLoading] = useState(false);
-    const [importNovedadesLoading, setImportNovedadesLoading] = useState(false);
     const [showImportConfirmModal, setShowImportConfirmModal] = useState(false);
     const [importConfirmData, setImportConfirmData] = useState(null);
 
     // Estados para eliminar planilla
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [planillaToDelete, setPlanillaToDelete] = useState(null);
-    const [isDeleting, setIsDeleting] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -129,7 +120,7 @@ const PlanillasPage = () => {
 
     const fetchData = async () => {
         try {
-            setLoading(true);
+            setLoadingAction('init');
 
             // Fetch planillas
             const planillasData = await api.get('/api/payrollheaders');
@@ -159,14 +150,14 @@ const PlanillasPage = () => {
         } catch (err) {
             toast.error(err.message || 'Error al cargar datos');
         } finally {
-            setLoading(false);
+            setLoadingAction(null);
         }
     };
 
     const handleDeletePlanilla = async () => {
         if (!planillaToDelete) return;
         try {
-            setIsDeleting(true);
+            setLoadingAction('deleting');
             await api.delete(`/api/payrollheaders/${planillaToDelete.id}`);
             toast.success(`Planilla ${planillaToDelete.payrollNumber} eliminada`);
             setShowDeleteModal(false);
@@ -180,7 +171,7 @@ const PlanillasPage = () => {
         } catch (error) {
             toast.error(error.message || 'Error al eliminar la planilla');
         } finally {
-            setIsDeleting(false);
+            setLoadingAction(null);
         }
     };
 
@@ -204,13 +195,13 @@ const PlanillasPage = () => {
     // Carga las horas trabajadas de la planilla seleccionada
     const fetchHours = async (planillaId) => {
         try {
-            setHoursLoading(true);
+            setLoadingAction('hours');
             const data = await api.get(`/api/payrollheaders/${planillaId}/hours`);
             setEmployeeHours(Array.isArray(data) ? data.map(normalizeHoursRow) : data);
         } catch (err) {
             toast.error(err.message || 'Error al cargar horas trabajadas');
         } finally {
-            setHoursLoading(false);
+            setLoadingAction(null);
         }
     };
 
@@ -227,34 +218,34 @@ const PlanillasPage = () => {
     // Crear/verificar configuración de impuestos (CSS, SE, ISR) si falta
     const handleEnsureTaxConfig = async () => {
         try {
-            setEnsureTaxConfigLoading(true);
+            setLoadingAction('taxConfig');
             await api.post('/api/payrollheaders/ensure-tax-config');
             toast.success('Configuración de planilla creada o verificada. Vuelve a intentar Calcular Planilla.');
         } catch (err) {
             toast.error(err.message || 'Error al crear configuración');
         } finally {
-            setEnsureTaxConfigLoading(false);
+            setLoadingAction(null);
         }
     };
 
     // Auto-llena horas regulares con defaults del backend
     const handleGenerateDefaultHours = async () => {
         try {
-            setHoursLoading(true);
+            setLoadingAction('hours');
             await api.post(`/api/payrollheaders/${selectedPlanilla.id}/hours/generate-defaults`);
             toast.success('Horas regulares generadas exitosamente');
             await fetchHours(selectedPlanilla.id);
         } catch (err) {
             toast.error(err.message || 'Error al generar horas por defecto');
         } finally {
-            setHoursLoading(false);
+            setLoadingAction(null);
         }
     };
 
     // Importa horas extra y ausencias desde módulos separados
     const handleImportNovedades = async (mode = 'overwrite') => {
         try {
-            setImportNovedadesLoading(true);
+            setLoadingAction('importing');
             const response = await api.post(`/api/payrollheaders/${selectedPlanilla.id}/hours/import-novedades?mode=${mode}`);
 
             if (response.requiresConfirmation) {
@@ -276,7 +267,7 @@ const PlanillasPage = () => {
         } catch (err) {
             toast.error(err.message || 'Error al importar novedades');
         } finally {
-            setImportNovedadesLoading(false);
+            setLoadingAction(null);
         }
     };
 
@@ -355,13 +346,6 @@ const PlanillasPage = () => {
         } catch (err) {
             toast.error(`Error al guardar horas de empleado: ${err.message}`);
         }
-    };
-
-    const formatCurrency = (amount) => {
-        return 'B/. ' + new Intl.NumberFormat('es-PA', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        }).format(amount || 0);
     };
 
     const getStatusBadge = (status) => {
@@ -443,7 +427,7 @@ const PlanillasPage = () => {
         if (!selectedPlanilla) return;
 
         try {
-            setProcessingAction('calculating');
+            setLoadingAction('calculating');
 
             const result = await api.post(`/api/payrollheaders/${selectedPlanilla.id}/calculate`);
             const employeeCount = result.details?.length || empleadosCount;
@@ -454,7 +438,7 @@ const PlanillasPage = () => {
         } catch (err) {
             toast.error(err.message || 'Error al calcular planilla');
         } finally {
-            setProcessingAction(null);
+            setLoadingAction(null);
         }
     };
 
@@ -468,7 +452,7 @@ const PlanillasPage = () => {
         if (!selectedPlanilla) return;
 
         try {
-            setProcessingAction('approving');
+            setLoadingAction('approving');
             setShowApproveConfirmModal(false);
 
             await api.post(`/api/payrollheaders/${selectedPlanilla.id}/approve`);
@@ -478,7 +462,7 @@ const PlanillasPage = () => {
         } catch (err) {
             toast.error(err.message || 'Error al aprobar planilla');
         } finally {
-            setProcessingAction(null);
+            setLoadingAction(null);
         }
     };
 
@@ -499,7 +483,7 @@ const PlanillasPage = () => {
         return `${planilla.payrollNumber} — ${fechaLabel}${periodoLabel ? ` (${periodoLabel})` : ''}`;
     };
 
-    if (loading) {
+    if (loadingAction === 'init') {
         return (
             <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -789,10 +773,10 @@ const PlanillasPage = () => {
                                 {/* Acción Principal */}
                                 <button
                                     onClick={handleCalculate}
-                                    disabled={processingAction === 'calculating'}
+                                    disabled={loadingAction === 'calculating'}
                                     className="group inline-flex items-center gap-3 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all shadow-lg shadow-primary-900/40 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5 hover:shadow-xl"
                                 >
-                                    {processingAction === 'calculating' ? (
+                                    {loadingAction === 'calculating' ? (
                                         <>
                                             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                             Calculando...
@@ -820,11 +804,11 @@ const PlanillasPage = () => {
                                 <button
                                     type="button"
                                     onClick={handleEnsureTaxConfig}
-                                    disabled={ensureTaxConfigLoading}
+                                    disabled={loadingAction === 'taxConfig'}
                                     title="Si Calcular Planilla falla por falta de configuración CSS/SE/ISR, haz clic aquí"
                                     className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-amber-500/40 text-gray-300 hover:text-amber-300 px-4 py-2.5 rounded-xl font-medium text-sm transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {ensureTaxConfigLoading ? (
+                                    {loadingAction === 'taxConfig' ? (
                                         <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
                                     ) : (
                                         <Settings className="w-4 h-4" />
@@ -848,10 +832,10 @@ const PlanillasPage = () => {
                                 {/* Acción Principal */}
                                 <button
                                     onClick={handleApprove}
-                                    disabled={processingAction === 'approving'}
+                                    disabled={loadingAction === 'approving'}
                                     className="inline-flex items-center gap-3 bg-green-600 hover:bg-green-700 text-white px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all shadow-lg shadow-green-900/40 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5 hover:shadow-xl"
                                 >
-                                    {processingAction === 'approving' ? (
+                                    {loadingAction === 'approving' ? (
                                         <>
                                             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                             Aprobando...
@@ -870,10 +854,10 @@ const PlanillasPage = () => {
                                 {/* Herramientas secundarias */}
                                 <button
                                     onClick={handleCalculate}
-                                    disabled={processingAction === 'calculating'}
+                                    disabled={loadingAction === 'calculating'}
                                     className="inline-flex items-center gap-2 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-600/30 hover:border-amber-500/50 text-amber-400 px-4 py-2.5 rounded-xl font-medium text-sm transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {processingAction === 'calculating' ? (
+                                    {loadingAction === 'calculating' ? (
                                         <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
                                     ) : (
                                         <RotateCcw className="w-4 h-4" />
@@ -970,10 +954,10 @@ const PlanillasPage = () => {
                         <div className="flex gap-2">
                             <button
                                 onClick={handleGenerateDefaultHours}
-                                disabled={hoursLoading}
+                                disabled={loadingAction === 'hours'}
                                 className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {hoursLoading ? (
+                                {loadingAction === 'hours' ? (
                                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                                 ) : (
                                     <Zap className="w-4 h-4" />
@@ -982,10 +966,10 @@ const PlanillasPage = () => {
                             </button>
                             <button
                                 onClick={() => handleImportNovedades('overwrite')}
-                                disabled={importNovedadesLoading || hoursLoading}
+                                disabled={loadingAction === 'importing' || loadingAction === 'hours'}
                                 className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                {importNovedadesLoading ? (
+                                {loadingAction === 'importing' ? (
                                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                                 ) : (
                                     <Upload className="w-4 h-4" />
@@ -994,7 +978,7 @@ const PlanillasPage = () => {
                             </button>
                             <button
                                 onClick={handleSaveAndClose}
-                                disabled={hoursLoading || importNovedadesLoading}
+                                disabled={loadingAction === 'hours' || loadingAction === 'importing'}
                                 className="inline-flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Guardar cambios y cerrar el panel"
                             >
@@ -1004,7 +988,7 @@ const PlanillasPage = () => {
                         </div>
                     </div>
 
-                    {hoursLoading && employeeHours.length === 0 ? (
+                    {loadingAction === 'hours' && employeeHours.length === 0 ? (
                         <div className="flex items-center justify-center py-12">
                             <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
                         </div>
@@ -1621,7 +1605,7 @@ const PlanillasPage = () => {
                 }
                 confirmText="Eliminar"
                 variant="danger"
-                isLoading={isDeleting}
+                isLoading={loadingAction === 'deleting'}
             />
 
         </div>

@@ -54,8 +54,9 @@ export default function SystemUsersPage() {
       }));
 
       setUsers(mappedUsers);
-    } catch (error: any) {
-      toast.error(error.message || 'Error cargando usuarios');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error cargando usuarios';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -82,8 +83,9 @@ export default function SystemUsersPage() {
       setShowModal(false);
       setFormData({ nombre: '', apellido: '', correo: '', telefono: '' });
       loadUsers();
-    } catch (error: any) {
-      toast.error(error.message || 'Error creando usuario');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error creando usuario';
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -104,18 +106,20 @@ export default function SystemUsersPage() {
       await systemAdminService.deleteUser(userId);
       toast.success('Usuario eliminado permanentemente');
       loadUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Manejar errores específicos del backend
-      if (error.statusCode === 400 && error.details?.activeTenants) {
-        const tenantsList = error.details.activeTenants
-          .map((t: any) => `${t.tenantName} (${t.role})`)
+      const errObj = error as { statusCode?: number; message?: string; details?: { activeTenants?: { tenantName: string; role: string }[] } };
+      if (errObj.statusCode === 400 && errObj.details?.activeTenants) {
+        const tenantsList = errObj.details.activeTenants
+          .map((t) => `${t.tenantName} (${t.role})`)
           .join(', ');
         toast.error(
           `No se puede eliminar el usuario porque tiene membresías activas en: ${tenantsList}. Debes removerlo primero de cada tenant.`,
           { duration: 8000 }
         );
       } else {
-        toast.error(error.message || 'Error al eliminar usuario');
+        const message = error instanceof Error ? error.message : 'Error al eliminar usuario';
+        toast.error(message);
       }
     } finally {
       setDeletingUserId(null);

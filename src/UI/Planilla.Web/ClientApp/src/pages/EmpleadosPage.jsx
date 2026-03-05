@@ -5,21 +5,8 @@ import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { LinkUserModal } from '../components/empleados/LinkUserModal';
 import { DeleteEmployeeModal } from '../components/empleados/DeleteEmployeeModal';
-
-// Configuración de períodos de pago - definida fuera del componente para evitar recreación
-const PAY_PERIOD_CONFIG = {
-    0: { name: 'Semanal',    periodsPerYear: 52,    weekMultiplier: 1 },
-    1: { name: 'Bisemanal',  periodsPerYear: 26,    weekMultiplier: 2 },
-    2: { name: 'Quincenal',  periodsPerYear: 24,    weekMultiplier: 52 / 24 },
-    3: { name: 'Mensual',    periodsPerYear: 12,    weekMultiplier: 52 / 12 },
-};
-
-// Opciones de riesgo CSS según tasas oficiales CSS Panamá (Decreto 53 de 1971)
-const CSS_RISK_OPTIONS = [
-    { value: 0.56,  label: '0.56% — Bajo (Oficinas, administración, comercio)' },
-    { value: 2.50,  label: '2.50% — Medio (Transporte, manufactura)' },
-    { value: 5.39,  label: '5.39% — Alto (Construcción, maquinaria, minería)' },
-];
+import { formatBalboas } from '../utils/currency';
+import { PAY_PERIOD_CONFIG, CSS_RISK_OPTIONS } from '../constants/payroll';
 
 const EmpleadosPage = () => {
     // Auth context for permissions
@@ -140,11 +127,6 @@ const EmpleadosPage = () => {
 
     const activeEmpleados = empleados.filter(emp => emp.estaActivo);
     const totalNomina = activeEmpleados.reduce((sum, emp) => sum + emp.salarioBase, 0);
-
-    // Formatear moneda en Balboas panameños (B/.)
-    const formatBalboas = (amount) => {
-        return `B/. ${Number(amount || 0).toLocaleString('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    };
 
     // Handle form submission (Create/Update)
     const handleSubmit = async (e) => {
