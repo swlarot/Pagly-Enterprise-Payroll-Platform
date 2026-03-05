@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmModal from '../components/ConfirmModal';
+import { formatCurrency } from '../utils/currency';
 
 const OvertimeByTypeBarChart = lazy(() => import('../components/charts/OvertimeByTypeBarChart'));
 const OvertimeCostDistributionPieChart = lazy(() => import('../components/charts/OvertimeCostDistributionPieChart'));
@@ -284,13 +285,6 @@ const HorasExtraPage = () => {
             color: colors[index % colors.length]
         };
     });
-
-    const formatCurrency = (amount) => {
-        return 'B/. ' + new Intl.NumberFormat('es-PA', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        }).format(amount || 0);
-    };
 
     const formatTime = (timeSpan) => {
         // timeSpan viene como "09:00:00" del backend

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
+import { formatCurrency } from '../utils/currency';
 
 const MESES = [
     { value: 1, label: 'Enero' },
@@ -55,9 +56,6 @@ const ReportesPage = () => {
             setLoadingPlanillas(false);
         }
     };
-
-    const formatCurrency = (amount) =>
-        'B/. ' + new Intl.NumberFormat('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
 
     const formatDate = (dateString) => {
         if (!dateString) return '';

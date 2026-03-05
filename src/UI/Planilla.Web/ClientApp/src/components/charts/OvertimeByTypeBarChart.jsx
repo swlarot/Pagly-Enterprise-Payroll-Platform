@@ -53,7 +53,7 @@ export default function OvertimeByTypeBarChart({ data = [], title = 'Horas Extra
                         wrapperStyle={{ color: '#9CA3AF' }}
                         formatter={(value) => {
                             if (value === 'horas') return 'Horas';
-                            if (value === 'monto') return 'Monto (USD)';
+                            if (value === 'monto') return 'Monto (B/.)';
                             return value;
                         }}
                     />

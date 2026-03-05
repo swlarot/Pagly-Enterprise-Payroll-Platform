@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { formatCurrency } from '../utils/currency';
 
 const PrestamosPage = () => {
     // Auth context - Solo Manager+ puede crear/aprobar préstamos
@@ -78,14 +79,6 @@ const PrestamosPage = () => {
             fetchPrestamos();
         }
     }, [filterEmpleado, filterEstado]);
-
-    // Format currency
-    const formatCurrency = (amount) => {
-        return 'B/. ' + new Intl.NumberFormat('es-PA', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        }).format(amount || 0);
-    };
 
     // Filter prestamos
     const filteredPrestamos = prestamos.filter(p =>

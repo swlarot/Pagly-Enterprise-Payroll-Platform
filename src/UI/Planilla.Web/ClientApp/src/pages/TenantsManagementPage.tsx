@@ -38,8 +38,9 @@ export default function TenantsManagementPage() {
       setIsLoading(true);
       const data = await systemAdminService.getAllTenants();
       setAllTenants(data);
-    } catch (error: any) {
-      toast.error(error.message || 'Error al cargar tenants');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al cargar tenants';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }

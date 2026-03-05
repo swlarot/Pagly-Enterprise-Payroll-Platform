@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { formatCurrency } from '../utils/currency';
 
 const AusenciasPage = () => {
     // Auth context for permissions
@@ -81,13 +82,6 @@ const AusenciasPage = () => {
     const diasPerdidos = ausencias.reduce((sum, a) => sum + a.diasAusencia, 0);
     const injustificadas = ausencias.filter(a => a.tipoAusencia === 1).length;
     const conJustificacion = ausencias.filter(a => a.tieneJustificacion).length;
-
-    const formatCurrency = (amount) => {
-        return 'B/. ' + new Intl.NumberFormat('es-PA', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        }).format(amount || 0);
-    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();

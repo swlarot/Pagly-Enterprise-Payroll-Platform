@@ -97,8 +97,9 @@ export default function TenantDetailsPage() {
       const data = await systemAdminService.getTenantById(parseInt(id!));
       setTenant(data);
       setNewPlan(data.subscription?.plan || SubscriptionPlan.Free);
-    } catch (error: any) {
-      toast.error(error.message || 'Error al cargar tenant');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al cargar tenant';
+      toast.error(message);
       navigate('/system-admin/tenants');
     } finally {
       setIsLoading(false);
@@ -110,7 +111,7 @@ export default function TenantDetailsPage() {
       setIsLoadingUsers(true);
       const data = await systemAdminService.getTenantUsers(parseInt(id!));
       setUsers(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading users:', error);
       toast.error('Error al cargar usuarios');
     } finally {
@@ -148,12 +149,14 @@ export default function TenantDetailsPage() {
       toast.success('Usuario eliminado del tenant exitosamente');
       await loadUsers();
       await loadTenant(); // Recargar para actualizar estadísticas
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error removing user:', error);
-      if (error.statusCode === 400 && error.message?.includes('último Owner')) {
+      const errObj = error as { statusCode?: number; message?: string };
+      if (errObj.statusCode === 400 && errObj.message?.includes('último Owner')) {
         toast.error('No se puede eliminar el último Owner del tenant');
       } else {
-        toast.error(error.message || 'Error al eliminar usuario del tenant');
+        const message = error instanceof Error ? error.message : 'Error al eliminar usuario del tenant';
+        toast.error(message);
       }
     } finally {
       setDeletingUserId(null);
@@ -166,7 +169,7 @@ export default function TenantDetailsPage() {
       const data = await systemAdminService.getTenantAuditLog(parseInt(id!), auditFilters);
       setAuditLogs(data.data);
       setAuditTotal(data.total);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading audit logs:', error);
       toast.error('Error al cargar logs de auditoría');
     } finally {
@@ -183,8 +186,9 @@ export default function TenantDetailsPage() {
       setTenant(updated);
       setShowChangePlanModal(false);
       toast.success('Plan actualizado exitosamente');
-    } catch (error: any) {
-      toast.error(error.message || 'Error al cambiar plan');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al cambiar plan';
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -200,8 +204,9 @@ export default function TenantDetailsPage() {
       setTenant(updated);
       setShowExtendTrialModal(false);
       toast.success(`Trial extendido ${extendDays} días`);
-    } catch (error: any) {
-      toast.error(error.message || 'Error al extender trial');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al extender trial';
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -219,8 +224,9 @@ export default function TenantDetailsPage() {
       }
       await loadTenant();
       setShowDeactivateModal(false);
-    } catch (error: any) {
-      toast.error(error.message || 'Error al cambiar estado del tenant');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al cambiar estado del tenant';
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }

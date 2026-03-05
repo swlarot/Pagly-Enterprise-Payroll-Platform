@@ -5,6 +5,7 @@ import { api } from '../services/api';
 import ConfirmModal from '../components/ConfirmModal';
 import { useAuth } from '../contexts/AuthContext';
 import { TenantRole } from '../types/api';
+import { formatCurrency } from '../utils/currency';
 
 const PosicionesPage = () => {
     // Auth context - Solo Owner puede gestionar posiciones (permisos granulares en desarrollo)
@@ -164,13 +165,6 @@ const PosicionesPage = () => {
             2: { text: 'Alto (5.39%)', className: 'bg-red-500/15 text-red-400' }
         };
         return badges[nivel] || badges[0];
-    };
-
-    const formatCurrency = (value) => {
-        return 'B/. ' + new Intl.NumberFormat('es-PA', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        }).format(value || 0);
     };
 
     const filteredPosiciones = selectedDeptId

@@ -28,8 +28,9 @@ export default function RolesPage() {
       setIsLoading(true);
       const data = await roleService.getRoles();
       setRoles(data);
-    } catch (error: any) {
-      toast.error(error.message || 'Error al cargar roles');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al cargar roles';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -50,8 +51,9 @@ export default function RolesPage() {
       toast.success('Rol eliminado exitosamente');
       await loadRoles();
       setDeletingRole(null);
-    } catch (error: any) {
-      toast.error(error.message || 'Error al eliminar rol');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al eliminar rol';
+      toast.error(message);
     } finally {
       setIsDeleting(false);
     }
