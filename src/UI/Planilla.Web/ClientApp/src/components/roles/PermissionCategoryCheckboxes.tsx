@@ -1,4 +1,3 @@
-import React from 'react';
 import type { PermissionDto } from '../../types/api';
 
 interface PermissionCategoryCheckboxesProps {
@@ -17,7 +16,6 @@ export function PermissionCategoryCheckboxes({
   onSelectAll,
 }: PermissionCategoryCheckboxesProps) {
   const allSelected = permissions.every((p) => selectedPermissions.includes(p.key));
-  const someSelected = permissions.some((p) => selectedPermissions.includes(p.key));
 
   const handleSelectAll = () => {
     if (allSelected) {

@@ -5,6 +5,7 @@ export interface JwtPayload {
   tenant_role: string;
   plan: string;
   is_system_admin?: string;
+  nombre_completo?: string;
   exp: number;
   iat: number;
 }

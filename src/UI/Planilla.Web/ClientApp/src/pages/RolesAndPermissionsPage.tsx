@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Shield } from 'lucide-react';
 import { RolesTab } from '../components/roles/RolesTab';
 import { UsersManagementTab } from '../components/roles/UsersManagementTab';

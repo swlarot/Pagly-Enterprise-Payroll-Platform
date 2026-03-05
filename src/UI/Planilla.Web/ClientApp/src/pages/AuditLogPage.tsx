@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { auditService } from '../services/auditService';
 import type { AuditLogDto, PagedResultDto } from '../types/api';
 import toast from 'react-hot-toast';
@@ -18,7 +18,7 @@ export default function AuditLogPage() {
     try {
       const data = await auditService.getAuditLogs({ page, pageSize });
       setLogs(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error('Error al cargar el registro de auditoría');
     } finally {
       setIsLoading(false);

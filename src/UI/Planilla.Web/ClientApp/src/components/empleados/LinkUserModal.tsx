@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Search, Loader2, UserCheck, AlertCircle } from 'lucide-react';
 import { Button } from '../ui/Button';
-import { Modal } from '../ui/Modal';
 import toast from 'react-hot-toast';
 import { api } from '../../services/api';
 

@@ -42,7 +42,7 @@ export const systemAdminService = {
   deleteUser: (userId: string) => api.delete(`/api/admin/users/${userId}`),
 
   // Tenant management
-  getAllTenants: (params?: {
+  getAllTenants: (_params?: {
     page?: number;
     pageSize?: number;
     search?: string;

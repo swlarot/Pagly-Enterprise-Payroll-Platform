@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { PaglyLogo } from '../components/ui/PaglyLogo';
 import toast from 'react-hot-toast';
-import { Building2, Shield, User, Clock, ArrowRight, LogOut, Crown, Briefcase, BookOpen } from 'lucide-react';
+import { Building2, Shield, User, Clock, ArrowRight, LogOut, Crown } from 'lucide-react';
 import { TenantRole } from '../types/api';
 
 const TENANT_SELECTION_TIMEOUT_MS = 5 * 60 * 1000;
@@ -18,26 +18,12 @@ const roleConfig: Record<number, { label: string; icon: typeof Shield; color: st
     bg: 'rgba(251,191,36,0.08)',
     border: 'rgba(251,191,36,0.2)',
   },
-  [TenantRole.Admin]: {
-    label: 'Administrador',
-    icon: Shield,
+  [TenantRole.User]: {
+    label: 'Usuario',
+    icon: User,
     color: '#10b981',
     bg: 'rgba(16,185,129,0.08)',
     border: 'rgba(16,185,129,0.2)',
-  },
-  [TenantRole.Manager]: {
-    label: 'Gerente',
-    icon: Briefcase,
-    color: '#60a5fa',
-    bg: 'rgba(96,165,250,0.08)',
-    border: 'rgba(96,165,250,0.2)',
-  },
-  [TenantRole.Accountant]: {
-    label: 'Contador',
-    icon: BookOpen,
-    color: '#a78bfa',
-    bg: 'rgba(167,139,250,0.08)',
-    border: 'rgba(167,139,250,0.2)',
   },
 };
 
@@ -105,8 +91,9 @@ export default function TenantSelectorPage() {
       localStorage.setItem(LAST_TENANT_KEY, tenantId.toString());
       toast.success('Empresa seleccionada exitosamente');
       navigate('/dashboard', { replace: true });
-    } catch (error: any) {
-      toast.error(error.message || 'Error al seleccionar empresa');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al seleccionar empresa';
+      toast.error(message);
       setIsSelecting(false);
       setSelectedId(null);
     }

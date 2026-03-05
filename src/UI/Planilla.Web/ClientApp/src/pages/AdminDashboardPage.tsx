@@ -4,11 +4,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
+import { formatCurrency, formatCurrencyShort } from '../utils/currency';
+import type { EmpleadoSummaryDto, PayrollHeaderSummaryDto } from '../types/api';
 
 interface DashboardStats {
   totalEmpleados: number;
   empleadosActivos: number;
-  ultimaPlanilla: any | null;
+  ultimaPlanilla: PayrollHeaderSummaryDto | null;
   aportesCss: number;
   pendientes: number;
 }
@@ -23,7 +25,7 @@ export default function AdminDashboardPage() {
     pendientes: 0,
   });
   // Lista de las últimas planillas para el mini chart
-  const [planillasList, setPlanillasList] = useState<any[]>([]);
+  const [planillasList, setPlanillasList] = useState<PayrollHeaderSummaryDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const hasLoadedRef = React.useRef(false); // Ref para evitar cargar múltiples veces
 
@@ -40,16 +42,16 @@ export default function AdminDashboardPage() {
 
       // Cargar empleados
       console.log('[AdminDashboardPage] Fetching empleados...');
-      const empleadosRes = await api.get('/api/empleados');
+      const empleadosRes = await api.get('/api/empleados') as any;
       const empleados = Array.isArray(empleadosRes)
         ? empleadosRes
         : Array.isArray(empleadosRes?.data)
           ? empleadosRes.data
           : [];
-      const activos = empleados.filter((e: any) => e.estaActivo).length;
+      const activos = empleados.filter((e: EmpleadoSummaryDto) => e.estaActivo).length;
 
       // Cargar planillas
-      const planillasRes = await api.get('/api/payrollheaders');
+      const planillasRes = await api.get('/api/payrollheaders') as any;
       const planillas = Array.isArray(planillasRes)
         ? planillasRes
         : Array.isArray(planillasRes?.data)
@@ -60,7 +62,7 @@ export default function AdminDashboardPage() {
       const ultimaPlanilla = planillas.length > 0 ? planillas[0] : null;
 
       // Planillas pendientes (Draft = 0)
-      const pendientes = planillas.filter((p: any) => p.status === 0).length;
+      const pendientes = planillas.filter((p: PayrollHeaderSummaryDto) => p.status === 0).length;
 
       // Guardar lista para mini chart (hasta 8)
       setPlanillasList(planillas.slice(0, 8));
@@ -79,9 +81,10 @@ export default function AdminDashboardPage() {
         planillas: planillas.length,
         pendientes: pendientes
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('[AdminDashboardPage] Error loading dashboard data:', error);
-      toast.error(error.message || 'Error al cargar datos del dashboard');
+      const message = error instanceof Error ? error.message : 'Error al cargar datos del dashboard';
+      toast.error(message);
       hasLoadedRef.current = false; // Permitir reintento en caso de error
     } finally {
       setIsLoading(false);
@@ -108,20 +111,6 @@ export default function AdminDashboardPage() {
     return () => clearTimeout(timeoutId);
   }, [authLoading, tenant, loadDashboardData]);
 
-
-  const formatCurrency = (amount: number) => {
-    return 'B/. ' + new Intl.NumberFormat('es-PA', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount || 0);
-  };
-
-  const formatCurrencyShort = (amount: number) => {
-    if (amount >= 1000) {
-      return `B/.${(amount / 1000).toFixed(1)}k`;
-    }
-    return formatCurrency(amount);
-  };
 
   const getStatusBadge = (status: number) => {
     const badges: Record<number, { text: string; color: string }> = {
@@ -181,7 +170,7 @@ export default function AdminDashboardPage() {
   // Calcular valor máximo de planillas para el mini chart
   const chartPlanillas = [...planillasList].reverse();
   const maxNetPay = chartPlanillas.length > 0
-    ? Math.max(...chartPlanillas.map((p: any) => p.totalNetPay || 0))
+    ? Math.max(...chartPlanillas.map((p: PayrollHeaderSummaryDto) => p.totalNetPay || 0))
     : 0;
 
   return (
@@ -346,7 +335,7 @@ export default function AdminDashboardPage() {
             <>
               {/* Barras del chart */}
               <div className="flex items-end gap-1.5 h-20 mb-2">
-                {chartPlanillas.map((p: any, i: number) => {
+                {chartPlanillas.map((p: PayrollHeaderSummaryDto, i: number) => {
                   const pct = maxNetPay > 0 ? Math.round(((p.totalNetPay || 0) / maxNetPay) * 100) : 0;
                   const isLast = i === chartPlanillas.length - 1;
                   return (
@@ -367,7 +356,7 @@ export default function AdminDashboardPage() {
 
               {/* Etiquetas inferiores (período abreviado) */}
               <div className="flex items-center gap-1.5">
-                {chartPlanillas.map((p: any, i: number) => {
+                {chartPlanillas.map((p: PayrollHeaderSummaryDto, i: number) => {
                   const date = p.periodStartDate
                     ? new Date(p.periodStartDate).toLocaleDateString('es-PA', { month: 'short', day: 'numeric' })
                     : `#${i + 1}`;
@@ -484,7 +473,7 @@ export default function AdminDashboardPage() {
           </div>
           <div className="flex items-center gap-0">
             {['Borrador', 'Calculado', 'Aprobado', 'Pagado'].map((step, idx) => {
-              const currentStep = getStatusStep(stats.ultimaPlanilla.status);
+              const currentStep = getStatusStep(stats.ultimaPlanilla!.status);
               const isCompleted = idx < currentStep;
               const isActive = idx === currentStep;
               return (

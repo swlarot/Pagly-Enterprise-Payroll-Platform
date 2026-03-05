@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardHeader, CardBody } from '../components/ui/Card';
-import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
-import { User, Users, DollarSign, Calendar, FileText, Clock, Briefcase, ArrowLeft, Search } from 'lucide-react';
+import { User, DollarSign, Calendar, FileText, Clock, Briefcase, ArrowLeft, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { TenantRole } from '../types/api';
+import { formatCurrency } from '../utils/currency';
 
 interface Empleado {
   id: number;
@@ -47,9 +47,6 @@ interface Vacacion {
 // ============================================================
 // Utilidades compartidas
 // ============================================================
-
-const formatCurrency = (amount: number) =>
-  'B/. ' + new Intl.NumberFormat('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount || 0);
 
 const formatDate = (dateString: string) =>
   new Date(dateString).toLocaleDateString('es-PA', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -115,9 +112,10 @@ function EmployeeDetail({ empleado, isOwnerView, onBack }: EmployeeDetailProps) 
         : '/api/vacaciones';
       const vacacionesRes = await api.get<Vacacion[]>(vacacionesUrl);
       setVacaciones(vacacionesRes.slice(0, 5));
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error cargando datos del empleado:', error);
-      toast.error(error.message || 'Error al cargar datos del empleado');
+      const message = error instanceof Error ? error.message : 'Error al cargar datos del empleado';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -528,7 +526,7 @@ function EmployeeList({ empleados, onSelectEmpleado }: EmployeeListProps) {
 // ============================================================
 
 export default function MiPerfilPage() {
-  const { user, hasRole } = useAuth();
+  const { hasRole } = useAuth();
   const isOwner = hasRole(TenantRole.Owner);
 
   const [isLoading, setIsLoading] = useState(true);
@@ -549,9 +547,10 @@ export default function MiPerfilPage() {
       if (!isOwner && data && data.length > 0) {
         setSelectedEmpleado(data[0]);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error cargando empleados:', error);
-      toast.error(error.message || 'Error al cargar información');
+      const message = error instanceof Error ? error.message : 'Error al cargar información';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { subscriptionService } from '../services/subscriptionService';
 import toast from 'react-hot-toast';
@@ -13,8 +13,9 @@ export default function BillingPage() {
     try {
       const url = await subscriptionService.getBillingPortalUrl();
       window.location.href = url;
-    } catch (error: any) {
-      toast.error(error.message || 'Error al redirigir al portal de facturación');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al redirigir al portal de facturación';
+      toast.error(message);
       setIsRedirecting(false);
     }
   };

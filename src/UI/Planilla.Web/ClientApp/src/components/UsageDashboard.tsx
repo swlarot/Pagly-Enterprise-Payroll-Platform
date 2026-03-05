@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Users, Building2, UserPlus, TrendingUp, AlertCircle, Check, Lock, ArrowUpCircle } from 'lucide-react';
+import { Users, UserPlus, TrendingUp, AlertCircle, Check, Lock, ArrowUpCircle } from 'lucide-react';
 import { subscriptionService } from '../services/subscriptionService';
 import { useAuth } from '../contexts/AuthContext';
 import type { SubscriptionUsageDto } from '../types/api';
@@ -26,11 +26,6 @@ export function UsageDashboard() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const getUsagePercentage = (current: number, max: number): number => {
-    if (max === 0 || max === Number.MAX_VALUE) return 0;
-    return Math.min(Math.round((current / max) * 100), 100);
   };
 
   const getUsageColor = (percentage: number): string => {

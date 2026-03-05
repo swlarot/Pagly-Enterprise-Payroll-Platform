@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { tenantService } from '../services/tenantService';
 import { useAuth } from '../contexts/AuthContext';
-import type { TenantUserDto, InvitationDto, TenantRole, UpdateTenantUserDto } from '../types/api';
+import type { TenantUserDto, InvitationDto, UpdateTenantUserDto } from '../types/api';
+import { TenantRole } from '../types/api';
 import toast from 'react-hot-toast';
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -25,14 +26,14 @@ export default function UsersPage() {
   // Invite modal state
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState<TenantRole>(2); // Manager by default
+  const [inviteRole, setInviteRole] = useState<TenantRole>(TenantRole.User); // Manager by default
   const [isInviting, setIsInviting] = useState(false);
   const [generatedInviteUrl, setGeneratedInviteUrl] = useState('');
 
   // Role change modal state
   const [isRoleModalOpen, setIsRoleModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<TenantUserDto | null>(null);
-  const [newRole, setNewRole] = useState<TenantRole>(2);
+  const [newRole, setNewRole] = useState<TenantRole>(TenantRole.User);
   const [isUpdatingRole, setIsUpdatingRole] = useState(false);
 
   // Confirm modal state
@@ -66,7 +67,7 @@ export default function UsersPage() {
       setUsers(usersData);
       setInvitations(invitationsData);
       setUsage({ usersCount: usageData.usersCount, maxUsers: usageData.maxUsers });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error('Error al cargar datos de usuarios');
       console.error(error);
     } finally {
@@ -81,7 +82,7 @@ export default function UsersPage() {
       if (!response.ok) throw new Error('Error al cargar roles');
       const data = await response.json();
       setCustomRoles(data || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading custom roles:', error);
       // Si falla la carga de roles custom, usar roles predeterminados
       setCustomRoles([]);
@@ -126,9 +127,10 @@ export default function UsersPage() {
 
       // Reset form but keep modal open to show URL
       setInviteEmail('');
-      setInviteRole(2);
-    } catch (error: any) {
-      toast.error(error.message || 'Error al enviar invitación');
+      setInviteRole(TenantRole.User);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al enviar invitación';
+      toast.error(message);
     } finally {
       setIsInviting(false);
     }
@@ -143,7 +145,7 @@ export default function UsersPage() {
     setIsInviteModalOpen(false);
     setGeneratedInviteUrl('');
     setInviteEmail('');
-    setInviteRole(2);
+    setInviteRole(TenantRole.User);
   };
 
   const handleOpenRoleModal = (user: TenantUserDto) => {
@@ -164,8 +166,9 @@ export default function UsersPage() {
       setIsRoleModalOpen(false);
       setSelectedUser(null);
       await loadData();
-    } catch (error: any) {
-      toast.error(error.message || 'Error al cambiar rol');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al cambiar rol';
+      toast.error(message);
     } finally {
       setIsUpdatingRole(false);
     }
@@ -185,8 +188,9 @@ export default function UsersPage() {
           await tenantService.updateUser(user.id, dto);
           toast.success(`Usuario ${action === 'activar' ? 'activado' : 'desactivado'} exitosamente`);
           await loadData();
-        } catch (error: any) {
-          toast.error(error.message || `Error al ${action} usuario`);
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : `Error al ${action} usuario`;
+          toast.error(message);
         }
       },
     });
@@ -203,8 +207,9 @@ export default function UsersPage() {
           await tenantService.removeUser(user.id);
           toast.success('Usuario removido exitosamente');
           await loadData();
-        } catch (error: any) {
-          toast.error(error.message || 'Error al remover usuario');
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : 'Error al remover usuario';
+          toast.error(message);
         }
       },
     });
@@ -221,8 +226,9 @@ export default function UsersPage() {
           await tenantService.revokeInvitation(invitation.id);
           toast.success('Invitación revocada exitosamente');
           await loadData();
-        } catch (error: any) {
-          toast.error(error.message || 'Error al revocar invitación');
+        } catch (error: unknown) {
+          const message = error instanceof Error ? error.message : 'Error al revocar invitación';
+          toast.error(message);
         }
       },
     });
