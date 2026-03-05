@@ -88,7 +88,8 @@ public class Empleado : ITenantEntity
     public int? PosicionId { get; set; }
 
     /// <summary>
-    /// A�os cotizados en CSS (determina tope CSS: 25 a�os ? intermedio, 30 a�os ? alto)
+    /// A�os cotizados en CSS. M�nimo 20 a�os (240 cuotas) para jubilaci�n.
+    /// 25 a�os → tope pens i�n intermedio ($2,000), 30 a�os → tope pens i�n alto ($2,500).
     /// </summary>
     public int YearsCotized { get; set; } = 0;
 
@@ -99,7 +100,9 @@ public class Empleado : ITenantEntity
     public decimal AverageSalaryLast10Years { get; set; } = 0;
 
     /// <summary>
-    /// Porcentaje de riesgo profesional CSS: 0.56 (bajo), 2.50 (medio), 5.39 (alto)
+    /// Porcentaje de riesgo profesional CSS (Acuerdo N°2 de 1995):
+    /// 0.56 = Clase I (Riesgo Mínimo), 0.98 = Clase II,
+    /// 2.10 = Clase III (Riesgo Medio), 3.64 = Clase IV, 5.67 = Clase V (Riesgo Máximo)
     /// </summary>
     [Column(TypeName = "decimal(5, 2)")]
     public decimal CssRiskPercentage { get; set; } = 0.56m;
@@ -152,7 +155,8 @@ public class Empleado : ITenantEntity
     public const decimal WeeksPerMonth = 52m / 12m;
 
     /// <summary>
-    /// N�mero de dependientes declarados (m�ximo 3 para deducci�n ISR)
+    /// N�mero de dependientes declarados para deducci�n ISR ($800 c/u).
+    /// Sin l�mite legal (Ley 37/2018 + Decreto 368/2018).
     /// </summary>
     public int Dependents { get; set; } = 0;
 
