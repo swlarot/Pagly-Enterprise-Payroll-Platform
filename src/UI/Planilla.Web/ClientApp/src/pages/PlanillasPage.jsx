@@ -71,6 +71,11 @@ const PlanillasPage = () => {
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [planillaToDelete, setPlanillaToDelete] = useState(null);
 
+    // Estados para desglose detallado del modal "Ver"
+    const [expandedDetails, setExpandedDetails] = useState(new Set());
+    const [breakdowns, setBreakdowns] = useState({});
+    const [loadingBreakdown, setLoadingBreakdown] = useState(null);
+
     useEffect(() => {
         fetchData();
     }, []);
@@ -188,7 +193,8 @@ const PlanillasPage = () => {
             overtimeHolidayHours: n(row.overtimeHolidayHours),
             overtimeMixedHours: n(row.overtimeMixedHours),
             overtimeExcessHours: n(row.overtimeExcessHours),
-            absenceHours: n(row.absenceHours)
+            absenceHours: n(row.absenceHours),
+            commissions: n(row.commissions)
         };
     };
 
@@ -341,7 +347,8 @@ const PlanillasPage = () => {
                 overtimeHolidayHours: row.overtimeHolidayHours || 0,
                 overtimeMixedHours: row.overtimeMixedHours || 0,
                 overtimeExcessHours: row.overtimeExcessHours || 0,
-                absenceHours: row.absenceHours || 0
+                absenceHours: row.absenceHours || 0,
+                commissions: row.commissions || 0
             });
         } catch (err) {
             toast.error(`Error al guardar horas de empleado: ${err.message}`);
@@ -470,9 +477,34 @@ const PlanillasPage = () => {
         try {
             const data = await api.get(`/api/payrollheaders/${planilla.id}`);
             setPlanillaDetails(data);
+            setExpandedDetails(new Set());
+            setBreakdowns({});
             setShowDetailsModal(true);
         } catch (err) {
             toast.error(err.message || 'Error al cargar detalles');
+        }
+    };
+
+    const toggleDetailExpand = async (payrollId, detailId) => {
+        const newExpanded = new Set(expandedDetails);
+        if (newExpanded.has(detailId)) {
+            newExpanded.delete(detailId);
+            setExpandedDetails(newExpanded);
+            return;
+        }
+        newExpanded.add(detailId);
+        setExpandedDetails(newExpanded);
+
+        if (breakdowns[detailId]) return; // ya en caché
+
+        setLoadingBreakdown(detailId);
+        try {
+            const data = await api.get(`/api/payrollheaders/${payrollId}/details/${detailId}/breakdown`);
+            setBreakdowns(prev => ({ ...prev, [detailId]: data }));
+        } catch (err) {
+            toast.error('Error al cargar desglose: ' + (err.message || ''));
+        } finally {
+            setLoadingBreakdown(null);
         }
     };
 
@@ -1019,6 +1051,10 @@ const PlanillasPage = () => {
                                     <span className="w-3 h-3 rounded-sm bg-red-500/30 border border-red-400" />
                                     <span className="text-xs text-gray-400">Ausencias</span>
                                 </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-3 h-3 rounded-sm bg-blue-500/30 border border-blue-400" />
+                                    <span className="text-xs text-gray-400">Comisiones (B/.)</span>
+                                </div>
                             </div>
 
                             <table className="w-full text-sm">
@@ -1033,6 +1069,7 @@ const PlanillasPage = () => {
                                     <col className="w-[70px]" />
                                     <col className="w-[70px]" />
                                     <col className="w-[70px]" />
+                                    <col className="w-[90px]" />
                                 </colgroup>
                                 <thead className="bg-navy-950 border-b-2 border-navy-600 sticky top-0 z-10">
                                     <tr>
@@ -1046,6 +1083,7 @@ const PlanillasPage = () => {
                                         <th className="text-center py-4 px-3 text-xs font-semibold text-purple-400 uppercase tracking-wider" title="Horas extra mixtas">Extra Mixtas</th>
                                         <th className="text-center py-4 px-3 text-xs font-semibold text-purple-400 uppercase tracking-wider" title="Horas extra con exceso">Extra Exceso</th>
                                         <th className="text-center py-4 px-3 text-xs font-semibold text-red-400 uppercase tracking-wider" title="Horas de ausencia">Ausencias</th>
+                                        <th className="text-center py-4 px-3 text-xs font-semibold text-blue-400 uppercase tracking-wider" title="Comisiones del período (B/.)">Comisión B/.</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-navy-700/50">
@@ -1152,6 +1190,17 @@ const PlanillasPage = () => {
                                                         value={num(row.absenceHours)}
                                                         onChange={(e) => handleHoursChange(row.empleadoId, 'absenceHours', e.target.value)}
                                                         className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-red-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
+                                                    />
+                                                </td>
+                                                {/* Comisiones — azul */}
+                                                <td className="py-3 px-3 text-center align-middle">
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        value={num(row.commissions)}
+                                                        onChange={(e) => handleHoursChange(row.empleadoId, 'commissions', e.target.value)}
+                                                        className="w-full min-w-[80px] max-w-[80px] mx-auto block px-2 py-2 bg-navy-800 border border-blue-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                                                     />
                                                 </td>
                                             </tr>
@@ -1501,38 +1550,46 @@ const PlanillasPage = () => {
             >
                 {planillaDetails && (
                     <div>
-                        {/* Header Info */}
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                            <div>
-                                <p className="text-sm text-gray-400">Período</p>
-                                <p className="font-medium text-gray-100">
-                                    {new Date(planillaDetails.periodStartDate).toLocaleDateString('es-PA')}
-                                    {' - '}
-                                    {new Date(planillaDetails.periodEndDate).toLocaleDateString('es-PA')}
+                        {/* Header Info — 4 cards de resumen */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                            <div className="bg-navy-800 rounded-xl p-4 border border-emerald-700/30">
+                                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Bruto Total</p>
+                                <p className="font-bold text-lg text-emerald-400 font-mono">{formatCurrency(planillaDetails.totalGrossPay)}</p>
+                                <p className="text-xs text-gray-500 mt-1">
+                                    {new Date(planillaDetails.periodStartDate).toLocaleDateString('es-PA')} — {new Date(planillaDetails.periodEndDate).toLocaleDateString('es-PA')}
                                 </p>
                             </div>
-                            <div>
-                                <p className="text-sm text-gray-400">Fecha de Pago</p>
-                                <p className="font-medium text-gray-100">
-                                    {new Date(planillaDetails.payDate).toLocaleDateString('es-PA')}
+                            <div className="bg-navy-800 rounded-xl p-4 border border-amber-700/30">
+                                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">CSS + SE</p>
+                                <p className="font-bold text-lg text-amber-400 font-mono">
+                                    {formatCurrency((planillaDetails.details?.reduce((s, d) => s + (d.cssEmployee || 0) + (d.educationalInsuranceEmployee || 0), 0)) || 0)}
                                 </p>
+                                <p className="text-xs text-gray-500 mt-1">Deducciones legales sociales</p>
                             </div>
-                            <div>
-                                <p className="text-sm text-gray-400">Estado</p>
-                                <div className="mt-1">{getStatusBadge(planillaDetails.status)}</div>
+                            <div className="bg-navy-800 rounded-xl p-4 border border-orange-700/30">
+                                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">ISR</p>
+                                <p className="font-bold text-lg text-orange-400 font-mono">
+                                    {formatCurrency(planillaDetails.details?.reduce((s, d) => s + (d.incomeTax || 0), 0) || 0)}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">Impuesto sobre la renta</p>
                             </div>
-                            <div>
-                                <p className="text-sm text-gray-400">Total Neto</p>
-                                <p className="font-bold text-lg text-gray-100 font-mono">{formatCurrency(planillaDetails.totalNetPay)}</p>
+                            <div className="bg-navy-800 rounded-xl p-4 border border-blue-700/30">
+                                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Neto a Pagar</p>
+                                <p className="font-bold text-lg text-blue-300 font-mono">{formatCurrency(planillaDetails.totalNetPay)}</p>
+                                <p className="text-xs text-gray-500 mt-1">{getStatusBadge(planillaDetails.status)}</p>
                             </div>
                         </div>
 
-                        {/* Details Table */}
+                        {/* Details Table con filas expandibles */}
                         {planillaDetails.details && planillaDetails.details.length > 0 ? (
                             <div className="overflow-x-auto">
+                                <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                                    <span className="text-gray-400">▸</span> Haz clic en una fila para ver el desglose detallado del cálculo
+                                </p>
                                 <table className="w-full">
                                     <thead className="bg-navy-950 border-b border-navy-700">
                                         <tr>
+                                            <th className="py-3 px-2 w-8"></th>
                                             <th className="text-left py-3 px-3 text-xs font-medium text-gray-500 uppercase">Empleado</th>
                                             <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">Bruto</th>
                                             <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">CSS</th>
@@ -1546,30 +1603,143 @@ const PlanillasPage = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="bg-navy-900 divide-y divide-navy-700">
-                                        {planillaDetails.details.map((detail) => (
-                                            <tr key={detail.id} className="hover:bg-navy-800">
-                                                <td className="py-3 px-3 text-sm text-gray-100">{detail.empleado?.nombre} {detail.empleado?.apellido}</td>
-                                                <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.grossPay)}</td>
-                                                <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.cssEmployee)}</td>
-                                                <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.educationalInsuranceEmployee)}</td>
-                                                <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.incomeTax)}</td>
-                                                <td className="py-3 px-3 text-sm text-right text-red-400 font-mono">{formatCurrency(detail.pensionAlimenticia || 0)}</td>
-                                                <td className="py-3 px-3 text-sm text-right text-orange-400 font-mono">{formatCurrency(detail.embargos || 0)}</td>
-                                                <td className="py-3 px-3 text-sm text-right text-blue-400 font-mono">{formatCurrency(detail.deduccionesVoluntarias || 0)}</td>
-                                                <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.totalDeductions)}</td>
-                                                <td className="py-3 px-3 text-sm text-right font-medium font-mono">
-                                                    <span className="text-gray-100">{formatCurrency(detail.netPay)}</span>
-                                                    {detail.tuvoLimitacionSalarioMinimo && (
-                                                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-400" title="Deducción limitada por salario mínimo">
-                                                            SM
-                                                        </span>
+                                        {planillaDetails.details.map((detail) => {
+                                            const isExpanded = expandedDetails.has(detail.id);
+                                            const isLoadingThis = loadingBreakdown === detail.id;
+                                            const bd = breakdowns[detail.id];
+                                            return (
+                                                <React.Fragment key={detail.id}>
+                                                    <tr
+                                                        className="hover:bg-navy-800 cursor-pointer transition-colors"
+                                                        onClick={() => toggleDetailExpand(planillaDetails.id, detail.id)}
+                                                    >
+                                                        <td className="py-3 px-2 text-center text-gray-400 text-xs select-none">
+                                                            {isLoadingThis ? (
+                                                                <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                                                            ) : (
+                                                                <span>{isExpanded ? '▾' : '▸'}</span>
+                                                            )}
+                                                        </td>
+                                                        <td className="py-3 px-3 text-sm text-gray-100">{detail.empleado?.nombre} {detail.empleado?.apellido}</td>
+                                                        <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.grossPay)}</td>
+                                                        <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.cssEmployee)}</td>
+                                                        <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.educationalInsuranceEmployee)}</td>
+                                                        <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.incomeTax)}</td>
+                                                        <td className="py-3 px-3 text-sm text-right text-red-400 font-mono">{formatCurrency(detail.pensionAlimenticia || 0)}</td>
+                                                        <td className="py-3 px-3 text-sm text-right text-orange-400 font-mono">{formatCurrency(detail.embargos || 0)}</td>
+                                                        <td className="py-3 px-3 text-sm text-right text-blue-400 font-mono">{formatCurrency(detail.deduccionesVoluntarias || 0)}</td>
+                                                        <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.totalDeductions)}</td>
+                                                        <td className="py-3 px-3 text-sm text-right font-medium font-mono">
+                                                            <span className="text-gray-100">{formatCurrency(detail.netPay)}</span>
+                                                            {detail.tuvoLimitacionSalarioMinimo && (
+                                                                <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-400" title="Deducción limitada por salario mínimo">
+                                                                    SM
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                    {/* Fila de desglose expandida */}
+                                                    {isExpanded && (
+                                                        <tr className="bg-navy-950/60">
+                                                            <td colSpan={11} className="p-0">
+                                                                {isLoadingThis || !bd ? (
+                                                                    <div className="flex items-center justify-center py-6">
+                                                                        <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mr-2"></div>
+                                                                        <span className="text-gray-400 text-sm">Cargando desglose...</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="px-6 py-4 space-y-4">
+                                                                        {/* Ingresos */}
+                                                                        <div>
+                                                                            <h4 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2">Ingresos</h4>
+                                                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1 text-xs">
+                                                                                {bd.ingresos.horasRegulares > 0 && <div className="flex justify-between"><span className="text-gray-400">Salario base</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.horasRegulares)}</span></div>}
+                                                                                {bd.ingresos.horasDomingo > 0 && <div className="flex justify-between"><span className="text-gray-400">H. Domingo</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.horasDomingo)}</span></div>}
+                                                                                {bd.ingresos.horasFeriado > 0 && <div className="flex justify-between"><span className="text-gray-400">H. Feriado</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.horasFeriado)}</span></div>}
+                                                                                {bd.ingresos.horasExtraDiurnas > 0 && <div className="flex justify-between"><span className="text-gray-400">H.E. Diurnas</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.horasExtraDiurnas)}</span></div>}
+                                                                                {bd.ingresos.horasExtraNocturnas > 0 && <div className="flex justify-between"><span className="text-gray-400">H.E. Nocturnas</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.horasExtraNocturnas)}</span></div>}
+                                                                                {bd.ingresos.horasExtraFestivos > 0 && <div className="flex justify-between"><span className="text-gray-400">H.E. Festivos</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.horasExtraFestivos)}</span></div>}
+                                                                                {bd.ingresos.horasExtraMixtas > 0 && <div className="flex justify-between"><span className="text-gray-400">H.E. Mixtas</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.horasExtraMixtas)}</span></div>}
+                                                                                {bd.ingresos.horasExtraExceso > 0 && <div className="flex justify-between"><span className="text-gray-400">H.E. Exceso</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.horasExtraExceso)}</span></div>}
+                                                                                {bd.ingresos.comisiones > 0 && <div className="flex justify-between"><span className="text-gray-400">Comisiones</span><span className="font-mono text-blue-300">{formatCurrency(bd.ingresos.comisiones)}</span></div>}
+                                                                                {bd.ingresos.bonos > 0 && <div className="flex justify-between"><span className="text-gray-400">Bonificaciones</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.bonos)}</span></div>}
+                                                                                <div className="flex justify-between font-semibold border-t border-navy-700 pt-1 col-span-2 md:col-span-4">
+                                                                                    <span className="text-gray-300">Total Bruto</span>
+                                                                                    <span className="font-mono text-emerald-400">{formatCurrency(bd.ingresos.grossPay)}</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Deducciones legales */}
+                                                                        <div>
+                                                                            <h4 className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">Deducciones Legales</h4>
+                                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                                                                                {/* CSS */}
+                                                                                <div className="bg-navy-800/60 rounded-lg p-3">
+                                                                                    <p className="font-semibold text-gray-300 mb-1.5">CSS — 9.75%</p>
+                                                                                    <div className="space-y-0.5">
+                                                                                        <div className="flex justify-between"><span className="text-gray-400">Base usada</span><span className="font-mono text-gray-200">{formatCurrency(bd.css.baseUsada)}</span></div>
+                                                                                        {bd.css.seAplicoTope && <div className="flex justify-between"><span className="text-amber-400">⚠ Tope aplicado</span><span className="font-mono text-amber-400">{formatCurrency(bd.css.topeSalarial)}</span></div>}
+                                                                                        <div className="flex justify-between font-semibold border-t border-navy-700 pt-1 mt-1"><span className="text-gray-300">Deducción</span><span className="font-mono text-red-400">{formatCurrency(bd.css.monto)}</span></div>
+                                                                                    </div>
+                                                                                </div>
+                                                                                {/* SE */}
+                                                                                <div className="bg-navy-800/60 rounded-lg p-3">
+                                                                                    <p className="font-semibold text-gray-300 mb-1.5">Seg. Educativo — 1.25%</p>
+                                                                                    <div className="space-y-0.5">
+                                                                                        <div className="flex justify-between"><span className="text-gray-400">Base</span><span className="font-mono text-gray-200">{formatCurrency(bd.se.base)}</span></div>
+                                                                                        <div className="flex justify-between font-semibold border-t border-navy-700 pt-1 mt-1"><span className="text-gray-300">Deducción</span><span className="font-mono text-red-400">{formatCurrency(bd.se.monto)}</span></div>
+                                                                                    </div>
+                                                                                </div>
+                                                                                {/* ISR */}
+                                                                                <div className="bg-navy-800/60 rounded-lg p-3">
+                                                                                    <p className="font-semibold text-gray-300 mb-1.5">ISR — Brackets progresivos</p>
+                                                                                    <div className="space-y-0.5">
+                                                                                        <div className="flex justify-between"><span className="text-gray-400">Salario período</span><span className="font-mono text-gray-200">{formatCurrency(bd.isr.salarioPeriodo)}</span></div>
+                                                                                        <div className="flex justify-between"><span className="text-gray-400">× {bd.isr.periodosAlAno} períodos/año</span><span className="font-mono text-gray-200">{formatCurrency(bd.isr.salarioAnualizado)}</span></div>
+                                                                                        <div className="flex justify-between"><span className="text-gray-400">ISR anual</span><span className="font-mono text-gray-200">{formatCurrency(bd.isr.isrAnual)}</span></div>
+                                                                                        <div className="flex justify-between font-semibold border-t border-navy-700 pt-1 mt-1"><span className="text-gray-300">ISR período</span><span className="font-mono text-red-400">{formatCurrency(bd.isr.isrPeriodo)}</span></div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+
+                                                                        {/* Acreedores */}
+                                                                        {bd.acreedores && bd.acreedores.length > 0 && (
+                                                                            <div>
+                                                                                <h4 className="text-xs font-semibold text-orange-400 uppercase tracking-wider mb-2">Acreedores / Deducciones Adicionales</h4>
+                                                                                <div className="space-y-1">
+                                                                                    {bd.acreedores.map((a, i) => (
+                                                                                        <div key={i} className="flex items-center justify-between text-xs bg-navy-800/40 rounded px-3 py-1.5">
+                                                                                            <div>
+                                                                                                <span className="text-gray-200">{a.descripcion}</span>
+                                                                                                <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-navy-700 text-gray-400">{a.categoria}</span>
+                                                                                                {a.fueLimitado && <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-400" title={a.razonLimitacion || ''}>Limitado</span>}
+                                                                                            </div>
+                                                                                            <span className="font-mono text-orange-300">{formatCurrency(a.montoAplicado)}</span>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+
+                                                                        {/* Resumen neto */}
+                                                                        <div className="flex justify-between items-center pt-2 border-t border-navy-700 text-sm font-semibold">
+                                                                            <span className="text-gray-300">Neto a pagar</span>
+                                                                            <span className="font-mono text-emerald-400 text-base">{formatCurrency(bd.netPay)}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                        </tr>
                                                     )}
-                                                </td>
-                                            </tr>
-                                        ))}
+                                                </React.Fragment>
+                                            );
+                                        })}
                                     </tbody>
                                     <tfoot className="bg-navy-950 border-t-2 border-navy-600">
                                         <tr>
+                                            <td></td>
                                             <td className="py-3 px-3 text-sm font-bold text-gray-100">TOTALES</td>
                                             <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalGrossPay)}</td>
                                             <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.cssEmployee || 0), 0) || 0)}</td>

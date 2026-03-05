@@ -6,6 +6,7 @@ using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Web.Authorization;
 
 namespace Vorluno.Planilla.Web.Controllers;
 
@@ -37,7 +38,7 @@ public class PrestamosController : ControllerBase
     /// <param name="estado">Filtrar por estado (opcional).</param>
     /// <returns>Lista de préstamos.</returns>
     [HttpGet]
-    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [RequirePermission(SystemPermission.LoansManage, SystemPermission.LoansViewSelf)]
     public async Task<IActionResult> GetAll([FromQuery] int? empleadoId, [FromQuery] EstadoPrestamo? estado)
     {
         var tenantId = _tenantContext.TenantId;
@@ -69,7 +70,7 @@ public class PrestamosController : ControllerBase
     /// <param name="id">ID del préstamo.</param>
     /// <returns>Detalles del préstamo.</returns>
     [HttpGet("{id}")]
-    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [RequirePermission(SystemPermission.LoansManage, SystemPermission.LoansViewSelf)]
     public async Task<IActionResult> GetById(int id)
     {
         var tenantId = _tenantContext.TenantId;
@@ -95,7 +96,7 @@ public class PrestamosController : ControllerBase
     /// <param name="empleadoId">ID del empleado.</param>
     /// <returns>Lista de préstamos del empleado.</returns>
     [HttpGet("empleado/{empleadoId}")]
-    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [RequirePermission(SystemPermission.LoansManage, SystemPermission.LoansViewSelf)]
     public async Task<IActionResult> GetByEmpleado(int empleadoId)
     {
         var tenantId = _tenantContext.TenantId;
@@ -126,7 +127,7 @@ public class PrestamosController : ControllerBase
     /// <param name="request">Datos del préstamo a crear.</param>
     /// <returns>Préstamo creado.</returns>
     [HttpPost]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.LoansManage)]
     public async Task<IActionResult> Create(CreatePrestamoRequest request)
     {
         var tenantId = _tenantContext.TenantId;
@@ -229,7 +230,7 @@ public class PrestamosController : ControllerBase
     /// <param name="request">Datos actualizados.</param>
     /// <returns>NoContent si fue exitoso.</returns>
     [HttpPut("{id}")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.LoansManage)]
     public async Task<IActionResult> Update(int id, CreatePrestamoRequest request)
     {
         var tenantId = _tenantContext.TenantId;
@@ -295,7 +296,7 @@ public class PrestamosController : ControllerBase
     /// <param name="id">ID del préstamo.</param>
     /// <returns>NoContent si fue exitoso.</returns>
     [HttpPost("{id}/suspender")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.LoansManage)]
     public async Task<IActionResult> Suspender(int id)
     {
         var tenantId = _tenantContext.TenantId;
@@ -325,7 +326,7 @@ public class PrestamosController : ControllerBase
     /// <param name="id">ID del préstamo.</param>
     /// <returns>NoContent si fue exitoso.</returns>
     [HttpPost("{id}/reactivar")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.LoansManage)]
     public async Task<IActionResult> Reactivar(int id)
     {
         var tenantId = _tenantContext.TenantId;
@@ -355,7 +356,7 @@ public class PrestamosController : ControllerBase
     /// <param name="id">ID del préstamo.</param>
     /// <returns>NoContent si fue exitoso.</returns>
     [HttpDelete("{id}/cancelar")]
-    [Authorize(Roles = "Owner,Admin")]
+    [RequirePermission(SystemPermission.LoansManage)]
     public async Task<IActionResult> Cancelar(int id)
     {
         var tenantId = _tenantContext.TenantId;

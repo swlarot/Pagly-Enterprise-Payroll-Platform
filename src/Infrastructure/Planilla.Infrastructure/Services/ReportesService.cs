@@ -83,6 +83,8 @@ public class ReportesService
                     ? d.DeduccionesAplicadas.FirstOrDefault(da => da.MontoLimitado > 0)?.RazonLimitacion
                     : null;
 
+                var desglose = BuildDesgloseHoras(horas);
+
                 return new EmpleadoPlanillaRegularItem(
                     d.Empleado!.NumeroIdentificacion,
                     $"{d.Empleado.Nombre} {d.Empleado.Apellido}",
@@ -97,7 +99,8 @@ public class ReportesService
                     totalAcreedores,
                     d.NetPay,
                     d.TuvoLimitacionSalarioMinimo,
-                    razonLimitacion
+                    razonLimitacion,
+                    desglose
                 );
             })
             .OrderBy(e => e.NombreCompleto)
@@ -428,5 +431,30 @@ public class ReportesService
             planilla.PayDate,
             comprobantes
         );
+    }
+
+    private static List<LineaDesgloseHoras> BuildDesgloseHoras(Domain.Entities.PayrollEmployeeHours? horas)
+    {
+        if (horas == null) return [];
+
+        var lineas = new List<LineaDesgloseHoras>();
+
+        void Agregar(string concepto, decimal h, decimal pay)
+        {
+            if (h <= 0 || pay <= 0) return;
+            var tarifa = Math.Round(pay / h, 4);
+            lineas.Add(new LineaDesgloseHoras(concepto, h, tarifa, pay));
+        }
+
+        Agregar("Horas Regulares", horas.RegularHours, horas.RegularPay);
+        Agregar("Horas Domingo", horas.SundayHours, horas.SundayPay);
+        Agregar("Horas Feriado", horas.HolidayHours, horas.HolidayPay);
+        Agregar("H. Extra Diurnas", horas.OvertimeDayHours, horas.OvertimeDayPay);
+        Agregar("H. Extra Nocturnas", horas.OvertimeNightHours, horas.OvertimeNightPay);
+        Agregar("H. Extra Feriado", horas.OvertimeHolidayHours, horas.OvertimeHolidayPay);
+        Agregar("H. Extra Mixtas", horas.OvertimeMixedHours, horas.OvertimeMixedPay);
+        Agregar("H. Extra Excedentes", horas.OvertimeExcessHours, horas.OvertimeExcessPay);
+
+        return lineas;
     }
 }

@@ -6,6 +6,7 @@ using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Web.Authorization;
 
 namespace Vorluno.Planilla.Web.Controllers;
 
@@ -32,7 +33,7 @@ public class AusenciasController : ControllerBase
     /// Obtiene lista de ausencias con filtros
     /// </summary>
     [HttpGet]
-    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [RequirePermission(SystemPermission.AbsencesManage, SystemPermission.AbsencesViewSelf)]
     public async Task<IActionResult> GetAll(
         [FromQuery] int? empleadoId = null,
         [FromQuery] TipoAusencia? tipo = null,
@@ -68,7 +69,7 @@ public class AusenciasController : ControllerBase
     /// Obtiene una ausencia por ID
     /// </summary>
     [HttpGet("{id}")]
-    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [RequirePermission(SystemPermission.AbsencesManage, SystemPermission.AbsencesViewSelf)]
     public async Task<IActionResult> GetById(int id)
     {
         var tenantId = _tenantContext.TenantId;
@@ -88,7 +89,7 @@ public class AusenciasController : ControllerBase
     /// Obtiene ausencias de un empleado
     /// </summary>
     [HttpGet("empleado/{empleadoId}")]
-    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [RequirePermission(SystemPermission.AbsencesManage, SystemPermission.AbsencesViewSelf)]
     public async Task<IActionResult> GetByEmpleado(int empleadoId)
     {
         var tenantId = _tenantContext.TenantId;
@@ -125,7 +126,7 @@ public class AusenciasController : ControllerBase
     /// Crea una nueva ausencia
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.AbsencesManage)]
     public async Task<IActionResult> Create(CreateAusenciaRequest request)
     {
         var tenantId = _tenantContext.TenantId;
@@ -174,7 +175,7 @@ public class AusenciasController : ControllerBase
     /// Actualiza una ausencia
     /// </summary>
     [HttpPut("{id}")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.AbsencesManage)]
     public async Task<IActionResult> Update(int id, CreateAusenciaRequest request)
     {
         var tenantId = _tenantContext.TenantId;
@@ -211,7 +212,7 @@ public class AusenciasController : ControllerBase
     /// Elimina una ausencia
     /// </summary>
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Owner,Admin")]
+    [RequirePermission(SystemPermission.AbsencesManage)]
     public async Task<IActionResult> Delete(int id)
     {
         var tenantId = _tenantContext.TenantId;

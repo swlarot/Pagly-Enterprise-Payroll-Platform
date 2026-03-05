@@ -12,12 +12,20 @@ public record ReportePlanillaRegularDto(
     TotalesPlanillaRegular Totales
 );
 
+public record LineaDesgloseHoras(
+    string TipoConcepto,
+    decimal Horas,
+    decimal TarifaPorHora,
+    decimal Valor
+);
+
 public record EmpleadoPlanillaRegularItem(
     string Cedula, string NombreCompleto,
     decimal HorasRegulares, decimal HorasDomingo, decimal HorasFeriado, decimal HorasExtra,
     decimal SalarioBruto, decimal CssEmpleado, decimal SeEmpleado, decimal Isr,
     decimal TotalAcreedores, decimal SalarioNeto,
-    bool TuvoLimitacion, string? RazonLimitacion
+    bool TuvoLimitacion, string? RazonLimitacion,
+    List<LineaDesgloseHoras> DesgloseHoras
 );
 
 public record TotalesPlanillaRegular(

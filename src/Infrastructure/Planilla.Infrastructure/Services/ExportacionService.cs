@@ -114,6 +114,35 @@ public class ExportacionService
                 ws.Cell(row, 13).Style.Fill.BackgroundColor = XLColor.Orange;
 
             row++;
+
+            // Sub-tabla desglose de horas
+            if (emp.DesgloseHoras.Count > 0)
+            {
+                // Encabezado desglose
+                ws.Cell(row, 2).Value = "  Tipo/Concepto";
+                ws.Cell(row, 3).Value = "Horas";
+                ws.Cell(row, 4).Value = "Tarifa x Hora";
+                ws.Cell(row, 5).Value = "Valor";
+                var desgloseHeaderRange = ws.Range(row, 2, row, 5);
+                desgloseHeaderRange.Style.Font.Bold = true;
+                desgloseHeaderRange.Style.Font.FontSize = 8;
+                desgloseHeaderRange.Style.Fill.BackgroundColor = XLColor.LightCyan;
+                row++;
+
+                foreach (var linea in emp.DesgloseHoras)
+                {
+                    ws.Cell(row, 2).Value = $"    {linea.TipoConcepto}";
+                    ws.Cell(row, 3).Value = linea.Horas;
+                    ws.Cell(row, 4).Value = linea.TarifaPorHora;
+                    ws.Cell(row, 5).Value = linea.Valor;
+                    ws.Cell(row, 2).Style.Font.FontSize = 8;
+                    ws.Cell(row, 2).Style.Font.Italic = true;
+                    ws.Range(row, 3, row, 5).Style.NumberFormat.Format = "#,##0.00";
+                    ws.Range(row, 3, row, 5).Style.Font.FontSize = 8;
+                    ws.Range(row, 3, row, 5).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                    row++;
+                }
+            }
         }
 
         ws.Cell(row, 2).Value = "TOTALES";
@@ -206,6 +235,38 @@ public class ExportacionService
                         table.Cell().Background(rowBg).Padding(3).AlignRight().Text(emp.Isr > 0 ? $"B/.{emp.Isr:N2}" : "").FontSize(8);
                         table.Cell().Background(rowBg).Padding(3).AlignRight().Text(emp.TotalAcreedores > 0 ? $"B/.{emp.TotalAcreedores:N2}" : "").FontSize(8);
                         table.Cell().Background(rowBg).Padding(3).AlignRight().Text($"B/.{emp.SalarioNeto:N2}").FontSize(8);
+
+                        // Desglose de horas: ocupa las 12 columnas con una mini-tabla
+                        if (emp.DesgloseHoras.Count > 0)
+                        {
+                            table.Cell().ColumnSpan(12).PaddingLeft(20).PaddingBottom(4).Table(inner =>
+                            {
+                                inner.ColumnsDefinition(ic =>
+                                {
+                                    ic.RelativeColumn(4);   // Tipo/Concepto
+                                    ic.RelativeColumn(1.5f); // Horas
+                                    ic.RelativeColumn(2);   // Tarifa
+                                    ic.RelativeColumn(2);   // Valor
+                                });
+
+                                inner.Header(ih =>
+                                {
+                                    var hbg = Colors.LightBlue.Lighten3;
+                                    ih.Cell().Background(hbg).Padding(2).Text("Tipo/Concepto").Bold().FontSize(7);
+                                    ih.Cell().Background(hbg).Padding(2).AlignCenter().Text("Horas").Bold().FontSize(7);
+                                    ih.Cell().Background(hbg).Padding(2).AlignRight().Text("Tarifa x Hora").Bold().FontSize(7);
+                                    ih.Cell().Background(hbg).Padding(2).AlignRight().Text("Valor").Bold().FontSize(7);
+                                });
+
+                                foreach (var linea in emp.DesgloseHoras)
+                                {
+                                    inner.Cell().Padding(2).Text(linea.TipoConcepto).FontSize(7);
+                                    inner.Cell().Padding(2).AlignCenter().Text($"{linea.Horas:N2}").FontSize(7);
+                                    inner.Cell().Padding(2).AlignRight().Text($"B/.{linea.TarifaPorHora:N4}").FontSize(7);
+                                    inner.Cell().Padding(2).AlignRight().Text($"B/.{linea.Valor:N2}").FontSize(7);
+                                }
+                            });
+                        }
                     }
 
                     // Fila totales

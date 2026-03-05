@@ -79,6 +79,22 @@ public class SolicitudVacaciones : ITenantEntity
 
     public string? Observaciones { get; set; }
 
+    // ====================================================================
+    // Salario vacacional calculado (DEV-42)
+    // ====================================================================
+
+    /// <summary>Salario diario vacacional promedio usado para el cálculo</summary>
+    public decimal? SalarioVacacional { get; set; }
+
+    /// <summary>Monto total a pagar por las vacaciones (SalarioVacacional × DiasVacaciones)</summary>
+    public decimal? MontoVacaciones { get; set; }
+
+    /// <summary>Inicio del período de referencia usado para el promedio salarial</summary>
+    public DateTime? PeriodoReferenciaDesde { get; set; }
+
+    /// <summary>Fin del período de referencia usado para el promedio salarial</summary>
+    public DateTime? PeriodoReferenciaHasta { get; set; }
+
     // Auditoría
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }

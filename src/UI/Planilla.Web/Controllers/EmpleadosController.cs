@@ -253,10 +253,12 @@ namespace Vorluno.Planilla.Web.Controllers
             var tenantId = _tenantContext.TenantId;
             var createdById = this.GetCurrentUserId();
 
-            // Validar número de identificación único (índice único en BD)
+            // Validar número de identificación único dentro del tenant
+            // DEV-34: Filtrar explícitamente por TenantId para evitar fuga cross-tenant.
+            // Sin este filtro, revelaría si la cédula existe en otro tenant.
             var numeroIdentificacion = (empleadoDto.NumeroIdentificacion ?? "").Trim();
             var yaExiste = await _context.Empleados
-                .AnyAsync(e => e.NumeroIdentificacion == numeroIdentificacion && !e.IsDeleted);
+                .AnyAsync(e => e.TenantId == tenantId && e.NumeroIdentificacion == numeroIdentificacion && !e.IsDeleted);
             if (yaExiste)
             {
                 return BadRequest(new { message = "Este número de identificación ya está registrado. Use otro número o verifique si el empleado ya existe en la lista." });
@@ -853,6 +855,84 @@ namespace Vorluno.Planilla.Web.Controllers
         {
             return $"Temp{Guid.NewGuid().ToString("N")[..8]}!1Aa";
         }
+
+        /// <summary>
+        /// Obtiene el saldo inicial de un empleado (para empresas que migraron al sistema a mitad de año).
+        /// GET /api/empleados/{id}/saldo-inicial
+        /// </summary>
+        [HttpGet("{id}/saldo-inicial")]
+        [RequirePermission(SystemPermission.EmployeesRead)]
+        public async Task<ActionResult<SaldoInicialDto>> GetSaldoInicial(int id)
+        {
+            var tenantId = _tenantContext.TenantId;
+
+            var empleado = await _context.Empleados
+                .FirstOrDefaultAsync(e => e.Id == id && e.TenantId == tenantId && !e.IsDeleted);
+            if (empleado == null)
+                return NotFound(new { message = $"Empleado {id} no encontrado" });
+
+            var saldo = await _context.SaldosInicialesEmpleados
+                .FirstOrDefaultAsync(s => s.EmpleadoId == id && s.TenantId == tenantId);
+
+            if (saldo == null)
+                return Ok(new SaldoInicialDto(id, null, 0, 0, 0, null));
+
+            return Ok(new SaldoInicialDto(
+                EmpleadoId: saldo.EmpleadoId,
+                FechaCorte: saldo.FechaCorte,
+                DiasVacacionesAcumulados: saldo.DiasVacacionesAcumulados,
+                DiasVacacionesTomados: saldo.DiasVacacionesTomados,
+                MontoDecimoAcumulado: saldo.MontoDecimoAcumulado,
+                Notas: saldo.Notas
+            ));
+        }
+
+        /// <summary>
+        /// Crea o actualiza el saldo inicial de un empleado (upsert).
+        /// POST /api/empleados/{id}/saldo-inicial
+        /// </summary>
+        [HttpPost("{id}/saldo-inicial")]
+        [RequirePermission(SystemPermission.EmployeesUpdate)]
+        public async Task<ActionResult<SaldoInicialDto>> UpsertSaldoInicial(
+            int id, [FromBody] UpsertSaldoInicialRequest request)
+        {
+            var tenantId = _tenantContext.TenantId;
+
+            var empleado = await _context.Empleados
+                .FirstOrDefaultAsync(e => e.Id == id && e.TenantId == tenantId && !e.IsDeleted);
+            if (empleado == null)
+                return NotFound(new { message = $"Empleado {id} no encontrado" });
+
+            var existing = await _context.SaldosInicialesEmpleados
+                .FirstOrDefaultAsync(s => s.EmpleadoId == id && s.TenantId == tenantId);
+
+            if (existing != null)
+            {
+                existing.FechaCorte = request.FechaCorte;
+                existing.DiasVacacionesAcumulados = request.DiasVacacionesAcumulados;
+                existing.DiasVacacionesTomados = request.DiasVacacionesTomados;
+                existing.MontoDecimoAcumulado = request.MontoDecimoAcumulado;
+                existing.Notas = request.Notas;
+                existing.UpdatedAt = DateTime.UtcNow;
+            }
+            else
+            {
+                _context.SaldosInicialesEmpleados.Add(new SaldoInicialEmpleado
+                {
+                    EmpleadoId = id,
+                    TenantId = tenantId,
+                    FechaCorte = request.FechaCorte,
+                    DiasVacacionesAcumulados = request.DiasVacacionesAcumulados,
+                    DiasVacacionesTomados = request.DiasVacacionesTomados,
+                    MontoDecimoAcumulado = request.MontoDecimoAcumulado,
+                    Notas = request.Notas
+                });
+            }
+
+            await _context.SaveChangesAsync();
+            return Ok(new SaldoInicialDto(id, request.FechaCorte, request.DiasVacacionesAcumulados,
+                request.DiasVacacionesTomados, request.MontoDecimoAcumulado, request.Notas));
+        }
     }
 
     /// <summary>
@@ -862,4 +942,21 @@ namespace Vorluno.Planilla.Web.Controllers
     {
         public bool Confirmed { get; set; }
     }
+
+    public record SaldoInicialDto(
+        int EmpleadoId,
+        DateTime? FechaCorte,
+        decimal DiasVacacionesAcumulados,
+        decimal DiasVacacionesTomados,
+        decimal MontoDecimoAcumulado,
+        string? Notas
+    );
+
+    public record UpsertSaldoInicialRequest(
+        DateTime FechaCorte,
+        decimal DiasVacacionesAcumulados = 0,
+        decimal DiasVacacionesTomados = 0,
+        decimal MontoDecimoAcumulado = 0,
+        string? Notas = null
+    );
 }

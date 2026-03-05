@@ -37,6 +37,7 @@ import HorasExtraPage from './pages/HorasExtraPage.jsx';
 import AusenciasPage from './pages/AusenciasPage.jsx';
 import VacacionesPage from './pages/VacacionesPage.jsx';
 import PlanillasPage from './pages/PlanillasPage.jsx';
+import DecimoPage from './pages/DecimoPage.jsx';
 import ConfiguracionPage from './pages/ConfiguracionPage.jsx';
 import SalarioMinimoPage from './pages/SalarioMinimoPage.jsx';
 import ReportesPage from './pages/ReportesPage.jsx';
@@ -338,6 +339,17 @@ function App() {
             <ProtectedRoute>
               <AuthLayout>
                 <PlanillasPage />
+              </AuthLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/decimo"
+          element={
+            <ProtectedRoute>
+              <AuthLayout>
+                <DecimoPage />
               </AuthLayout>
             </ProtectedRoute>
           }

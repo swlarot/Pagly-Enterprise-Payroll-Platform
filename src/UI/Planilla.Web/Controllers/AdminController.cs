@@ -1380,13 +1380,11 @@ public class AdminController : ControllerBase
             catch (Exception deleteEx)
             {
                 _logger.LogError(deleteEx, "Exception during UserManager.DeleteAsync for user {UserId}", userId);
-                return StatusCode(500, new
-                {
-                    error = "Error al eliminar usuario del sistema",
-                    details = deleteEx.Message,
-                    innerException = deleteEx.InnerException?.Message,
-                    stackTrace = deleteEx.StackTrace
-                });
+                // DEV-33: Solo exponer detalles técnicos en Development
+                var env33 = HttpContext.RequestServices.GetRequiredService<IHostEnvironment>();
+                return StatusCode(500, env33.IsDevelopment()
+                    ? (object)new { error = "Error al eliminar usuario del sistema", details = deleteEx.Message, innerException = deleteEx.InnerException?.Message }
+                    : new { error = "Error al eliminar usuario del sistema. Consulte los logs del servidor." });
             }
         }
         catch (DbUpdateException dbEx)

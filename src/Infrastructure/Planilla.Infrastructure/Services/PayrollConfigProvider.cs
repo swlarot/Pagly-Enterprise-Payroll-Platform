@@ -66,7 +66,8 @@ public class PayrollConfigProvider : IPayrollConfigProvider
                 c.EducationalInsuranceEmployeeRate,
                 c.EducationalInsuranceEmployerRate,
                 c.DependentDeductionAmount,
-                c.MaxDependents
+                c.MaxDependents,
+                c.SalarioMinimoLegal  // DEV-28: incluir en DTO
             ))
             .FirstOrDefaultAsync();
 
@@ -103,6 +104,29 @@ public class PayrollConfigProvider : IPayrollConfigProvider
                 b.FixedAmount
             ))
             .ToListAsync();
+
+        // DEV-29: Fallback al año más reciente disponible si no hay brackets para el año solicitado.
+        // Evita PayrollConfigurationException en 2027+ si el admin no ha configurado nuevos brackets.
+        if (brackets.Count == 0)
+        {
+            var mostRecentYear = await _context.TaxBrackets
+                .AsNoTracking()
+                .Where(b => b.TenantId == tenantId && b.IsActive && b.Year < year)
+                .MaxAsync(b => (int?)b.Year);
+
+            if (mostRecentYear.HasValue)
+            {
+                brackets = await _context.TaxBrackets
+                    .AsNoTracking()
+                    .Where(b => b.TenantId == tenantId && b.Year == mostRecentYear.Value && b.IsActive)
+                    .OrderBy(b => b.Order)
+                    .Select(b => new TaxBracketDto(
+                        b.Id, b.TenantId, b.Year, b.Order, b.Description,
+                        b.MinIncome, b.MaxIncome, b.Rate, b.FixedAmount
+                    ))
+                    .ToListAsync();
+            }
+        }
 
         return brackets;
     }

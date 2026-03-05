@@ -196,9 +196,18 @@ builder.Services.AddCors(options =>
                   .AllowAnyMethod()
                   .AllowCredentials();
         }
+        else if (builder.Environment.IsDevelopment())
+        {
+            // Desarrollo sin variable de entorno: denegar todo (configuración incompleta)
+            policy.WithOrigins("http://localhost:0"); // origen imposible → bloquea todo
+        }
         else
         {
-            policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod();
+            // DEV-30: En producción, si Cors__AllowedOrigins no está configurada, fallar al arrancar.
+            // Nunca abrir AllowAnyOrigin en producción.
+            throw new InvalidOperationException(
+                "CORS no configurado: la variable de entorno Cors__AllowedOrigins debe estar seteada en producción. " +
+                "Ejemplo: https://app.pagly.io  Verifique la configuración en CapRover antes de desplegar.");
         }
     });
 });

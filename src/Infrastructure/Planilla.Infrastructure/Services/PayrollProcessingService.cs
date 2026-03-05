@@ -8,6 +8,7 @@
 
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
+using Vorluno.Planilla.Application.Helpers;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Application.Results;
 using Vorluno.Planilla.Application.Services;
@@ -76,8 +77,12 @@ public class PayrollProcessingService
         // PASO 2: Calcular GrossPay ajustado con asistencia
         // ====================================================================
 
+        var horasRegistradas = await _context.PayrollEmployeeHours
+            .FirstOrDefaultAsync(h => h.PayrollHeaderId == payrollHeaderId && h.EmpleadoId == empleado.Id);
+        decimal comisiones = horasRegistradas?.Commissions ?? 0m;
+
         decimal salarioPeriodo = empleado.GetSalarioPeriodo();
-        decimal grossPayAjustado = salarioPeriodo + montoHorasExtra - descuentoAusencias;
+        decimal grossPayAjustado = salarioPeriodo + montoHorasExtra - descuentoAusencias + comisiones;
 
         // ====================================================================
         // PASO 3: Calcular deducciones legales (CSS, SE, ISR)
@@ -135,7 +140,7 @@ public class PayrollProcessingService
             BaseSalary = empleado.SalarioBase,
             OvertimePay = montoHorasExtra,
             Bonuses = 0,
-            Commissions = 0,
+            Commissions = comisiones,
 
             // Deducciones legales
             CssEmployee = payrollResult.CssEmployee,
@@ -178,6 +183,216 @@ public class PayrollProcessingService
         };
 
         return (detail, deduccionesResult.PrestamoIds, deduccionesResult.AnticipoIds, horasExtra, ausencias, vacaciones, deduccionesResult);
+    }
+
+    /// <summary>
+    /// DEV-35: Calcula el detalle de planilla para un empleado usando datos pre-cargados en memoria.
+    /// Elimina N+1 queries del loop de cálculo. El controller pre-carga los datos antes del loop
+    /// y llama a este método por empleado.
+    /// </summary>
+    public async Task<(PayrollDetail detail, DeduccionesResult deduccionesResult)> CalculateFromPreloadedDataAsync(
+        int tenantId,
+        Empleado employee,
+        PayrollHeader payrollHeader,
+        PayrollEmployeeHours? hours,
+        List<DeduccionFija> deduccionesFijas,
+        List<Prestamo> prestamosActivos,
+        List<Anticipo> anticiposAprobados,
+        decimal salarioMinimoPeriodo)
+    {
+        var periodsPerYear = PayrollConstants.GetPeriodsPerYear(payrollHeader.PayPeriodType);
+
+        // ====================================================================
+        // PASO 1: Calcular GrossPay
+        // ====================================================================
+        decimal grossPay = employee.GetSalarioPeriodo();
+
+        if (hours != null)
+        {
+            var hourlyRate = employee.HourlyRate > 0
+                ? employee.HourlyRate
+                : Empleado.ComputeHourlyRateFromMonthly(employee.SalarioBase, employee.HoursPerWeek);
+
+            hours.RegularPay = hours.RegularHours * hourlyRate;
+            var salarioPeriodoExacto = employee.GetSalarioPeriodo();
+            if (Math.Abs(hours.RegularPay - salarioPeriodoExacto) < 0.05m)
+                hours.RegularPay = salarioPeriodoExacto;
+
+            hours.SundayPay = hours.SundayHours * hourlyRate * 1.50m;
+            hours.HolidayPay = hours.HolidayHours * hourlyRate * 1.50m;
+            hours.OvertimeDayPay = hours.OvertimeDayHours * hourlyRate * 1.25m;
+            hours.OvertimeNightPay = hours.OvertimeNightHours * hourlyRate * 1.50m;
+            hours.OvertimeHolidayPay = hours.OvertimeHolidayHours * hourlyRate * 3.125m;
+            hours.OvertimeMixedPay = hours.OvertimeMixedHours * hourlyRate * 1.50m;
+            hours.OvertimeExcessPay = hours.OvertimeExcessHours * hourlyRate * 2.1875m;
+            hours.AbsenceDeduction = hours.AbsenceHours * hourlyRate;
+            hours.TotalHoursPay = hours.RegularPay + hours.SundayPay + hours.HolidayPay
+                + hours.OvertimeDayPay + hours.OvertimeNightPay
+                + hours.OvertimeHolidayPay + hours.OvertimeMixedPay + hours.OvertimeExcessPay
+                - hours.AbsenceDeduction;
+            hours.UpdatedAt = DateTime.UtcNow;
+
+            grossPay = hours.TotalHoursPay + hours.Commissions;
+        }
+
+        // ====================================================================
+        // PASO 2: Deducciones legales CSS + SE + ISR
+        // DEV-24 FIX: usar PayPeriodType de la planilla, no PayFrequency del empleado
+        // ====================================================================
+        var calculationResult = await _orchestrator.CalculateEmployeePayrollAsync(
+            companyId: tenantId,
+            grossPay: grossPay,
+            payFrequency: payrollHeader.PayPeriodType.ToString(),
+            yearsCotized: employee.YearsCotized,
+            averageSalaryLast10Years: employee.AverageSalaryLast10Years,
+            cssRiskPercentage: employee.CssRiskPercentage,
+            dependents: employee.Dependents,
+            isSubjectToCss: employee.IsSubjectToCss,
+            isSubjectToEducationalInsurance: employee.IsSubjectToEducationalInsurance,
+            isSubjectToIncomeTax: employee.IsSubjectToIncomeTax,
+            calculationDate: DateTime.UtcNow
+        );
+
+        // ====================================================================
+        // PASO 3: Deducciones adicionales con motor de prelación (datos pre-cargados)
+        // ====================================================================
+        decimal netoPostLegal = grossPay
+            - calculationResult.CssEmployee
+            - calculationResult.EducationalInsuranceEmployee
+            - calculationResult.IncomeTax;
+
+        var deduccionesPendientes = new List<DeduccionPendiente>();
+
+        foreach (var df in deduccionesFijas)
+        {
+            deduccionesPendientes.Add(new DeduccionPendiente
+            {
+                OrigenDeduccionFijaId = df.Id,
+                TipoDeduccion = df.TipoDeduccion,
+                Categoria = InferirCategoria(df),
+                Descripcion = df.Descripcion,
+                MontoFijo = df.Monto,
+                Porcentaje = df.Porcentaje,
+                EsPorcentaje = df.EsPorcentaje,
+                BaseCalculo = df.BaseCalculo,
+                Prioridad = df.Prioridad,
+                NombreAcreedor = df.NombreAcreedor,
+                MontoTotalACobrar = df.MontoTotalACobrar,
+                MontoCobradoAcumulado = df.MontoCobradoAcumulado
+            });
+        }
+
+        foreach (var prestamo in prestamosActivos)
+        {
+            var montoCuotaPeriodo = Math.Round(prestamo.CuotaMensual * 12m / periodsPerYear, 2);
+            montoCuotaPeriodo = Math.Min(montoCuotaPeriodo, prestamo.MontoPendiente);
+
+            deduccionesPendientes.Add(new DeduccionPendiente
+            {
+                OrigenPrestamoId = prestamo.Id,
+                TipoDeduccion = TipoDeduccion.PrestamoInterno,
+                Categoria = CategoriaDeduccion.Voluntaria,
+                Descripcion = $"Prestamo #{prestamo.Id} - Cuota {prestamo.CuotasPagadas + 1}/{prestamo.NumeroCuotas}",
+                MontoFijo = montoCuotaPeriodo,
+                EsPorcentaje = false,
+                BaseCalculo = BaseCalculoDeduccion.SalarioBruto,
+                Prioridad = 100
+            });
+        }
+
+        foreach (var anticipo in anticiposAprobados)
+        {
+            deduccionesPendientes.Add(new DeduccionPendiente
+            {
+                OrigenAnticipoId = anticipo.Id,
+                TipoDeduccion = TipoDeduccion.Otro,
+                Categoria = CategoriaDeduccion.Voluntaria,
+                Descripcion = $"Anticipo #{anticipo.Id} - {anticipo.Motivo}",
+                MontoFijo = anticipo.Monto,
+                EsPorcentaje = false,
+                BaseCalculo = BaseCalculoDeduccion.SalarioBruto,
+                Prioridad = 200
+            });
+        }
+
+        var deduccionesResult = _deduccionEngine.AplicarDeduccionesConPrelacion(
+            grossPay, netoPostLegal, salarioMinimoPeriodo, deduccionesPendientes);
+
+        // ====================================================================
+        // PASO 4: Horas extra aprobadas del período (desde asistenciaService)
+        // ====================================================================
+        decimal overtimePay = 0m;
+        decimal horasExtraDiurnas = 0m;
+        decimal horasExtraNocturnas = 0m;
+        decimal horasExtraDomingoFeriado = 0m;
+
+        var horasExtraAprobadas = await _asistenciaService.GetHorasExtraAprobadas(
+            employee.Id, payrollHeader.PeriodStartDate, payrollHeader.PeriodEndDate);
+
+        if (horasExtraAprobadas.Any())
+        {
+            var salarioHora = employee.HourlyRate > 0
+                ? employee.HourlyRate
+                : Empleado.ComputeHourlyRateFromMonthly(employee.SalarioBase, employee.HoursPerWeek);
+
+            var (montoHorasExtra, horasDiurnas, horasNocturnas, horasDomFeriado) =
+                await _asistenciaService.CalcularMontoHorasExtra(
+                    employee.Id, salarioHora, payrollHeader.PeriodStartDate, payrollHeader.PeriodEndDate);
+
+            overtimePay = montoHorasExtra;
+            horasExtraDiurnas = horasDiurnas;
+            horasExtraNocturnas = horasNocturnas;
+            horasExtraDomingoFeriado = horasDomFeriado;
+        }
+        else if (hours != null)
+        {
+            overtimePay = hours.OvertimeDayPay + hours.OvertimeNightPay;
+            horasExtraDiurnas = hours.OvertimeDayHours;
+            horasExtraNocturnas = hours.OvertimeNightHours;
+        }
+
+        // ====================================================================
+        // PASO 5: Construir PayrollDetail
+        // ====================================================================
+        decimal totalDedsForEmployee = calculationResult.TotalDeductions + deduccionesResult.TotalDeduccionesAdicionales;
+        decimal netPayForEmployee = calculationResult.NetPay - deduccionesResult.TotalDeduccionesAdicionales;
+
+        var detail = new PayrollDetail
+        {
+            PayrollHeaderId = payrollHeader.Id,
+            EmpleadoId = employee.Id,
+            GrossPay = calculationResult.GrossPay,
+            BaseSalary = employee.SalarioBase,
+            OvertimePay = overtimePay,
+            Bonuses = 0,
+            Commissions = hours?.Commissions ?? 0,
+            HorasExtraDiurnas = horasExtraDiurnas,
+            HorasExtraNocturnas = horasExtraNocturnas,
+            HorasExtraDomingoFeriado = horasExtraDomingoFeriado,
+            MontoHorasExtra = overtimePay,
+            CssEmployee = calculationResult.CssEmployee,
+            CssEmployer = calculationResult.CssEmployer,
+            RiskContribution = calculationResult.RiskContribution,
+            EducationalInsuranceEmployee = calculationResult.EducationalInsuranceEmployee,
+            EducationalInsuranceEmployer = calculationResult.EducationalInsuranceEmployer,
+            IncomeTax = calculationResult.IncomeTax,
+            OtherDeductions = 0,
+            DeduccionesFijas = deduccionesResult.TotalDeduccionesAdicionales - deduccionesResult.TotalPrestamos - deduccionesResult.TotalAnticipos,
+            Prestamos = deduccionesResult.TotalPrestamos,
+            Anticipos = deduccionesResult.TotalAnticipos,
+            PensionAlimenticia = deduccionesResult.TotalPensionAlimenticia,
+            Embargos = deduccionesResult.TotalEmbargos,
+            DeduccionesVoluntarias = deduccionesResult.TotalVoluntarias,
+            SalarioMinimoLegalAplicado = deduccionesResult.SalarioMinimoAplicado,
+            MontoLimitadoPorSalarioMinimo = deduccionesResult.MontoLimitadoPorSalarioMinimo,
+            TuvoLimitacionSalarioMinimo = deduccionesResult.TuvoLimitacion,
+            TotalDeductions = totalDedsForEmployee,
+            NetPay = netPayForEmployee,
+            EmployerCost = calculationResult.TotalEmployerCost,
+            TenantId = tenantId
+        };
+
+        return (detail, deduccionesResult);
     }
 
     /// <summary>
@@ -241,15 +456,20 @@ public class PayrollProcessingService
                         p.CuotasPagadas < p.NumeroCuotas)
             .ToListAsync();
 
+        var periodsPerYear = PayrollConstants.GetPeriodsPerYear(payPeriodType);
+
         foreach (var prestamo in prestamos)
         {
+            var montoCuotaPeriodo = Math.Round(prestamo.CuotaMensual * 12m / periodsPerYear, 2);
+            montoCuotaPeriodo = Math.Min(montoCuotaPeriodo, prestamo.MontoPendiente);
+
             deduccionesPendientes.Add(new DeduccionPendiente
             {
                 OrigenPrestamoId = prestamo.Id,
                 TipoDeduccion = TipoDeduccion.PrestamoInterno,
                 Categoria = CategoriaDeduccion.Voluntaria,
                 Descripcion = $"Prestamo #{prestamo.Id} - Cuota {prestamo.CuotasPagadas + 1}/{prestamo.NumeroCuotas}",
-                MontoFijo = prestamo.CuotaMensual,
+                MontoFijo = montoCuotaPeriodo,
                 EsPorcentaje = false,
                 BaseCalculo = BaseCalculoDeduccion.SalarioBruto,
                 Prioridad = 100,

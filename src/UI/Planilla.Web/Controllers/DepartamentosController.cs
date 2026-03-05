@@ -5,7 +5,9 @@ using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
+using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Web.Authorization;
 
 namespace Vorluno.Planilla.Web.Controllers;
 
@@ -99,7 +101,7 @@ public class DepartamentosController : ControllerBase
     /// Crea un nuevo departamento.
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.DepartmentsManage)]
     public async Task<IActionResult> Create(DepartamentoCrearDto departamentoDto)
     {
         var tenantId = _tenantContext.TenantId;
@@ -161,7 +163,7 @@ public class DepartamentosController : ControllerBase
     /// Actualiza un departamento existente.
     /// </summary>
     [HttpPut("{id}")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.DepartmentsManage)]
     public async Task<IActionResult> Update(int id, DepartamentoActualizarDto departamentoDto)
     {
         var tenantId = _tenantContext.TenantId;
@@ -209,7 +211,7 @@ public class DepartamentosController : ControllerBase
     /// Elimina (desactiva) un departamento.
     /// </summary>
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Owner,Admin")]
+    [RequirePermission(SystemPermission.DepartmentsManage)]
     public async Task<IActionResult> Delete(int id)
     {
         var tenantId = _tenantContext.TenantId;

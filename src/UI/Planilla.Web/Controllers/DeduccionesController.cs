@@ -6,6 +6,7 @@ using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Web.Authorization;
 
 namespace Vorluno.Planilla.Web.Controllers;
 
@@ -127,7 +128,7 @@ public class DeduccionesController : ControllerBase
     /// Crea una nueva deducción.
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.DeductionsManage)]
     public async Task<IActionResult> Create(CreateDeduccionRequest request)
     {
         var tenantId = _tenantContext.TenantId;
@@ -235,7 +236,7 @@ public class DeduccionesController : ControllerBase
     /// Actualiza una deducción existente.
     /// </summary>
     [HttpPut("{id}")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.DeductionsManage)]
     public async Task<IActionResult> Update(int id, CreateDeduccionRequest request)
     {
         var tenantId = _tenantContext.TenantId;
@@ -329,7 +330,7 @@ public class DeduccionesController : ControllerBase
     /// El historial en DeduccionAplicada se preserva (DeduccionFijaId queda en null por cascade SetNull).
     /// </summary>
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Owner,Admin")]
+    [RequirePermission(SystemPermission.DeductionsManage)]
     public async Task<IActionResult> Eliminar(int id, [FromQuery] string? motivo = null)
     {
         var tenantId = _tenantContext.TenantId;

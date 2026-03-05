@@ -8,6 +8,7 @@ using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
 using Vorluno.Planilla.Infrastructure.Services;
+using Vorluno.Planilla.Web.Authorization;
 
 namespace Vorluno.Planilla.Web.Controllers;
 
@@ -150,7 +151,7 @@ public class HorasExtraController : ControllerBase
     /// Crea una nueva hora extra
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.OvertimeManage)]
     public async Task<IActionResult> Create(CreateHoraExtraRequest request)
     {
         var tenantId = _tenantContext.TenantId;
@@ -219,7 +220,7 @@ public class HorasExtraController : ControllerBase
     /// Crea múltiples horas extra (batch)
     /// </summary>
     [HttpPost("batch")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.OvertimeManage)]
     public async Task<IActionResult> CreateBatch([FromBody] List<CreateHoraExtraRequest> requests)
     {
         if (requests == null || requests.Count == 0)
@@ -286,7 +287,7 @@ public class HorasExtraController : ControllerBase
     /// Actualiza una hora extra
     /// </summary>
     [HttpPut("{id}")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.OvertimeManage)]
     public async Task<IActionResult> Update(int id, CreateHoraExtraRequest request)
     {
         var tenantId = _tenantContext.TenantId;
@@ -359,7 +360,7 @@ public class HorasExtraController : ControllerBase
     /// Aprueba una hora extra
     /// </summary>
     [HttpPost("{id}/aprobar")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.OvertimeManage)]
     public async Task<IActionResult> Aprobar(int id)
     {
         var tenantId = _tenantContext.TenantId;
@@ -399,7 +400,7 @@ public class HorasExtraController : ControllerBase
     /// Rechaza una hora extra
     /// </summary>
     [HttpPost("{id}/rechazar")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.OvertimeManage)]
     public async Task<IActionResult> Rechazar(int id)
     {
         var tenantId = _tenantContext.TenantId;
@@ -419,7 +420,7 @@ public class HorasExtraController : ControllerBase
     /// Elimina una hora extra
     /// </summary>
     [HttpDelete("{id}")]
-    [Authorize(Roles = "Owner,Admin")]
+    [RequirePermission(SystemPermission.OvertimeManage)]
     public async Task<IActionResult> Delete(int id)
     {
         var tenantId = _tenantContext.TenantId;
@@ -536,7 +537,7 @@ public class HorasExtraController : ControllerBase
     /// GET /api/horasextra/estadisticas?empleadoId=&fechaInicio=&fechaFin=
     /// </summary>
     [HttpGet("estadisticas")]
-    [Authorize(Roles = "Owner,Admin,Manager,Accountant")]
+    [RequirePermission(SystemPermission.OvertimeManage, SystemPermission.OvertimeViewSelf)]
     public async Task<ActionResult<HorasExtraEstadisticasDto>> GetEstadisticas(
         [FromQuery] int? empleadoId = null,
         [FromQuery] DateTime? fechaInicio = null,
@@ -723,7 +724,7 @@ public class HorasExtraController : ControllerBase
     /// GET /api/horasextra/validar-limites?empleadoId=&fecha=&horasNuevas=
     /// </summary>
     [HttpGet("validar-limites")]
-    [Authorize(Roles = "Owner,Admin,Manager")]
+    [RequirePermission(SystemPermission.OvertimeManage)]
     public async Task<ActionResult> ValidarLimites(
         [FromQuery] int empleadoId,
         [FromQuery] DateTime fecha,
