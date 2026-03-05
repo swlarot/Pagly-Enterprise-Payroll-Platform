@@ -64,9 +64,9 @@ export default function LoginPage() {
           const { parseJwt } = await import('../utils/jwt');
           const payload = parseJwt(token);
           const adminClaim = payload?.is_system_admin;
-          shouldRedirectToAdmin = adminClaim === 'true' || adminClaim === 'True' || adminClaim === true || adminClaim === '1';
+          shouldRedirectToAdmin = adminClaim === 'true' || adminClaim === 'True' || adminClaim === '1';
           const tenantId = payload?.tenant_id;
-          if (tenantId && tenantId !== '0' && tenantId !== 0 && tenantId !== 'null') shouldRedirectToAdmin = false;
+          if (tenantId && tenantId !== '0' && tenantId !== 'null') shouldRedirectToAdmin = false;
         } catch { shouldRedirectToAdmin = false; }
       }
       if (!shouldRedirectToAdmin) await new Promise(r => setTimeout(r, 200));
@@ -75,8 +75,9 @@ export default function LoginPage() {
       } else {
         navigate(from.startsWith('/system-admin') ? '/dashboard' : from, { replace: true });
       }
-    } catch (error: any) {
-      toast.error(error.message || 'Error al iniciar sesión');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al iniciar sesión';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }

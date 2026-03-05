@@ -553,3 +553,32 @@ export interface DeletionResult {
   blockers: DeletionBlocker[];
   warnings: DeletionWarning[];
 }
+
+// Payroll DTOs (dashboard/summary shapes)
+export interface EmpleadoSummaryDto {
+  id: number;
+  nombre: string;
+  apellido: string;
+  estaActivo: boolean;
+  salarioBase: number;
+}
+
+export interface PayrollHeaderSummaryDto {
+  id: number;
+  payrollNumber: string;
+  periodStartDate: string;
+  periodEndDate: string;
+  payDate: string;
+  payPeriodType: number;
+  status: number;
+  totalGrossPay: number;
+  totalDeductions: number;
+  totalNetPay: number;
+  totalEmployerCost: number;
+  totalEmployerCss: number;
+  totalEmployerSe: number;
+  totalRiskInsurance: number;
+  isApproved: boolean;
+  isPaid: boolean;
+  createdAt: string;
+}

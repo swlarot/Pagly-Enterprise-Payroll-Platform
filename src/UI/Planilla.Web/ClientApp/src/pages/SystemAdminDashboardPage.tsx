@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { SystemAdminLayout } from '../components/layout/SystemAdminLayout';
 import { systemAdminService } from '../services/systemAdminService';
@@ -26,8 +26,9 @@ export default function SystemAdminDashboardPage() {
       setIsLoading(true);
       const data = await systemAdminService.getMetrics();
       setMetrics(data);
-    } catch (error: any) {
-      toast.error(error.message || 'Error al cargar métricas');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al cargar métricas';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }

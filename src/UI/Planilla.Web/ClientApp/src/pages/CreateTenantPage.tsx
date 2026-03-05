@@ -59,12 +59,13 @@ export default function CreateTenantPage() {
 
     try {
       setIsSubmitting(true);
-      const tenant = await systemAdminService.createTenant(formData);
+      const tenant = await systemAdminService.createTenant(formData as any);
       setCreatedTenant(tenant);
       setShowSuccess(true);
       toast.success('Tenant creado exitosamente');
-    } catch (error: any) {
-      toast.error(error.message || 'Error al crear tenant');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error al crear tenant';
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }

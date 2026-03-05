@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import {
@@ -90,6 +90,7 @@ export function DeleteEmployeeModal({
   };
 
   const renderContent = () => {
+    const isDeleting = state === 'deleting';
     switch (state) {
       case 'validating':
         return (
@@ -215,7 +216,7 @@ export function DeleteEmployeeModal({
                 variant="danger"
                 onClick={handleConfirmDelete}
                 disabled={!confirmChecked}
-                loading={state === 'deleting'}
+                loading={isDeleting}
               >
                 Eliminar de todas formas
               </Button>
@@ -263,7 +264,7 @@ export function DeleteEmployeeModal({
               <Button
                 variant="danger"
                 onClick={handleConfirmDelete}
-                loading={state === 'deleting'}
+                loading={isDeleting}
               >
                 Eliminar
               </Button>
