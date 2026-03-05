@@ -36,7 +36,7 @@ public class PayrollHeadersController : ControllerBase
     private readonly ITenantContext _tenantContext;
     private readonly IAuditLogService _auditLogService;
     private readonly ICurrentUserService _currentUserService;
-    private readonly AsistenciaCalculationService _asistenciaService;
+    private readonly IAsistenciaCalculationService _asistenciaService;
     private readonly PayrollProcessingService _processingService;
 
     public PayrollHeadersController(
@@ -46,7 +46,7 @@ public class PayrollHeadersController : ControllerBase
         ITenantContext tenantContext,
         IAuditLogService auditLogService,
         ICurrentUserService currentUserService,
-        AsistenciaCalculationService asistenciaService,
+        IAsistenciaCalculationService asistenciaService,
         PayrollProcessingService processingService)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
@@ -387,7 +387,7 @@ public class PayrollHeadersController : ControllerBase
                     - calculationResult.EducationalInsuranceEmployee
                     - calculationResult.IncomeTax;
 
-                var deduccionEngine = HttpContext.RequestServices.GetRequiredService<DeduccionPrioridadEngine>();
+                var deduccionEngine = HttpContext.RequestServices.GetRequiredService<IDeduccionPrioridadEngine>();
 
                 // Cargar salario minimo legal vigente
                 var taxConfig = await _context.PayrollTaxConfigurations

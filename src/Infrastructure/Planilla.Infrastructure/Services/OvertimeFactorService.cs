@@ -6,6 +6,7 @@
 // ====================================================================
 
 using Microsoft.EntityFrameworkCore;
+using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
 
@@ -15,7 +16,7 @@ namespace Vorluno.Planilla.Infrastructure.Services;
 /// Servicio para determinar el tipo de hora extra según fecha y horario,
 /// calcular factores multiplicadores y validar límites legales.
 /// </summary>
-public class OvertimeFactorService
+public class OvertimeFactorService : IOvertimeFactorService
 {
     private readonly ApplicationDbContext _context;
     private readonly PanamaHolidayService _holidayService;

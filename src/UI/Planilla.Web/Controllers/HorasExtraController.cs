@@ -22,13 +22,13 @@ public class HorasExtraController : ControllerBase
     private readonly IUnitOfWork _unitOfWork;
     private readonly ApplicationDbContext _context;
     private readonly ITenantContext _tenantContext;
-    private readonly OvertimeFactorService _overtimeFactorService;
+    private readonly IOvertimeFactorService _overtimeFactorService;
 
     public HorasExtraController(
-        IUnitOfWork unitOfWork, 
-        ApplicationDbContext context, 
+        IUnitOfWork unitOfWork,
+        ApplicationDbContext context,
         ITenantContext tenantContext,
-        OvertimeFactorService overtimeFactorService)
+        IOvertimeFactorService overtimeFactorService)
     {
         _unitOfWork = unitOfWork;
         _context = context;
@@ -385,7 +385,7 @@ public class HorasExtraController : ControllerBase
 
         horaExtra.EstaAprobada = true;
         horaExtra.FechaAprobacion = DateTime.UtcNow;
-        horaExtra.AprobadoPor = "Sistema"; // TODO: Obtener usuario actual
+        horaExtra.AprobadoPor = User.FindFirst("sub")?.Value ?? User.FindFirst("email")?.Value ?? "Sistema";
         horaExtra.MontoCalculado = montoCalculado;
         horaExtra.UpdatedAt = DateTime.UtcNow;
 
@@ -803,7 +803,7 @@ public class HorasExtraController : ControllerBase
         [FromQuery] string horaFin)
     {
         var holidayService = HttpContext.RequestServices.GetRequiredService<PanamaHolidayService>();
-        var overtimeFactorService = HttpContext.RequestServices.GetRequiredService<OvertimeFactorService>();
+        var overtimeFactorService = HttpContext.RequestServices.GetRequiredService<IOvertimeFactorService>();
 
         if (!TimeSpan.TryParse(horaInicio, out var inicio) || !TimeSpan.TryParse(horaFin, out var fin))
         {

@@ -8,6 +8,7 @@
 
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
+using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Application.Results;
 using Vorluno.Planilla.Application.Services;
 using Vorluno.Planilla.Domain.Entities;
@@ -25,14 +26,14 @@ public class PayrollProcessingService
 {
     private readonly ApplicationDbContext _context;
     private readonly PayrollCalculationOrchestratorPortable _orchestrator;
-    private readonly AsistenciaCalculationService _asistenciaService;
-    private readonly DeduccionPrioridadEngine _deduccionEngine;
+    private readonly IAsistenciaCalculationService _asistenciaService;
+    private readonly IDeduccionPrioridadEngine _deduccionEngine;
 
     public PayrollProcessingService(
         ApplicationDbContext context,
         PayrollCalculationOrchestratorPortable orchestrator,
-        AsistenciaCalculationService asistenciaService,
-        DeduccionPrioridadEngine deduccionEngine)
+        IAsistenciaCalculationService asistenciaService,
+        IDeduccionPrioridadEngine deduccionEngine)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
@@ -85,14 +86,14 @@ public class PayrollProcessingService
         var payrollResult = await _orchestrator.CalculateEmployeePayrollAsync(
             companyId,
             grossPayAjustado,
-            "Quincenal", // TODO: Obtener de configuración del empleado
-            0, // TODO: Obtener años cotizados del empleado
-            grossPayAjustado, // TODO: Obtener promedio últimos 10 años
-            0.56m, // TODO: Obtener nivel de riesgo del empleado
-            0, // TODO: Obtener dependientes del empleado
-            true, // isSubjectToCss
-            true, // isSubjectToEducationalInsurance
-            true, // isSubjectToIncomeTax
+            empleado.PayFrequency,
+            empleado.YearsCotized,
+            empleado.AverageSalaryLast10Years > 0 ? empleado.AverageSalaryLast10Years : grossPayAjustado,
+            empleado.CssRiskPercentage,
+            empleado.Dependents,
+            empleado.IsSubjectToCss,
+            empleado.IsSubjectToEducationalInsurance,
+            empleado.IsSubjectToIncomeTax,
             payrollPeriodStart
         );
 
