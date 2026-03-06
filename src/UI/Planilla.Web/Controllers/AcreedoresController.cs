@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
+using Vorluno.Planilla.Application.Helpers;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
@@ -124,7 +125,7 @@ public class AcreedoresController : ControllerBase
     public IActionResult GetTipos()
     {
         var tipos = Enum.GetValues<TipoAcreedor>()
-            .Select(t => new { value = (int)t, label = GetTipoNombre(t) })
+            .Select(t => new { value = (int)t, label = EnumDisplayHelper.ToNombre(t) })
             .ToList();
 
         return Ok(tipos);
@@ -152,7 +153,7 @@ public class AcreedoresController : ControllerBase
                 a.Id,
                 a.Nombre,
                 a.TipoAcreedor,
-                TipoAcreedorNombre = GetTipoNombre(a.TipoAcreedor),
+                TipoAcreedorNombre = EnumDisplayHelper.ToNombre(a.TipoAcreedor),
                 a.Identificacion,
                 a.Banco,
                 a.NumeroCuenta
@@ -322,7 +323,7 @@ public class AcreedoresController : ControllerBase
         a.Id,
         a.Nombre,
         a.TipoAcreedor,
-        GetTipoNombre(a.TipoAcreedor),
+        EnumDisplayHelper.ToNombre(a.TipoAcreedor),
         a.Identificacion,
         a.TipoIdentificacion,
         a.Banco,
@@ -340,15 +341,4 @@ public class AcreedoresController : ControllerBase
         a.CreatedAt
     );
 
-    private static string GetTipoNombre(TipoAcreedor tipo) => tipo switch
-    {
-        TipoAcreedor.PersonaNatural => "Persona Natural",
-        TipoAcreedor.Banco => "Banco",
-        TipoAcreedor.Cooperativa => "Cooperativa",
-        TipoAcreedor.Sindicato => "Sindicato",
-        TipoAcreedor.Aseguradora => "Aseguradora",
-        TipoAcreedor.EntidadGubernamental => "Entidad Gubernamental",
-        TipoAcreedor.Otro => "Otro",
-        _ => "Desconocido"
-    };
 }
