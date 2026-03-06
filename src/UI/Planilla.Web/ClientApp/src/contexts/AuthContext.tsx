@@ -164,7 +164,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(enrichUserWithToken(data.user, data.token));
     
     // Establecer tenant ANTES de otras operaciones para que esté disponible inmediatamente
-    console.log('[AuthContext] Setting tenant from login response:', data.tenant);
     setTenant(data.tenant);
     
     setSubscription(data.subscription);
@@ -181,8 +180,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       setPermissions([]);
     }
-
-    console.log('[AuthContext] Login completed. Tenant set:', data.tenant ? `${data.tenant.name} (ID: ${data.tenant.id})` : 'null');
 
     return { requiresTenantSelection: false };
   };

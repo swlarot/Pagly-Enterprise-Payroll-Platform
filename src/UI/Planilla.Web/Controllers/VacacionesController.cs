@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -285,7 +286,7 @@ public class VacacionesController : ControllerBase
 
         solicitud.Estado = EstadoVacaciones.Aprobada;
         solicitud.FechaAprobacion = DateTime.UtcNow;
-        solicitud.AprobadoPor = "Sistema"; // TODO: Usuario actual
+        solicitud.AprobadoPor = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "Desconocido";
         solicitud.UpdatedAt = DateTime.UtcNow;
 
         _unitOfWork.Repository<SolicitudVacaciones>().Update(solicitud);
@@ -313,7 +314,7 @@ public class VacacionesController : ControllerBase
 
         solicitud.Estado = EstadoVacaciones.Rechazada;
         solicitud.FechaRechazo = DateTime.UtcNow;
-        solicitud.RechazadoPor = "Sistema"; // TODO: Usuario actual
+        solicitud.RechazadoPor = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "Desconocido";
         solicitud.MotivoRechazo = request.Motivo;
         solicitud.UpdatedAt = DateTime.UtcNow;
 

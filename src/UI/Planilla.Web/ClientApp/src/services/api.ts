@@ -55,7 +55,7 @@ async function tryRefreshToken(): Promise<string | null> {
 
       return null;
     } catch (error) {
-      console.error('Token refresh failed:', error);
+      if (import.meta.env.DEV) console.error('Token refresh failed:', error);
       return null;
     } finally {
       isRefreshing = false;
