@@ -219,7 +219,7 @@ public class PayrollProcessingService
                 hours.RegularPay = salarioPeriodoExacto;
 
             hours.SundayPay = hours.SundayHours * hourlyRate * 1.50m;
-            hours.HolidayPay = hours.HolidayHours * hourlyRate * 1.50m;
+            hours.HolidayPay = hours.HolidayHours * hourlyRate * 2.50m; // Art. 49: +150% adicional (fiestas nacionales)
             hours.OvertimeDayPay = hours.OvertimeDayHours * hourlyRate * 1.25m;
             hours.OvertimeNightPay = hours.OvertimeNightHours * hourlyRate * 1.50m;
             hours.OvertimeHolidayPay = hours.OvertimeHolidayHours * hourlyRate * 3.125m;
