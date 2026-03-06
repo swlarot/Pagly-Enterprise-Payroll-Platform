@@ -34,7 +34,7 @@ public class PayrollEmployeeHours : ITenantEntity
     [Column(TypeName = "decimal(8, 2)")]
     public decimal SundayHours { get; set; } = 0;
 
-    /// <summary>Horas trabajadas en días feriados nacionales (recargo 50%)</summary>
+    /// <summary>Horas trabajadas en días feriados nacionales (recargo 150%, Art. 49 Código de Trabajo)</summary>
     [Column(TypeName = "decimal(8, 2)")]
     public decimal HolidayHours { get; set; } = 0;
 
@@ -82,7 +82,7 @@ public class PayrollEmployeeHours : ITenantEntity
     [Column(TypeName = "decimal(18, 2)")]
     public decimal SundayPay { get; set; }
 
-    /// <summary>Pago por horas feriado: HolidayHours × HourlyRate × 1.50</summary>
+    /// <summary>Pago por horas feriado: HolidayHours × HourlyRate × 2.50 (Art. 49: +150% adicional)</summary>
     [Column(TypeName = "decimal(18, 2)")]
     public decimal HolidayPay { get; set; }
 
