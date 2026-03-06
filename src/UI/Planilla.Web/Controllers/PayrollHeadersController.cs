@@ -605,6 +605,11 @@ public class PayrollHeadersController : ControllerBase
                     .Distinct()
                     .ToList();
 
+                var montoAplicadoPorPrestamo = deducciones
+                    .Where(d => d.PrestamoId.HasValue && d.MontoAplicado > 0m)
+                    .GroupBy(d => d.PrestamoId!.Value)
+                    .ToDictionary(g => g.Key, g => g.Sum(x => x.MontoAplicado));
+
                 var anticipoIds = deducciones
                     .Where(d => d.AnticipoId.HasValue)
                     .Select(d => d.AnticipoId!.Value)
@@ -612,7 +617,7 @@ public class PayrollHeadersController : ControllerBase
                     .ToList();
 
                 if (prestamoIds.Count > 0)
-                    await _processingService.ProcessPrestamosAsync(prestamoIds, detail.Id, payrollHeader.Id);
+                    await _processingService.ProcessPrestamosAsync(prestamoIds, detail.Id, payrollHeader.Id, montoAplicadoPorPrestamo);
 
                 if (anticipoIds.Count > 0)
                     await _processingService.ProcessAnticiposAsync(anticipoIds, detail.Id, payrollHeader.Id);
