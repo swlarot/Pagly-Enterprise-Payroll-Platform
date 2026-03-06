@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { formatCurrency } from '../utils/currency';
+import { formatDate } from '../utils/date';
 
 const MESES = [
     { value: 1, label: 'Enero' },
@@ -64,11 +65,6 @@ const ReportesPage = () => {
         } finally {
             setLoadingPlanillas(false);
         }
-    };
-
-    const formatDate = (dateString) => {
-        if (!dateString) return '';
-        return new Date(dateString).toLocaleDateString('es-PA');
     };
 
     const formatHoras = (h) => (h || 0).toFixed(2) + 'h';
