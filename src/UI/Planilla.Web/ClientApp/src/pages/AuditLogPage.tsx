@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { auditService } from '../services/auditService';
 import type { AuditLogDto, PagedResultDto } from '../types/api';
-import toast from 'react-hot-toast';
+import { useAsyncLoad } from '../hooks/useAsyncLoad';
 
 export default function AuditLogPage() {
   const [logs, setLogs] = useState<PagedResultDto<AuditLogDto> | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { isLoading, run } = useAsyncLoad();
   const [page, setPage] = useState(1);
   const pageSize = 20;
 
@@ -13,17 +13,10 @@ export default function AuditLogPage() {
     loadLogs();
   }, [page]);
 
-  const loadLogs = async () => {
-    setIsLoading(true);
-    try {
-      const data = await auditService.getAuditLogs({ page, pageSize });
-      setLogs(data);
-    } catch (error: unknown) {
-      toast.error('Error al cargar el registro de auditoría');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const loadLogs = () => run(async () => {
+    const data = await auditService.getAuditLogs({ page, pageSize });
+    setLogs(data);
+  }, 'Error al cargar el registro de auditoría');
 
   // Formatea fechas de forma robusta.
   // El backend envía 'createdAt' (DateTime UTC de .NET) serializado como ISO 8601.

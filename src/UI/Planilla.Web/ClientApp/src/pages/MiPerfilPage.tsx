@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useAsyncLoad } from '../hooks/useAsyncLoad';
 import { Card, CardHeader, CardBody } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { User, DollarSign, Calendar, FileText, Clock, Briefcase, ArrowLeft, Search } from 'lucide-react';
@@ -83,43 +84,33 @@ interface EmployeeDetailProps {
 function EmployeeDetail({ empleado, isOwnerView, onBack }: EmployeeDetailProps) {
   const [planillas, setPlanillas] = useState<Planilla[]>([]);
   const [vacaciones, setVacaciones] = useState<Vacacion[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { isLoading, run } = useAsyncLoad();
 
   useEffect(() => {
     loadEmployeeData();
   }, [empleado.id]);
 
-  const loadEmployeeData = async () => {
-    try {
-      setIsLoading(true);
+  const loadEmployeeData = () => run(async () => {
+    // Cargar planillas (con filtro por empleadoId si es Owner)
+    const planillasUrl = isOwnerView
+      ? `/api/payrollheaders?empleadoId=${empleado.id}`
+      : '/api/payrollheaders';
+    const planillasRes = await api.get<Planilla[]>(planillasUrl);
 
-      // Cargar planillas (con filtro por empleadoId si es Owner)
-      const planillasUrl = isOwnerView
-        ? `/api/payrollheaders?empleadoId=${empleado.id}`
-        : '/api/payrollheaders';
-      const planillasRes = await api.get<Planilla[]>(planillasUrl);
+    // Filtrar detalles para mostrar solo los del empleado seleccionado
+    const filteredPlanillas = planillasRes.map(p => ({
+      ...p,
+      details: p.details?.filter(d => d.empleadoId === empleado.id) || [],
+    }));
+    setPlanillas(filteredPlanillas.slice(0, 5));
 
-      // Filtrar detalles para mostrar solo los del empleado seleccionado
-      const filteredPlanillas = planillasRes.map(p => ({
-        ...p,
-        details: p.details?.filter(d => d.empleadoId === empleado.id) || [],
-      }));
-      setPlanillas(filteredPlanillas.slice(0, 5));
-
-      // Cargar vacaciones (con filtro por empleadoId si es Owner)
-      const vacacionesUrl = isOwnerView
-        ? `/api/vacaciones?empleadoId=${empleado.id}`
-        : '/api/vacaciones';
-      const vacacionesRes = await api.get<Vacacion[]>(vacacionesUrl);
-      setVacaciones(vacacionesRes.slice(0, 5));
-    } catch (error: unknown) {
-      console.error('Error cargando datos del empleado:', error);
-      const message = error instanceof Error ? error.message : 'Error al cargar datos del empleado';
-      toast.error(message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    // Cargar vacaciones (con filtro por empleadoId si es Owner)
+    const vacacionesUrl = isOwnerView
+      ? `/api/vacaciones?empleadoId=${empleado.id}`
+      : '/api/vacaciones';
+    const vacacionesRes = await api.get<Vacacion[]>(vacacionesUrl);
+    setVacaciones(vacacionesRes.slice(0, 5));
+  }, 'Error al cargar datos del empleado');
 
   const initials = `${empleado.nombre?.[0] || ''}${empleado.apellido?.[0] || ''}`.toUpperCase();
   const color = avatarColors[(empleado.nombre?.charCodeAt(0) || 0) % avatarColors.length];
@@ -529,7 +520,7 @@ export default function MiPerfilPage() {
   const { hasRole } = useAuth();
   const isOwner = hasRole(TenantRole.Owner);
 
-  const [isLoading, setIsLoading] = useState(true);
+  const { isLoading, run } = useAsyncLoad();
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [selectedEmpleado, setSelectedEmpleado] = useState<Empleado | null>(null);
 
@@ -537,24 +528,15 @@ export default function MiPerfilPage() {
     loadEmpleados();
   }, []);
 
-  const loadEmpleados = async () => {
-    try {
-      setIsLoading(true);
-      const data = await api.get<Empleado[]>('/api/empleados');
-      setEmpleados(data || []);
+  const loadEmpleados = () => run(async () => {
+    const data = await api.get<Empleado[]>('/api/empleados');
+    setEmpleados(data || []);
 
-      // Si no es Owner, seleccionar automáticamente el primer (y único) empleado
-      if (!isOwner && data && data.length > 0) {
-        setSelectedEmpleado(data[0]);
-      }
-    } catch (error: unknown) {
-      console.error('Error cargando empleados:', error);
-      const message = error instanceof Error ? error.message : 'Error al cargar información';
-      toast.error(message);
-    } finally {
-      setIsLoading(false);
+    // Si no es Owner, seleccionar automáticamente el primer (y único) empleado
+    if (!isOwner && data && data.length > 0) {
+      setSelectedEmpleado(data[0]);
     }
-  };
+  }, 'Error al cargar información');
 
   // Loading
   if (isLoading) {

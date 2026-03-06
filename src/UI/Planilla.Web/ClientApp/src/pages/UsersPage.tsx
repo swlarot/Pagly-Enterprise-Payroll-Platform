@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useAsyncLoad } from '../hooks/useAsyncLoad';
 import { tenantService } from '../services/tenantService';
 import { useAuth } from '../contexts/AuthContext';
 import type { TenantUserDto, InvitationDto, UpdateTenantUserDto } from '../types/api';
@@ -19,9 +20,9 @@ export default function UsersPage() {
   const [users, setUsers] = useState<TenantUserDto[]>([]);
   const [invitations, setInvitations] = useState<InvitationDto[]>([]);
   const [usage, setUsage] = useState<{ usersCount: number; maxUsers: number } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { isLoading, run } = useAsyncLoad();
   const [customRoles, setCustomRoles] = useState<CustomRole[]>([]);
-  const [isLoadingRoles, setIsLoadingRoles] = useState(false);
+  const { isLoading: isLoadingRoles, run: runRoles } = useAsyncLoad();
 
   // Invite modal state
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -55,41 +56,23 @@ export default function UsersPage() {
     loadCustomRoles();
   }, []);
 
-  const loadData = async () => {
-    try {
-      setIsLoading(true);
-      const [usersData, invitationsData, usageData] = await Promise.all([
-        tenantService.getUsers(),
-        tenantService.getInvitations(),
-        tenantService.getUsage(),
-      ]);
+  const loadData = () => run(async () => {
+    const [usersData, invitationsData, usageData] = await Promise.all([
+      tenantService.getUsers(),
+      tenantService.getInvitations(),
+      tenantService.getUsage(),
+    ]);
+    setUsers(usersData);
+    setInvitations(invitationsData);
+    setUsage({ usersCount: usageData.usersCount, maxUsers: usageData.maxUsers });
+  }, 'Error al cargar datos de usuarios');
 
-      setUsers(usersData);
-      setInvitations(invitationsData);
-      setUsage({ usersCount: usageData.usersCount, maxUsers: usageData.maxUsers });
-    } catch (error: unknown) {
-      toast.error('Error al cargar datos de usuarios');
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadCustomRoles = async () => {
-    try {
-      setIsLoadingRoles(true);
-      const response = await fetch('/api/tenants/roles');
-      if (!response.ok) throw new Error('Error al cargar roles');
-      const data = await response.json();
-      setCustomRoles(data || []);
-    } catch (error: unknown) {
-      console.error('Error loading custom roles:', error);
-      // Si falla la carga de roles custom, usar roles predeterminados
-      setCustomRoles([]);
-    } finally {
-      setIsLoadingRoles(false);
-    }
-  };
+  const loadCustomRoles = () => runRoles(async () => {
+    const response = await fetch('/api/tenants/roles');
+    if (!response.ok) throw new Error('Error al cargar roles');
+    const data = await response.json();
+    setCustomRoles(data || []);
+  });
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
