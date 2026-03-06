@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { auditService } from '../services/auditService';
 import type { AuditLogDto, PagedResultDto } from '../types/api';
 import { useAsyncLoad } from '../hooks/useAsyncLoad';
+import { formatDateTime } from '../utils/date';
 
 export default function AuditLogPage() {
   const [logs, setLogs] = useState<PagedResultDto<AuditLogDto> | null>(null);
@@ -18,18 +19,6 @@ export default function AuditLogPage() {
     setLogs(data);
   }, 'Error al cargar el registro de auditoría');
 
-  // Formatea fechas de forma robusta.
-  // El backend envía 'createdAt' (DateTime UTC de .NET) serializado como ISO 8601.
-  // Protege contra valores nulos, vacíos o no parseables.
-  const formatDate = (dateStr: string | undefined | null) => {
-    if (!dateStr) return '-';
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return '-';
-    return date.toLocaleString('es-PA', {
-      dateStyle: 'short',
-      timeStyle: 'short',
-    });
-  };
 
   const getActionBadge = (action: string) => {
     // Colores adaptados para dark theme
@@ -111,7 +100,7 @@ export default function AuditLogPage() {
                   <tr key={log.id} className="hover:bg-navy-800 transition-colors">
                     <td className="px-6 py-4 text-sm text-gray-100 whitespace-nowrap">
                       {/* Usamos log.createdAt porque el backend serializa AuditLogDto.CreatedAt como "createdAt" */}
-                      {formatDate(log.createdAt)}
+                      {formatDateTime(log.createdAt)}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-100">
                       {log.actorEmail || 'Sistema'}

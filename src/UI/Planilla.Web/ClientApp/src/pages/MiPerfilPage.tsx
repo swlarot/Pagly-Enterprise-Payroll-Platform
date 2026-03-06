@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formatDate } from '../utils/date';
 import { useAsyncLoad } from '../hooks/useAsyncLoad';
 import { Card, CardHeader, CardBody } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -48,9 +49,6 @@ interface Vacacion {
 // ============================================================
 // Utilidades compartidas
 // ============================================================
-
-const formatDate = (dateString: string) =>
-  new Date(dateString).toLocaleDateString('es-PA', { day: '2-digit', month: 'short', year: 'numeric' });
 
 const getStatusBadge = (status: string) => {
   const statusMap: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'info' }> = {
