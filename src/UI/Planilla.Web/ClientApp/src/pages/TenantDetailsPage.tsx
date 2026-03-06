@@ -12,6 +12,7 @@ import { RoleBadge } from '../components/admin/RoleBadge';
 import { StatusBadge } from '../components/admin/StatusBadge';
 import { ActionBadge } from '../components/admin/ActionBadge';
 import type { AdminTenantDto, AdminTenantUserDto, AuditLogDto } from '../types/api';
+import { Pagination } from '../components/ui/Pagination';
 import { SubscriptionPlan, SubscriptionStatus } from '../types/api';
 import {
   ArrowLeft,
@@ -758,32 +759,13 @@ export default function TenantDetailsPage() {
                   </div>
 
                   {/* Pagination */}
-                  {auditTotal > auditFilters.pageSize && (
-                    <div className="mt-4 flex items-center justify-between">
-                      <div className="text-sm text-gray-400">
-                        Mostrando {(auditFilters.page - 1) * auditFilters.pageSize + 1} -{' '}
-                        {Math.min(auditFilters.page * auditFilters.pageSize, auditTotal)} de {auditTotal}
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={auditFilters.page === 1}
-                          onClick={() => setAuditFilters({ ...auditFilters, page: auditFilters.page - 1 })}
-                        >
-                          Anterior
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={auditFilters.page * auditFilters.pageSize >= auditTotal}
-                          onClick={() => setAuditFilters({ ...auditFilters, page: auditFilters.page + 1 })}
-                        >
-                          Siguiente
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                  <Pagination
+                    page={auditFilters.page}
+                    totalPages={Math.ceil(auditTotal / auditFilters.pageSize)}
+                    totalCount={auditTotal}
+                    pageSize={auditFilters.pageSize}
+                    onPageChange={(p) => setAuditFilters({ ...auditFilters, page: p })}
+                  />
                 </>
               )}
             </div>

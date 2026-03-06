@@ -11,10 +11,9 @@ import {
   Search,
   Eye,
   Loader2,
-  ChevronLeft,
-  ChevronRight,
 } from 'lucide-react';
 import { useAsyncLoad } from '../hooks/useAsyncLoad';
+import { Pagination } from '../components/ui/Pagination';
 
 export default function TenantsManagementPage() {
   const navigate = useNavigate();
@@ -299,37 +298,13 @@ export default function TenantsManagementPage() {
           </div>
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="px-6 py-4 border-t border-navy-700 flex items-center justify-between">
-              <div className="text-sm text-gray-400">
-                Mostrando {(page - 1) * pageSize + 1} a{' '}
-                {Math.min(page * pageSize, totalCount)} de {totalCount} resultados
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  icon={ChevronLeft}
-                  onClick={() => setPage(page - 1)}
-                  disabled={page === 1}
-                >
-                  {''}
-                </Button>
-                <span className="text-sm text-gray-400">
-                  Página {page} de {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  icon={ChevronRight}
-                  onClick={() => setPage(page + 1)}
-                  disabled={page === totalPages}
-                >
-                  {''}
-                </Button>
-              </div>
-            </div>
-          )}
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            totalCount={totalCount}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
         </div>
       </div>
     </SystemAdminLayout>
