@@ -223,6 +223,7 @@ public class PayrollProcessingService
             hours.OvertimeDayPay = hours.OvertimeDayHours * hourlyRate * 1.25m;
             hours.OvertimeNightPay = hours.OvertimeNightHours * hourlyRate * 1.50m;
             hours.OvertimeHolidayPay = hours.OvertimeHolidayHours * hourlyRate * 3.125m;
+            // DEV-27: Mixta 1.50x (D→N). Para 1.75x (N→D) haría falta campo/convención en PayrollEmployeeHours.
             hours.OvertimeMixedPay = hours.OvertimeMixedHours * hourlyRate * 1.50m;
             hours.OvertimeExcessPay = hours.OvertimeExcessHours * hourlyRate * 2.1875m;
             hours.AbsenceDeduction = hours.AbsenceHours * hourlyRate;
@@ -527,34 +528,51 @@ public class PayrollProcessingService
     }
 
     /// <summary>
-    /// Procesa los pagos de préstamos asociados a un detalle de planilla
+    /// Procesa los pagos de préstamos asociados a un detalle de planilla.
+    /// Usa el monto realmente aplicado (prorrateado por frecuencia de pago) del resultado de deducciones.
     /// </summary>
-    public async Task ProcessPrestamosAsync(List<int> prestamoIds, int payrollDetailId, int payrollHeaderId)
+    public async Task ProcessPrestamosAsync(List<int> prestamoIds, int payrollDetailId, int payrollHeaderId, DeduccionesResult deduccionesResult)
+    {
+        var montoPorPrestamo = deduccionesResult.Detalle
+            .Where(d => d.OrigenPrestamoId.HasValue && d.MontoAplicado > 0m)
+            .ToDictionary(d => d.OrigenPrestamoId!.Value, d => d.MontoAplicado);
+        await ProcessPrestamosAsync(prestamoIds, payrollDetailId, payrollHeaderId, montoPorPrestamo);
+    }
+
+    /// <summary>
+    /// Procesa los pagos de préstamos con montos aplicados por préstamo (para flujo Marcar como Pagada desde BD).
+    /// </summary>
+    public async Task ProcessPrestamosAsync(List<int> prestamoIds, int payrollDetailId, int payrollHeaderId, IReadOnlyDictionary<int, decimal> montoAplicadoPorPrestamoId)
     {
         foreach (var prestamoId in prestamoIds)
         {
             var prestamo = await _context.Prestamos.FindAsync(prestamoId);
             if (prestamo == null) continue;
 
+            if (!montoAplicadoPorPrestamoId.TryGetValue(prestamoId, out var montoAplicado) || montoAplicado <= 0m) continue;
+
+            var saldoAnterior = prestamo.MontoPendiente;
+            var saldoNuevo = Math.Max(0m, saldoAnterior - montoAplicado);
+
             var pago = new PagoPrestamo
             {
                 PrestamoId = prestamoId,
                 PlanillaDetailId = payrollDetailId,
                 FechaPago = DateTime.UtcNow,
-                MontoPagado = prestamo.CuotaMensual,
-                SaldoAnterior = prestamo.MontoPendiente,
-                SaldoNuevo = prestamo.MontoPendiente - prestamo.CuotaMensual,
+                MontoPagado = montoAplicado,
+                SaldoAnterior = saldoAnterior,
+                SaldoNuevo = saldoNuevo,
                 NumeroCuota = prestamo.CuotasPagadas + 1,
                 CreatedAt = DateTime.UtcNow
             };
 
             _context.PagosPrestamos.Add(pago);
 
-            prestamo.MontoPendiente -= prestamo.CuotaMensual;
+            prestamo.MontoPendiente = saldoNuevo;
             prestamo.CuotasPagadas++;
             prestamo.UpdatedAt = DateTime.UtcNow;
 
-            if (prestamo.CuotasPagadas >= prestamo.NumeroCuotas)
+            if (prestamo.CuotasPagadas >= prestamo.NumeroCuotas || prestamo.MontoPendiente <= 0m)
             {
                 prestamo.Estado = EstadoPrestamo.Pagado;
                 prestamo.MontoPendiente = 0;
@@ -662,8 +680,8 @@ public class PayrollProcessingService
         // Persistir auditoría de deducciones aplicadas (para reportes)
         await CreateDeduccionesAplicadasAsync(detail, deduccionesResult);
 
-        // Procesar préstamos y anticipos
-        await ProcessPrestamosAsync(prestamoIds, detail.Id, payrollHeaderId);
+        // Procesar préstamos (usar monto realmente aplicado/prorrateado) y anticipos
+        await ProcessPrestamosAsync(prestamoIds, detail.Id, payrollHeaderId, deduccionesResult);
         await ProcessAnticiposAsync(anticipoIds, detail.Id, payrollHeaderId);
 
         // Procesar conceptos de asistencia
