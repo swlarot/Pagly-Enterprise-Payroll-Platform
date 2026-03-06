@@ -1391,24 +1391,19 @@ public class AdminController : ControllerBase
         {
             _logger.LogError(dbEx, "Database error deleting user {UserId}. InnerException: {InnerException}",
                 userId, dbEx.InnerException?.Message);
-            return StatusCode(500, new
-            {
-                error = "Error de base de datos al eliminar usuario",
-                details = dbEx.Message,
-                innerException = dbEx.InnerException?.Message
-            });
+            var envDb = HttpContext.RequestServices.GetRequiredService<IHostEnvironment>();
+            return StatusCode(500, envDb.IsDevelopment()
+                ? (object)new { error = "Error de base de datos al eliminar usuario", details = dbEx.Message, innerException = dbEx.InnerException?.Message }
+                : new { error = "Error de base de datos al eliminar usuario. Consulte los logs del servidor." });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Unexpected error deleting user {UserId}. Type: {ExceptionType}, Message: {Message}, StackTrace: {StackTrace}",
                 userId, ex.GetType().Name, ex.Message, ex.StackTrace);
-            return StatusCode(500, new
-            {
-                error = "Error inesperado al eliminar el usuario",
-                details = ex.Message,
-                exceptionType = ex.GetType().Name,
-                innerException = ex.InnerException?.Message
-            });
+            var envEx = HttpContext.RequestServices.GetRequiredService<IHostEnvironment>();
+            return StatusCode(500, envEx.IsDevelopment()
+                ? (object)new { error = "Error inesperado al eliminar el usuario", details = ex.Message, exceptionType = ex.GetType().Name, innerException = ex.InnerException?.Message }
+                : new { error = "Error inesperado al eliminar el usuario. Consulte los logs del servidor." });
         }
     }
 
@@ -1927,14 +1922,10 @@ public class AdminController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error sending test email to {ToEmail}", dto.ToEmail);
-            return StatusCode(500, new
-            {
-                success = false,
-                error = "Error al enviar email de prueba",
-                details = ex.Message,
-                innerException = ex.InnerException?.Message,
-                toEmail = dto.ToEmail
-            });
+            var envEmail = HttpContext.RequestServices.GetRequiredService<IHostEnvironment>();
+            return StatusCode(500, envEmail.IsDevelopment()
+                ? (object)new { success = false, error = "Error al enviar email de prueba", details = ex.Message, innerException = ex.InnerException?.Message, toEmail = dto.ToEmail }
+                : new { success = false, error = "Error al enviar email de prueba. Consulte los logs del servidor.", toEmail = dto.ToEmail });
         }
     }
 
