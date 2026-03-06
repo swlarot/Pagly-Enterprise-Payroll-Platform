@@ -3,6 +3,7 @@ import { auditService } from '../services/auditService';
 import type { AuditLogDto, PagedResultDto } from '../types/api';
 import { useAsyncLoad } from '../hooks/useAsyncLoad';
 import { formatDateTime } from '../utils/date';
+import { Pagination } from '../components/ui/Pagination';
 
 export default function AuditLogPage() {
   const [logs, setLogs] = useState<PagedResultDto<AuditLogDto> | null>(null);
@@ -126,29 +127,14 @@ export default function AuditLogPage() {
         </div>
 
         {/* Paginación */}
-        {logs && logs.totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-navy-700">
-            <div className="text-sm text-gray-400">
-              Mostrando página {logs.page} de {logs.totalPages} ({logs.totalCount} registros
-              totales)
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage(page - 1)}
-                disabled={page === 1}
-                className="px-4 py-2 border border-navy-600 text-gray-300 rounded-lg hover:bg-navy-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Anterior
-              </button>
-              <button
-                onClick={() => setPage(page + 1)}
-                disabled={page === logs.totalPages}
-                className="px-4 py-2 border border-navy-600 text-gray-300 rounded-lg hover:bg-navy-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Siguiente
-              </button>
-            </div>
-          </div>
+        {logs && (
+          <Pagination
+            page={page}
+            totalPages={logs.totalPages}
+            totalCount={logs.totalCount}
+            pageSize={pageSize}
+            onPageChange={setPage}
+          />
         )}
       </div>
     </div>
