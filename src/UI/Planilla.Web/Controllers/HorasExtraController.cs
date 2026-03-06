@@ -132,17 +132,14 @@ public class HorasExtraController : ControllerBase
     [HttpGet("tipos")]
     public IActionResult GetTipos()
     {
-        var tipos = new[]
-        {
-            new { Valor = (int)TipoHoraExtra.Diurna, Nombre = "Diurna (1.25x)", Factor = 1.25m },
-            new { Valor = (int)TipoHoraExtra.Nocturna, Nombre = "Nocturna (1.50x)", Factor = 1.50m },
-            new { Valor = (int)TipoHoraExtra.DomingoFeriado, Nombre = "Domingo/Feriado (1.50x)", Factor = 1.50m },
-            new { Valor = (int)TipoHoraExtra.NocturnaDomingoFeriado, Nombre = "Nocturna Dom/Fer (2.25x)", Factor = 2.25m },
-            new { Valor = (int)TipoHoraExtra.FiestaNacionalDiurna, Nombre = "Fiesta Nacional Diurna (3.125x)", Factor = 3.125m },
-            new { Valor = (int)TipoHoraExtra.FiestaNacionalNocturna, Nombre = "Fiesta Nacional Nocturna (3.75x)", Factor = 3.75m },
-            new { Valor = (int)TipoHoraExtra.MixtaDiurnaNocturna, Nombre = "Mixta Diurna-Nocturna (1.50x)", Factor = 1.50m },
-            new { Valor = (int)TipoHoraExtra.MixtaNocturnaDiurna, Nombre = "Mixta Nocturna-Diurna (1.75x)", Factor = 1.75m }
-        };
+        var tipos = Enum.GetValues<TipoHoraExtra>()
+            .Select(t => new
+            {
+                Valor = (int)t,
+                Nombre = ObtenerNombreTipo(t),
+                Factor = _overtimeFactorService.CalculateBaseFactor(t)
+            })
+            .ToArray();
 
         return Ok(tipos);
     }
@@ -474,22 +471,6 @@ public class HorasExtraController : ControllerBase
 
         var monto = hourlyRate * cantidadHoras * factorTotal;
         return Math.Round(monto, 2);
-    }
-
-    private decimal ObtenerFactor(TipoHoraExtra tipo)
-    {
-        return tipo switch
-        {
-            TipoHoraExtra.Diurna => 1.25m,
-            TipoHoraExtra.Nocturna => 1.50m,
-            TipoHoraExtra.DomingoFeriado => 1.50m,
-            TipoHoraExtra.NocturnaDomingoFeriado => 2.25m, // 1.50 × 1.50 según Código de Trabajo Art. 50
-            TipoHoraExtra.FiestaNacionalDiurna => 3.125m, // 2.50 × 1.25 según Código de Trabajo Art. 49
-            TipoHoraExtra.FiestaNacionalNocturna => 3.75m, // 2.50 × 1.50 según Código de Trabajo Art. 49
-            TipoHoraExtra.MixtaDiurnaNocturna => 1.50m, // Según Código de Trabajo Art. 33
-            TipoHoraExtra.MixtaNocturnaDiurna => 1.75m, // Según Código de Trabajo Art. 33
-            _ => 1.25m
-        };
     }
 
     private string ObtenerNombreTipo(TipoHoraExtra tipo)
