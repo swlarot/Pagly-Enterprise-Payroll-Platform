@@ -558,7 +558,7 @@ const DeduccionesPage = () => {
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Categoría</th>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
-                                <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Monto/%</th>
+                                <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Monto mensual/%</th>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Vigencia</th>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Prioridad</th>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
@@ -801,6 +801,7 @@ const DeduccionesPage = () => {
                                                 placeholder="150.00"
                                             />
                                         </div>
+                                        <p className="mt-1 text-xs text-gray-500">Ingresa el monto mensual. El sistema lo prorratea automáticamente al período de pago de la empresa.</p>
                                     </div>
                                 ) : (
                                     <div className="md:col-span-2">

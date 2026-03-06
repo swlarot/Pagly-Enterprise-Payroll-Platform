@@ -113,7 +113,10 @@ public class MockPayrollConfigProvider : IPayrollConfigProvider
 
             // ISR - Deducción por dependientes
             DependentDeductionAmount: 800m, // B/. 800 por dependiente
-            MaxDependents: 3                // Máximo 3 dependientes
+            MaxDependents: 3,               // Máximo 3 dependientes
+
+            // Salario mínimo legal (Decreto Ejecutivo 74 de 2023)
+            SalarioMinimoLegal: 700m
         );
     }
 
