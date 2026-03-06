@@ -62,7 +62,9 @@ export function UsersManagementTab() {
       setUsage({ usersCount: usageData.usersCount, maxUsers: usageData.maxUsers });
     } catch (error: any) {
       toast.error('Error al cargar datos de usuarios');
-      console.error(error);
+      if (import.meta.env.DEV) {
+        console.error(error);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -75,7 +77,9 @@ export function UsersManagementTab() {
       // Solo roles personalizados (no sistema) para invitar/asignar
       setCustomRoles(Array.isArray(data) ? data.filter((r: CustomTenantRoleDto) => !r.isSystem) : []);
     } catch (error: any) {
-      console.error('Error loading custom roles:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error loading custom roles:', error);
+      }
       setCustomRoles([]);
     } finally {
       setIsLoadingRoles(false);

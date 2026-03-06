@@ -22,7 +22,9 @@ export function parseJwt(token: string): JwtPayload | null {
     );
     return JSON.parse(jsonPayload);
   } catch (error) {
-    console.error('Error parsing JWT:', error);
+    if (import.meta.env.DEV) {
+      console.error('Error parsing JWT:', error);
+    }
     return null;
   }
 }

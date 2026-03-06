@@ -57,7 +57,9 @@ export function InviteUserModal({ tenantId, isOpen, onClose, onSuccess }: Invite
       setTotalPages(result.totalPages);
     } catch (error: any) {
       toast.error('Error al cargar usuarios del sistema');
-      console.error('Error loading system users:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error loading system users:', error);
+      }
     } finally {
       setIsLoadingUsers(false);
     }
