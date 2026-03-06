@@ -282,32 +282,44 @@ public static class PayrollConfigSeeder
 
     /// <summary>
     /// Seed de TaxBrackets (ISR) para un tenant específico.
+    /// DEV-29: Incluye 2026 y 2027 para evitar excepción al calcular ISR en 2027.
     /// </summary>
     private static async Task SeedTaxBracketsForTenantAsync(
         ApplicationDbContext context,
         int tenantId,
         ILogger? logger)
     {
-        // Check si ya existen brackets para este tenant
+        await SeedTaxBracketsForYearAsync(context, tenantId, 2026, logger);
+        await SeedTaxBracketsForYearAsync(context, tenantId, 2027, logger);
+    }
+
+    /// <summary>
+    /// Seed de TaxBrackets (ISR) para un tenant y año fiscal.
+    /// Estructura Panamá: exento hasta $11,000, 15% hasta $50,000, 25% resto.
+    /// </summary>
+    private static async Task SeedTaxBracketsForYearAsync(
+        ApplicationDbContext context,
+        int tenantId,
+        int year,
+        ILogger? logger)
+    {
         var existingCount = await context.TaxBrackets
             .IgnoreQueryFilters()
-            .Where(b => b.TenantId == tenantId && b.Year == 2026)
+            .Where(b => b.TenantId == tenantId && b.Year == year)
             .CountAsync();
 
         if (existingCount > 0)
         {
-            logger?.LogInformation("Tenant {TenantId} ya tiene {Count} tax brackets para 2026. Saltando.",
-                tenantId, existingCount);
+            logger?.LogInformation("Tenant {TenantId} ya tiene tax brackets para {Year}. Saltando.", tenantId, year);
             return;
         }
 
-        // Tax brackets ISR Panamá 2026 (valores anuales)
         var brackets = new List<TaxBracket>
         {
             new TaxBracket
             {
                 TenantId = tenantId,
-                Year = 2026,
+                Year = year,
                 Order = 1,
                 Description = "Exento - Hasta $11,000",
                 MinIncome = 0.00m,
@@ -320,7 +332,7 @@ public static class PayrollConfigSeeder
             new TaxBracket
             {
                 TenantId = tenantId,
-                Year = 2026,
+                Year = year,
                 Order = 2,
                 Description = "15% - $11,000 a $50,000",
                 MinIncome = 11000.01m,
@@ -333,13 +345,13 @@ public static class PayrollConfigSeeder
             new TaxBracket
             {
                 TenantId = tenantId,
-                Year = 2026,
+                Year = year,
                 Order = 3,
                 Description = "25% - Más de $50,000",
                 MinIncome = 50000.01m,
-                MaxIncome = null,  // Sin límite superior
+                MaxIncome = null,
                 Rate = 25.00m,
-                FixedAmount = 5850.00m,  // 15% de $39,000 = $5,850
+                FixedAmount = 5850.00m,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
             }
@@ -348,8 +360,8 @@ public static class PayrollConfigSeeder
         context.TaxBrackets.AddRange(brackets);
         await context.SaveChangesAsync();
 
-        logger?.LogInformation("✓ {Count} tax brackets creados para Tenant {TenantId}",
-            brackets.Count, tenantId);
+        logger?.LogInformation("✓ {Count} tax brackets creados para Tenant {TenantId} año {Year}",
+            brackets.Count, tenantId, year);
     }
 
     /// <summary>
