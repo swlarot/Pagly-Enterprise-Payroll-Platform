@@ -82,7 +82,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const perms = await api.get<string[]>('/api/permissions/me');
       setPermissions(perms || []);
     } catch (error) {
-      console.error('Error fetching user permissions:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error fetching user permissions:', error);
+      }
       // Si falla, usar permisos vacíos (usuario sin permisos personalizados)
       setPermissions([]);
     }
@@ -126,7 +128,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setPermissions([]);
       }
     } catch (error) {
-      console.error('Auth validation failed:', error);
+      if (import.meta.env.DEV) {
+        console.error('Auth validation failed:', error);
+      }
       localStorage.removeItem('auth_token');
       localStorage.removeItem('refresh_token');
       setPermissions([]);
