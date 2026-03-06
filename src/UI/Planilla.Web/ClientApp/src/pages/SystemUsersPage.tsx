@@ -153,16 +153,6 @@ export default function SystemUsersPage() {
     ) : null},
   ];
 
-  if (isLoading) {
-    return (
-      <SystemAdminLayout>
-        <div className="flex items-center justify-center h-[calc(100vh-80px)]">
-          <Loader2 className="w-8 h-8 animate-spin text-primary-400" />
-        </div>
-      </SystemAdminLayout>
-    );
-  }
-
   return (
     <SystemAdminLayout>
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
