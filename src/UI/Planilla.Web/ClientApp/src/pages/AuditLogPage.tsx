@@ -4,6 +4,8 @@ import type { AuditLogDto, PagedResultDto } from '../types/api';
 import { useAsyncLoad } from '../hooks/useAsyncLoad';
 import { formatDateTime } from '../utils/date';
 import { Pagination } from '../components/ui/Pagination';
+import { DataTable } from '../components/ui/DataTable';
+import type { Column } from '../components/ui/DataTable';
 
 export default function AuditLogPage() {
   const [logs, setLogs] = useState<PagedResultDto<AuditLogDto> | null>(null);
@@ -44,6 +46,17 @@ export default function AuditLogPage() {
     );
   };
 
+  const auditColumns: Column<AuditLogDto>[] = [
+    { key: 'createdAt', header: 'Fecha/Hora', className: 'whitespace-nowrap', render: (log) => formatDateTime(log.createdAt) },
+    { key: 'actorEmail', header: 'Usuario', render: (log) => log.actorEmail || 'Sistema' },
+    { key: 'action', header: 'Acción', render: (log) => getActionBadge(log.action) },
+    { key: 'entityType', header: 'Entidad', className: 'text-gray-300', render: (log) => (
+      <>{log.entityType || '-'}{log.entityId && <span className="text-gray-500"> #{log.entityId}</span>}</>
+    )},
+    { key: 'metadataJson', header: 'Detalles', className: 'text-gray-300 max-w-xs truncate', render: (log) => log.metadataJson || '-' },
+    { key: 'ipAddress', header: 'IP', className: 'text-gray-300 font-mono', render: (log) => log.ipAddress || '-' },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Encabezado */}
@@ -56,75 +69,13 @@ export default function AuditLogPage() {
 
       {/* Tabla de auditoría */}
       <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-navy-700 bg-navy-800">
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-100">
-                  Fecha/Hora
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-100">
-                  Usuario
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-100">
-                  Acción
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-100">
-                  Entidad
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-100">
-                  Detalles
-                </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-100">
-                  IP
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-navy-700">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-400"></div>
-                      Cargando registros...
-                    </div>
-                  </td>
-                </tr>
-              ) : !logs || logs.items.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
-                    No hay registros de auditoría
-                  </td>
-                </tr>
-              ) : (
-                logs.items.map((log) => (
-                  <tr key={log.id} className="hover:bg-navy-800 transition-colors">
-                    <td className="px-6 py-4 text-sm text-gray-100 whitespace-nowrap">
-                      {/* Usamos log.createdAt porque el backend serializa AuditLogDto.CreatedAt como "createdAt" */}
-                      {formatDateTime(log.createdAt)}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-100">
-                      {log.actorEmail || 'Sistema'}
-                    </td>
-                    <td className="px-6 py-4">{getActionBadge(log.action)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-300">
-                      {log.entityType || '-'}
-                      {log.entityId && (
-                        <span className="text-gray-500"> #{log.entityId}</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-300 max-w-xs truncate">
-                      {log.metadataJson || '-'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-300 font-mono">
-                      {log.ipAddress || '-'}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable<AuditLogDto>
+          columns={auditColumns}
+          data={logs?.items}
+          isLoading={isLoading}
+          emptyMessage="No hay registros de auditoría"
+          keyExtractor={(log) => log.id}
+        />
 
         {/* Paginación */}
         {logs && (

@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useAsyncLoad } from '../hooks/useAsyncLoad';
-import { createPortal } from 'react-dom';
 import { SystemAdminLayout } from '../components/layout/SystemAdminLayout';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { Modal } from '../components/ui/Modal';
+import { DataTable } from '../components/ui/DataTable';
+import type { Column } from '../components/ui/DataTable';
 import { systemAdminService } from '../services/systemAdminService';
 import { UserPlus, Mail, Phone, Loader2, Trash2, Building2 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -110,6 +112,47 @@ export default function SystemUsersPage() {
     }
   };
 
+  const userColumns: Column<SystemUserViewModel>[] = [
+    { key: 'nombreCompleto', header: 'Usuario', render: (u) => (
+      <div>
+        <div className="font-medium text-gray-100">{u.nombreCompleto}</div>
+        <div className="text-gray-400 flex items-center gap-1"><Mail className="w-3 h-3" />{u.email}</div>
+      </div>
+    )},
+    { key: 'telefono', header: 'Teléfono', render: (u) =>
+      u.telefono ? <span className="text-gray-300 flex items-center gap-1"><Phone className="w-3 h-3 text-gray-500" />{u.telefono}</span> : <span className="text-gray-500">N/A</span>
+    },
+    { key: 'tenants', header: 'Tenants Asignados', render: (u) => (
+      <div className="flex flex-wrap gap-1">
+        {u.tenantAssignments && u.tenantAssignments.length > 0
+          ? u.tenantAssignments.map((ta, i) => (
+              <span key={i} className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400">
+                <Building2 className="w-3 h-3" />{ta.tenantName} ({ta.role})
+              </span>
+            ))
+          : <span className="text-xs text-gray-500">Sin asignar</span>}
+      </div>
+    )},
+    { key: 'estado', header: 'Estado', render: (u) => (
+      <div className="flex flex-col gap-1">
+        {u.isSystemAdmin && <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-500/15 text-red-400">System Admin</span>}
+        {u.emailConfirmed
+          ? <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-500/15 text-green-400">Verificado</span>
+          : <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-500/15 text-amber-400">Pendiente</span>}
+      </div>
+    )},
+    { key: 'acciones', header: 'Acciones', render: (u) => !u.isSystemAdmin ? (
+      <button
+        onClick={() => handleDeleteUser(u.id, u.nombreCompleto)}
+        disabled={deletingUserId === u.id}
+        className="inline-flex items-center justify-center p-2 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        title="Eliminar usuario"
+      >
+        {deletingUserId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+      </button>
+    ) : null},
+  ];
+
   if (isLoading) {
     return (
       <SystemAdminLayout>
@@ -138,132 +181,18 @@ export default function SystemUsersPage() {
           <div className="px-6 py-4 border-b border-navy-700 bg-navy-800 rounded-t-xl">
             <h2 className="text-lg font-semibold text-gray-100">Todos los Usuarios</h2>
           </div>
-          <div className="px-6 py-4">
-            {users.length === 0 ? (
-              <div className="text-center py-12">
-                <UserPlus className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-                <p className="text-gray-400">No hay usuarios en el sistema</p>
-                <Button onClick={() => setShowModal(true)} className="mt-4">
-                  Crear primer usuario
-                </Button>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-navy-700">
-                  <thead className="bg-navy-800 rounded-lg">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Usuario
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Teléfono
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Tenants Asignados
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Estado
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Acciones
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-navy-700">
-                    {users.map((user) => (
-                      <tr key={user.id} className="hover:bg-navy-800 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div>
-                              <div className="text-sm font-medium text-gray-100">
-                                {user.nombreCompleto}
-                              </div>
-                              <div className="text-sm text-gray-400 flex items-center gap-1">
-                                <Mail className="w-3 h-3" />
-                                {user.email}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-300 flex items-center gap-1">
-                            {user.telefono ? (
-                              <>
-                                <Phone className="w-3 h-3 text-gray-500" />
-                                {user.telefono}
-                              </>
-                            ) : (
-                              <span className="text-gray-500">N/A</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-wrap gap-1">
-                            {user.tenantAssignments && user.tenantAssignments.length > 0 ? (
-                              user.tenantAssignments.map((ta, idx) => (
-                                <span
-                                  key={idx}
-                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400"
-                                >
-                                  <Building2 className="w-3 h-3" />
-                                  {ta.tenantName} ({ta.role})
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-xs text-gray-500">Sin asignar</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex flex-col gap-1">
-                            {user.isSystemAdmin && (
-                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-500/15 text-red-400">
-                                System Admin
-                              </span>
-                            )}
-                            {user.emailConfirmed ? (
-                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-500/15 text-green-400">
-                                Verificado
-                              </span>
-                            ) : (
-                              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-amber-500/15 text-amber-400">
-                                Pendiente
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                          {!user.isSystemAdmin && (
-                            <button
-                              onClick={() => handleDeleteUser(user.id, user.nombreCompleto)}
-                              disabled={deletingUserId === user.id}
-                              className="inline-flex items-center justify-center p-2 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                              title="Eliminar usuario"
-                            >
-                              {deletingUserId === user.id ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="w-4 h-4" />
-                              )}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+          <DataTable<SystemUserViewModel>
+            columns={userColumns}
+            data={users}
+            isLoading={isLoading}
+            emptyMessage="No hay usuarios en el sistema"
+            keyExtractor={(u) => u.id}
+          />
         </div>
       </div>
 
       {/* Modal de creación */}
-      {showModal && createPortal(
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-navy-900 border border-navy-700 rounded-xl shadow-xl shadow-black/25 p-6 w-full max-w-md">
-            <h2 className="text-xl font-bold text-gray-100 mb-4">Crear Nuevo Usuario</h2>
-
+      <Modal isOpen={showModal} onClose={handleCancel} title="Crear Nuevo Usuario" size="sm">
             <form onSubmit={handleCreate} className="space-y-4">
               <Input
                 label="Nombre"
@@ -332,10 +261,7 @@ export default function SystemUsersPage() {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>,
-        document.body
-      )}
+      </Modal>
     </SystemAdminLayout>
   );
 }
