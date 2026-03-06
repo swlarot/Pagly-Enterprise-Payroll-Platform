@@ -286,7 +286,7 @@ public class VacacionesController : ControllerBase
 
         solicitud.Estado = EstadoVacaciones.Aprobada;
         solicitud.FechaAprobacion = DateTime.UtcNow;
-        solicitud.AprobadoPor = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "Desconocido";
+        solicitud.AprobadoPor = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue("email") ?? User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "Desconocido";
         solicitud.UpdatedAt = DateTime.UtcNow;
 
         _unitOfWork.Repository<SolicitudVacaciones>().Update(solicitud);
@@ -314,7 +314,7 @@ public class VacacionesController : ControllerBase
 
         solicitud.Estado = EstadoVacaciones.Rechazada;
         solicitud.FechaRechazo = DateTime.UtcNow;
-        solicitud.RechazadoPor = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "Desconocido";
+        solicitud.RechazadoPor = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue("email") ?? User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "Desconocido";
         solicitud.MotivoRechazo = request.Motivo;
         solicitud.UpdatedAt = DateTime.UtcNow;
 
