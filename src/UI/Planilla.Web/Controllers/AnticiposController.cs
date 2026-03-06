@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
+using Vorluno.Planilla.Application.Helpers;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
@@ -288,27 +289,12 @@ public class AnticiposController : ControllerBase
             FechaAprobacion: anticipo.FechaAprobacion,
             FechaDescuento: anticipo.FechaDescuento,
             Estado: anticipo.Estado,
-            EstadoNombre: GetEstadoNombre(anticipo.Estado),
+            EstadoNombre: anticipo.Estado.ToNombre(),
             Motivo: anticipo.Motivo,
             AprobadoPor: anticipo.AprobadoPor
         );
     }
 
-    /// <summary>
-    /// Obtiene el nombre legible del estado del anticipo.
-    /// </summary>
-    private static string GetEstadoNombre(EstadoAnticipo estado)
-    {
-        return estado switch
-        {
-            EstadoAnticipo.Pendiente => "Pendiente",
-            EstadoAnticipo.Aprobado => "Aprobado",
-            EstadoAnticipo.Descontado => "Descontado",
-            EstadoAnticipo.Rechazado => "Rechazado",
-            EstadoAnticipo.Cancelado => "Cancelado",
-            _ => estado.ToString()
-        };
-    }
 }
 
 /// <summary>

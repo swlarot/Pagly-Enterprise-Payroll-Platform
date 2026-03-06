@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs;
+using Vorluno.Planilla.Application.Helpers;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
@@ -435,24 +436,10 @@ public class PrestamosController : ControllerBase
             CuotasPagadas: prestamo.CuotasPagadas,
             CuotasRestantes: cuotasRestantes,
             Estado: prestamo.Estado,
-            EstadoNombre: GetEstadoNombre(prestamo.Estado),
+            EstadoNombre: prestamo.Estado.ToNombre(),
             Referencia: prestamo.Referencia,
             PorcentajePagado: porcentajePagado
         );
     }
 
-    /// <summary>
-    /// Obtiene el nombre legible del estado del préstamo.
-    /// </summary>
-    private static string GetEstadoNombre(EstadoPrestamo estado)
-    {
-        return estado switch
-        {
-            EstadoPrestamo.Activo => "Activo",
-            EstadoPrestamo.Pagado => "Pagado",
-            EstadoPrestamo.Cancelado => "Cancelado",
-            EstadoPrestamo.Suspendido => "Suspendido",
-            _ => estado.ToString()
-        };
-    }
 }
