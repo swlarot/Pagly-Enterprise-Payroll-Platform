@@ -8,43 +8,12 @@ import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { TenantRole } from '../types/api';
+import type { EmpleadoDetalleDto, PlanillaMiPerfilDto, VacacionResumenDto } from '../types/api';
 import { formatCurrency } from '../utils/currency';
 
-interface Empleado {
-  id: number;
-  nombre: string;
-  apellido: string;
-  email: string;
-  salarioBase: number;
-  fechaContratacion: string;
-  numeroIdentificacion: string;
-  departamentoNombre?: string;
-  posicionNombre?: string;
-  estaActivo?: boolean;
-  hourlyRate?: number;
-  hoursPerWeek?: number;
-}
-
-interface Planilla {
-  id: number;
-  periodStartDate: string;
-  periodEndDate: string;
-  status: string;
-  netPay?: number;
-  details: Array<{
-    empleadoId: number;
-    netPay: number;
-    grossPay: number;
-  }>;
-}
-
-interface Vacacion {
-  id: number;
-  fechaInicio: string;
-  fechaFin: string;
-  diasSolicitados: number;
-  estado: string;
-}
+type Empleado = EmpleadoDetalleDto;
+type Planilla = PlanillaMiPerfilDto;
+type Vacacion = VacacionResumenDto;
 
 // ============================================================
 // Utilidades compartidas
