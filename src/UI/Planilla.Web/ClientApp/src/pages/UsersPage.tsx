@@ -5,6 +5,7 @@ import { tenantService } from '../services/tenantService';
 import { useAuth } from '../contexts/AuthContext';
 import type { TenantUserDto, InvitationDto, UpdateTenantUserDto } from '../types/api';
 import { TenantRole } from '../types/api';
+import { formatDate } from '../utils/date';
 import toast from 'react-hot-toast';
 import ConfirmModal from '../components/ConfirmModal';
 
@@ -219,15 +220,15 @@ export default function UsersPage() {
 
   const getRoleBadge = (roleName: string) => {
     const colors: Record<string, string> = {
-      Owner: 'bg-purple-100 text-purple-800',
-      Admin: 'bg-blue-100 text-blue-800',
-      Manager: 'bg-green-100 text-green-800',
-      Accountant: 'bg-yellow-100 text-yellow-800',
-      Employee: 'bg-gray-100 text-gray-800',
+      Owner: 'bg-purple-500/15 text-purple-400',
+      Admin: 'bg-blue-500/15 text-blue-400',
+      Manager: 'bg-green-500/15 text-green-400',
+      Accountant: 'bg-yellow-500/15 text-yellow-400',
+      Employee: 'bg-navy-700 text-gray-400',
     };
 
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[roleName] || 'bg-gray-100 text-gray-800'}`}>
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${colors[roleName] || 'bg-navy-700 text-gray-400'}`}>
         {roleName}
       </span>
     );
@@ -249,8 +250,8 @@ export default function UsersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Gestión de Usuarios</h1>
-          <p className="text-gray-600 mt-2">Administra los usuarios de tu equipo</p>
+          <h1 className="text-3xl font-bold text-gray-100">Gestión de Usuarios</h1>
+          <p className="text-gray-400 mt-2">Administra los usuarios de tu equipo</p>
         </div>
         <button
           onClick={() => setIsInviteModalOpen(true)}
@@ -275,23 +276,23 @@ export default function UsersPage() {
 
       {/* Usage Card */}
       {usage && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <div className="bg-navy-800 rounded-xl shadow-sm border border-navy-700 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Usuarios Activos</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {usage.usersCount} <span className="text-lg text-gray-500">/ {usage.maxUsers}</span>
+              <p className="text-sm text-gray-400">Usuarios Activos</p>
+              <p className="text-2xl font-bold text-gray-100">
+                {usage.usersCount} <span className="text-lg text-gray-400">/ {usage.maxUsers}</span>
               </p>
             </div>
             <div className="text-right">
-              <p className="text-sm text-gray-600">Plan Actual</p>
-              <p className="text-lg font-semibold text-blue-600">{subscription?.planName}</p>
+              <p className="text-sm text-gray-400">Plan Actual</p>
+              <p className="text-lg font-semibold text-blue-400">{subscription?.planName}</p>
             </div>
           </div>
 
           {/* Usage bar */}
           <div className="mt-3">
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-navy-700 rounded-full h-2">
               <div
                 className={`h-2 rounded-full transition-all ${
                   usage.usersCount >= usage.maxUsers
@@ -309,31 +310,31 @@ export default function UsersPage() {
 
       {/* Pending Invitations */}
       {invitations.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Invitaciones Pendientes</h2>
+        <div className="bg-navy-800 rounded-xl shadow-sm border border-navy-700">
+          <div className="px-6 py-4 border-b border-navy-700">
+            <h2 className="text-lg font-semibold text-gray-100">Invitaciones Pendientes</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Email</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Rol</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Fecha de Envío</th>
-                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Expira</th>
-                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">Acciones</th>
+                <tr className="border-b border-navy-700 bg-navy-900">
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Email</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Rol</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Fecha de Envío</th>
+                  <th className="px-6 py-3 text-left text-sm font-semibold text-gray-300">Expira</th>
+                  <th className="px-6 py-3 text-right text-sm font-semibold text-gray-300">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-navy-700">
                 {invitations.map((invitation) => (
-                  <tr key={invitation.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">{invitation.email}</td>
+                  <tr key={invitation.id} className="hover:bg-navy-700">
+                    <td className="px-6 py-4 text-sm text-gray-100">{invitation.email}</td>
                     <td className="px-6 py-4">{getRoleBadge(invitation.roleName)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {new Date(invitation.createdAt).toLocaleDateString('es-PA')}
+                    <td className="px-6 py-4 text-sm text-gray-400">
+                      {formatDate(invitation.createdAt)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {new Date(invitation.expiresAt).toLocaleDateString('es-PA')}
+                    <td className="px-6 py-4 text-sm text-gray-400">
+                      {formatDate(invitation.expiresAt)}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button
@@ -352,73 +353,71 @@ export default function UsersPage() {
       )}
 
       {/* Users Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Usuarios del Equipo</h2>
+      <div className="bg-navy-800 rounded-xl shadow-sm border border-navy-700">
+        <div className="px-6 py-4 border-b border-navy-700">
+          <h2 className="text-lg font-semibold text-gray-100">Usuarios del Equipo</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+              <tr className="border-b border-navy-700 bg-navy-900">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
                   Email
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
                   Rol
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
                   Estado
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
                   Fecha de Ingreso
                 </th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">
                   Último Acceso
                 </th>
-                <th className="px-6 py-4 text-right text-sm font-semibold text-gray-900">
+                <th className="px-6 py-4 text-right text-sm font-semibold text-gray-300">
                   Acciones
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
+            <tbody className="divide-y divide-navy-700">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
                     <div className="flex items-center justify-center gap-2">
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
                       Cargando usuarios...
                     </div>
                   </td>
                 </tr>
               ) : users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-gray-400">
                     No hay usuarios
                   </td>
                 </tr>
               ) : (
                 users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-sm text-gray-900">{user.email}</td>
+                  <tr key={user.id} className="hover:bg-navy-700">
+                    <td className="px-6 py-4 text-sm text-gray-100">{user.email}</td>
                     <td className="px-6 py-4">{getRoleBadge(user.roleName)}</td>
                     <td className="px-6 py-4">
                       {user.isActive ? (
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-500/15 text-green-400">
                           Activo
                         </span>
                       ) : (
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-navy-700 text-gray-400">
                           Inactivo
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {new Date(user.joinedAt).toLocaleDateString('es-PA')}
+                    <td className="px-6 py-4 text-sm text-gray-400">
+                      {formatDate(user.joinedAt)}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {user.lastLoginAt
-                        ? new Date(user.lastLoginAt).toLocaleDateString('es-PA')
-                        : 'Nunca'}
+                    <td className="px-6 py-4 text-sm text-gray-400">
+                      {user.lastLoginAt ? formatDate(user.lastLoginAt) : 'Nunca'}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -638,7 +637,7 @@ export default function UsersPage() {
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-gray-400 mb-1">Usuario:</p>
-                <p className="font-medium text-gray-100">{selectedUser.email}</p>
+                <p className="font-medium text-gray-100">{selectedUser?.email}</p>
               </div>
 
               <div>
@@ -689,7 +688,7 @@ export default function UsersPage() {
                   type="button"
                   onClick={handleChangeRole}
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                  disabled={isUpdatingRole || newRole === selectedUser.role}
+                  disabled={isUpdatingRole || newRole === selectedUser?.role}
                 >
                   {isUpdatingRole ? (
                     <>
