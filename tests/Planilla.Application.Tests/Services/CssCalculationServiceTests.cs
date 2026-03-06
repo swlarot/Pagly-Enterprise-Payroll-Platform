@@ -143,6 +143,61 @@ public class CssCalculationServiceTests
         result.Amount.Should().Be(198.75m); // 1500 * 13.25% = 198.75
     }
 
+    [Fact]
+    public async Task CalculateEmployerCss__SalarioSobreTope__AplicaTopeAlContributionBase()
+    {
+        // grossPay = 2000 > tope estándar (1500) → contribución debe basarse en 1500
+        var mockProvider = new MockPayrollConfigProvider();
+        var service = new CssCalculationServicePortable(mockProvider);
+
+        var result = await service.CalculateEmployerCssAsync(
+            DefaultCompanyId,
+            grossPay: 2000m,
+            payFrequency: "Mensual",
+            yearsCotized: 10,
+            averageSalaryLast10Years: 1200m,
+            isSubjectToCss: true,
+            calculationDate: _calculationDate
+        );
+
+        result.ContributionBase.Should().Be(1500m);  // capped
+        result.Rate.Should().Be(13.25m);
+        result.Amount.Should().Be(198.75m); // 1500 * 13.25% = 198.75 (no 2000 * 13.25% = 265)
+    }
+
+    // ====================================================================
+    // CSS por frecuencia de pago no-mensual (DEV-75)
+    // Verifica que periodCap se prorratee y se aplique al contributionBase
+    // ====================================================================
+
+    [Theory]
+    [InlineData("Quincenal", 900.00, 750.00,  73.13)]  // cap=1500/2=750;  750*9.75%=73.125→73.13
+    [InlineData("Bisemanal", 800.00, 692.31,  67.50)]  // cap=1500*12/26=692.31; 692.31*9.75%=67.500225→67.50
+    [InlineData("Semanal",   400.00, 346.15,  33.75)]  // cap=1500*12/52=346.15; *9.75%=33.75
+    public async Task CalculateEmployeeCss__FrecuenciaNivel_ProrrateoTope_ReturnsCorrectAmount(
+        string payFrequency, decimal grossPay, decimal expectedCap, decimal expectedAmount)
+    {
+        // En todas las frecuencias: grossPay > periodCap → contributionBase = periodCap
+        var mockProvider = new MockPayrollConfigProvider();
+        var service = new CssCalculationServicePortable(mockProvider);
+
+        var result = await service.CalculateEmployeeCssAsync(
+            DefaultCompanyId,
+            grossPay,
+            payFrequency,
+            yearsCotized: 10,
+            averageSalaryLast10Years: 1200m,
+            isSubjectToCss: true,
+            calculationDate: _calculationDate
+        );
+
+        result.ContributionBase.Should().Be(expectedCap);
+        result.MaxContributionBase.Should().Be(expectedCap);
+        result.TipoTope.Should().Be("Estándar");
+        result.Rate.Should().Be(9.75m);
+        result.Amount.Should().Be(expectedAmount);
+    }
+
     [Theory]
     [InlineData(0.56, 0.56, 8.40)]  // Riesgo bajo
     [InlineData(2.50, 2.50, 37.50)] // Riesgo medio
