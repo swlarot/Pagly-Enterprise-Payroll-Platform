@@ -13,6 +13,10 @@ frontend-error.log
 test-*.ps1
 test-*.html
 
+# Scripts temporales de tooling (pueden contener tokens/credenciales)
+tmp_*.py
+tmp_*.json
+
 # Resúmenes temporales
 RESUMEN-*.txt
 
