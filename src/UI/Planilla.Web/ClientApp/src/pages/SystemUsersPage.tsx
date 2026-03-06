@@ -7,19 +7,10 @@ import { Input } from '../components/ui/Input';
 import { systemAdminService } from '../services/systemAdminService';
 import { UserPlus, Mail, Phone, Loader2, Trash2, Building2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-interface User {
-  id: string;
-  nombreCompleto: string;
-  email: string;
-  telefono?: string;
-  isSystemAdmin: boolean;
-  emailConfirmed: boolean;
-  tenantAssignments?: { tenantName: string; role: string }[];
-}
+import type { SystemUserViewModel } from '../types/api';
 
 export default function SystemUsersPage() {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<SystemUserViewModel[]>([]);
   const { isLoading, run } = useAsyncLoad();
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);

@@ -582,3 +582,51 @@ export interface PayrollHeaderSummaryDto {
   isPaid: boolean;
   createdAt: string;
 }
+
+// MiPerfilPage view models
+export interface EmpleadoDetalleDto {
+  id: number;
+  nombre: string;
+  apellido: string;
+  email: string;
+  salarioBase: number;
+  fechaContratacion: string;
+  numeroIdentificacion: string;
+  departamentoNombre?: string;
+  posicionNombre?: string;
+  estaActivo?: boolean;
+  hourlyRate?: number;
+  hoursPerWeek?: number;
+}
+
+export interface PlanillaMiPerfilDto {
+  id: number;
+  periodStartDate: string;
+  periodEndDate: string;
+  status: string;
+  netPay?: number;
+  details: Array<{
+    empleadoId: number;
+    netPay: number;
+    grossPay: number;
+  }>;
+}
+
+export interface VacacionResumenDto {
+  id: number;
+  fechaInicio: string;
+  fechaFin: string;
+  diasSolicitados: number;
+  estado: string;
+}
+
+// SystemUsersPage view model
+export interface SystemUserViewModel {
+  id: string;
+  nombreCompleto: string;
+  email: string;
+  telefono?: string;
+  isSystemAdmin: boolean;
+  emailConfirmed: boolean;
+  tenantAssignments?: { tenantName: string; role: string }[];
+}
