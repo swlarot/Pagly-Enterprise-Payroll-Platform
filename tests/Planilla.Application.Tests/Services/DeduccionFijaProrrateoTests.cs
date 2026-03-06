@@ -98,6 +98,77 @@ public class DeduccionFijaProrrateoTests
     }
 
     // ====================================================================
+    // MontoTotalACobrar — el engine limita al remanente pendiente
+    // ====================================================================
+
+    [Fact]
+    public void Engine_MontoTotalACobrar_LimitaAlRemanente_CuandoMontoProrrateadoEsMayor()
+    {
+        // Deuda total: $1,000. Ya cobrado: $975. Remanente: $25.
+        // Monto prorrateado del período: $50 (100 mensual / 2 quincenal).
+        // El engine debe aplicar solo $25 (el remanente).
+        var montoFijo = Math.Round(100m * 12m / PayrollConstants.GetPeriodsPerYear(PayPeriodType.Quincenal), 2); // $50
+
+        var deduccion = new DeduccionPendiente
+        {
+            OrigenDeduccionFijaId = 1,
+            TipoDeduccion = TipoDeduccion.Embargo,
+            Categoria = CategoriaDeduccion.EmbargoJudicial,
+            Descripcion = "Embargo - último período",
+            MontoFijo = montoFijo,
+            EsPorcentaje = false,
+            BaseCalculo = BaseCalculoDeduccion.SalarioBruto,
+            Prioridad = 1,
+            MontoTotalACobrar = 1_000m,
+            MontoCobradoAcumulado = 975m   // remanente = 25
+        };
+
+        var resultado = _engine.AplicarDeduccionesConPrelacion(
+            grossPay: 1_000m,
+            netoPostLegal: 800m,
+            salarioMinimoPeriodo: 0m,
+            deducciones: new[] { deduccion });
+
+        resultado.TotalEmbargos.Should().Be(25m);
+        // El engine limita MontoSolicitado al remanente antes de crear el item
+        resultado.Detalle[0].MontoSolicitado.Should().Be(25m);
+        resultado.Detalle[0].MontoAplicado.Should().Be(25m);
+        resultado.Detalle[0].MontoLimitado.Should().Be(0m);
+    }
+
+    [Fact]
+    public void Engine_MontoTotalACobrar_DeudaSaldada_NoAplicaNada()
+    {
+        // Deuda completamente pagada: remanente = 0.
+        // El engine no debe aplicar nada.
+        var montoFijo = Math.Round(100m * 12m / PayrollConstants.GetPeriodsPerYear(PayPeriodType.Quincenal), 2); // $50
+
+        var deduccion = new DeduccionPendiente
+        {
+            OrigenDeduccionFijaId = 1,
+            TipoDeduccion = TipoDeduccion.Embargo,
+            Categoria = CategoriaDeduccion.EmbargoJudicial,
+            Descripcion = "Embargo - deuda saldada",
+            MontoFijo = montoFijo,
+            EsPorcentaje = false,
+            BaseCalculo = BaseCalculoDeduccion.SalarioBruto,
+            Prioridad = 1,
+            MontoTotalACobrar = 1_000m,
+            MontoCobradoAcumulado = 1_000m  // remanente = 0
+        };
+
+        var resultado = _engine.AplicarDeduccionesConPrelacion(
+            grossPay: 1_000m,
+            netoPostLegal: 800m,
+            salarioMinimoPeriodo: 0m,
+            deducciones: new[] { deduccion });
+
+        resultado.TotalEmbargos.Should().Be(0m);
+        resultado.Detalle[0].MontoSolicitado.Should().Be(0m);
+        resultado.Detalle[0].MontoAplicado.Should().Be(0m);
+    }
+
+    // ====================================================================
     // EsPorcentaje = true — MontoFijo es ignorado por el engine
     // ====================================================================
 

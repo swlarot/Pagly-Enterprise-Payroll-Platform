@@ -115,7 +115,7 @@ public class CssCalculationServicePortable
         var periodsPerYear = PayrollConstants.GetPeriodsPerYear(payFrequency);
         var periodCap = RoundingPolicy.Round(cap * 12m / periodsPerYear, 2);
 
-        var contributionBase = grossPay; // No existe tope de cotización CSS (Art. 178 Ley 462 — tope aplica solo a pensión)
+        var contributionBase = Math.Min(grossPay, periodCap); // Tope de salario cotizable según Ley 462 Art. 178
         var rate = config.CssEmployeeRate;
         var amount = RoundingPolicy.CalculatePercentage(contributionBase, rate);
 
