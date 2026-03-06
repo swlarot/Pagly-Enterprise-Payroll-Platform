@@ -786,7 +786,7 @@ const DeduccionesPage = () => {
                                 {!formData.esPorcentaje ? (
                                     <div className="md:col-span-2">
                                         <label className="block text-sm font-medium text-gray-300 mb-2">
-                                            Monto <span className="text-red-500">*</span>
+                                            Monto mensual <span className="text-red-500">*</span>
                                         </label>
                                         <div className="relative">
                                             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>

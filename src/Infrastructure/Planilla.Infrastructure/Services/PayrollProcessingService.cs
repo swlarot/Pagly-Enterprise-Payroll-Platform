@@ -272,7 +272,7 @@ public class PayrollProcessingService
                 TipoDeduccion = df.TipoDeduccion,
                 Categoria = InferirCategoria(df),
                 Descripcion = df.Descripcion,
-                MontoFijo = df.Monto,
+                MontoFijo = Math.Round(df.Monto * 12m / periodsPerYear, 2),
                 Porcentaje = df.Porcentaje,
                 EsPorcentaje = df.EsPorcentaje,
                 BaseCalculo = df.BaseCalculo,
@@ -417,6 +417,7 @@ public class PayrollProcessingService
 
         // Convertir las 3 fuentes a DeduccionPendiente unificado
         var deduccionesPendientes = new List<DeduccionPendiente>();
+        var periodsPerYear = PayrollConstants.GetPeriodsPerYear(payPeriodType);
 
         // 1. Deducciones fijas activas (excluir ordenes levantadas)
         var deduccionesFijas = await _context.DeduccionesFijas
@@ -439,7 +440,7 @@ public class PayrollProcessingService
                 TipoDeduccion = df.TipoDeduccion,
                 Categoria = categoria,
                 Descripcion = df.Descripcion,
-                MontoFijo = df.Monto,
+                MontoFijo = Math.Round(df.Monto * 12m / periodsPerYear, 2),
                 Porcentaje = df.Porcentaje,
                 EsPorcentaje = df.EsPorcentaje,
                 BaseCalculo = df.BaseCalculo,
@@ -456,8 +457,6 @@ public class PayrollProcessingService
                         p.Estado == EstadoPrestamo.Activo &&
                         p.CuotasPagadas < p.NumeroCuotas)
             .ToListAsync();
-
-        var periodsPerYear = PayrollConstants.GetPeriodsPerYear(payPeriodType);
 
         foreach (var prestamo in prestamos)
         {

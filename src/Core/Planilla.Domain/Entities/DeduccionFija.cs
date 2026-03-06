@@ -32,7 +32,7 @@ public class DeduccionFija : ITenantEntity
     public string Descripcion { get; set; } = string.Empty;
 
     /// <summary>
-    /// Monto fijo por período (si no es porcentaje)
+    /// Monto mensual fijo (si no es porcentaje). Se prorrata al período al procesar la planilla.
     /// </summary>
     public decimal Monto { get; set; }
 
