@@ -122,7 +122,9 @@ const HorasExtraPage = () => {
                 mensaje: response.mensaje || ''
             });
         } catch (err) {
-            console.error('Error al validar límites:', err);
+            if (import.meta.env.DEV) {
+                console.error('Error al validar límites:', err);
+            }
         } finally {
             setValidando(false);
         }
@@ -142,7 +144,9 @@ const HorasExtraPage = () => {
                 nombreFestivo: response.nombreFestivo || null
             });
         } catch (err) {
-            console.error('Error al verificar festivo:', err);
+            if (import.meta.env.DEV) {
+                console.error('Error al verificar festivo:', err);
+            }
         }
     };
 
@@ -157,7 +161,9 @@ const HorasExtraPage = () => {
 
             setSugerenciaTipo(response);
         } catch (err) {
-            console.error('Error al sugerir tipo:', err);
+            if (import.meta.env.DEV) {
+                console.error('Error al sugerir tipo:', err);
+            }
         }
     };
 

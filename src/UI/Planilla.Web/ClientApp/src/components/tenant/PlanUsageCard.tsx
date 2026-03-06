@@ -29,7 +29,9 @@ export default function PlanUsageCard() {
       setPlanUsage(data);
     } catch (error: any) {
       toast.error(error.message || 'Error al cargar información del plan');
-      console.error('Error loading plan usage:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error loading plan usage:', error);
+      }
     } finally {
       setIsLoading(false);
     }

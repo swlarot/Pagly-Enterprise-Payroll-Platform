@@ -38,10 +38,14 @@ export default function AdminDashboardPage() {
 
     try {
       setIsLoading(true);
-      console.log('[AdminDashboardPage] Starting to load dashboard data...');
+      if (import.meta.env.DEV) {
+        console.log('[AdminDashboardPage] Starting to load dashboard data...');
+      }
 
       // Cargar empleados
-      console.log('[AdminDashboardPage] Fetching empleados...');
+      if (import.meta.env.DEV) {
+        console.log('[AdminDashboardPage] Fetching empleados...');
+      }
       const empleadosRes = await api.get('/api/empleados') as any;
       const empleados = Array.isArray(empleadosRes)
         ? empleadosRes
@@ -75,14 +79,18 @@ export default function AdminDashboardPage() {
         pendientes: pendientes,
       });
 
-      console.log('[AdminDashboardPage] Dashboard data loaded successfully:', {
-        totalEmpleados: empleados.length,
-        empleadosActivos: activos,
-        planillas: planillas.length,
-        pendientes: pendientes
-      });
+      if (import.meta.env.DEV) {
+        console.log('[AdminDashboardPage] Dashboard data loaded successfully:', {
+          totalEmpleados: empleados.length,
+          empleadosActivos: activos,
+          planillas: planillas.length,
+          pendientes: pendientes
+        });
+      }
     } catch (error: unknown) {
-      console.error('[AdminDashboardPage] Error loading dashboard data:', error);
+      if (import.meta.env.DEV) {
+        console.error('[AdminDashboardPage] Error loading dashboard data:', error);
+      }
       const message = error instanceof Error ? error.message : 'Error al cargar datos del dashboard';
       toast.error(message);
       hasLoadedRef.current = false; // Permitir reintento en caso de error
@@ -99,7 +107,9 @@ export default function AdminDashboardPage() {
 
     // Si el tenant está disponible, cargar datos
     if (tenant) {
-      console.log('[AdminDashboardPage] Tenant available, loading dashboard data for:', tenant.name);
+      if (import.meta.env.DEV) {
+        console.log('[AdminDashboardPage] Tenant available, loading dashboard data for:', tenant.name);
+      }
       loadDashboardData();
       return;
     }

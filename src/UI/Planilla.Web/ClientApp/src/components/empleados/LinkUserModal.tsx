@@ -58,7 +58,9 @@ export function LinkUserModal({
       }
     } catch (error: any) {
       toast.error(error.message || 'Error al cargar usuarios disponibles');
-      console.error('Error loading user suggestions:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error loading user suggestions:', error);
+      }
     } finally {
       setIsLoadingUsers(false);
     }
@@ -82,7 +84,9 @@ export function LinkUserModal({
     } catch (error: any) {
       const msg = error?.message || error?.error || 'Error al vincular usuario';
       toast.error(msg);
-      console.error('Error vinculando usuario:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error vinculando usuario:', error);
+      }
     } finally {
       setIsSubmitting(false);
     }

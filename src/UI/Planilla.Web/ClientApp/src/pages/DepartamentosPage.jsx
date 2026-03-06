@@ -49,7 +49,9 @@ const DepartamentosPage = () => {
             const data = await api.get('/api/empleados');
             setEmpleados(data.filter(e => e.estaActivo));
         } catch (error) {
-            console.error('Error al cargar empleados:', error);
+            if (import.meta.env.DEV) {
+                console.error('Error al cargar empleados:', error);
+            }
         }
     };
 

@@ -113,7 +113,9 @@ export default function TenantDetailsPage() {
       const data = await systemAdminService.getTenantUsers(parseInt(id!));
       setUsers(data);
     } catch (error: unknown) {
-      console.error('Error loading users:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error loading users:', error);
+      }
       toast.error('Error al cargar usuarios');
     } finally {
       setIsLoadingUsers(false);
@@ -151,7 +153,9 @@ export default function TenantDetailsPage() {
       await loadUsers();
       await loadTenant(); // Recargar para actualizar estadísticas
     } catch (error: unknown) {
-      console.error('Error removing user:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error removing user:', error);
+      }
       const errObj = error as { statusCode?: number; message?: string };
       if (errObj.statusCode === 400 && errObj.message?.includes('último Owner')) {
         toast.error('No se puede eliminar el último Owner del tenant');
@@ -171,7 +175,9 @@ export default function TenantDetailsPage() {
       setAuditLogs(data.data);
       setAuditTotal(data.total);
     } catch (error: unknown) {
-      console.error('Error loading audit logs:', error);
+      if (import.meta.env.DEV) {
+        console.error('Error loading audit logs:', error);
+      }
       toast.error('Error al cargar logs de auditoría');
     } finally {
       setIsLoadingAudit(false);
