@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useAsyncLoad } from '../hooks/useAsyncLoad';
 import { createPortal } from 'react-dom';
 import { SystemAdminLayout } from '../components/layout/SystemAdminLayout';
 import { Button } from '../components/ui/Button';
@@ -19,7 +20,7 @@ interface User {
 
 export default function SystemUsersPage() {
   const [users, setUsers] = useState<User[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { isLoading, run } = useAsyncLoad();
   const [showModal, setShowModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
@@ -34,33 +35,25 @@ export default function SystemUsersPage() {
     loadUsers();
   }, []);
 
-  const loadUsers = async () => {
-    try {
-      setIsLoading(true);
-      const response = await systemAdminService.getAllSystemUsers();
+  const loadUsers = () => run(async () => {
+    const response = await systemAdminService.getAllSystemUsers();
 
-      // Mapear SystemUserDto a interfaz local User
-      const mappedUsers = (response.data || []).map((u: any) => ({
-        id: u.userId,
-        nombreCompleto: u.fullName,
-        email: u.email,
-        telefono: u.telefono || undefined,
-        isSystemAdmin: u.isSystemAdmin,
-        emailConfirmed: true, // Por ahora asumimos true
-        tenantAssignments: (u.tenants || []).map((t: any) => ({
-          tenantName: t.tenantName,
-          role: t.role
-        }))
-      }));
+    // Mapear SystemUserDto a interfaz local User
+    const mappedUsers = (response.data || []).map((u: any) => ({
+      id: u.userId,
+      nombreCompleto: u.fullName,
+      email: u.email,
+      telefono: u.telefono || undefined,
+      isSystemAdmin: u.isSystemAdmin,
+      emailConfirmed: true, // Por ahora asumimos true
+      tenantAssignments: (u.tenants || []).map((t: any) => ({
+        tenantName: t.tenantName,
+        role: t.role
+      }))
+    }));
 
-      setUsers(mappedUsers);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Error cargando usuarios';
-      toast.error(message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    setUsers(mappedUsers);
+  }, 'Error cargando usuarios');
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();

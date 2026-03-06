@@ -14,12 +14,12 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useAsyncLoad } from '../hooks/useAsyncLoad';
 
 export default function TenantsManagementPage() {
   const navigate = useNavigate();
   const [allTenants, setAllTenants] = useState<AdminTenantDto[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { isLoading, run } = useAsyncLoad();
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
 
@@ -33,18 +33,10 @@ export default function TenantsManagementPage() {
     loadTenants();
   }, []);
 
-  const loadTenants = async () => {
-    try {
-      setIsLoading(true);
-      const data = await systemAdminService.getAllTenants();
-      setAllTenants(data);
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Error al cargar tenants';
-      toast.error(message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const loadTenants = () => run(async () => {
+    const data = await systemAdminService.getAllTenants();
+    setAllTenants(data);
+  }, 'Error al cargar tenants');
 
   // Client-side filtering and pagination
   const filteredTenants = useMemo(() => {
