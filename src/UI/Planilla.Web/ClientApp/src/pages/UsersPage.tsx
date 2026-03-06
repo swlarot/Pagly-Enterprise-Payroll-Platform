@@ -466,17 +466,17 @@ export default function UsersPage() {
               {usage && (
                 <div className={`p-3 rounded-lg ${
                   usage.usersCount >= usage.maxUsers
-                    ? 'bg-red-50 border border-red-200'
+                    ? 'bg-red-500/15 border border-red-500/25'
                     : usage.usersCount >= usage.maxUsers * 0.8
-                    ? 'bg-yellow-50 border border-yellow-200'
-                    : 'bg-blue-50 border border-blue-200'
+                    ? 'bg-amber-500/15 border border-amber-500/25'
+                    : 'bg-blue-500/15 border border-blue-500/25'
                 }`}>
                   <p className={`text-sm font-medium ${
                     usage.usersCount >= usage.maxUsers
-                      ? 'text-red-800'
+                      ? 'text-red-400'
                       : usage.usersCount >= usage.maxUsers * 0.8
-                      ? 'text-yellow-800'
-                      : 'text-blue-800'
+                      ? 'text-amber-400'
+                      : 'text-blue-400'
                   }`}>
                     Usuarios: {usage.usersCount} / {usage.maxUsers}
                   </p>
@@ -486,7 +486,7 @@ export default function UsersPage() {
               {!generatedInviteUrl ? (
                 <>
                   <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                       Correo Electrónico
                     </label>
                     <input
@@ -494,7 +494,7 @@ export default function UsersPage() {
                       type="email"
                       value={inviteEmail}
                       onChange={(e) => setInviteEmail(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500"
                       placeholder="usuario@empresa.com"
                       disabled={isInviting}
                       required
@@ -502,14 +502,14 @@ export default function UsersPage() {
                   </div>
 
                   <div>
-                    <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
-                      Rol {customRoles.length > 0 && <span className="text-blue-600">(Personalizado)</span>}
+                    <label htmlFor="role" className="block text-sm font-medium text-gray-300 mb-2">
+                      Rol {customRoles.length > 0 && <span className="text-blue-400">(Personalizado)</span>}
                     </label>
                     <select
                       id="role"
                       value={inviteRole}
                       onChange={(e) => setInviteRole(Number(e.target.value) as TenantRole)}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       disabled={isInviting || isLoadingRoles}
                     >
                       {customRoles.length > 0 ? (
@@ -529,7 +529,7 @@ export default function UsersPage() {
                         </>
                       )}
                     </select>
-                    <p className="mt-2 text-xs text-gray-500">
+                    <p className="mt-2 text-xs text-gray-400">
                       {customRoles.length > 0
                         ? customRoles.find((r) => r.id === inviteRole)?.description || ''
                         : getRoleDescription(inviteRole)}
@@ -540,7 +540,7 @@ export default function UsersPage() {
                     <button
                       type="button"
                       onClick={handleCloseInviteModal}
-                      className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      className="flex-1 px-4 py-2 border border-navy-600 text-gray-300 rounded-lg hover:bg-navy-700 transition-colors"
                       disabled={isInviting}
                     >
                       Cancelar
@@ -564,9 +564,9 @@ export default function UsersPage() {
               ) : (
                 <>
                   <div className="text-center py-4">
-                    <div className="inline-flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-4">
+                    <div className="inline-flex items-center justify-center w-12 h-12 bg-green-500/15 rounded-full mb-4">
                       <svg
-                        className="w-6 h-6 text-green-600"
+                        className="w-6 h-6 text-green-400"
                         fill="none"
                         viewBox="0 0 24 24"
                         stroke="currentColor"
@@ -579,22 +579,22 @@ export default function UsersPage() {
                         />
                       </svg>
                     </div>
-                    <h4 className="text-lg font-semibold text-gray-900 mb-2">
+                    <h4 className="text-lg font-semibold text-gray-100 mb-2">
                       Invitación Enviada
                     </h4>
-                    <p className="text-sm text-gray-600 mb-4">
+                    <p className="text-sm text-gray-400 mb-4">
                       Comparte este link con el usuario invitado
                     </p>
                   </div>
 
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <p className="text-xs text-gray-600 mb-2 font-medium">Link de Invitación:</p>
+                  <div className="bg-navy-800 p-4 rounded-lg">
+                    <p className="text-xs text-gray-400 mb-2 font-medium">Link de Invitación:</p>
                     <div className="flex gap-2">
                       <input
                         type="text"
                         value={generatedInviteUrl}
                         readOnly
-                        className="flex-1 px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm"
+                        className="flex-1 px-3 py-2 bg-navy-900 border border-navy-600 text-gray-300 rounded-lg text-sm"
                       />
                       <button
                         type="button"
@@ -637,19 +637,19 @@ export default function UsersPage() {
       <Modal isOpen={isRoleModalOpen && !!selectedUser} onClose={() => setIsRoleModalOpen(false)} title="Cambiar Rol de Usuario" size="sm">
             <div className="space-y-4">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Usuario:</p>
-                <p className="font-medium text-gray-900">{selectedUser.email}</p>
+                <p className="text-sm text-gray-400 mb-1">Usuario:</p>
+                <p className="font-medium text-gray-100">{selectedUser.email}</p>
               </div>
 
               <div>
-                <label htmlFor="newRole" className="block text-sm font-medium text-gray-700 mb-2">
-                  Nuevo Rol {customRoles.length > 0 && <span className="text-blue-600">(Personalizado)</span>}
+                <label htmlFor="newRole" className="block text-sm font-medium text-gray-300 mb-2">
+                  Nuevo Rol {customRoles.length > 0 && <span className="text-blue-400">(Personalizado)</span>}
                 </label>
                 <select
                   id="newRole"
                   value={newRole}
                   onChange={(e) => setNewRole(Number(e.target.value) as TenantRole)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-3 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   disabled={isUpdatingRole || isLoadingRoles}
                 >
                   {customRoles.length > 0 ? (
@@ -669,7 +669,7 @@ export default function UsersPage() {
                     </>
                   )}
                 </select>
-                <p className="mt-2 text-xs text-gray-500">
+                <p className="mt-2 text-xs text-gray-400">
                   {customRoles.length > 0
                     ? customRoles.find((r) => r.id === newRole)?.description || ''
                     : getRoleDescription(newRole)}
@@ -680,7 +680,7 @@ export default function UsersPage() {
                 <button
                   type="button"
                   onClick={() => setIsRoleModalOpen(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-4 py-2 border border-navy-600 text-gray-300 rounded-lg hover:bg-navy-700 transition-colors"
                   disabled={isUpdatingRole}
                 >
                   Cancelar
