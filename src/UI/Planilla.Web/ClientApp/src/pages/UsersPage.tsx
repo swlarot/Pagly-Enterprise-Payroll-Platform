@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { useAsyncLoad } from '../hooks/useAsyncLoad';
+import { Modal } from '../components/ui/Modal';
 import { tenantService } from '../services/tenantService';
 import { useAuth } from '../contexts/AuthContext';
 import type { TenantUserDto, InvitationDto, UpdateTenantUserDto } from '../types/api';
@@ -460,27 +460,8 @@ export default function UsersPage() {
       </div>
 
       {/* Invite Modal */}
-      {isInviteModalOpen && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Invitar Usuario</h3>
-              <button
-                onClick={handleCloseInviteModal}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleInvite} className="p-6 space-y-4">
+      <Modal isOpen={isInviteModalOpen} onClose={handleCloseInviteModal} title="Invitar Usuario" size="sm">
+            <form onSubmit={handleInvite} className="space-y-4">
               {/* Usage info */}
               {usage && (
                 <div className={`p-3 rounded-lg ${
@@ -650,33 +631,11 @@ export default function UsersPage() {
                 </>
               )}
             </form>
-          </div>
-        </div>,
-        document.body
-      )}
+      </Modal>
 
       {/* Role Change Modal */}
-      {isRoleModalOpen && selectedUser && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Cambiar Rol de Usuario</h3>
-              <button
-                onClick={() => setIsRoleModalOpen(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <div className="p-6 space-y-4">
+      <Modal isOpen={isRoleModalOpen && !!selectedUser} onClose={() => setIsRoleModalOpen(false)} title="Cambiar Rol de Usuario" size="sm">
+            <div className="space-y-4">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Usuario:</p>
                 <p className="font-medium text-gray-900">{selectedUser.email}</p>
@@ -743,10 +702,7 @@ export default function UsersPage() {
                 </button>
               </div>
             </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      </Modal>
 
       {/* Confirm Modal */}
       <ConfirmModal
