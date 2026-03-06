@@ -50,9 +50,11 @@ export default function DecimoPage() {
     try {
       setIsLoading(true);
       const res = await api.get(`/api/decimo?ano=${anoFiltro}`);
-      setPlanillas(res.data);
+      const data = res?.data;
+      setPlanillas(Array.isArray(data) ? data : []);
     } catch (e) {
       toast.error(e.response?.data?.message || 'Error al cargar planillas de décimo');
+      setPlanillas([]);
     } finally {
       setIsLoading(false);
     }
@@ -379,7 +381,7 @@ export default function DecimoPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-700">
-                        {viewPlanilla.detalles.map(det => {
+                        {(viewPlanilla.detalles ?? []).map(det => {
                           const isExpanded = expandedRows.has(det.id);
                           return (
                             <React.Fragment key={det.id}>
@@ -416,10 +418,10 @@ export default function DecimoPage() {
                                           Desglose mensual de devengado
                                         </h4>
                                         <div className="space-y-1">
-                                          {det.desgloseMensual.length === 0 && (
+                                          {(!det.desgloseMensual || det.desgloseMensual.length === 0) && (
                                             <p className="text-xs text-gray-500 italic">Sin planillas en el período</p>
                                           )}
-                                          {det.desgloseMensual.map((m, i) => (
+                                          {(det.desgloseMensual ?? []).map((m, i) => (
                                             <div key={i} className="flex justify-between text-xs">
                                               <span className="text-gray-400">{MESES[m.mes]} {m.ano}</span>
                                               <span className="font-mono text-gray-200">{fmt(m.bruto)}</span>

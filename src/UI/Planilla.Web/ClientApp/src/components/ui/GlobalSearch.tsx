@@ -5,7 +5,7 @@ import {
   Search, LayoutDashboard, Users, Building2, Briefcase,
   ClipboardList, BarChart3, User, DollarSign, CreditCard,
   Minus, Clock, TreePalm, XCircle, Building, X, ArrowRight,
-  Loader2, ChevronRight,
+  Loader2, ChevronRight, Banknote,
 } from 'lucide-react';
 import { api } from '../../services/api';
 
@@ -40,6 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Posiciones', path: '/posiciones', icon: <Briefcase className="w-4 h-4" />, group: 'Navegación', keywords: ['cargos', 'puestos'] },
   { label: 'Mi Perfil', path: '/mi-perfil', icon: <User className="w-4 h-4" />, group: 'Navegación' },
   { label: 'Planillas', path: '/planillas', icon: <ClipboardList className="w-4 h-4" />, group: 'Módulos', keywords: ['nomina', 'nómina', 'pago'] },
+  { label: 'Décimo 13°', path: '/decimo', icon: <Banknote className="w-4 h-4" />, group: 'Módulos', keywords: ['décimo', 'decimo', 'tercer mes', '13'] },
   { label: 'Reportes', path: '/reportes', icon: <BarChart3 className="w-4 h-4" />, group: 'Módulos', keywords: ['css', 'informes', 'estadísticas'] },
   { label: 'Anticipos', path: '/anticipos', icon: <DollarSign className="w-4 h-4" />, group: 'Novedades' },
   { label: 'Préstamos', path: '/prestamos', icon: <CreditCard className="w-4 h-4" />, group: 'Novedades' },
