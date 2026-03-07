@@ -223,13 +223,19 @@ public class PayrollProcessingService
                 ? employee.HourlyRate
                 : Empleado.ComputeHourlyRateFromMonthly(employee.SalarioBase, employee.HoursPerWeek);
 
-            hours.RegularPay = hours.RegularHours * hourlyRate;
-            var salarioPeriodoExacto = employee.GetSalarioPeriodo();
-            if (Math.Abs(hours.RegularPay - salarioPeriodoExacto) < 0.05m)
-                hours.RegularPay = salarioPeriodoExacto;
+            // DEV-88: RegularPay excluye horas de domingo y feriado (son subconjuntos).
+            // SundayPay y HolidayPay usan tasa completa (base + recargo), por eso se excluyen de RegularPay.
+            hours.RegularPay = (hours.RegularHours - hours.SundayHours - hours.HolidayHours) * hourlyRate;
+            // Snap a salario exacto solo cuando no hay horas especiales (evita truncar la diferencia real)
+            if (hours.SundayHours == 0 && hours.HolidayHours == 0)
+            {
+                var salarioPeriodoExacto = employee.GetSalarioPeriodo();
+                if (Math.Abs(hours.RegularPay - salarioPeriodoExacto) < 0.05m)
+                    hours.RegularPay = salarioPeriodoExacto;
+            }
 
-            hours.SundayPay = hours.SundayHours * hourlyRate * 0.50m;   // Art. 26: recargo 50% (base ya en RegularPay)
-            hours.HolidayPay = hours.HolidayHours * hourlyRate * 1.50m; // Art. 49: recargo 150% (base ya en RegularPay)
+            hours.SundayPay = hours.SundayHours * hourlyRate * 1.50m;   // Art. 26: tasa completa 1.50x (base + recargo 50%)
+            hours.HolidayPay = hours.HolidayHours * hourlyRate * 2.50m; // Art. 49: tasa completa 2.50x (base + recargo 150%)
             hours.OvertimeDayPay = hours.OvertimeDayHours * hourlyRate * 1.25m;
             hours.OvertimeNightPay = hours.OvertimeNightHours * hourlyRate * 1.50m;
             hours.OvertimeHolidayPay = hours.OvertimeHolidayHours * hourlyRate * 3.125m;
