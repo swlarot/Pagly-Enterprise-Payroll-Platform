@@ -201,9 +201,6 @@ public class CssCalculationServicePortable
     public async Task<(decimal Amount, decimal Rate)> CalculateRiskContributionAsync(
         int companyId,
         decimal grossPay,
-        string payFrequency,
-        int yearsCotized,
-        decimal averageSalaryLast10Years,
         decimal cssRiskPercentage,
         bool isSubjectToCss,
         DateTime calculationDate)
@@ -213,12 +210,18 @@ public class CssCalculationServicePortable
             return (0, 0);
         }
 
+        // DEV-92: tasa negativa indica dato corrupto en BD — lanza excepción explícita.
+        if (cssRiskPercentage < 0)
+        {
+            throw new InvalidOperationException(
+                $"CssRiskPercentage no puede ser negativo: {cssRiskPercentage}. " +
+                "Verifique la configuración del empleado.");
+        }
+
         // DEV-86: Riesgo profesional NO tiene tope de cotización pensional (Art. 178 Ley 462).
         // Se calcula sobre el salario bruto completo — no se necesita DetermineCssCapAsync.
-        // El tope aplica solo a CSS pensión (CalculateEmployeeCssAsync / CalculateEmployerCssAsync).
-
+        // DEV-91: payFrequency, yearsCotized, averageSalaryLast10Years eliminados (no usados).
         // Usar la tasa del empleado directamente (Acuerdo N°2 de 1995: 0.56/0.98/2.10/3.64/5.67%)
-        // El campo CssRiskPercentage almacena el valor como porcentaje (ej: 2.10 = 2.10%)
         decimal riskRate = cssRiskPercentage;
 
         var amount = RoundingPolicy.CalculatePercentage(grossPay, riskRate);
@@ -255,7 +258,7 @@ public class CssCalculationServicePortable
             companyId, grossPay, payFrequency, yearsCotized, averageSalaryLast10Years, isSubjectToCss, calculationDate);
 
         var (riskAmount, riskRate) = await CalculateRiskContributionAsync(
-            companyId, grossPay, payFrequency, yearsCotized, averageSalaryLast10Years, cssRiskPercentage, isSubjectToCss, calculationDate);
+            companyId, grossPay, cssRiskPercentage, isSubjectToCss, calculationDate);
 
         return new CssFullCalculationResult(
             EmployeeCss: employeeCss,
