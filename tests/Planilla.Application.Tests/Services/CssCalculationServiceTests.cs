@@ -220,9 +220,6 @@ public class CssCalculationServiceTests
         var (amount, rate) = await service.CalculateRiskContributionAsync(
             DefaultCompanyId,
             grossPay,
-            "Mensual",
-            yearsCotized,
-            avgSalary,
             cssRiskPercentage,
             isSubject,
             _calculationDate
@@ -290,6 +287,27 @@ public class CssCalculationServiceTests
         // Assert
         await act.Should().ThrowAsync<InvalidOperationException>()
             .WithMessage("*No se encontró configuración de CSS*");
+    }
+
+    [Fact]
+    public async Task CalculateRiskContribution__NegativeRate__ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var mockProvider = new MockPayrollConfigProvider();
+        var service = new CssCalculationServicePortable(mockProvider);
+
+        // Act
+        Func<Task> act = async () => await service.CalculateRiskContributionAsync(
+            DefaultCompanyId,
+            grossPay: 1500m,
+            cssRiskPercentage: -1m, // tasa inválida
+            isSubjectToCss: true,
+            calculationDate: _calculationDate
+        );
+
+        // Assert
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .WithMessage("*CssRiskPercentage no puede ser negativo*");
     }
 
     [Fact]
