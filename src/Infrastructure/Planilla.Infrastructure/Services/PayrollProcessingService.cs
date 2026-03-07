@@ -209,6 +209,16 @@ public class PayrollProcessingService
 
         if (hours != null)
         {
+            // DEV-87: SundayHours y HolidayHours deben ser subconjuntos de RegularHours.
+            // Si superan el total, el cálculo de GrossPay sería incorrecto silenciosamente.
+            if (hours.SundayHours + hours.HolidayHours > hours.RegularHours)
+            {
+                throw new InvalidOperationException(
+                    $"Las horas de domingo ({hours.SundayHours}) + feriado ({hours.HolidayHours}) " +
+                    $"no pueden exceder las horas regulares totales ({hours.RegularHours}) " +
+                    $"para el empleado {employee.Id}.");
+            }
+
             var hourlyRate = employee.HourlyRate > 0
                 ? employee.HourlyRate
                 : Empleado.ComputeHourlyRateFromMonthly(employee.SalarioBase, employee.HoursPerWeek);

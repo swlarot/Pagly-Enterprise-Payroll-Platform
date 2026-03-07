@@ -213,28 +213,15 @@ public class CssCalculationServicePortable
             return (0, 0);
         }
 
-        var (cap, _) = await DetermineCssCapAsync(
-            companyId, yearsCotized, averageSalaryLast10Years, calculationDate);
-
-        var config = await _configProvider.GetTaxConfigAsync(companyId, calculationDate);
-        if (config == null)
-        {
-            throw new InvalidOperationException(
-                $"No se encontró configuración de CSS activa para companyId={companyId} en fecha {calculationDate:yyyy-MM-dd}");
-        }
-
-        // Prorratear tope mensual según frecuencia de pago
-        var periodsPerYear = PayrollConstants.GetPeriodsPerYear(payFrequency);
-        var periodCap = RoundingPolicy.Round(cap * 12m / periodsPerYear, 2);
-
-        // No existe tope de cotización CSS — solo aplica a pensión (Art. 178 Ley 462)
-        var contributionBase = grossPay;
+        // DEV-86: Riesgo profesional NO tiene tope de cotización pensional (Art. 178 Ley 462).
+        // Se calcula sobre el salario bruto completo — no se necesita DetermineCssCapAsync.
+        // El tope aplica solo a CSS pensión (CalculateEmployeeCssAsync / CalculateEmployerCssAsync).
 
         // Usar la tasa del empleado directamente (Acuerdo N°2 de 1995: 0.56/0.98/2.10/3.64/5.67%)
         // El campo CssRiskPercentage almacena el valor como porcentaje (ej: 2.10 = 2.10%)
         decimal riskRate = cssRiskPercentage;
 
-        var amount = RoundingPolicy.CalculatePercentage(contributionBase, riskRate);
+        var amount = RoundingPolicy.CalculatePercentage(grossPay, riskRate);
 
         return (amount, riskRate);
     }
