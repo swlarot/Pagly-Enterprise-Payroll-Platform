@@ -209,6 +209,14 @@ public class PayrollProcessingService
 
         if (hours != null)
         {
+            // DEV-90: Validar que ningún tipo de hora sea negativo (dato corrupto en BD).
+            if (hours.RegularHours < 0 || hours.SundayHours < 0 || hours.HolidayHours < 0)
+            {
+                throw new InvalidOperationException(
+                    $"Las horas no pueden ser negativas para el empleado {employee.Id}. " +
+                    $"Regular={hours.RegularHours}, Domingo={hours.SundayHours}, Feriado={hours.HolidayHours}.");
+            }
+
             // DEV-87: SundayHours y HolidayHours deben ser subconjuntos de RegularHours.
             // Si superan el total, el cálculo de GrossPay sería incorrecto silenciosamente.
             if (hours.SundayHours + hours.HolidayHours > hours.RegularHours)
