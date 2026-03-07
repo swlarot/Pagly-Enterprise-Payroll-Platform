@@ -405,7 +405,7 @@ public class ReportesService
                     $"{d.Empleado.Nombre} {d.Empleado.Apellido}",
                     d.Empleado.Posicion?.Nombre,
                     d.Empleado.Departamento?.Nombre,
-                    d.BaseSalary,
+                    horas?.RegularPay ?? d.BaseSalary, // DEV-89: pago real del período; fallback a salario base si no hay horas
                     horas?.SundayPay ?? 0,
                     horas?.HolidayPay ?? 0,
                     d.MontoHorasExtra,
