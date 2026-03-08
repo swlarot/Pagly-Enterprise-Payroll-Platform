@@ -231,6 +231,26 @@ private decimal CalculateIncomeTax(
 }
 ```
 
+### Horas Regulares con Recargo (Domingo y Feriado)
+
+> **CRÍTICO (DEV-92):** Las horas de domingo y feriado dentro del período regular se pagan con el modelo **base incluida + solo recargo adicional**, no tasa completa. La tasa base ya está cubierta en `RegularPay`.
+
+```
+RegularPay  = RegularHours × hourlyRate          // TODAS las horas (incluye domingo y feriado)
+SundayPay   = SundayHours  × hourlyRate × 0.50   // Recargo +50% (Art. 26)
+HolidayPay  = HolidayHours × hourlyRate × 1.50   // Recargo +150% (Art. 49)
+```
+
+**Efectivo total equivalente:**
+- Hora de domingo  = base (en RegularPay) + 0.50x recargo = 1.50x ✓
+- Hora de feriado  = base (en RegularPay) + 1.50x recargo = 2.50x ✓
+
+**Restricción de subconjunto:** `SundayHours + HolidayHours ≤ RegularHours` (validado antes del cálculo).
+
+**En el comprobante de pago:** las líneas se muestran como "Recargo Domingo" y "Recargo Feriado" para claridad al empleado.
+
+---
+
 ### Cálculo de Horas Extra (Actualizado con 8 tipos)
 
 ```csharp
@@ -414,6 +434,7 @@ Before delivering payroll code, verify:
 ✓ **Riesgo profesional**: 5 clases (0.56/0.98/2.10/3.64/5.67%) almacenado en Empleado.CssRiskPercentage
 ✓ **SE sin tope**: Seguro Educativo se calcula sobre el total
 ✓ **ISR proyectado**: Proyectar anualmente, dividir por períodos
+✓ **Domingo/Feriado regulares**: RegularPay = todas las horas × rate; SundayPay = ×0.50 recargo; HolidayPay = ×1.50 recargo (DEV-92)
 ✓ **Horas extra**: 8 tipos con factores correctos (1.25x a 3.75x)
 ✓ **Exceso horas**: Art. 48 - 3h/día, 9h/semana, factor 1.75x
 ✓ **PayPeriodType**: ISR usa el de la planilla, no del empleado

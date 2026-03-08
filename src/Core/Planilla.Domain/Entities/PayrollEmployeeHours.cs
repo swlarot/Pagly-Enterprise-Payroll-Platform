@@ -78,11 +78,11 @@ public class PayrollEmployeeHours : ITenantEntity
     [Column(TypeName = "decimal(18, 2)")]
     public decimal RegularPay { get; set; }
 
-    /// <summary>Pago por horas domingo: SundayHours × HourlyRate × 1.50</summary>
+    /// <summary>Recargo por horas domingo: SundayHours × HourlyRate × 0.50 (base ya incluida en RegularPay)</summary>
     [Column(TypeName = "decimal(18, 2)")]
     public decimal SundayPay { get; set; }
 
-    /// <summary>Pago por horas feriado: HolidayHours × HourlyRate × 2.50 (Art. 49: +150% adicional)</summary>
+    /// <summary>Recargo por horas feriado: HolidayHours × HourlyRate × 1.50 (base ya incluida en RegularPay. Art. 49)</summary>
     [Column(TypeName = "decimal(18, 2)")]
     public decimal HolidayPay { get; set; }
 

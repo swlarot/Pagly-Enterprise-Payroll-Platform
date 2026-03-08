@@ -231,10 +231,11 @@ public class PayrollProcessingService
                 ? employee.HourlyRate
                 : Empleado.ComputeHourlyRateFromMonthly(employee.SalarioBase, employee.HoursPerWeek);
 
-            // DEV-88: RegularPay excluye horas de domingo y feriado (son subconjuntos).
-            // SundayPay y HolidayPay usan tasa completa (base + recargo), por eso se excluyen de RegularPay.
-            hours.RegularPay = (hours.RegularHours - hours.SundayHours - hours.HolidayHours) * hourlyRate;
-            // Snap a salario exacto solo cuando no hay horas especiales (evita truncar la diferencia real)
+            // DEV-92: RegularPay incluye TODAS las horas (incluyendo domingo y feriado) a tasa base 1.0x.
+            // Las 104 horas regulares ya contienen el pago base de cada día trabajado; domingo y feriado
+            // solo añaden el recargo adicional (0.50x y 1.50x respectivamente).
+            hours.RegularPay = hours.RegularHours * hourlyRate;
+            // Snap a salario exacto cuando no hay horas especiales (evita diferencia de centavos por redondeo)
             if (hours.SundayHours == 0 && hours.HolidayHours == 0)
             {
                 var salarioPeriodoExacto = employee.GetSalarioPeriodo();
@@ -242,8 +243,8 @@ public class PayrollProcessingService
                     hours.RegularPay = salarioPeriodoExacto;
             }
 
-            hours.SundayPay = hours.SundayHours * hourlyRate * 1.50m;   // Art. 26: tasa completa 1.50x (base + recargo 50%)
-            hours.HolidayPay = hours.HolidayHours * hourlyRate * 2.50m; // Art. 49: tasa completa 2.50x (base + recargo 150%)
+            hours.SundayPay = hours.SundayHours * hourlyRate * 0.50m;   // Art. 26: recargo 50% (base ya pagada en RegularPay)
+            hours.HolidayPay = hours.HolidayHours * hourlyRate * 1.50m; // Art. 49: recargo 150% (base ya pagada en RegularPay)
             hours.OvertimeDayPay = hours.OvertimeDayHours * hourlyRate * 1.25m;
             hours.OvertimeNightPay = hours.OvertimeNightHours * hourlyRate * 1.50m;
             hours.OvertimeHolidayPay = hours.OvertimeHolidayHours * hourlyRate * 3.125m;
