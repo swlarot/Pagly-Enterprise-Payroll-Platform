@@ -447,8 +447,8 @@ public class ReportesService
         }
 
         Agregar("Horas Regulares", horas.RegularHours, horas.RegularPay);
-        Agregar("Horas Domingo", horas.SundayHours, horas.SundayPay);
-        Agregar("Horas Feriado", horas.HolidayHours, horas.HolidayPay);
+        Agregar("Recargo Domingo", horas.SundayHours, horas.SundayPay);
+        Agregar("Recargo Feriado", horas.HolidayHours, horas.HolidayPay);
         Agregar("H. Extra Diurnas", horas.OvertimeDayHours, horas.OvertimeDayPay);
         Agregar("H. Extra Nocturnas", horas.OvertimeNightHours, horas.OvertimeNightPay);
         Agregar("H. Extra Feriado", horas.OvertimeHolidayHours, horas.OvertimeHolidayPay);

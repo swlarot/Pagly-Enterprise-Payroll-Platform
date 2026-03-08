@@ -939,7 +939,7 @@ public class ExportacionService
                             // Horas dominicales (si aplica)
                             if (comp.PagoHorasDomingo > 0)
                             {
-                                table.Cell().Padding(4).Text("Pago Horas Domingo (+50%)").FontSize(9);
+                                table.Cell().Padding(4).Text("Recargo Domingo (+50%)").FontSize(9);
                                 table.Cell().Padding(4).AlignRight().Text($"B/.{comp.PagoHorasDomingo:N2}").FontSize(9);
                             }
                             else
@@ -953,7 +953,7 @@ public class ExportacionService
                             // Horas feriado (si aplica)
                             if (comp.PagoHorasFeriado > 0)
                             {
-                                table.Cell().Padding(4).Text("Pago Horas Feriado (+150%)").FontSize(9);
+                                table.Cell().Padding(4).Text("Recargo Feriado (+150%)").FontSize(9);
                                 table.Cell().Padding(4).AlignRight().Text($"B/.{comp.PagoHorasFeriado:N2}").FontSize(9);
                             }
                             else
