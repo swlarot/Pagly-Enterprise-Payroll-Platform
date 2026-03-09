@@ -57,6 +57,12 @@ FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 
 WORKDIR /app
 
+# Fuentes requeridas por QuestPDF para renderizar texto en Linux
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    fontconfig \
+    fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN adduser --disabled-password --gecos "" appuser && chown -R appuser /app
 USER appuser
 
