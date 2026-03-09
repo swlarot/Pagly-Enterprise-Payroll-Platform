@@ -216,17 +216,26 @@ export const api = {
   },
 
   async download(endpoint: string, filename: string): Promise<void> {
-    const token = localStorage.getItem('auth_token');
-    const headers: HeadersInit = {};
+    const doFetch = (token: string | null) => {
+      const headers: HeadersInit = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      return fetch(`${API_BASE_URL}${endpoint}`, { method: 'GET', headers });
+    };
 
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+    let response = await doFetch(localStorage.getItem('auth_token'));
+
+    // 401: intentar refresh token igual que handleResponse()
+    if (response.status === 401) {
+      const newToken = await tryRefreshToken();
+      if (newToken) {
+        response = await doFetch(newToken);
+      }
+      if (response.status === 401) {
+        localStorage.clear();
+        window.location.href = '/login';
+        throw new ApiException(401, 'Sesión expirada. Por favor inicia sesión nuevamente.');
+      }
     }
-
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-      method: 'GET',
-      headers,
-    });
 
     if (!response.ok) {
       let message = 'Error al descargar archivo';
