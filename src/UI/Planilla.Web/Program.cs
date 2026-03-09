@@ -272,8 +272,11 @@ builder.Services.AddSwaggerGen(options =>
 });
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 // RISK: Creating inline no-op email sender since Blazor Components.Account was removed
-builder.Services.AddSingleton<IEmailSender<AppUser>>(provider => 
+builder.Services.AddSingleton<IEmailSender<AppUser>>(provider =>
     new NoOpEmailSender());
+
+// QuestPDF Community license — configurar una sola vez al arrancar
+QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 // TODO: React will handle authentication UI - backend provides Identity API endpoints
 
