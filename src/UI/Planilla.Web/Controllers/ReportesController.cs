@@ -365,4 +365,30 @@ public class ReportesController : ControllerBase
             return StatusCode(500, new { message = $"Error al exportar: {ex.Message}" });
         }
     }
+
+    /// <summary>
+    /// Exporta los Comprobantes de Pago a PDF en formato compacto para impresión física.
+    /// Genera 2 empleados por página Letter con original y copia lado a lado,
+    /// separados por una línea de corte horizontal. Ideal para entrega de recibos en papel.
+    /// </summary>
+    [HttpGet("comprobantes/{planillaId}/pdf-compacto")]
+    [PlanLimits(PlanLimitType.ExportPdf)]
+    public async Task<IActionResult> ExportarComprobantesCompactosPdf(int planillaId)
+    {
+        try
+        {
+            var reporte = await _reportesService.GenerarReporteComprobantes(planillaId);
+            var bytes = _exportacionService.ExportarPdfComprobantesCompactos(reporte);
+            var fileName = $"Comprobantes_Compacto_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+            return File(bytes, "application/pdf", fileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Error al exportar: {ex.Message}" });
+        }
+    }
 }
