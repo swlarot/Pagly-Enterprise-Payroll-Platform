@@ -9,6 +9,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using Vorluno.Planilla.Application.DTOs.Reportes;
+using Vorluno.Planilla.Application.Helpers;
 
 namespace Vorluno.Planilla.Infrastructure.Services;
 
@@ -30,12 +31,27 @@ public class ExportacionService
 
     private static class PdfTheme
     {
-        public const string NavyDark   = "#1e3a5f";
-        public const string NavyMedium = "#2563eb";
-        public const string NavyLight  = "#dbeafe";
-        public const string FooterBg   = "#f1f5f9";
-        public const string FooterText = "#64748b";
-        public const string BrandUrl   = "pagly.clau.com.pa";
+        // Primario del sistema: verde (primary-600 Tailwind)
+        public const string PrimaryDark   = "#047857";   // primary-700 — barras, bordes fuertes
+        public const string PrimaryMedium = "#059669";   // primary-600 — URL footer, acentos
+
+        // Dark header / neto a recibir
+        public const string DarkBg        = "#0a1929";   // navy-950 del sistema
+
+        // Footer
+        public const string FooterBg      = "#f1f5f9";
+        public const string FooterText    = "#64748b";
+
+        // Colores de tabla ingresos/deducciones
+        public const string IngresoBg      = "#dcfce7";  // green-100
+        public const string IngresoText    = "#15803d";  // green-700
+        public const string IngresoHeader  = "#16a34a";  // green-600
+        public const string DeduccionBg    = "#fee2e2";  // red-100
+        public const string DeduccionText  = "#b91c1c";  // red-700
+        public const string DeduccionHeader = "#dc2626"; // red-600
+
+        // Branding
+        public const string BrandUrl      = "pagly.clau.com.pa";
     }
 
     private static void BuildProfessionalFooter(PageDescriptor page, string nombreEmpresa)
@@ -43,7 +59,7 @@ public class ExportacionService
         page.Footer().Element(footer =>
         {
             footer
-                .BorderTop(1).BorderColor(PdfTheme.NavyDark)
+                .BorderTop(1).BorderColor(PdfTheme.PrimaryDark)
                 .Background(PdfTheme.FooterBg)
                 .PaddingVertical(4).PaddingHorizontal(8)
                 .Row(row =>
@@ -51,7 +67,7 @@ public class ExportacionService
                     row.RelativeItem().AlignLeft().Text(t =>
                     {
                         t.Span($"{nombreEmpresa}  ·  Generado: ").FontSize(7).FontColor(PdfTheme.FooterText);
-                        t.Span($"{DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(7).FontColor(PdfTheme.FooterText);
+                        t.Span($"{DateTimeHelper.NowPanama():dd/MM/yyyy HH:mm}").FontSize(7).FontColor(PdfTheme.FooterText);
                     });
 
                     row.ConstantItem(80).AlignCenter().Text(t =>
@@ -64,7 +80,7 @@ public class ExportacionService
 
                     row.ConstantItem(120).AlignRight()
                         .Text(PdfTheme.BrandUrl)
-                        .FontSize(7).FontColor(PdfTheme.NavyMedium);
+                        .FontSize(7).FontColor(PdfTheme.PrimaryMedium);
                 });
         });
     }
@@ -84,7 +100,6 @@ public class ExportacionService
         ws.Cell("A3").Value = $"Período: {periodo}";
         ws.Cell("A4").Value = titulo;
         ws.Cell("A4").Style.Font.Bold = true;
-        ws.Cell("A5").Value = $"Generado: {DateTime.Now:dd/MM/yyyy HH:mm}";
     }
 
     private static void AplicarEstiloHeaderFila(IXLWorksheet ws, int fila, int columnas)
@@ -115,7 +130,7 @@ public class ExportacionService
 
         const int cols = 14;
         AplicarEstiloEncabezado(ws, $"PLANILLA REGULAR — {reporte.Estado}", reporte.NombreEmpresa, reporte.Ruc, reporte.Periodo, cols);
-        ws.Cell("A5").Value = $"Generado: {DateTime.Now:dd/MM/yyyy HH:mm}  |  N° Planilla: {reporte.NumeroPlanilla}  |  Fecha de Pago: {reporte.FechaPago:dd/MM/yyyy}";
+        ws.Cell("A5").Value = $"Generado: {DateTimeHelper.NowPanama():dd/MM/yyyy HH:mm}  |  N° Planilla: {reporte.NumeroPlanilla}  |  Fecha de Pago: {reporte.FechaPago:dd/MM/yyyy}";
 
         var hr = 7;
         ws.Cell(hr, 1).Value = "Cédula";
@@ -214,6 +229,9 @@ public class ExportacionService
     /// <summary>Exporta la Planilla Regular a PDF en orientación Landscape.</summary>
     public byte[] ExportarPdfPlanillaRegular(ReportePlanillaRegularDto reporte)
     {
+        if (!reporte.Empleados.Any())
+            return Array.Empty<byte>();
+
         var document = Document.Create(container =>
         {
             container.Page(page =>
@@ -223,12 +241,17 @@ public class ExportacionService
 
                 page.Header().Column(col =>
                 {
-                    col.Item().Height(3).Background(PdfTheme.NavyDark);
+                    col.Item().Height(4).Background(PdfTheme.PrimaryDark);
                     col.Item().PaddingTop(4).Text(reporte.NombreEmpresa).FontSize(14).Bold();
                     col.Item().Text($"RUC: {reporte.Ruc}").FontSize(9);
                     col.Item().Text($"PLANILLA REGULAR — {reporte.NumeroPlanilla} — {reporte.Periodo} — {reporte.Estado}").FontSize(11).Bold();
-                    col.Item().Text($"Fecha de Pago: {reporte.FechaPago:dd/MM/yyyy}").FontSize(9);
-                    col.Item().PaddingBottom(8);
+                    col.Item().Background("#f1f5f9").Padding(4).Row(infoRow =>
+                    {
+                        infoRow.RelativeItem().Text($"N° Planilla: {reporte.NumeroPlanilla}").FontSize(8);
+                        infoRow.RelativeItem().AlignCenter().Text($"Período: {reporte.Periodo}").FontSize(8);
+                        infoRow.RelativeItem().AlignRight().Text($"Fecha de Pago: {reporte.FechaPago:dd/MM/yyyy}").FontSize(8);
+                    });
+                    col.Item().PaddingBottom(6);
                 });
 
                 page.Content().Table(table =>
@@ -251,24 +274,26 @@ public class ExportacionService
 
                     table.Header(header =>
                     {
-                        var bg = Colors.Grey.Lighten2;
-                        header.Cell().Background(bg).Padding(4).Text("Cédula").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).Text("Nombre").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).AlignCenter().Text("H.Reg").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).AlignCenter().Text("H.Dom").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).AlignCenter().Text("H.Fer").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).AlignCenter().Text("H.Ext").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Bruto").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("CSS").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("SE").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("ISR").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Acreed.").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Neto").Bold().FontSize(8);
+                        var bg = PdfTheme.PrimaryDark;
+                        header.Cell().Background(bg).Padding(4).Text("Cédula").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).Text("Nombre").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignCenter().Text("H.Reg").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignCenter().Text("H.Dom").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignCenter().Text("H.Fer").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignCenter().Text("H.Ext").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Bruto").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("CSS").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("SE").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("ISR").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Acreed.").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Neto").Bold().FontSize(8).FontColor("#ffffff");
                     });
 
+                    var altRow = 0;
                     foreach (var emp in reporte.Empleados)
                     {
-                        var rowBg = emp.TuvoLimitacion ? Colors.Orange.Lighten4 : Colors.White;
+                        var baseRowBg = (altRow++ % 2 == 0) ? "#ffffff" : "#f8fafc";
+                        var rowBg = emp.TuvoLimitacion ? "#fff3e0" : baseRowBg;  // Orange.Lighten4 ≈ #fff3e0
                         table.Cell().Background(rowBg).Padding(3).Text(emp.Cedula).FontSize(8);
                         table.Cell().Background(rowBg).Padding(3).Text(emp.NombreCompleto).FontSize(8);
                         table.Cell().Background(rowBg).Padding(3).AlignCenter().Text(emp.HorasRegulares > 0 ? $"{emp.HorasRegulares:N1}" : "").FontSize(8);
@@ -403,6 +428,9 @@ public class ExportacionService
     /// <summary>Exporta el Reporte Mensual consolidado a PDF.</summary>
     public byte[] ExportarPdfMensual(ReporteMensualDto reporte)
     {
+        if (!reporte.Empleados.Any())
+            return Array.Empty<byte>();
+
         var document = Document.Create(container =>
         {
             container.Page(page =>
@@ -412,13 +440,17 @@ public class ExportacionService
 
                 page.Header().Column(col =>
                 {
-                    col.Item().Height(3).Background(PdfTheme.NavyDark);
+                    col.Item().Height(4).Background(PdfTheme.PrimaryDark);
                     col.Item().PaddingTop(4).Text(reporte.NombreEmpresa).FontSize(14).Bold();
                     col.Item().Text($"RUC: {reporte.Ruc}").FontSize(9);
                     col.Item().Text($"REPORTE MENSUAL — {reporte.NombreMes} {reporte.Anio}").FontSize(12).Bold();
-                    if (reporte.PeriodosIncluidos.Any())
-                        col.Item().Text($"Planillas: {string.Join(", ", reporte.PeriodosIncluidos)}").FontSize(8);
-                    col.Item().PaddingBottom(8);
+                    col.Item().Background("#f1f5f9").Padding(4).Row(infoRow =>
+                    {
+                        infoRow.RelativeItem().Text($"Período: {reporte.NombreMes} {reporte.Anio}").FontSize(8);
+                        if (reporte.PeriodosIncluidos.Any())
+                            infoRow.RelativeItem().AlignRight().Text($"Planillas: {string.Join(", ", reporte.PeriodosIncluidos)}").FontSize(8);
+                    });
+                    col.Item().PaddingBottom(6);
                 });
 
                 page.Content().Table(table =>
@@ -437,27 +469,29 @@ public class ExportacionService
 
                     table.Header(header =>
                     {
-                        var bg = Colors.Grey.Lighten2;
-                        header.Cell().Background(bg).Padding(4).Text("Cédula").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).Text("Nombre").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Total Bruto").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("CSS").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("SE").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("ISR").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Acreed.").Bold().FontSize(8);
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Total Neto").Bold().FontSize(8);
+                        var bg = PdfTheme.PrimaryDark;
+                        header.Cell().Background(bg).Padding(4).Text("Cédula").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).Text("Nombre").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Total Bruto").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("CSS").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("SE").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("ISR").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Acreed.").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Total Neto").Bold().FontSize(8).FontColor("#ffffff");
                     });
 
+                    var altRowM = 0;
                     foreach (var emp in reporte.Empleados)
                     {
-                        table.Cell().Padding(3).Text(emp.Cedula).FontSize(8);
-                        table.Cell().Padding(3).Text(emp.NombreCompleto).FontSize(8);
-                        table.Cell().Padding(3).AlignRight().Text($"B/.{emp.TotalBruto:N2}").FontSize(8);
-                        table.Cell().Padding(3).AlignRight().Text($"B/.{emp.TotalCss:N2}").FontSize(8);
-                        table.Cell().Padding(3).AlignRight().Text($"B/.{emp.TotalSe:N2}").FontSize(8);
-                        table.Cell().Padding(3).AlignRight().Text(emp.TotalIsr > 0 ? $"B/.{emp.TotalIsr:N2}" : "").FontSize(8);
-                        table.Cell().Padding(3).AlignRight().Text(emp.TotalAcreedores > 0 ? $"B/.{emp.TotalAcreedores:N2}" : "").FontSize(8);
-                        table.Cell().Padding(3).AlignRight().Text($"B/.{emp.TotalNeto:N2}").FontSize(8);
+                        var rowBgM = (altRowM++ % 2 == 0) ? "#ffffff" : "#f8fafc";
+                        table.Cell().Background(rowBgM).Padding(3).Text(emp.Cedula).FontSize(8);
+                        table.Cell().Background(rowBgM).Padding(3).Text(emp.NombreCompleto).FontSize(8);
+                        table.Cell().Background(rowBgM).Padding(3).AlignRight().Text($"B/.{emp.TotalBruto:N2}").FontSize(8);
+                        table.Cell().Background(rowBgM).Padding(3).AlignRight().Text($"B/.{emp.TotalCss:N2}").FontSize(8);
+                        table.Cell().Background(rowBgM).Padding(3).AlignRight().Text($"B/.{emp.TotalSe:N2}").FontSize(8);
+                        table.Cell().Background(rowBgM).Padding(3).AlignRight().Text(emp.TotalIsr > 0 ? $"B/.{emp.TotalIsr:N2}" : "").FontSize(8);
+                        table.Cell().Background(rowBgM).Padding(3).AlignRight().Text(emp.TotalAcreedores > 0 ? $"B/.{emp.TotalAcreedores:N2}" : "").FontSize(8);
+                        table.Cell().Background(rowBgM).Padding(3).AlignRight().Text($"B/.{emp.TotalNeto:N2}").FontSize(8);
                     }
 
                     var totBg = Colors.Yellow.Lighten3;
@@ -588,6 +622,9 @@ public class ExportacionService
     /// <summary>Exporta el Reporte de Acreedores a PDF con tabla resumen y detalle por acreedor.</summary>
     public byte[] ExportarPdfAcreedores(ReporteAcreedoresDto reporte)
     {
+        if (!reporte.Acreedores.Any())
+            return Array.Empty<byte>();
+
         var document = Document.Create(container =>
         {
             container.Page(page =>
@@ -597,12 +634,17 @@ public class ExportacionService
 
                 page.Header().Column(col =>
                 {
-                    col.Item().Height(3).Background(PdfTheme.NavyDark);
+                    col.Item().Height(4).Background(PdfTheme.PrimaryDark);
                     col.Item().PaddingTop(4).Text(reporte.NombreEmpresa).FontSize(14).Bold();
                     col.Item().Text($"RUC: {reporte.Ruc}").FontSize(9);
                     col.Item().Text($"REPORTE DE ACREEDORES — {reporte.Periodo}").FontSize(12).Bold();
-                    col.Item().Text($"Generado: {reporte.FechaGeneracion:dd/MM/yyyy HH:mm}  |  Total a transferir: B/.{reporte.GranTotal:N2}").FontSize(9);
-                    col.Item().PaddingBottom(8);
+                    col.Item().Background("#f1f5f9").Padding(4).Row(infoRow =>
+                    {
+                        infoRow.RelativeItem().Text($"Período: {reporte.Periodo}").FontSize(8);
+                        infoRow.RelativeItem().AlignCenter().Text($"Total a transferir: B/.{reporte.GranTotal:N2}").FontSize(8).Bold();
+                        infoRow.RelativeItem().AlignRight().Text($"Generado: {reporte.FechaGeneracion:dd/MM/yyyy HH:mm}").FontSize(8);
+                    });
+                    col.Item().PaddingBottom(6);
                 });
 
                 page.Content().Column(contentCol =>
@@ -623,14 +665,14 @@ public class ExportacionService
 
                         table.Header(header =>
                         {
-                            var bg = Colors.Grey.Lighten2;
-                            header.Cell().Background(bg).Padding(4).Text("Acreedor").Bold().FontSize(8);
-                            header.Cell().Background(bg).Padding(4).Text("Tipo").Bold().FontSize(8);
-                            header.Cell().Background(bg).Padding(4).Text("Identificación").Bold().FontSize(8);
-                            header.Cell().Background(bg).Padding(4).Text("Banco").Bold().FontSize(8);
-                            header.Cell().Background(bg).Padding(4).Text("N° Cuenta").Bold().FontSize(8);
-                            header.Cell().Background(bg).Padding(4).AlignCenter().Text("Emp.").Bold().FontSize(8);
-                            header.Cell().Background(bg).Padding(4).AlignRight().Text("Total").Bold().FontSize(8);
+                            var bg = PdfTheme.PrimaryDark;
+                            header.Cell().Background(bg).Padding(4).Text("Acreedor").Bold().FontSize(8).FontColor("#ffffff");
+                            header.Cell().Background(bg).Padding(4).Text("Tipo").Bold().FontSize(8).FontColor("#ffffff");
+                            header.Cell().Background(bg).Padding(4).Text("Identificación").Bold().FontSize(8).FontColor("#ffffff");
+                            header.Cell().Background(bg).Padding(4).Text("Banco").Bold().FontSize(8).FontColor("#ffffff");
+                            header.Cell().Background(bg).Padding(4).Text("N° Cuenta").Bold().FontSize(8).FontColor("#ffffff");
+                            header.Cell().Background(bg).Padding(4).AlignCenter().Text("Emp.").Bold().FontSize(8).FontColor("#ffffff");
+                            header.Cell().Background(bg).Padding(4).AlignRight().Text("Total").Bold().FontSize(8).FontColor("#ffffff");
                         });
 
                         foreach (var acr in reporte.Acreedores)
@@ -660,6 +702,8 @@ public class ExportacionService
                     foreach (var acr in reporte.Acreedores)
                     {
                         contentCol.Item().PaddingBottom(4)
+                            .Background("#e8f5e9").BorderLeft(3).BorderColor(PdfTheme.PrimaryDark)
+                            .PaddingVertical(4).PaddingHorizontal(8)
                             .Text($"Acreedor: {acr.NombreAcreedor}  —  Total: B/.{acr.TotalATransferir:N2}").FontSize(10).Bold();
 
                         contentCol.Item().Table(detTable =>
@@ -677,14 +721,14 @@ public class ExportacionService
 
                             detTable.Header(header =>
                             {
-                                var bg = Colors.LightBlue.Medium;
-                                header.Cell().Background(bg).Padding(3).Text("Empleado").Bold().FontSize(7);
-                                header.Cell().Background(bg).Padding(3).Text("Cédula").Bold().FontSize(7);
-                                header.Cell().Background(bg).Padding(3).Text("Tipo").Bold().FontSize(7);
-                                header.Cell().Background(bg).Padding(3).Text("Descripción").Bold().FontSize(7);
-                                header.Cell().Background(bg).Padding(3).AlignRight().Text("Solicitado").Bold().FontSize(7);
-                                header.Cell().Background(bg).Padding(3).AlignRight().Text("Aplicado").Bold().FontSize(7);
-                                header.Cell().Background(bg).Padding(3).Text("Razón Limitación").Bold().FontSize(7);
+                                var bg = PdfTheme.PrimaryDark;
+                                header.Cell().Background(bg).Padding(3).Text("Empleado").Bold().FontSize(7).FontColor("#ffffff");
+                                header.Cell().Background(bg).Padding(3).Text("Cédula").Bold().FontSize(7).FontColor("#ffffff");
+                                header.Cell().Background(bg).Padding(3).Text("Tipo").Bold().FontSize(7).FontColor("#ffffff");
+                                header.Cell().Background(bg).Padding(3).Text("Descripción").Bold().FontSize(7).FontColor("#ffffff");
+                                header.Cell().Background(bg).Padding(3).AlignRight().Text("Solicitado").Bold().FontSize(7).FontColor("#ffffff");
+                                header.Cell().Background(bg).Padding(3).AlignRight().Text("Aplicado").Bold().FontSize(7).FontColor("#ffffff");
+                                header.Cell().Background(bg).Padding(3).Text("Razón Limitación").Bold().FontSize(7).FontColor("#ffffff");
                             });
 
                             foreach (var det in acr.Empleados)
@@ -780,6 +824,9 @@ public class ExportacionService
     /// <summary>Exporta el Reporte SIP para la CSS a PDF.</summary>
     public byte[] ExportarPdfSip(ReporteSipDto reporte)
     {
+        if (!reporte.Empleados.Any())
+            return Array.Empty<byte>();
+
         var document = Document.Create(container =>
         {
             container.Page(page =>
@@ -789,7 +836,7 @@ public class ExportacionService
 
                 page.Header().Column(col =>
                 {
-                    col.Item().Height(3).Background(PdfTheme.NavyDark);
+                    col.Item().Height(3).Background(PdfTheme.PrimaryDark);
                     col.Item().PaddingTop(4).Text(reporte.NombreEmpresa).FontSize(14).Bold();
                     col.Item().Text($"RUC: {reporte.Ruc}").FontSize(9);
                     col.Item().Text($"REPORTE SIP — CAJA DE SEGURO SOCIAL — {reporte.NumeroPlanilla}").FontSize(12).Bold();
@@ -873,6 +920,9 @@ public class ExportacionService
     /// </summary>
     public byte[] ExportarPdfComprobantes(ReporteComprobantesDto reporte)
     {
+        if (!reporte.Comprobantes.Any())
+            return Array.Empty<byte>();
+
         var document = Document.Create(container =>
         {
             foreach (var comp in reporte.Comprobantes)
@@ -887,7 +937,7 @@ public class ExportacionService
                     // ----------------------------------------
                     page.Header().Column(col =>
                     {
-                        col.Item().Height(3).Background(PdfTheme.NavyDark);
+                        col.Item().Height(4).Background(PdfTheme.PrimaryDark);
                         col.Item().PaddingTop(4).Row(row =>
                         {
                             row.RelativeItem().Column(c =>
@@ -895,7 +945,7 @@ public class ExportacionService
                                 c.Item().Text(reporte.NombreEmpresa).FontSize(14).Bold();
                                 c.Item().Text($"RUC: {reporte.Ruc}").FontSize(9);
                             });
-                            row.ConstantItem(190).Background(PdfTheme.NavyDark).Padding(6).AlignRight().Column(c =>
+                            row.ConstantItem(190).Background(PdfTheme.DarkBg).Padding(6).AlignRight().Column(c =>
                             {
                                 c.Item().Text("COMPROBANTE DE PAGO").FontSize(12).Bold().FontColor("#ffffff");
                                 c.Item().Text($"N° Planilla: {reporte.NumeroPlanilla}").FontSize(9).FontColor("#dbeafe");
@@ -913,12 +963,12 @@ public class ExportacionService
                     page.Content().Column(content =>
                     {
                         // Datos del empleado
-                        content.Item().Background(Colors.Grey.Lighten3).Padding(8).Row(row =>
+                        content.Item().Background("#e8f5e9").BorderLeft(3).BorderColor(PdfTheme.PrimaryDark).Padding(8).Row(row =>
                         {
                             row.RelativeItem(2).Column(c =>
                             {
                                 c.Item().Text(comp.NombreCompleto).FontSize(13).Bold();
-                                c.Item().Text($"Cédula: {comp.Cedula}").FontSize(10);
+                                c.Item().Text($"Cédula: {comp.Cedula}").FontSize(10).FontColor("#64748b");
                             });
                             row.RelativeItem(1).Column(c =>
                             {
@@ -949,9 +999,9 @@ public class ExportacionService
                             // Encabezado de tabla
                             table.Header(header =>
                             {
-                                header.Cell().ColumnSpan(2).Background("#16a34a")
+                                header.Cell().ColumnSpan(2).Background(PdfTheme.IngresoHeader)
                                     .Padding(5).AlignCenter().Text("INGRESOS").Bold().FontSize(10).FontColor("#ffffff");
-                                header.Cell().ColumnSpan(2).Background("#dc2626")
+                                header.Cell().ColumnSpan(2).Background(PdfTheme.DeduccionHeader)
                                     .Padding(5).AlignCenter().Text("DEDUCCIONES").Bold().FontSize(10).FontColor("#ffffff");
                             });
 
@@ -1032,43 +1082,50 @@ public class ExportacionService
                             }
 
                             // Separador totales
-                            table.Cell().ColumnSpan(2).LineHorizontal(0.5f).LineColor(Colors.Grey.Medium);
-                            table.Cell().ColumnSpan(2).LineHorizontal(0.5f).LineColor(Colors.Grey.Medium);
+                            table.Cell().ColumnSpan(2).LineHorizontal(1).LineColor(Colors.Grey.Medium);
+                            table.Cell().ColumnSpan(2).LineHorizontal(1).LineColor(Colors.Grey.Medium);
 
                             // Total ingresos | Total deducciones
-                            table.Cell().Background(Colors.Green.Lighten4).Padding(4)
+                            table.Cell().Background(PdfTheme.IngresoBg).Padding(4)
                                 .Text("TOTAL INGRESOS").Bold().FontSize(9);
-                            table.Cell().Background(Colors.Green.Lighten4).Padding(4).AlignRight()
+                            table.Cell().Background(PdfTheme.IngresoBg).Padding(4).AlignRight()
                                 .Text($"B/.{comp.SalarioBruto:N2}").Bold().FontSize(9);
-                            table.Cell().Background(Colors.Red.Lighten4).Padding(4)
+                            table.Cell().Background(PdfTheme.DeduccionBg).Padding(4)
                                 .Text("TOTAL DEDUCCIONES").Bold().FontSize(9);
-                            table.Cell().Background(Colors.Red.Lighten4).Padding(4).AlignRight()
+                            table.Cell().Background(PdfTheme.DeduccionBg).Padding(4).AlignRight()
                                 .Text($"B/.{comp.TotalDeducciones:N2}").Bold().FontSize(9);
                         });
 
                         content.Item().PaddingTop(12);
 
                         // Neto a recibir destacado
-                        content.Item().Background(PdfTheme.NavyDark).Padding(10).Row(row =>
+                        content.Item().Background(PdfTheme.DarkBg).Padding(12).Row(row =>
                         {
-                            row.RelativeItem().Text("NETO A RECIBIR:").FontSize(14).Bold().FontColor("#ffffff");
-                            row.ConstantItem(200).AlignRight().Text($"B/.{comp.SalarioNeto:N2}").FontSize(16).Bold().FontColor("#ffffff");
+                            row.RelativeItem().Text(t =>
+                            {
+                                t.Span("NETO A RECIBIR:").FontSize(14).Bold().FontColor("#ffffff");
+                            });
+                            row.ConstantItem(220).AlignRight().Text(t =>
+                            {
+                                t.Span("B/.").FontSize(14).Bold().FontColor(PdfTheme.PrimaryMedium);
+                                t.Span($"{comp.SalarioNeto:N2}").FontSize(18).Bold().FontColor("#ffffff");
+                            });
                         });
 
                         content.Item().PaddingTop(8);
 
                         // Reserva décimo referencial
-                        content.Item().Background(Colors.Grey.Lighten4).Padding(6).Row(row =>
+                        content.Item().Background("#f0fdf4").Padding(6).Row(row =>
                         {
                             row.RelativeItem().Column(c =>
                             {
                                 c.Item().Text("Provisión Décimo Tercer Mes (referencial):").FontSize(9).Italic();
-                                c.Item().Text("[referencial - no deducción]").FontSize(7).FontColor(Colors.Grey.Medium);
+                                c.Item().Text("[referencial - no deducción]").FontSize(7).FontColor(PdfTheme.PrimaryMedium);
                             });
-                            row.ConstantItem(120).AlignRight().Text($"B/.{comp.ReservaDecimo:N2}").FontSize(9).Italic();
+                            row.ConstantItem(120).AlignRight().Text($"B/.{comp.ReservaDecimo:N2}").FontSize(9).Italic().FontColor(PdfTheme.PrimaryMedium);
                         });
 
-                        content.Item().PaddingTop(20);
+                        content.Item().PaddingTop(24);
 
                         // Línea de firma
                         content.Item().Row(row =>
@@ -1108,6 +1165,9 @@ public class ExportacionService
     /// </summary>
     public byte[] ExportarPdfComprobantesCompactos(ReporteComprobantesDto reporte)
     {
+        if (!reporte.Comprobantes.Any())
+            return Array.Empty<byte>();
+
         var document = Document.Create(container =>
         {
             // Agrupar comprobantes en pares: primero + segundo (puede ser null si es impar)
@@ -1130,7 +1190,7 @@ public class ExportacionService
                     page.Content().Column(col =>
                     {
                         // Mitad superior: Empleado 1 — original y copia lado a lado
-                        col.Item().Height(129, Unit.Millimetre).Row(row =>
+                        col.Item().Height(119, Unit.Millimetre).Row(row =>
                         {
                             row.RelativeItem().Element(c => RenderSlipCompacto(c, par.primero, "ORIGINAL", reporte));
                             row.ConstantItem(1).Background("#cccccc");
@@ -1146,7 +1206,7 @@ public class ExportacionService
                         });
 
                         // Mitad inferior: Empleado 2 (o espacio vacío si la planilla tiene número impar)
-                        col.Item().Height(129, Unit.Millimetre).Row(row =>
+                        col.Item().Height(119, Unit.Millimetre).Row(row =>
                         {
                             if (par.segundo != null)
                             {
@@ -1181,19 +1241,20 @@ public class ExportacionService
         container.Padding(4).Column(col =>
         {
             // Barra de acento superior
-            col.Item().Height(2).Background(PdfTheme.NavyDark);
+            col.Item().Height(2).Background(PdfTheme.PrimaryDark);
 
             // Encabezado: nombre empresa a la izquierda, período a la derecha
             col.Item().PaddingTop(2).Row(row =>
             {
-                row.RelativeItem().Text(reporte.NombreEmpresa ?? "Empresa").FontSize(6).Bold();
+                row.RelativeItem().Text(reporte.NombreEmpresa ?? "Empresa").FontSize(6.5f).Bold().FontColor(PdfTheme.PrimaryMedium);
                 row.RelativeItem().AlignRight().Text(reporte.Periodo).FontSize(5);
             });
-            col.Item().AlignCenter().Text("COMPROBANTE DE PAGO").FontSize(5);
-            col.Item().BorderBottom(0.5f).BorderColor("#333333").PaddingBottom(2);
+            col.Item().Background(PdfTheme.DarkBg).PaddingVertical(1).AlignCenter()
+                .Text("COMPROBANTE DE PAGO").FontSize(5).Bold().FontColor("#ffffff");
+            col.Item().PaddingBottom(2);
 
-            // Datos del empleado con fondo gris
-            col.Item().Background("#e8e8e8").Padding(2).Column(emp =>
+            // Datos del empleado con fondo verde suave
+            col.Item().Background("#e8f5e9").BorderLeft(1.5f).BorderColor(PdfTheme.PrimaryDark).Padding(2).Column(emp =>
             {
                 emp.Item().Row(r =>
                 {
@@ -1213,22 +1274,22 @@ public class ExportacionService
             {
                 table.ColumnsDefinition(cols =>
                 {
-                    cols.RelativeColumn(3); // Concepto ingreso
+                    cols.RelativeColumn(4); // Concepto ingreso
                     cols.RelativeColumn(2); // Monto ingreso
-                    cols.RelativeColumn(3); // Concepto deducción
+                    cols.RelativeColumn(4); // Concepto deducción
                     cols.RelativeColumn(2); // Monto deducción
                 });
 
                 // Encabezados de columna
                 static IContainer IngresoHeaderCell(IContainer c) =>
-                    c.Background("#dcfce7").BorderBottom(0.3f).BorderColor("#16a34a").PaddingVertical(1).PaddingHorizontal(1);
+                    c.Background(PdfTheme.IngresoBg).BorderBottom(0.3f).BorderColor(PdfTheme.IngresoHeader).PaddingVertical(1).PaddingHorizontal(1);
                 static IContainer DeduccionHeaderCell(IContainer c) =>
-                    c.Background("#fee2e2").BorderBottom(0.3f).BorderColor("#dc2626").PaddingVertical(1).PaddingHorizontal(1);
+                    c.Background(PdfTheme.DeduccionBg).BorderBottom(0.3f).BorderColor(PdfTheme.DeduccionHeader).PaddingVertical(1).PaddingHorizontal(1);
 
-                table.Cell().Element(IngresoHeaderCell).Text("INGRESO").FontSize(5).Bold().FontColor("#15803d");
-                table.Cell().Element(IngresoHeaderCell).AlignRight().Text("MONTO").FontSize(5).Bold().FontColor("#15803d");
-                table.Cell().Element(DeduccionHeaderCell).Text("DEDUCCIÓN").FontSize(5).Bold().FontColor("#b91c1c");
-                table.Cell().Element(DeduccionHeaderCell).AlignRight().Text("MONTO").FontSize(5).Bold().FontColor("#b91c1c");
+                table.Cell().Element(IngresoHeaderCell).Text("INGRESO").FontSize(5).Bold().FontColor(PdfTheme.IngresoText);
+                table.Cell().Element(IngresoHeaderCell).AlignRight().Text("MONTO").FontSize(5).Bold().FontColor(PdfTheme.IngresoText);
+                table.Cell().Element(DeduccionHeaderCell).Text("DEDUCCIÓN").FontSize(5).Bold().FontColor(PdfTheme.DeduccionText);
+                table.Cell().Element(DeduccionHeaderCell).AlignRight().Text("MONTO").FontSize(5).Bold().FontColor(PdfTheme.DeduccionText);
 
                 // Fila 1: Salario Base | CSS 9.75%
                 table.Cell().Text("Salario Base").FontSize(5.5f);
@@ -1281,10 +1342,10 @@ public class ExportacionService
 
             col.Item().PaddingTop(2);
 
-            // Neto a recibir con fondo azul oscuro
-            col.Item().Background("#1e40af").Padding(3).AlignCenter()
+            // Neto a recibir con fondo oscuro
+            col.Item().Background(PdfTheme.DarkBg).Padding(3).AlignCenter()
                 .Text($"NETO A RECIBIR: B/. {comp.SalarioNeto:N2}")
-                .FontSize(8).Bold().FontColor("#ffffff");
+                .FontSize(8.5f).Bold().FontColor("#ffffff");
 
             col.Item().PaddingTop(3);
 
@@ -1305,10 +1366,10 @@ public class ExportacionService
             });
 
             // Etiqueta ORIGINAL / COPIA diferenciada por color
-            var badgeColor = tipo == "ORIGINAL" ? PdfTheme.NavyMedium : "#94a3b8";
+            var badgeBg = tipo == "ORIGINAL" ? PdfTheme.PrimaryDark : "#94a3b8";
             col.Item().PaddingTop(2).AlignRight()
-                .Border(0.5f).BorderColor(badgeColor).Padding(1)
-                .Text(tipo).FontSize(4.5f).Bold().FontColor(badgeColor);
+                .Background(badgeBg).Padding(1)
+                .Text(tipo).FontSize(4.5f).Bold().FontColor("#ffffff");
         });
     }
 }
