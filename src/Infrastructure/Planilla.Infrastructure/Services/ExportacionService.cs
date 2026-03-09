@@ -25,6 +25,51 @@ public class ExportacionService
     }
 
     // ====================================================================
+    // Tema visual compartido para PDFs
+    // ====================================================================
+
+    private static class PdfTheme
+    {
+        public const string NavyDark   = "#1e3a5f";
+        public const string NavyMedium = "#2563eb";
+        public const string NavyLight  = "#dbeafe";
+        public const string FooterBg   = "#f1f5f9";
+        public const string FooterText = "#64748b";
+        public const string BrandUrl   = "pagly.clau.com.pa";
+    }
+
+    private static void BuildProfessionalFooter(PageDescriptor page, string nombreEmpresa)
+    {
+        page.Footer().Element(footer =>
+        {
+            footer
+                .BorderTop(1).BorderColor(PdfTheme.NavyDark)
+                .Background(PdfTheme.FooterBg)
+                .PaddingVertical(4).PaddingHorizontal(8)
+                .Row(row =>
+                {
+                    row.RelativeItem().AlignLeft().Text(t =>
+                    {
+                        t.Span($"{nombreEmpresa}  ·  Generado: ").FontSize(7).FontColor(PdfTheme.FooterText);
+                        t.Span($"{DateTime.Now:dd/MM/yyyy HH:mm}").FontSize(7).FontColor(PdfTheme.FooterText);
+                    });
+
+                    row.ConstantItem(80).AlignCenter().Text(t =>
+                    {
+                        t.Span("Página ").FontSize(7).FontColor(PdfTheme.FooterText);
+                        t.CurrentPageNumber().FontSize(7).FontColor(PdfTheme.FooterText);
+                        t.Span(" de ").FontSize(7).FontColor(PdfTheme.FooterText);
+                        t.TotalPages().FontSize(7).FontColor(PdfTheme.FooterText);
+                    });
+
+                    row.ConstantItem(120).AlignRight()
+                        .Text(PdfTheme.BrandUrl)
+                        .FontSize(7).FontColor(PdfTheme.NavyMedium);
+                });
+        });
+    }
+
+    // ====================================================================
     // Helpers privados
     // ====================================================================
 
@@ -178,7 +223,8 @@ public class ExportacionService
 
                 page.Header().Column(col =>
                 {
-                    col.Item().Text(reporte.NombreEmpresa).FontSize(14).Bold();
+                    col.Item().Height(3).Background(PdfTheme.NavyDark);
+                    col.Item().PaddingTop(4).Text(reporte.NombreEmpresa).FontSize(14).Bold();
                     col.Item().Text($"RUC: {reporte.Ruc}").FontSize(9);
                     col.Item().Text($"PLANILLA REGULAR — {reporte.NumeroPlanilla} — {reporte.Periodo} — {reporte.Estado}").FontSize(11).Bold();
                     col.Item().Text($"Fecha de Pago: {reporte.FechaPago:dd/MM/yyyy}").FontSize(9);
@@ -285,13 +331,7 @@ public class ExportacionService
                     table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.TotalNeto:N2}").Bold().FontSize(8);
                 });
 
-                page.Footer().AlignCenter().Text(text =>
-                {
-                    text.Span($"Generado: {DateTime.Now:dd/MM/yyyy HH:mm} | Página ");
-                    text.CurrentPageNumber();
-                    text.Span(" de ");
-                    text.TotalPages();
-                });
+                BuildProfessionalFooter(page, reporte.NombreEmpresa);
             });
         });
 
@@ -372,7 +412,8 @@ public class ExportacionService
 
                 page.Header().Column(col =>
                 {
-                    col.Item().Text(reporte.NombreEmpresa).FontSize(14).Bold();
+                    col.Item().Height(3).Background(PdfTheme.NavyDark);
+                    col.Item().PaddingTop(4).Text(reporte.NombreEmpresa).FontSize(14).Bold();
                     col.Item().Text($"RUC: {reporte.Ruc}").FontSize(9);
                     col.Item().Text($"REPORTE MENSUAL — {reporte.NombreMes} {reporte.Anio}").FontSize(12).Bold();
                     if (reporte.PeriodosIncluidos.Any())
@@ -430,13 +471,7 @@ public class ExportacionService
                     table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.GranTotalNeto:N2}").Bold().FontSize(8);
                 });
 
-                page.Footer().AlignCenter().Text(text =>
-                {
-                    text.Span($"Generado: {DateTime.Now:dd/MM/yyyy HH:mm} | Página ");
-                    text.CurrentPageNumber();
-                    text.Span(" de ");
-                    text.TotalPages();
-                });
+                BuildProfessionalFooter(page, reporte.NombreEmpresa);
             });
         });
 
@@ -562,7 +597,8 @@ public class ExportacionService
 
                 page.Header().Column(col =>
                 {
-                    col.Item().Text(reporte.NombreEmpresa).FontSize(14).Bold();
+                    col.Item().Height(3).Background(PdfTheme.NavyDark);
+                    col.Item().PaddingTop(4).Text(reporte.NombreEmpresa).FontSize(14).Bold();
                     col.Item().Text($"RUC: {reporte.Ruc}").FontSize(9);
                     col.Item().Text($"REPORTE DE ACREEDORES — {reporte.Periodo}").FontSize(12).Bold();
                     col.Item().Text($"Generado: {reporte.FechaGeneracion:dd/MM/yyyy HH:mm}  |  Total a transferir: B/.{reporte.GranTotal:N2}").FontSize(9);
@@ -668,13 +704,7 @@ public class ExportacionService
                     }
                 });
 
-                page.Footer().AlignCenter().Text(text =>
-                {
-                    text.Span($"Generado: {reporte.FechaGeneracion:dd/MM/yyyy HH:mm} | Página ");
-                    text.CurrentPageNumber();
-                    text.Span(" de ");
-                    text.TotalPages();
-                });
+                BuildProfessionalFooter(page, reporte.NombreEmpresa);
             });
         });
 
@@ -759,7 +789,8 @@ public class ExportacionService
 
                 page.Header().Column(col =>
                 {
-                    col.Item().Text(reporte.NombreEmpresa).FontSize(14).Bold();
+                    col.Item().Height(3).Background(PdfTheme.NavyDark);
+                    col.Item().PaddingTop(4).Text(reporte.NombreEmpresa).FontSize(14).Bold();
                     col.Item().Text($"RUC: {reporte.Ruc}").FontSize(9);
                     col.Item().Text($"REPORTE SIP — CAJA DE SEGURO SOCIAL — {reporte.NumeroPlanilla}").FontSize(12).Bold();
                     col.Item().Text($"Período: {reporte.Periodo}  |  Generado: {reporte.FechaGeneracion:dd/MM/yyyy HH:mm}").FontSize(9);
@@ -824,13 +855,7 @@ public class ExportacionService
                     table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.GranTotalSip:N2}").Bold().FontSize(8);
                 });
 
-                page.Footer().AlignCenter().Text(text =>
-                {
-                    text.Span($"Generado: {reporte.FechaGeneracion:dd/MM/yyyy HH:mm} | Página ");
-                    text.CurrentPageNumber();
-                    text.Span(" de ");
-                    text.TotalPages();
-                });
+                BuildProfessionalFooter(page, reporte.NombreEmpresa);
             });
         });
 
@@ -862,23 +887,23 @@ public class ExportacionService
                     // ----------------------------------------
                     page.Header().Column(col =>
                     {
-                        col.Item().Row(row =>
+                        col.Item().Height(3).Background(PdfTheme.NavyDark);
+                        col.Item().PaddingTop(4).Row(row =>
                         {
                             row.RelativeItem().Column(c =>
                             {
                                 c.Item().Text(reporte.NombreEmpresa).FontSize(14).Bold();
                                 c.Item().Text($"RUC: {reporte.Ruc}").FontSize(9);
                             });
-                            row.ConstantItem(180).AlignRight().Column(c =>
+                            row.ConstantItem(190).Background(PdfTheme.NavyDark).Padding(6).AlignRight().Column(c =>
                             {
-                                c.Item().Text("COMPROBANTE DE PAGO").FontSize(12).Bold();
-                                c.Item().Text($"N° Planilla: {reporte.NumeroPlanilla}").FontSize(9);
-                                c.Item().Text($"Período: {reporte.Periodo}").FontSize(9);
-                                c.Item().Text($"Fecha Pago: {reporte.FechaPago:dd/MM/yyyy}").FontSize(9).Bold();
+                                c.Item().Text("COMPROBANTE DE PAGO").FontSize(12).Bold().FontColor("#ffffff");
+                                c.Item().Text($"N° Planilla: {reporte.NumeroPlanilla}").FontSize(9).FontColor("#dbeafe");
+                                c.Item().Text($"Período: {reporte.Periodo}").FontSize(9).FontColor("#dbeafe");
+                                c.Item().Text($"Fecha Pago: {reporte.FechaPago:dd/MM/yyyy}").FontSize(9).Bold().FontColor("#ffffff");
                             });
                         });
 
-                        col.Item().LineHorizontal(1).LineColor(Colors.Grey.Medium);
                         col.Item().PaddingBottom(6);
                     });
 
@@ -924,10 +949,10 @@ public class ExportacionService
                             // Encabezado de tabla
                             table.Header(header =>
                             {
-                                header.Cell().ColumnSpan(2).Background(Colors.Green.Lighten3)
-                                    .Padding(5).AlignCenter().Text("INGRESOS").Bold().FontSize(10);
-                                header.Cell().ColumnSpan(2).Background(Colors.Red.Lighten3)
-                                    .Padding(5).AlignCenter().Text("DEDUCCIONES").Bold().FontSize(10);
+                                header.Cell().ColumnSpan(2).Background("#16a34a")
+                                    .Padding(5).AlignCenter().Text("INGRESOS").Bold().FontSize(10).FontColor("#ffffff");
+                                header.Cell().ColumnSpan(2).Background("#dc2626")
+                                    .Padding(5).AlignCenter().Text("DEDUCCIONES").Bold().FontSize(10).FontColor("#ffffff");
                             });
 
                             // Salario base
@@ -1024,10 +1049,10 @@ public class ExportacionService
                         content.Item().PaddingTop(12);
 
                         // Neto a recibir destacado
-                        content.Item().Background(Colors.Blue.Lighten4).Padding(10).Row(row =>
+                        content.Item().Background(PdfTheme.NavyDark).Padding(10).Row(row =>
                         {
-                            row.RelativeItem().Text("NETO A RECIBIR:").FontSize(14).Bold();
-                            row.ConstantItem(200).AlignRight().Text($"B/.{comp.SalarioNeto:N2}").FontSize(16).Bold();
+                            row.RelativeItem().Text("NETO A RECIBIR:").FontSize(14).Bold().FontColor("#ffffff");
+                            row.ConstantItem(200).AlignRight().Text($"B/.{comp.SalarioNeto:N2}").FontSize(16).Bold().FontColor("#ffffff");
                         });
 
                         content.Item().PaddingTop(8);
@@ -1062,14 +1087,7 @@ public class ExportacionService
                         });
                     });
 
-                    // Footer con número de página
-                    page.Footer().AlignCenter().Text(text =>
-                    {
-                        text.Span($"Planilla SaaS | {reporte.NombreEmpresa} | Generado: {DateTime.Now:dd/MM/yyyy HH:mm} | Página ");
-                        text.CurrentPageNumber();
-                        text.Span(" de ");
-                        text.TotalPages();
-                    });
+                    BuildProfessionalFooter(page, reporte.NombreEmpresa);
                 });
             }
         });
@@ -1144,6 +1162,8 @@ public class ExportacionService
                             }
                         });
                     });
+
+                    BuildProfessionalFooter(page, reporte.NombreEmpresa);
                 });
             }
         });
@@ -1160,8 +1180,11 @@ public class ExportacionService
     {
         container.Padding(4).Column(col =>
         {
+            // Barra de acento superior
+            col.Item().Height(2).Background(PdfTheme.NavyDark);
+
             // Encabezado: nombre empresa a la izquierda, período a la derecha
-            col.Item().Row(row =>
+            col.Item().PaddingTop(2).Row(row =>
             {
                 row.RelativeItem().Text(reporte.NombreEmpresa ?? "Empresa").FontSize(6).Bold();
                 row.RelativeItem().AlignRight().Text(reporte.Periodo).FontSize(5);
@@ -1197,13 +1220,15 @@ public class ExportacionService
                 });
 
                 // Encabezados de columna
-                static IContainer CellStyle(IContainer c) =>
-                    c.BorderBottom(0.3f).BorderColor("#cccccc").PaddingVertical(1);
+                static IContainer IngresoHeaderCell(IContainer c) =>
+                    c.Background("#dcfce7").BorderBottom(0.3f).BorderColor("#16a34a").PaddingVertical(1).PaddingHorizontal(1);
+                static IContainer DeduccionHeaderCell(IContainer c) =>
+                    c.Background("#fee2e2").BorderBottom(0.3f).BorderColor("#dc2626").PaddingVertical(1).PaddingHorizontal(1);
 
-                table.Cell().Element(CellStyle).Text("INGRESO").FontSize(5).Bold();
-                table.Cell().Element(CellStyle).AlignRight().Text("MONTO").FontSize(5).Bold();
-                table.Cell().Element(CellStyle).Text("DEDUCCION").FontSize(5).Bold();
-                table.Cell().Element(CellStyle).AlignRight().Text("MONTO").FontSize(5).Bold();
+                table.Cell().Element(IngresoHeaderCell).Text("INGRESO").FontSize(5).Bold().FontColor("#15803d");
+                table.Cell().Element(IngresoHeaderCell).AlignRight().Text("MONTO").FontSize(5).Bold().FontColor("#15803d");
+                table.Cell().Element(DeduccionHeaderCell).Text("DEDUCCIÓN").FontSize(5).Bold().FontColor("#b91c1c");
+                table.Cell().Element(DeduccionHeaderCell).AlignRight().Text("MONTO").FontSize(5).Bold().FontColor("#b91c1c");
 
                 // Fila 1: Salario Base | CSS 9.75%
                 table.Cell().Text("Salario Base").FontSize(5.5f);
@@ -1279,9 +1304,11 @@ public class ExportacionService
                 });
             });
 
-            // Etiqueta ORIGINAL / COPIA en la esquina inferior derecha
+            // Etiqueta ORIGINAL / COPIA diferenciada por color
+            var badgeColor = tipo == "ORIGINAL" ? PdfTheme.NavyMedium : "#94a3b8";
             col.Item().PaddingTop(2).AlignRight()
-                .Text(tipo).FontSize(4.5f).Italic().FontColor("#888888");
+                .Border(0.5f).BorderColor(badgeColor).Padding(1)
+                .Text(tipo).FontSize(4.5f).Bold().FontColor(badgeColor);
         });
     }
 }
