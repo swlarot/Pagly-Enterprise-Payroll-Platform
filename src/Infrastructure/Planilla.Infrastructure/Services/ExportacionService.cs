@@ -1076,4 +1076,212 @@ public class ExportacionService
 
         return document.GeneratePdf();
     }
+
+    // ====================================================================
+    // REPORTE 5: Comprobantes de Pago — PDF Compacto (Formato Banco 2×2)
+    // Layout por página Letter: 2 empleados verticalmente,
+    // cada uno con original + copia lado a lado separados por línea de corte.
+    // ====================================================================
+
+    /// <summary>
+    /// Exporta los Comprobantes a PDF en formato compacto: 2 empleados por página Letter.
+    /// Cada empleado ocupa una mitad de la página con original y copia lado a lado.
+    /// Ideal para entrega física en empresas que imprimen recibos de sueldo en papel.
+    /// </summary>
+    public byte[] ExportarPdfComprobantesCompactos(ReporteComprobantesDto reporte)
+    {
+        var document = Document.Create(container =>
+        {
+            // Agrupar comprobantes en pares: primero + segundo (puede ser null si es impar)
+            var pares = reporte.Comprobantes
+                .Select((c, i) => (c, i))
+                .GroupBy(x => x.i / 2)
+                .Select(g => (
+                    primero: g.First().c,
+                    segundo: g.Count() > 1 ? (ComprobanteEmpleado?)g.Last().c : null
+                )).ToList();
+
+            foreach (var par in pares)
+            {
+                container.Page(page =>
+                {
+                    page.Size(PageSizes.Letter);
+                    page.Margin(8, Unit.Millimetre);
+                    page.DefaultTextStyle(x => x.FontSize(6));
+
+                    page.Content().Column(col =>
+                    {
+                        // Mitad superior: Empleado 1 — original y copia lado a lado
+                        col.Item().Height(50, Unit.Percentage).Row(row =>
+                        {
+                            row.RelativeItem().Element(c => RenderSlipCompacto(c, par.primero, "ORIGINAL", reporte));
+                            row.ConstantItem(1).Background("#cccccc");
+                            row.RelativeItem().Element(c => RenderSlipCompacto(c, par.primero, "COPIA", reporte));
+                        });
+
+                        // Línea de corte horizontal entre los dos empleados
+                        col.Item().PaddingVertical(2).Row(row =>
+                        {
+                            row.RelativeItem().BorderBottom(0.5f).BorderColor("#999999").Element(c =>
+                                c.AlignCenter().Text("- - - - - - - - - - - - cortar aqui - - - - - - - - - - - -")
+                                    .FontSize(5).FontColor("#999999").Italic());
+                        });
+
+                        // Mitad inferior: Empleado 2 (o espacio vacío si la planilla tiene número impar)
+                        col.Item().Height(50, Unit.Percentage).Row(row =>
+                        {
+                            if (par.segundo.HasValue)
+                            {
+                                row.RelativeItem().Element(c => RenderSlipCompacto(c, par.segundo.Value, "ORIGINAL", reporte));
+                                row.ConstantItem(1).Background("#cccccc");
+                                row.RelativeItem().Element(c => RenderSlipCompacto(c, par.segundo.Value, "COPIA", reporte));
+                            }
+                            else
+                            {
+                                // Mitad inferior vacía cuando hay número impar de empleados
+                                row.RelativeItem().AlignCenter().AlignMiddle()
+                                    .Text("").FontSize(12).FontColor("#cccccc");
+                            }
+                        });
+                    });
+                });
+            }
+        });
+
+        return document.GeneratePdf();
+    }
+
+    /// <summary>
+    /// Renderiza un slip individual (original o copia) dentro del formato compacto.
+    /// Incluye encabezado empresa, datos del empleado, tabla de ingresos/deducciones,
+    /// neto a recibir y líneas de firma.
+    /// </summary>
+    private static void RenderSlipCompacto(IContainer container, ComprobanteEmpleado comp, string tipo, ReporteComprobantesDto reporte)
+    {
+        container.Padding(4).Column(col =>
+        {
+            // Encabezado: nombre empresa a la izquierda, período a la derecha
+            col.Item().Row(row =>
+            {
+                row.RelativeItem().Text(reporte.NombreEmpresa ?? "Empresa").FontSize(6).Bold();
+                row.RelativeItem().AlignRight().Text(reporte.Periodo).FontSize(5);
+            });
+            col.Item().AlignCenter().Text("COMPROBANTE DE PAGO").FontSize(5);
+            col.Item().BorderBottom(0.5f).BorderColor("#333333").PaddingBottom(2);
+
+            // Datos del empleado con fondo gris
+            col.Item().Background("#e8e8e8").Padding(2).Column(emp =>
+            {
+                emp.Item().Row(r =>
+                {
+                    r.RelativeItem().Text(comp.NombreCompleto).FontSize(7).Bold();
+                    r.ConstantItem(40).AlignRight().Text(comp.Cedula ?? "").FontSize(5);
+                });
+                emp.Item().Row(r =>
+                {
+                    r.RelativeItem().Text($"{comp.Cargo ?? ""} / {comp.Departamento ?? ""}").FontSize(5);
+                });
+            });
+
+            col.Item().PaddingTop(2);
+
+            // Tabla de ingresos (izquierda) y deducciones (derecha) en 4 columnas
+            col.Item().Table(table =>
+            {
+                table.ColumnsDefinition(cols =>
+                {
+                    cols.RelativeColumn(3); // Concepto ingreso
+                    cols.RelativeColumn(2); // Monto ingreso
+                    cols.RelativeColumn(3); // Concepto deducción
+                    cols.RelativeColumn(2); // Monto deducción
+                });
+
+                // Encabezados de columna
+                static IContainer CellStyle(IContainer c) =>
+                    c.BorderBottom(0.3f).BorderColor("#cccccc").PaddingVertical(1);
+
+                table.Cell().Element(CellStyle).Text("INGRESO").FontSize(5).Bold();
+                table.Cell().Element(CellStyle).AlignRight().Text("MONTO").FontSize(5).Bold();
+                table.Cell().Element(CellStyle).Text("DEDUCCION").FontSize(5).Bold();
+                table.Cell().Element(CellStyle).AlignRight().Text("MONTO").FontSize(5).Bold();
+
+                // Fila 1: Salario Base | CSS 9.75%
+                table.Cell().Text("Salario Base").FontSize(5.5f);
+                table.Cell().AlignRight().Text($"{comp.SalarioBase:N2}").FontSize(5.5f);
+                table.Cell().Text("CSS 9.75%").FontSize(5.5f);
+                table.Cell().AlignRight().Text($"{comp.CssEmpleado:N2}").FontSize(5.5f);
+
+                // Fila 2: Recargo Domingo (si aplica) | Seg. Educativo
+                table.Cell().Text(comp.PagoHorasDomingo > 0 ? "Rec. Domingo" : "").FontSize(5.5f);
+                table.Cell().AlignRight().Text(comp.PagoHorasDomingo > 0 ? $"{comp.PagoHorasDomingo:N2}" : "").FontSize(5.5f);
+                table.Cell().Text("Seg. Edu. 1.25%").FontSize(5.5f);
+                table.Cell().AlignRight().Text($"{comp.SeEmpleado:N2}").FontSize(5.5f);
+
+                // Fila 3: Recargo Feriado (si aplica) | ISR (si aplica)
+                if (comp.PagoHorasFeriado > 0 || comp.Isr > 0)
+                {
+                    table.Cell().Text(comp.PagoHorasFeriado > 0 ? "Rec. Feriado" : "").FontSize(5.5f);
+                    table.Cell().AlignRight().Text(comp.PagoHorasFeriado > 0 ? $"{comp.PagoHorasFeriado:N2}" : "").FontSize(5.5f);
+                    table.Cell().Text(comp.Isr > 0 ? "ISR" : "").FontSize(5.5f);
+                    table.Cell().AlignRight().Text(comp.Isr > 0 ? $"{comp.Isr:N2}" : "").FontSize(5.5f);
+                }
+
+                // Fila 4: Horas Extra (si aplica)
+                if (comp.PagoHorasExtra > 0)
+                {
+                    table.Cell().Text("Horas Extra").FontSize(5.5f);
+                    table.Cell().AlignRight().Text($"{comp.PagoHorasExtra:N2}").FontSize(5.5f);
+                    table.Cell().Text("").FontSize(5.5f);
+                    table.Cell().Text("").FontSize(5.5f);
+                }
+
+                // Acreedores (hasta 3, para no desbordar el espacio disponible)
+                foreach (var ded in comp.DeduccionesAcreedores.Where(d => d.Monto > 0).Take(3))
+                {
+                    table.Cell().Text("").FontSize(5.5f);
+                    table.Cell().Text("").FontSize(5.5f);
+                    table.Cell().Text(ded.NombreAcreedor).FontSize(5.5f);
+                    table.Cell().AlignRight().Text($"{ded.Monto:N2}").FontSize(5.5f);
+                }
+
+                // Fila de totales con borde superior
+                static IContainer TotalCell(IContainer c) =>
+                    c.BorderTop(0.5f).BorderColor("#333333").PaddingTop(1);
+
+                table.Cell().Element(TotalCell).Text("TOTAL INGRESOS").FontSize(5.5f).Bold();
+                table.Cell().Element(TotalCell).AlignRight().Text($"{comp.SalarioBruto:N2}").FontSize(5.5f).Bold();
+                table.Cell().Element(TotalCell).Text("TOTAL DEDUCCIONES").FontSize(5.5f).Bold();
+                table.Cell().Element(TotalCell).AlignRight().Text($"{comp.TotalDeducciones:N2}").FontSize(5.5f).Bold();
+            });
+
+            col.Item().PaddingTop(2);
+
+            // Neto a recibir con fondo azul oscuro
+            col.Item().Background("#1e40af").Padding(3).AlignCenter()
+                .Text($"NETO A RECIBIR: B/. {comp.SalarioNeto:N2}")
+                .FontSize(8).Bold().FontColor("#ffffff");
+
+            col.Item().PaddingTop(3);
+
+            // Líneas de firma
+            col.Item().Row(row =>
+            {
+                row.RelativeItem().Column(c =>
+                {
+                    c.Item().BorderBottom(0.5f).BorderColor("#333333").PaddingBottom(1);
+                    c.Item().AlignCenter().Text("Firma Empleado").FontSize(4.5f);
+                });
+                row.ConstantItem(5);
+                row.RelativeItem().Column(c =>
+                {
+                    c.Item().BorderBottom(0.5f).BorderColor("#333333").PaddingBottom(1);
+                    c.Item().AlignCenter().Text("Recursos Humanos").FontSize(4.5f);
+                });
+            });
+
+            // Etiqueta ORIGINAL / COPIA en la esquina inferior derecha
+            col.Item().PaddingTop(2).AlignRight()
+                .Text(tipo).FontSize(4.5f).Italic().FontColor("#888888");
+        });
+    }
 }

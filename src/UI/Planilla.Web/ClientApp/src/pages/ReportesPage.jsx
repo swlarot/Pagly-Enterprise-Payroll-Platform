@@ -156,6 +156,10 @@ const ReportesPage = () => {
                 if (!selComprobantes) { toast('Seleccione una planilla', { icon: '⚠️' }); return; }
                 url = `/api/reportes/comprobantes/${selComprobantes}/pdf`;
                 filename = `Comprobantes_${selComprobantes}_${fecha}.pdf`;
+            } else if (tipo === 'comprobantes-compacto') {
+                if (!selComprobantes) { toast('Seleccione una planilla', { icon: '⚠️' }); return; }
+                url = `/api/reportes/comprobantes/${selComprobantes}/pdf-compacto`;
+                filename = `Comprobantes_Banco_${selComprobantes}_${fecha}.pdf`;
             } else if (tipo === 'mensual') {
                 url = `/api/reportes/mensual/pdf?mes=${selMes}&anio=${selAnio}`;
                 filename = `Mensual_${selMes}_${selAnio}_${fecha}.pdf`;
@@ -580,6 +584,7 @@ const ReportesPage = () => {
                             Solo PDF (formato recibo vertical)
                         </div>
                         <AccionBtn onClick={() => descargarPdf('comprobantes')} disabled={!selComprobantes} colorClass="hover:bg-red-600 hover:border-red-600 hover:text-white" icon={iconPdf} label="PDF" />
+                        <AccionBtn onClick={() => descargarPdf('comprobantes-compacto')} disabled={!selComprobantes} colorClass="hover:bg-amber-600 hover:border-amber-600 hover:text-white" icon={iconPdf} label="PDF Banco" />
                     </div>
                 </div>
 
