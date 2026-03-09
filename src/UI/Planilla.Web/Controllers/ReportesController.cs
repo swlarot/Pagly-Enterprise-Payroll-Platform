@@ -6,6 +6,7 @@
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Vorluno.Planilla.Application.Helpers;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Services;
@@ -70,7 +71,7 @@ public class ReportesController : ControllerBase
         {
             var reporte = await _reportesService.GenerarReportePlanillaRegular(planillaId);
             var bytes = _exportacionService.ExportarExcelPlanillaRegular(reporte);
-            var fileName = $"PlanillaRegular_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+            var fileName = $"PlanillaRegular_{planillaId}_{DateTimeHelper.NowPanama():yyyyMMdd_HHmmss}.xlsx";
             return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }
         catch (InvalidOperationException ex)
@@ -92,7 +93,9 @@ public class ReportesController : ControllerBase
         {
             var reporte = await _reportesService.GenerarReportePlanillaRegular(planillaId);
             var bytes = _exportacionService.ExportarPdfPlanillaRegular(reporte);
-            var fileName = $"PlanillaRegular_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+            if (bytes.Length == 0)
+                return BadRequest(new { message = "No hay datos para exportar." });
+            var fileName = $"PlanillaRegular_{planillaId}_{DateTimeHelper.NowPanama():yyyyMMdd_HHmmss}.pdf";
             return File(bytes, "application/pdf", fileName);
         }
         catch (InvalidOperationException ex)
@@ -144,7 +147,7 @@ public class ReportesController : ControllerBase
 
             var reporte = await _reportesService.GenerarReporteMensual(mes, anio);
             var bytes = _exportacionService.ExportarExcelMensual(reporte);
-            var fileName = $"ReporteMensual_{mes:D2}_{anio}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+            var fileName = $"ReporteMensual_{mes:D2}_{anio}_{DateTimeHelper.NowPanama():yyyyMMdd_HHmmss}.xlsx";
             return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }
         catch (Exception ex)
@@ -165,7 +168,9 @@ public class ReportesController : ControllerBase
 
             var reporte = await _reportesService.GenerarReporteMensual(mes, anio);
             var bytes = _exportacionService.ExportarPdfMensual(reporte);
-            var fileName = $"ReporteMensual_{mes:D2}_{anio}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+            if (bytes.Length == 0)
+                return BadRequest(new { message = "No hay datos para exportar." });
+            var fileName = $"ReporteMensual_{mes:D2}_{anio}_{DateTimeHelper.NowPanama():yyyyMMdd_HHmmss}.pdf";
             return File(bytes, "application/pdf", fileName);
         }
         catch (Exception ex)
@@ -209,7 +214,7 @@ public class ReportesController : ControllerBase
         {
             var reporte = await _reportesService.GenerarReporteAcreedores(planillaId);
             var bytes = _exportacionService.ExportarExcelAcreedores(reporte);
-            var fileName = $"Acreedores_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+            var fileName = $"Acreedores_{planillaId}_{DateTimeHelper.NowPanama():yyyyMMdd_HHmmss}.xlsx";
             return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }
         catch (InvalidOperationException ex)
@@ -231,7 +236,9 @@ public class ReportesController : ControllerBase
         {
             var reporte = await _reportesService.GenerarReporteAcreedores(planillaId);
             var bytes = _exportacionService.ExportarPdfAcreedores(reporte);
-            var fileName = $"Acreedores_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+            if (bytes.Length == 0)
+                return BadRequest(new { message = "No hay datos para exportar." });
+            var fileName = $"Acreedores_{planillaId}_{DateTimeHelper.NowPanama():yyyyMMdd_HHmmss}.pdf";
             return File(bytes, "application/pdf", fileName);
         }
         catch (InvalidOperationException ex)
@@ -279,7 +286,7 @@ public class ReportesController : ControllerBase
         {
             var reporte = await _reportesService.GenerarReporteSip(planillaId);
             var bytes = _exportacionService.ExportarExcelSip(reporte);
-            var fileName = $"SIP_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+            var fileName = $"SIP_{planillaId}_{DateTimeHelper.NowPanama():yyyyMMdd_HHmmss}.xlsx";
             return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }
         catch (InvalidOperationException ex)
@@ -301,7 +308,9 @@ public class ReportesController : ControllerBase
         {
             var reporte = await _reportesService.GenerarReporteSip(planillaId);
             var bytes = _exportacionService.ExportarPdfSip(reporte);
-            var fileName = $"SIP_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+            if (bytes.Length == 0)
+                return BadRequest(new { message = "No hay datos para exportar." });
+            var fileName = $"SIP_{planillaId}_{DateTimeHelper.NowPanama():yyyyMMdd_HHmmss}.pdf";
             return File(bytes, "application/pdf", fileName);
         }
         catch (InvalidOperationException ex)
@@ -353,7 +362,9 @@ public class ReportesController : ControllerBase
         {
             var reporte = await _reportesService.GenerarReporteComprobantes(planillaId);
             var bytes = _exportacionService.ExportarPdfComprobantes(reporte);
-            var fileName = $"Comprobantes_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+            if (bytes.Length == 0)
+                return BadRequest(new { message = "No hay datos para exportar." });
+            var fileName = $"Comprobantes_{planillaId}_{DateTimeHelper.NowPanama():yyyyMMdd_HHmmss}.pdf";
             return File(bytes, "application/pdf", fileName);
         }
         catch (InvalidOperationException ex)
@@ -379,7 +390,9 @@ public class ReportesController : ControllerBase
         {
             var reporte = await _reportesService.GenerarReporteComprobantes(planillaId);
             var bytes = _exportacionService.ExportarPdfComprobantesCompactos(reporte);
-            var fileName = $"Comprobantes_Compacto_{planillaId}_{DateTime.Now:yyyyMMdd_HHmmss}.pdf";
+            if (bytes.Length == 0)
+                return BadRequest(new { message = "No hay datos para exportar." });
+            var fileName = $"Comprobantes_Compacto_{planillaId}_{DateTimeHelper.NowPanama():yyyyMMdd_HHmmss}.pdf";
             return File(bytes, "application/pdf", fileName);
         }
         catch (InvalidOperationException ex)
