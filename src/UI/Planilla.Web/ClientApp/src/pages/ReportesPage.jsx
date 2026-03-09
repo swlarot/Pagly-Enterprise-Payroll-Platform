@@ -508,6 +508,12 @@ const ReportesPage = () => {
         (reporteData.comprobantes?.length > 0)
     );
 
+    // Selecciones conocidas como vacías tras un "Ver" — deshabilitan Excel/PDF en las cards
+    const regularVacia    = emptySelections['planilla-regular'] === selPlanillaRegular && !!selPlanillaRegular;
+    const sipVacio        = emptySelections['sip'] === selSip && !!selSip;
+    const acreedoresVacio = emptySelections['acreedores'] === selAcreedores && !!selAcreedores;
+    const mensualVacio    = emptySelections['mensual'] === `${selMes}-${selAnio}`;
+
     const AccionBtn = ({ onClick, disabled, colorClass, icon, label }) => (
         <button
             onClick={onClick}
@@ -544,13 +550,11 @@ const ReportesPage = () => {
                     <h3 className="text-base font-bold text-gray-100 font-display mb-1">Planilla Regular</h3>
                     <p className="text-sm text-gray-500 mb-4 leading-relaxed">Borrador operativo del período con horas, salarios, CSS/SE e importes de acreedores por empleado</p>
                     <PlanillaSelect value={selPlanillaRegular} onChange={setSelPlanillaRegular} />
-                    {(() => { const vacia = emptySelections['planilla-regular'] === selPlanillaRegular && !!selPlanillaRegular; return (
                     <div className="flex items-center gap-2 pt-3 border-t border-navy-700">
                         <AccionBtn onClick={() => verReporte('planilla-regular')} disabled={!selPlanillaRegular} colorClass="hover:bg-primary-600 hover:border-primary-600 hover:text-white" icon={iconVer} label="Ver" />
-                        <AccionBtn onClick={() => descargarExcel('planilla-regular')} disabled={!selPlanillaRegular || vacia} colorClass="hover:bg-emerald-600 hover:border-emerald-600 hover:text-white" icon={iconExcel} label="Excel" />
-                        <AccionBtn onClick={() => descargarPdf('planilla-regular')} disabled={!selPlanillaRegular || vacia} colorClass="hover:bg-red-600 hover:border-red-600 hover:text-white" icon={iconPdf} label="PDF" />
+                        <AccionBtn onClick={() => descargarExcel('planilla-regular')} disabled={!selPlanillaRegular || regularVacia} colorClass="hover:bg-emerald-600 hover:border-emerald-600 hover:text-white" icon={iconExcel} label="Excel" />
+                        <AccionBtn onClick={() => descargarPdf('planilla-regular')} disabled={!selPlanillaRegular || regularVacia} colorClass="hover:bg-red-600 hover:border-red-600 hover:text-white" icon={iconPdf} label="PDF" />
                     </div>
-                    ); })()}
                 </div>
 
                 {/* ── Card 2: SIP ── */}
@@ -563,13 +567,11 @@ const ReportesPage = () => {
                     <h3 className="text-base font-bold text-gray-100 font-display mb-1">SIP — CSS Patronal</h3>
                     <p className="text-sm text-gray-500 mb-4 leading-relaxed">Datos exactos para ingresar en la plataforma CSS: base, CSS emp/pat, SE emp/pat y riesgo profesional</p>
                     <PlanillaSelect value={selSip} onChange={setSelSip} />
-                    {(() => { const vacia = emptySelections['sip'] === selSip && !!selSip; return (
                     <div className="flex items-center gap-2 pt-3 border-t border-navy-700">
                         <AccionBtn onClick={() => verReporte('sip')} disabled={!selSip} colorClass="hover:bg-primary-600 hover:border-primary-600 hover:text-white" icon={iconVer} label="Ver" />
-                        <AccionBtn onClick={() => descargarExcel('sip')} disabled={!selSip || vacia} colorClass="hover:bg-emerald-600 hover:border-emerald-600 hover:text-white" icon={iconExcel} label="Excel" />
-                        <AccionBtn onClick={() => descargarPdf('sip')} disabled={!selSip || vacia} colorClass="hover:bg-red-600 hover:border-red-600 hover:text-white" icon={iconPdf} label="PDF" />
+                        <AccionBtn onClick={() => descargarExcel('sip')} disabled={!selSip || sipVacio} colorClass="hover:bg-emerald-600 hover:border-emerald-600 hover:text-white" icon={iconExcel} label="Excel" />
+                        <AccionBtn onClick={() => descargarPdf('sip')} disabled={!selSip || sipVacio} colorClass="hover:bg-red-600 hover:border-red-600 hover:text-white" icon={iconPdf} label="PDF" />
                     </div>
-                    ); })()}
                 </div>
 
                 {/* ── Card 3: Acreedores ── */}
@@ -582,13 +584,11 @@ const ReportesPage = () => {
                     <h3 className="text-base font-bold text-gray-100 font-display mb-1">Acreedores</h3>
                     <p className="text-sm text-gray-500 mb-4 leading-relaxed">Lista de transferencias bancarias agrupadas por beneficiario con datos de cuenta para contabilidad</p>
                     <PlanillaSelect value={selAcreedores} onChange={setSelAcreedores} />
-                    {(() => { const vacia = emptySelections['acreedores'] === selAcreedores && !!selAcreedores; return (
                     <div className="flex items-center gap-2 pt-3 border-t border-navy-700">
                         <AccionBtn onClick={() => verReporte('acreedores')} disabled={!selAcreedores} colorClass="hover:bg-primary-600 hover:border-primary-600 hover:text-white" icon={iconVer} label="Ver" />
-                        <AccionBtn onClick={() => descargarExcel('acreedores')} disabled={!selAcreedores || vacia} colorClass="hover:bg-emerald-600 hover:border-emerald-600 hover:text-white" icon={iconExcel} label="Excel" />
-                        <AccionBtn onClick={() => descargarPdf('acreedores')} disabled={!selAcreedores || vacia} colorClass="hover:bg-red-600 hover:border-red-600 hover:text-white" icon={iconPdf} label="PDF" />
+                        <AccionBtn onClick={() => descargarExcel('acreedores')} disabled={!selAcreedores || acreedoresVacio} colorClass="hover:bg-emerald-600 hover:border-emerald-600 hover:text-white" icon={iconExcel} label="Excel" />
+                        <AccionBtn onClick={() => descargarPdf('acreedores')} disabled={!selAcreedores || acreedoresVacio} colorClass="hover:bg-red-600 hover:border-red-600 hover:text-white" icon={iconPdf} label="PDF" />
                     </div>
-                    ); })()}
                 </div>
 
                 {/* ── Card 4: Comprobantes ── */}
@@ -646,13 +646,11 @@ const ReportesPage = () => {
                                     </div>
                                 </div>
                                 {/* Botones */}
-                                {(() => { const vacia = emptySelections['mensual'] === `${selMes}-${selAnio}`; return (
                                 <div className="flex items-center gap-2">
                                     <AccionBtn onClick={() => verReporte('mensual')} colorClass="hover:bg-primary-600 hover:border-primary-600 hover:text-white" icon={iconVer} label="Ver" />
-                                    <AccionBtn onClick={() => descargarExcel('mensual')} disabled={vacia} colorClass="hover:bg-emerald-600 hover:border-emerald-600 hover:text-white" icon={iconExcel} label="Excel" />
-                                    <AccionBtn onClick={() => descargarPdf('mensual')} disabled={vacia} colorClass="hover:bg-red-600 hover:border-red-600 hover:text-white" icon={iconPdf} label="PDF" />
+                                    <AccionBtn onClick={() => descargarExcel('mensual')} disabled={mensualVacio} colorClass="hover:bg-emerald-600 hover:border-emerald-600 hover:text-white" icon={iconExcel} label="Excel" />
+                                    <AccionBtn onClick={() => descargarPdf('mensual')} disabled={mensualVacio} colorClass="hover:bg-red-600 hover:border-red-600 hover:text-white" icon={iconPdf} label="PDF" />
                                 </div>
-                                ); })()}
                             </div>
                         </div>
                     </div>
