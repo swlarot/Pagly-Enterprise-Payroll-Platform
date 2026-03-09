@@ -46,6 +46,20 @@ public static class PayrollConstants
     /// <summary>Tasa Seguro Educativo patronal: 1.50%.</summary>
     public const decimal SeTasaPatronal = 0.015m;
 
+    /// <summary>
+    /// Tasa CSS empleado aplicable al décimo tercer mes: 7.25%.
+    /// Base legal: Art. 59, Ley 29 de 1976 (tasa reducida para el décimo).
+    /// Distinta a la tasa CSS regular del 9.75%.
+    /// </summary>
+    public const decimal CssTasaDecimoEmpleado = 0.0725m;
+
+    /// <summary>
+    /// Tasa CSS patronal aplicable al décimo tercer mes: 10.75%.
+    /// Base legal: Art. 59, Ley 29 de 1976 (tasa reducida para el décimo).
+    /// Distinta a la tasa CSS patronal regular del 12.25%.
+    /// </summary>
+    public const decimal CssTasaDecimoPatronal = 0.1075m;
+
     // ====================================================================
 
     /// <summary>
