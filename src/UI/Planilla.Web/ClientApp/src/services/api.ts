@@ -229,7 +229,12 @@ export const api = {
     });
 
     if (!response.ok) {
-      throw new ApiException(response.status, 'Error al descargar archivo');
+      let message = 'Error al descargar archivo';
+      try {
+        const errorData = await response.json();
+        message = errorData?.message || message;
+      } catch { /* body no parseable */ }
+      throw new ApiException(response.status, message);
     }
 
     const blob = await response.blob();
