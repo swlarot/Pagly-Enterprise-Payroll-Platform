@@ -4,7 +4,6 @@ import { useAsyncLoad } from '../hooks/useAsyncLoad';
 import { Card, CardHeader, CardBody } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { User, DollarSign, Calendar, FileText, Clock, Briefcase, ArrowLeft, Search } from 'lucide-react';
-import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { TenantRole } from '../types/api';
