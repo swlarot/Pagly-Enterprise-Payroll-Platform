@@ -492,6 +492,13 @@ const ReportesPage = () => {
 
     // ── Card components ───────────────────────────────────────────────────
 
+    // true cuando el reporte cargado tiene al menos un registro exportable
+    const hasData = reporteData && (
+        (reporteData.empleados?.length > 0) ||
+        (reporteData.acreedores?.length > 0) ||
+        (reporteData.comprobantes?.length > 0)
+    );
+
     const AccionBtn = ({ onClick, disabled, colorClass, icon, label }) => (
         <button
             onClick={onClick}
@@ -680,23 +687,30 @@ const ReportesPage = () => {
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-navy-700 flex justify-end gap-3">
-                            {modalType !== 'comprobantes' && modalType !== 'acreedores-pdf-only' && (
-                                <button
-                                    onClick={() => descargarExcel(modalType)}
-                                    disabled={loading}
-                                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-2 disabled:opacity-50"
-                                >
-                                    {iconExcel} Descargar Excel
-                                </button>
+                        <div className="px-6 py-4 border-t border-navy-700 flex items-center justify-between gap-3">
+                            {!hasData && (
+                                <span className="text-xs text-amber-400 italic">Sin datos para exportar</span>
                             )}
-                            <button
-                                onClick={() => descargarPdf(modalType)}
-                                disabled={loading}
-                                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 disabled:opacity-50"
-                            >
-                                {iconPdf} Descargar PDF
-                            </button>
+                            <div className="flex gap-3 ml-auto">
+                                {modalType !== 'comprobantes' && modalType !== 'acreedores-pdf-only' && (
+                                    <button
+                                        onClick={() => descargarExcel(modalType)}
+                                        disabled={loading || !hasData}
+                                        title={!hasData ? 'No hay datos para exportar' : ''}
+                                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        {iconExcel} Descargar Excel
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => descargarPdf(modalType)}
+                                    disabled={loading || !hasData}
+                                    title={!hasData ? 'No hay datos para exportar' : ''}
+                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {iconPdf} Descargar PDF
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>,
