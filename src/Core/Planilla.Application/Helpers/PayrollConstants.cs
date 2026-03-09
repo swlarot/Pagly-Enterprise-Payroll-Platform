@@ -30,6 +30,24 @@ public static class PayrollConstants
         { "Bisemanal", 26 }   // 2 pagos por mes (cada 2 semanas exactas)
     };
 
+    // ====================================================================
+    // Tasas CSS / Seguro Educativo — Ley 462
+    // ====================================================================
+
+    /// <summary>Tasa CSS empleado: 9.75% del salario base sujeto a CSS.</summary>
+    public const decimal CssTasaEmpleado = 0.0975m;
+
+    /// <summary>Tasa CSS patronal: 12.25% del salario base sujeto a CSS.</summary>
+    public const decimal CssTasaPatronal = 0.1225m;
+
+    /// <summary>Tasa Seguro Educativo empleado: 1.25%.</summary>
+    public const decimal SeTasaEmpleado = 0.0125m;
+
+    /// <summary>Tasa Seguro Educativo patronal: 1.50%.</summary>
+    public const decimal SeTasaPatronal = 0.015m;
+
+    // ====================================================================
+
     /// <summary>
     /// Obtiene el número de períodos por año para una frecuencia de pago dada.
     /// </summary>

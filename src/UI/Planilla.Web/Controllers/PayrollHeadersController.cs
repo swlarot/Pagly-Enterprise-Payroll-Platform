@@ -1289,15 +1289,14 @@ public class PayrollHeadersController : ControllerBase
 
         // --- CSS ---
         // Derivar base usada: si se aplicó tope, cssBase < grossPay
-        const decimal CSS_TASA = 0.0975m;
-        decimal cssBase = detail.CssEmployee > 0 ? Math.Round(detail.CssEmployee / CSS_TASA, 2) : detail.GrossPay;
+        decimal cssBase = detail.CssEmployee > 0 ? Math.Round(detail.CssEmployee / PayrollConstants.CssTasaEmpleado, 2) : detail.GrossPay;
         bool seAplicoTope = cssBase < detail.GrossPay - 0.01m;
 
         var css = new CssBreakdownDto(
             BaseUsada: cssBase,
             TopeSalarial: seAplicoTope ? cssBase : 0,
             SeAplicoTope: seAplicoTope,
-            Tasa: CSS_TASA * 100,
+            Tasa: PayrollConstants.CssTasaEmpleado * 100,
             Monto: detail.CssEmployee
         );
 
