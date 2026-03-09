@@ -1112,7 +1112,7 @@ public class ExportacionService
                     page.Content().Column(col =>
                     {
                         // Mitad superior: Empleado 1 — original y copia lado a lado
-                        col.Item().Height(50, Unit.Percentage).Row(row =>
+                        col.Item().Height(129, Unit.Millimetre).Row(row =>
                         {
                             row.RelativeItem().Element(c => RenderSlipCompacto(c, par.primero, "ORIGINAL", reporte));
                             row.ConstantItem(1).Background("#cccccc");
@@ -1128,13 +1128,13 @@ public class ExportacionService
                         });
 
                         // Mitad inferior: Empleado 2 (o espacio vacío si la planilla tiene número impar)
-                        col.Item().Height(50, Unit.Percentage).Row(row =>
+                        col.Item().Height(129, Unit.Millimetre).Row(row =>
                         {
-                            if (par.segundo.HasValue)
+                            if (par.segundo != null)
                             {
-                                row.RelativeItem().Element(c => RenderSlipCompacto(c, par.segundo.Value, "ORIGINAL", reporte));
+                                row.RelativeItem().Element(c => RenderSlipCompacto(c, par.segundo, "ORIGINAL", reporte));
                                 row.ConstantItem(1).Background("#cccccc");
-                                row.RelativeItem().Element(c => RenderSlipCompacto(c, par.segundo.Value, "COPIA", reporte));
+                                row.RelativeItem().Element(c => RenderSlipCompacto(c, par.segundo, "COPIA", reporte));
                             }
                             else
                             {
