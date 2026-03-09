@@ -1284,7 +1284,7 @@ public class ExportacionService
                 static IContainer IngresoHeaderCell(IContainer c) =>
                     c.Background(PdfTheme.IngresoBg).BorderBottom(0.3f).BorderColor(PdfTheme.IngresoHeader).PaddingVertical(1).PaddingHorizontal(1);
                 static IContainer DeduccionHeaderCell(IContainer c) =>
-                    c.Background(PdfTheme.DeduccionBg).BorderBottom(0.3f).BorderColor(PdfTheme.DeduccionHeader).PaddingVertical(1).PaddingHorizontal(1);
+                    c.Background(PdfTheme.DeduccionBg).BorderBottom(0.3f).BorderColor(PdfTheme.DeduccionHeader).PaddingVertical(1).PaddingLeft(5).PaddingRight(1);
 
                 table.Cell().Element(IngresoHeaderCell).Text("INGRESO").FontSize(5).Bold().FontColor(PdfTheme.IngresoText);
                 table.Cell().Element(IngresoHeaderCell).AlignRight().Text("MONTO").FontSize(5).Bold().FontColor(PdfTheme.IngresoText);
@@ -1294,13 +1294,13 @@ public class ExportacionService
                 // Fila 1: Salario Base | CSS 9.75%
                 table.Cell().Text("Salario Base").FontSize(5.5f);
                 table.Cell().AlignRight().Text($"{comp.SalarioBase:N2}").FontSize(5.5f);
-                table.Cell().Text("CSS 9.75%").FontSize(5.5f);
+                table.Cell().PaddingLeft(5).Text("CSS 9.75%").FontSize(5.5f);
                 table.Cell().AlignRight().Text($"{comp.CssEmpleado:N2}").FontSize(5.5f);
 
                 // Fila 2: Recargo Domingo (si aplica) | Seg. Educativo
                 table.Cell().Text(comp.PagoHorasDomingo > 0 ? "Rec. Domingo" : "").FontSize(5.5f);
                 table.Cell().AlignRight().Text(comp.PagoHorasDomingo > 0 ? $"{comp.PagoHorasDomingo:N2}" : "").FontSize(5.5f);
-                table.Cell().Text("Seg. Edu. 1.25%").FontSize(5.5f);
+                table.Cell().PaddingLeft(5).Text("Seg. Edu. 1.25%").FontSize(5.5f);
                 table.Cell().AlignRight().Text($"{comp.SeEmpleado:N2}").FontSize(5.5f);
 
                 // Fila 3: Recargo Feriado (si aplica) | ISR (si aplica)
@@ -1308,7 +1308,7 @@ public class ExportacionService
                 {
                     table.Cell().Text(comp.PagoHorasFeriado > 0 ? "Rec. Feriado" : "").FontSize(5.5f);
                     table.Cell().AlignRight().Text(comp.PagoHorasFeriado > 0 ? $"{comp.PagoHorasFeriado:N2}" : "").FontSize(5.5f);
-                    table.Cell().Text(comp.Isr > 0 ? "ISR" : "").FontSize(5.5f);
+                    table.Cell().PaddingLeft(5).Text(comp.Isr > 0 ? "ISR" : "").FontSize(5.5f);
                     table.Cell().AlignRight().Text(comp.Isr > 0 ? $"{comp.Isr:N2}" : "").FontSize(5.5f);
                 }
 
@@ -1317,7 +1317,7 @@ public class ExportacionService
                 {
                     table.Cell().Text("Horas Extra").FontSize(5.5f);
                     table.Cell().AlignRight().Text($"{comp.PagoHorasExtra:N2}").FontSize(5.5f);
-                    table.Cell().Text("").FontSize(5.5f);
+                    table.Cell().PaddingLeft(5).Text("").FontSize(5.5f);
                     table.Cell().Text("").FontSize(5.5f);
                 }
 
@@ -1326,7 +1326,7 @@ public class ExportacionService
                 {
                     table.Cell().Text("").FontSize(5.5f);
                     table.Cell().Text("").FontSize(5.5f);
-                    table.Cell().Text(ded.NombreAcreedor).FontSize(5.5f);
+                    table.Cell().PaddingLeft(5).Text(ded.NombreAcreedor).FontSize(5.5f);
                     table.Cell().AlignRight().Text($"{ded.Monto:N2}").FontSize(5.5f);
                 }
 
@@ -1336,7 +1336,7 @@ public class ExportacionService
 
                 table.Cell().Element(TotalCell).Text("TOTAL INGRESOS").FontSize(5.5f).Bold();
                 table.Cell().Element(TotalCell).AlignRight().Text($"{comp.SalarioBruto:N2}").FontSize(5.5f).Bold();
-                table.Cell().Element(TotalCell).Text("TOTAL DEDUCCIONES").FontSize(5.5f).Bold();
+                table.Cell().Element(TotalCell).PaddingLeft(5).Text("TOTAL DEDUCCIONES").FontSize(5.5f).Bold();
                 table.Cell().Element(TotalCell).AlignRight().Text($"{comp.TotalDeducciones:N2}").FontSize(5.5f).Bold();
             });
 
@@ -1347,20 +1347,20 @@ public class ExportacionService
                 .Text($"NETO A RECIBIR: B/. {comp.SalarioNeto:N2}")
                 .FontSize(8.5f).Bold().FontColor("#ffffff");
 
-            col.Item().PaddingTop(3);
+            col.Item().PaddingTop(8);
 
             // Líneas de firma
             col.Item().Row(row =>
             {
                 row.RelativeItem().Column(c =>
                 {
-                    c.Item().BorderBottom(0.5f).BorderColor("#333333").PaddingBottom(1);
+                    c.Item().Height(12).AlignBottom().BorderBottom(0.5f).BorderColor("#333333").PaddingBottom(1);
                     c.Item().AlignCenter().Text("Firma Empleado").FontSize(4.5f);
                 });
                 row.ConstantItem(5);
                 row.RelativeItem().Column(c =>
                 {
-                    c.Item().BorderBottom(0.5f).BorderColor("#333333").PaddingBottom(1);
+                    c.Item().Height(12).AlignBottom().BorderBottom(0.5f).BorderColor("#333333").PaddingBottom(1);
                     c.Item().AlignCenter().Text("Recursos Humanos").FontSize(4.5f);
                 });
             });
