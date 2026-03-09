@@ -71,6 +71,8 @@ public class ReportesController : ControllerBase
         {
             var reporte = await _reportesService.GenerarReportePlanillaRegular(planillaId);
             var bytes = _exportacionService.ExportarExcelPlanillaRegular(reporte);
+            if (bytes.Length == 0)
+                return BadRequest(new { message = "No hay datos para exportar." });
             var fileName = $"PlanillaRegular_{planillaId}_{DateTimeHelper.NowPanama():yyyyMMdd_HHmmss}.xlsx";
             return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }
@@ -147,6 +149,8 @@ public class ReportesController : ControllerBase
 
             var reporte = await _reportesService.GenerarReporteMensual(mes, anio);
             var bytes = _exportacionService.ExportarExcelMensual(reporte);
+            if (bytes.Length == 0)
+                return BadRequest(new { message = "No hay datos para exportar." });
             var fileName = $"ReporteMensual_{mes:D2}_{anio}_{DateTimeHelper.NowPanama():yyyyMMdd_HHmmss}.xlsx";
             return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }
@@ -214,6 +218,8 @@ public class ReportesController : ControllerBase
         {
             var reporte = await _reportesService.GenerarReporteAcreedores(planillaId);
             var bytes = _exportacionService.ExportarExcelAcreedores(reporte);
+            if (bytes.Length == 0)
+                return BadRequest(new { message = "No hay datos para exportar." });
             var fileName = $"Acreedores_{planillaId}_{DateTimeHelper.NowPanama():yyyyMMdd_HHmmss}.xlsx";
             return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }
@@ -286,6 +292,8 @@ public class ReportesController : ControllerBase
         {
             var reporte = await _reportesService.GenerarReporteSip(planillaId);
             var bytes = _exportacionService.ExportarExcelSip(reporte);
+            if (bytes.Length == 0)
+                return BadRequest(new { message = "No hay datos para exportar." });
             var fileName = $"SIP_{planillaId}_{DateTimeHelper.NowPanama():yyyyMMdd_HHmmss}.xlsx";
             return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
         }

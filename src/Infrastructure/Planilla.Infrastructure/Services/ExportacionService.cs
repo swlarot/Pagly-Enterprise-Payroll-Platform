@@ -19,11 +19,6 @@ namespace Vorluno.Planilla.Infrastructure.Services;
 /// </summary>
 public class ExportacionService
 {
-    public ExportacionService()
-    {
-        // QuestPDF Community license — gratuita sin restricciones para proyectos open-source
-        QuestPDF.Settings.License = LicenseType.Community;
-    }
 
     // ====================================================================
     // Tema visual compartido para PDFs
@@ -125,6 +120,9 @@ public class ExportacionService
     /// <summary>Exporta la Planilla Regular a Excel con horas y deducciones resumidas.</summary>
     public byte[] ExportarExcelPlanillaRegular(ReportePlanillaRegularDto reporte)
     {
+        if (!reporte.Empleados.Any())
+            return Array.Empty<byte>();
+
         using var workbook = new XLWorkbook();
         var ws = workbook.Worksheets.Add("Planilla Regular");
 
@@ -370,6 +368,9 @@ public class ExportacionService
     /// <summary>Exporta el Reporte Mensual consolidado a Excel.</summary>
     public byte[] ExportarExcelMensual(ReporteMensualDto reporte)
     {
+        if (!reporte.Empleados.Any())
+            return Array.Empty<byte>();
+
         using var workbook = new XLWorkbook();
         var ws = workbook.Worksheets.Add("Reporte Mensual");
 
@@ -523,6 +524,9 @@ public class ExportacionService
     /// </summary>
     public byte[] ExportarExcelAcreedores(ReporteAcreedoresDto reporte)
     {
+        if (!reporte.Acreedores.Any())
+            return Array.Empty<byte>();
+
         using var workbook = new XLWorkbook();
 
         // Sheet 1: Consolidado
@@ -762,6 +766,9 @@ public class ExportacionService
     /// <summary>Exporta el Reporte SIP para la plataforma CSS a Excel.</summary>
     public byte[] ExportarExcelSip(ReporteSipDto reporte)
     {
+        if (!reporte.Empleados.Any())
+            return Array.Empty<byte>();
+
         using var workbook = new XLWorkbook();
         var ws = workbook.Worksheets.Add("SIP CSS");
 
@@ -1322,12 +1329,22 @@ public class ExportacionService
                 }
 
                 // Acreedores (hasta 3, para no desbordar el espacio disponible)
-                foreach (var ded in comp.DeduccionesAcreedores.Where(d => d.Monto > 0).Take(3))
+                var acreedoresConMonto = comp.DeduccionesAcreedores.Where(d => d.Monto > 0).ToList();
+                foreach (var ded in acreedoresConMonto.Take(3))
                 {
                     table.Cell().Text("").FontSize(5.5f);
                     table.Cell().Text("").FontSize(5.5f);
                     table.Cell().PaddingLeft(5).Text(ded.NombreAcreedor).FontSize(5.5f);
                     table.Cell().AlignRight().Text($"{ded.Monto:N2}").FontSize(5.5f);
+                }
+                // Indicador de truncamiento si hay más de 3 acreedores
+                if (acreedoresConMonto.Count > 3)
+                {
+                    var extras = acreedoresConMonto.Count - 3;
+                    table.Cell().Text("").FontSize(5.5f);
+                    table.Cell().Text("").FontSize(5.5f);
+                    table.Cell().PaddingLeft(5).Text($"+ {extras} más...").FontSize(5f).Italic().FontColor("#f59e0b");
+                    table.Cell().Text("").FontSize(5.5f);
                 }
 
                 // Fila de totales con borde superior
