@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using Vorluno.Planilla.Application.Helpers;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
@@ -237,13 +238,13 @@ public class DecimoController : ControllerBase
             decimal montoDecimo = Math.Round(totalDev / 12m, 2);
 
             // 4. CSS especiales (Art. 59 Ley 29/1976)
-            decimal cssEmp = Math.Round(montoDecimo * 0.0725m, 2);
-            decimal cssPat = Math.Round(montoDecimo * 0.1075m, 2);
+            decimal cssEmp = Math.Round(montoDecimo * PayrollConstants.CssTasaDecimoEmpleado, 2);
+            decimal cssPat = Math.Round(montoDecimo * PayrollConstants.CssTasaDecimoPatronal, 2);
 
             // 5. Seguro Educativo (mismo que regular)
             bool seActivo = empleado.IsSubjectToEducationalInsurance;
-            decimal seEmp = seActivo ? Math.Round(montoDecimo * 0.0125m, 2) : 0;
-            decimal sePat = seActivo ? Math.Round(montoDecimo * 0.0150m, 2) : 0;
+            decimal seEmp = seActivo ? Math.Round(montoDecimo * PayrollConstants.SeTasaEmpleado, 2) : 0;
+            decimal sePat = seActivo ? Math.Round(montoDecimo * PayrollConstants.SeTasaPatronal, 2) : 0;
 
             // 6. ISR del décimo: (última quincena + monto_décimo) × 13 → tramos → / 13
             decimal isr = 0;
