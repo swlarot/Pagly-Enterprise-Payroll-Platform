@@ -1341,9 +1341,10 @@ public class ExportacionService
                 if (acreedoresConMonto.Count > 3)
                 {
                     var extras = acreedoresConMonto.Count - 3;
+                    var montoTruncado = acreedoresConMonto.Skip(3).Sum(d => d.Monto);
                     table.Cell().Text("").FontSize(5.5f);
                     table.Cell().Text("").FontSize(5.5f);
-                    table.Cell().PaddingLeft(5).Text($"+ {extras} más...").FontSize(5f).Italic().FontColor("#f59e0b");
+                    table.Cell().PaddingLeft(5).Text($"+ {extras} más (B/.{montoTruncado:N2})").FontSize(5f).Italic().FontColor("#f59e0b");
                     table.Cell().Text("").FontSize(5.5f);
                 }
 
