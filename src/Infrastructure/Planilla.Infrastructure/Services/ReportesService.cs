@@ -133,41 +133,53 @@ public class ReportesService
         var tenantId = _tenantContext.TenantId;
 
         // SEGURIDAD CRÍTICA: Filtrar por TenantId para aislar datos entre tenants
-        var planillas = await _context.PayrollHeaders
+        // DEV-112: Proyección directa en BD — evita cargar entidades completas en memoria
+        var (nombre, ruc) = await GetTenantInfo();
+
+        var periodosIncluidos = await _context.PayrollHeaders
             .Where(p => p.TenantId == tenantId
                 && p.PeriodStartDate.Month == mes
                 && p.PeriodStartDate.Year == anio
                 && p.Status >= PayrollStatus.Calculated)
-            .Include(p => p.Details)
-                .ThenInclude(d => d.Empleado)
-            .Include(p => p.Details)
-                .ThenInclude(d => d.DeduccionesAplicadas)
-            .ToListAsync();
-
-        var (nombre, ruc) = await GetTenantInfo();
-
-        var periodosIncluidos = planillas
             .OrderBy(p => p.PeriodStartDate)
             .Select(p => p.PayrollNumber)
-            .ToList();
+            .ToListAsync();
 
-        // Agrupar todos los details por empleado y sumar
-        var todosDetails = planillas.SelectMany(p => p.Details).ToList();
+        // Proyección plana directa sobre PayrollDetails — sin Include de entidades completas
+        var rows = await _context.PayrollHeaders
+            .Where(p => p.TenantId == tenantId
+                && p.PeriodStartDate.Month == mes
+                && p.PeriodStartDate.Year == anio
+                && p.Status >= PayrollStatus.Calculated)
+            .SelectMany(p => p.Details
+                .Where(d => d.Empleado != null)
+                .Select(d => new
+                {
+                    d.EmpleadoId,
+                    Cedula = d.Empleado!.NumeroIdentificacion,
+                    Nombre = d.Empleado.Nombre + " " + d.Empleado.Apellido,
+                    d.GrossPay,
+                    d.CssEmployee,
+                    d.EducationalInsuranceEmployee,
+                    d.IncomeTax,
+                    TotalAcreedores = d.DeduccionesAplicadas.Sum(da => da.MontoAplicado),
+                    d.NetPay
+                }))
+            .ToListAsync();
 
-        var empleados = todosDetails
-            .Where(d => d.Empleado != null)
+        var empleados = rows
             .GroupBy(d => d.EmpleadoId)
             .Select(g =>
             {
                 var primer = g.First();
                 return new EmpleadoMensualItem(
-                    primer.Empleado!.NumeroIdentificacion,
-                    $"{primer.Empleado.Nombre} {primer.Empleado.Apellido}",
+                    primer.Cedula,
+                    primer.Nombre,
                     g.Sum(d => d.GrossPay),
                     g.Sum(d => d.CssEmployee),
                     g.Sum(d => d.EducationalInsuranceEmployee),
                     g.Sum(d => d.IncomeTax),
-                    g.Sum(d => d.DeduccionesAplicadas.Sum(da => da.MontoAplicado)),
+                    g.Sum(d => d.TotalAcreedores),
                     g.Sum(d => d.NetPay)
                 );
             })
@@ -310,7 +322,7 @@ public class ReportesService
             .Select(d =>
             {
                 // Recalcular base CSS desde el monto employee (reversa del 9.75%)
-                var baseCss = d.CssEmployee > 0 ? Math.Round(d.CssEmployee / 0.0975m, 2) : d.GrossPay;
+                var baseCss = d.CssEmployee > 0 ? Math.Round(d.CssEmployee / PayrollConstants.CssTasaEmpleado, 2) : d.GrossPay;
                 var totalSip = d.CssEmployee + d.CssEmployer
                     + d.EducationalInsuranceEmployee + d.EducationalInsuranceEmployer
                     + d.RiskContribution;
