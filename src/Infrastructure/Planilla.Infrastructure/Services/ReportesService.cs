@@ -6,6 +6,7 @@
 
 using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs.Reportes;
+using Vorluno.Planilla.Application.Helpers;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
@@ -280,7 +281,7 @@ public class ReportesService
         return new ReporteAcreedoresDto(
             nombre, ruc,
             $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
-            DateTime.Now,
+            DateTimeHelper.NowPanama(),
             gruposAcreedor,
             gruposAcreedor.Sum(a => a.TotalATransferir),
             gruposAcreedor.Count
@@ -345,7 +346,7 @@ public class ReportesService
             nombre, ruc,
             planilla.PayrollNumber,
             $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
-            DateTime.Now,
+            DateTimeHelper.NowPanama(),
             empleados, totales
         );
     }
