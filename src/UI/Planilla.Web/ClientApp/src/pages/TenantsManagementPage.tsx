@@ -3,17 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { SystemAdminLayout } from '../components/layout/SystemAdminLayout';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import { Modal } from '../components/ui/Modal';
+import { Input } from '../components/ui/Input';
 import { systemAdminService } from '../services/systemAdminService';
-import type { AdminTenantDto } from '../types/api';
+import type { AdminTenantDto, UpdateAdminTenantDto } from '../types/api';
 import { SubscriptionPlan, SubscriptionStatus } from '../types/api';
 import {
   Plus,
   Search,
   Eye,
   Loader2,
+  Pencil,
 } from 'lucide-react';
 import { useAsyncLoad } from '../hooks/useAsyncLoad';
 import { Pagination } from '../components/ui/Pagination';
+import toast from 'react-hot-toast';
 
 export default function TenantsManagementPage() {
   const navigate = useNavigate();
@@ -21,6 +25,21 @@ export default function TenantsManagementPage() {
   const { isLoading, run } = useAsyncLoad();
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10);
+
+  // Edit tenant state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedTenant, setSelectedTenant] = useState<AdminTenantDto | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    ruc: '',
+    dv: '',
+    address: '',
+    phone: '',
+    email: '',
+    isActive: true,
+  });
+  const [editErrors, setEditErrors] = useState<Record<string, string>>({});
+  const [isUpdatingTenant, setIsUpdatingTenant] = useState(false);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -117,6 +136,105 @@ export default function TenantsManagementPage() {
         return 'danger';
       default:
         return 'default';
+    }
+  };
+
+  const openEditModal = (tenant: AdminTenantDto) => {
+    setSelectedTenant(tenant);
+    setEditForm({
+      name: tenant.name ?? '',
+      ruc: tenant.ruc ?? '',
+      dv: tenant.dv ?? '',
+      address: tenant.address ?? '',
+      phone: tenant.phone ?? '',
+      email: tenant.email ?? '',
+      isActive: tenant.isActive,
+    });
+    setEditErrors({});
+    setIsEditModalOpen(true);
+  };
+
+  const closeEditModal = () => {
+    if (isUpdatingTenant) return;
+    setIsEditModalOpen(false);
+    setSelectedTenant(null);
+    setEditErrors({});
+  };
+
+  const handleEditInputChange = (field: keyof typeof editForm, value: string | boolean) => {
+    setEditForm((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+
+    if (editErrors[field]) {
+      setEditErrors((prev) => ({
+        ...prev,
+        [field]: '',
+      }));
+    }
+  };
+
+  const validateEditForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!editForm.name.trim()) {
+      newErrors.name = 'El nombre de la empresa es requerido';
+    }
+
+    if (!editForm.ruc.trim()) {
+      newErrors.ruc = 'El RUC es requerido';
+    }
+
+    if (!editForm.dv.trim()) {
+      newErrors.dv = 'El DV es requerido';
+    }
+
+    if (editForm.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editForm.email)) {
+      newErrors.email = 'El email no es válido';
+    }
+
+    setEditErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleUpdateTenant = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!selectedTenant) return;
+
+    if (!validateEditForm()) {
+      return;
+    }
+
+    try {
+      setIsUpdatingTenant(true);
+
+      const payload: UpdateAdminTenantDto = {
+        nombre: editForm.name.trim(),
+        ruc: editForm.ruc.trim(),
+        dv: editForm.dv.trim(),
+        direccion: editForm.address.trim() || undefined,
+        telefono: editForm.phone.trim() || undefined,
+        correo: editForm.email.trim() || undefined,
+        isActive: editForm.isActive,
+      };
+
+      const updatedTenant = await systemAdminService.updateTenant(selectedTenant.id, payload);
+
+      setAllTenants((prev) =>
+        prev.map((tenant) => (tenant.id === updatedTenant.id ? updatedTenant : tenant)),
+      );
+
+      toast.success('Empresa actualizada exitosamente');
+      setIsEditModalOpen(false);
+      setSelectedTenant(null);
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : 'Error al actualizar la empresa';
+      toast.error(message);
+    } finally {
+      setIsUpdatingTenant(false);
     }
   };
 
@@ -281,14 +399,26 @@ export default function TenantsManagementPage() {
                         {new Date(tenant.createdAt).toLocaleDateString('es-PA')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          icon={Eye}
-                          onClick={() => navigate(`/system-admin/tenants/${tenant.id}`)}
-                        >
-                          Ver
-                        </Button>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon={Eye}
+                            onClick={() =>
+                              navigate(`/system-admin/tenants/${tenant.id}`)
+                            }
+                          >
+                            Ver
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            icon={Pencil}
+                            onClick={() => openEditModal(tenant)}
+                          >
+                            Editar
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -307,6 +437,114 @@ export default function TenantsManagementPage() {
           />
         </div>
       </div>
+
+      {/* Edit Tenant Modal */}
+      <Modal
+        isOpen={isEditModalOpen && !!selectedTenant}
+        onClose={closeEditModal}
+        title="Editar Empresa"
+        size="md"
+      >
+        <form onSubmit={handleUpdateTenant} className="space-y-6">
+          <div className="space-y-4">
+            <Input
+              label="Nombre de la Empresa"
+              value={editForm.name}
+              onChange={(e) => handleEditInputChange('name', e.target.value)}
+              error={editErrors.name}
+              required
+              placeholder="Empresa ABC S.A."
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="RUC"
+                value={editForm.ruc}
+                onChange={(e) => handleEditInputChange('ruc', e.target.value)}
+                error={editErrors.ruc}
+                required
+                placeholder="123456789"
+              />
+              <Input
+                label="DV"
+                value={editForm.dv}
+                onChange={(e) => handleEditInputChange('dv', e.target.value)}
+                error={editErrors.dv}
+                required
+                maxLength={2}
+                placeholder="12"
+              />
+            </div>
+
+            <Input
+              label="Dirección"
+              value={editForm.address}
+              onChange={(e) => handleEditInputChange('address', e.target.value)}
+              placeholder="Calle 50, Edificio XYZ, Piso 5"
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Teléfono"
+                value={editForm.phone}
+                onChange={(e) => handleEditInputChange('phone', e.target.value)}
+                placeholder="+507 6000-0000"
+              />
+              <Input
+                label="Correo Electrónico"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => handleEditInputChange('email', e.target.value)}
+                error={editErrors.email}
+                placeholder="contacto@empresa.com"
+              />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <label className="text-sm font-medium text-gray-300">
+                Empresa activa
+              </label>
+              <button
+                type="button"
+                onClick={() =>
+                  handleEditInputChange('isActive', !editForm.isActive)
+                }
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  editForm.isActive ? 'bg-green-500' : 'bg-navy-700'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    editForm.isActive ? 'translate-x-5' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className="text-sm text-gray-300">
+                {editForm.isActive ? 'Activa' : 'Inactiva'}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={closeEditModal}
+              disabled={isUpdatingTenant}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={isUpdatingTenant}
+              className="flex-1"
+            >
+              {isUpdatingTenant ? 'Guardando...' : 'Guardar Cambios'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </SystemAdminLayout>
   );
 }
