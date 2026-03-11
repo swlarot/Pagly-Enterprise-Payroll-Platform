@@ -385,6 +385,12 @@ public class AdminController : ControllerBase
             if (!string.IsNullOrEmpty(dto.Nombre))
                 tenant.Name = dto.Nombre;
 
+            if (dto.Ruc != null)
+                tenant.RUC = dto.Ruc;
+
+            if (dto.Dv != null)
+                tenant.DV = dto.Dv;
+
             if (dto.TipoContribuyente != null)
                 tenant.TipoContribuyente = dto.TipoContribuyente;
 

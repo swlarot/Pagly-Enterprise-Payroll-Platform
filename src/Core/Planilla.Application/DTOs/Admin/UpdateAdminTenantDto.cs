@@ -58,5 +58,17 @@ public record UpdateAdminTenantDto(
     /// <summary>
     /// Activar o desactivar el tenant
     /// </summary>
-    bool? IsActive
+    bool? IsActive,
+
+    /// <summary>
+    /// RUC (Registro Único de Contribuyente) de Panamá
+    /// </summary>
+    [StringLength(20)]
+    string? Ruc,
+
+    /// <summary>
+    /// Dígito Verificador del RUC
+    /// </summary>
+    [StringLength(10)]
+    string? Dv
 );

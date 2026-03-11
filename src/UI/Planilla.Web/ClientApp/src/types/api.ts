@@ -363,14 +363,19 @@ export interface CreateTenantDto {
   companyEmail?: string;
 }
 
+/** Payload para PUT /api/admin/tenants/{id} - nombres en camelCase como espera el backend */
 export interface UpdateAdminTenantDto {
-  name?: string;
+  nombre?: string;
+  telefono?: string;
+  correo?: string;
+  direccion?: string;
   ruc?: string;
   dv?: string;
-  address?: string;
-  phone?: string;
-  email?: string;
   isActive?: boolean;
+  tipoContribuyente?: string;
+  pais?: string;
+  sitioWeb?: string;
+  logoUrl?: string;
 }
 
 // Admin Tenant User DTO (for system admin panel)
