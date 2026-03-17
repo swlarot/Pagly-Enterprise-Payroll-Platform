@@ -43,6 +43,13 @@ public class ReportesService
         _ => "Desconocido"
     };
 
+    private static string? ResolveNombreAcreedor(DeduccionAplicada da)
+    {
+        return !string.IsNullOrWhiteSpace(da.NombreAcreedor)
+            ? da.NombreAcreedor
+            : da.DeduccionFija?.Acreedor?.Nombre ?? da.DeduccionFija?.NombreAcreedor;
+    }
+
     /// <summary>Reporte 1: Planilla Regular — borrador operativo por período</summary>
     public async Task<ReportePlanillaRegularDto> GenerarReportePlanillaRegular(int planillaId)
     {
@@ -233,12 +240,11 @@ public class ReportesService
         var todasDeducciones = planilla.Details
             .Where(d => d.Empleado != null)
             .SelectMany(d => d.DeduccionesAplicadas
-                .Where(da => !string.IsNullOrEmpty(da.NombreAcreedor))
                 .Select(da => new
                 {
                     EmpleadoNombre = $"{d.Empleado!.Nombre} {d.Empleado.Apellido}",
                     EmpleadoCedula = d.Empleado.NumeroIdentificacion,
-                    da.NombreAcreedor,
+                    NombreAcreedor = ResolveNombreAcreedor(da),
                     Acreedor = da.DeduccionFija?.Acreedor,
                     DeduccionFija = da.DeduccionFija,
                     da.TipoDeduccion,
@@ -247,7 +253,8 @@ public class ReportesService
                     da.MontoAplicado,
                     da.MontoLimitado,
                     da.RazonLimitacion
-                }))
+                })
+                .Where(x => !string.IsNullOrWhiteSpace(x.NombreAcreedor)))
             .ToList();
 
         var gruposAcreedor = todasDeducciones
@@ -379,6 +386,8 @@ public class ReportesService
                     .ThenInclude(e => e!.Departamento)
             .Include(p => p.Details)
                 .ThenInclude(d => d.DeduccionesAplicadas)
+                    .ThenInclude(da => da.DeduccionFija)
+                        .ThenInclude(df => df!.Acreedor)
             .FirstOrDefaultAsync();
 
         if (planilla == null)
@@ -398,10 +407,16 @@ public class ReportesService
                 var horas = horasPorEmpleado.FirstOrDefault(h => h.EmpleadoId == d.EmpleadoId);
 
                 var lineasAcreedores = d.DeduccionesAplicadas
-                    .Where(da => !string.IsNullOrEmpty(da.NombreAcreedor))
+                    .Select(da => new
+                    {
+                        Deduccion = da,
+                        NombreAcreedor = ResolveNombreAcreedor(da)
+                    })
+                    .Where(x => !string.IsNullOrWhiteSpace(x.NombreAcreedor))
+                    .Select(x => x.Deduccion)
                     .OrderBy(da => da.OrdenAplicacion)
                     .Select(da => new LineaDeduccionComprobante(
-                        da.NombreAcreedor ?? "Sin nombre",
+                        ResolveNombreAcreedor(da) ?? "Sin nombre",
                         da.TipoDeduccion.ToString(),
                         da.Descripcion,
                         da.MontoAplicado
