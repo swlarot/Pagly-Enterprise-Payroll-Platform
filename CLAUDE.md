@@ -205,9 +205,12 @@ El registro de usuarios nuevos lo hace un admin del sistema desde `/system-admin
 
 **Antes de tocar cualquier archivo**, sin excepción de tamaño:
 
-1. **Crear ticket en Linear** (equipo `Pagly`) con:
-   - Título descriptivo
-   - Descripción: contexto, archivos afectados, cambio requerido, criterios de aceptación
+1. **Crear ticket en Linear** (equipo `DEV`) con:
+   - Título descriptivo (sin prefijo `DEV-#`)
+   - **Descripción: OBLIGATORIO usar la plantilla correspondiente al tipo** (ver MEMORY.md). Nunca crear ticket sin plantilla.
+     - `Bug` → plantilla Bug Report
+     - `Feature` → plantilla Feature Request
+     - `Refactor` / `Performance` / tech task → plantilla Tech Task
    - Labels apropiados (`Bug` / `Feature` / `Refactor` / etc., `WEBAPP` / `API` / etc.)
    - Estado: `Todo`
 
