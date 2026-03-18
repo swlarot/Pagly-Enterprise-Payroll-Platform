@@ -211,6 +211,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       setPermissions([]);
     }
+
+    // Recargar la página para que todos los componentes montados re-fetchen
+    // con el nuevo tenant. useEffect([]) solo corre al montar, no al cambiar contexto.
+    window.location.reload();
   };
 
   const logout = () => {
