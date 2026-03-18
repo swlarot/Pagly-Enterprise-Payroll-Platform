@@ -353,9 +353,8 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                   </>
                 )}
 
-                {/* Aviso sesión desactualizada */}
-                {availableTenants.length > 0 && (
-                  <div className="px-3 py-1.5 border-t border-white/[0.06]">
+                {/* Aviso sesión desactualizada — siempre visible para cualquier usuario autenticado */}
+                <div className="px-3 py-1.5 border-t border-white/[0.06]">
                     <p className="text-[9px] text-gray-600 leading-tight">
                       ¿No ves todas tus empresas?{' '}
                       <button
@@ -366,7 +365,6 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                       </button>
                     </p>
                   </div>
-                )}
 
                 {/* Cerrar sesión */}
                 <div className="p-1.5">
