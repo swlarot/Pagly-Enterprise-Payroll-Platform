@@ -42,7 +42,7 @@
         "language": "es-ES"
       },
       "nsis": {
-        "languages": ["SpanishLatin1"],
+        "languages": ["Spanish"],
         "installMode": "perMachine"
       }
     },
