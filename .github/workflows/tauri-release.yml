@@ -53,7 +53,7 @@ jobs:
       - name: Build frontend (modo desktop)
         working-directory: src/UI/Planilla.Web/ClientApp
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://app.pagly.io' }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL != '' && secrets.VITE_API_URL || 'https://app.pagly.clau.com.pa' }}
           VITE_APP_ENV: production
           VITE_ENABLE_STRIPE: 'true'
           VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}

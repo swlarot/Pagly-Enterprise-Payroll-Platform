@@ -57,7 +57,7 @@ export function validateConfig(): void {
     throw new Error('VITE_API_URL no está configurado para desarrollo');
   }
   if (import.meta.env.MODE === 'desktop' && !config.apiUrl) {
-    throw new Error('VITE_API_URL no está configurado para el build de escritorio. Verificar .env.desktop');
+    throw new Error('VITE_API_URL no está configurado para el build de escritorio. Verificar .env.desktop (debe apuntar a https://app.pagly.clau.com.pa)');
   }
 
   // En producción, verificar que Stripe esté configurado si está habilitado

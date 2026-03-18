@@ -24,7 +24,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' tauri: ipc: https://app.pagly.io; connect-src 'self' https://app.pagly.io wss://app.pagly.io; img-src 'self' data: blob: https://app.pagly.io; style-src 'self' 'unsafe-inline'; script-src 'self' https://js.stripe.com; frame-src https://js.stripe.com"
+      "csp": "default-src 'self' tauri: ipc: https://app.pagly.clau.com.pa; connect-src 'self' https://app.pagly.clau.com.pa wss://app.pagly.clau.com.pa; img-src 'self' data: blob: https://app.pagly.clau.com.pa; style-src 'self' 'unsafe-inline'; script-src 'self' https://js.stripe.com; frame-src https://js.stripe.com"
     }
   },
   "bundle": {
