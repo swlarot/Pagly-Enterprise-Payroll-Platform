@@ -368,23 +368,25 @@ else
 app.UseExceptionHandlingMiddleware();
 
 app.UseHttpsRedirection();
-// app.js y app.css tienen nombres fijos sin hash de contenido.
-// Cache-Control: no-cache fuerza revalidación en cada request para estos archivos,
+// Vite genera app.js, app.css y chunks JS/CSS con nombres fijos sin hash de contenido.
+// Cache-Control: no-cache fuerza revalidación en cada request para todos los JS/CSS,
 // evitando que los usuarios vean versiones desactualizadas después de un deploy.
-// Los demás assets estáticos mantienen caché agresivo (1 año) al tener nombres únicos por build.
+// Los assets de imagen y fuentes sí pueden cachearse de forma agresiva (1 año).
 app.UseStaticFiles(new StaticFileOptions
 {
     OnPrepareResponse = ctx =>
     {
         var fileName = ctx.File.Name;
-        if (fileName == "app.js" || fileName == "app.css")
+        if (fileName.EndsWith(".js") || fileName.EndsWith(".css"))
         {
             ctx.Context.Response.Headers["Cache-Control"] = "no-cache, must-revalidate";
         }
         else if (!fileName.EndsWith(".html"))
         {
+            // Imágenes, fuentes y otros assets binarios: caché agresivo (tienen nombres estables)
             ctx.Context.Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
         }
+        // .html: sin header explícito → el navegador usa ETag/Last-Modified
     }
 });
 app.UseRouting();
