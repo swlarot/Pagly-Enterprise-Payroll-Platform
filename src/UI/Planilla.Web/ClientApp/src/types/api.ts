@@ -625,6 +625,12 @@ export interface VacacionResumenDto {
   estado: string;
 }
 
+export interface UpdateSystemUserDto {
+  nombreCompleto: string;
+  email?: string;
+  telefono?: string;
+}
+
 // SystemUsersPage view model
 export interface SystemUserViewModel {
   id: string;

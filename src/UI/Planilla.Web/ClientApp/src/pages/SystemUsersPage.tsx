@@ -7,7 +7,7 @@ import { Modal } from '../components/ui/Modal';
 import { DataTable } from '../components/ui/DataTable';
 import type { Column } from '../components/ui/DataTable';
 import { systemAdminService } from '../services/systemAdminService';
-import { UserPlus, Mail, Phone, Loader2, Trash2, Building2 } from 'lucide-react';
+import { UserPlus, Mail, Phone, Loader2, Trash2, Building2, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { SystemUserViewModel } from '../types/api';
 
@@ -21,6 +21,12 @@ export default function SystemUsersPage() {
     nombre: '',
     apellido: '',
     correo: '',
+    telefono: ''
+  });
+  const [editingUser, setEditingUser] = useState<SystemUserViewModel | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    nombreCompleto: '',
+    email: '',
     telefono: ''
   });
 
@@ -80,6 +86,47 @@ export default function SystemUsersPage() {
   const handleCancel = () => {
     setShowModal(false);
     setFormData({ nombre: '', apellido: '', correo: '', telefono: '' });
+  };
+
+  const handleOpenEdit = (user: SystemUserViewModel) => {
+    setEditingUser(user);
+    setEditFormData({
+      nombreCompleto: user.nombreCompleto,
+      email: user.email,
+      telefono: user.telefono || ''
+    });
+  };
+
+  const handleEditCancel = () => {
+    setEditingUser(null);
+    setEditFormData({ nombreCompleto: '', email: '', telefono: '' });
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+
+    if (!editFormData.nombreCompleto.trim()) {
+      toast.error('El nombre completo es requerido');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await systemAdminService.updateUser(editingUser.id, {
+        nombreCompleto: editFormData.nombreCompleto.trim(),
+        email: editFormData.email.trim() || undefined,
+        telefono: editFormData.telefono.trim() || undefined
+      });
+      toast.success('Usuario actualizado exitosamente');
+      handleEditCancel();
+      loadUsers();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Error actualizando usuario';
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDeleteUser = async (userId: string, userName: string) => {
@@ -142,14 +189,23 @@ export default function SystemUsersPage() {
       </div>
     )},
     { key: 'acciones', header: 'Acciones', render: (u) => !u.isSystemAdmin ? (
-      <button
-        onClick={() => handleDeleteUser(u.id, u.nombreCompleto)}
-        disabled={deletingUserId === u.id}
-        className="inline-flex items-center justify-center p-2 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        title="Eliminar usuario"
-      >
-        {deletingUserId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => handleOpenEdit(u)}
+          className="inline-flex items-center justify-center p-2 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 text-blue-400 transition-colors"
+          title="Editar usuario"
+        >
+          <Pencil className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => handleDeleteUser(u.id, u.nombreCompleto)}
+          disabled={deletingUserId === u.id}
+          className="inline-flex items-center justify-center p-2 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Eliminar usuario"
+        >
+          {deletingUserId === u.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+        </button>
+      </div>
     ) : null},
   ];
 
@@ -180,6 +236,60 @@ export default function SystemUsersPage() {
           />
         </div>
       </div>
+
+      {/* Modal de edición */}
+      <Modal isOpen={!!editingUser} onClose={handleEditCancel} title="Editar Usuario" size="sm">
+            <form onSubmit={handleEdit} className="space-y-4">
+              <Input
+                label="Nombre Completo"
+                value={editFormData.nombreCompleto}
+                onChange={(e) => setEditFormData({ ...editFormData, nombreCompleto: e.target.value })}
+                required
+                placeholder="Juan Pérez"
+              />
+
+              <Input
+                label="Correo"
+                type="email"
+                value={editFormData.email}
+                onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                placeholder="juan.perez@empresa.com"
+              />
+
+              <Input
+                label="Teléfono (opcional)"
+                value={editFormData.telefono}
+                onChange={(e) => setEditFormData({ ...editFormData, telefono: e.target.value })}
+                placeholder="+507 6000-0000"
+              />
+
+              <div className="flex gap-3 pt-4">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleEditCancel}
+                  disabled={isSubmitting}
+                  className="flex-1"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    'Guardar Cambios'
+                  )}
+                </Button>
+              </div>
+            </form>
+      </Modal>
 
       {/* Modal de creación */}
       <Modal isOpen={showModal} onClose={handleCancel} title="Crear Nuevo Usuario" size="sm">
