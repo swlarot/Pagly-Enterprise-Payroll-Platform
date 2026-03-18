@@ -368,7 +368,25 @@ else
 app.UseExceptionHandlingMiddleware();
 
 app.UseHttpsRedirection();
-app.UseStaticFiles(); // Serves static files including React SPA from wwwroot
+// app.js y app.css tienen nombres fijos sin hash de contenido.
+// Cache-Control: no-cache fuerza revalidación en cada request para estos archivos,
+// evitando que los usuarios vean versiones desactualizadas después de un deploy.
+// Los demás assets estáticos mantienen caché agresivo (1 año) al tener nombres únicos por build.
+app.UseStaticFiles(new StaticFileOptions
+{
+    OnPrepareResponse = ctx =>
+    {
+        var fileName = ctx.File.Name;
+        if (fileName == "app.js" || fileName == "app.css")
+        {
+            ctx.Context.Response.Headers["Cache-Control"] = "no-cache, must-revalidate";
+        }
+        else if (!fileName.EndsWith(".html"))
+        {
+            ctx.Context.Response.Headers["Cache-Control"] = "public, max-age=31536000, immutable";
+        }
+    }
+});
 app.UseRouting();
 
 // CORS must be after UseRouting and before UseAuthentication
