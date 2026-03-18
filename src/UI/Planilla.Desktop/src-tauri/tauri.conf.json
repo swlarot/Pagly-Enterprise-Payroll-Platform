@@ -24,7 +24,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self' tauri: ipc: https://app.pagly.io; connect-src 'self' https://app.pagly.io wss://app.pagly.io; img-src 'self' data: blob: https://app.pagly.io; style-src 'self' 'unsafe-inline'; script-src 'self' https://js.stripe.com; frame-src https://js.stripe.com"
     }
   },
   "bundle": {
@@ -42,7 +42,7 @@
         "language": "es-ES"
       },
       "nsis": {
-        "languages": ["SpadishLatin1"],
+        "languages": ["SpanishLatin1"],
         "installMode": "perMachine"
       }
     },
