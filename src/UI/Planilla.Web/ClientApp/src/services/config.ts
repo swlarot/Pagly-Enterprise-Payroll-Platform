@@ -52,9 +52,12 @@ const config: AppConfig = {
  * Valida que la configuración sea correcta al iniciar la aplicación
  */
 export function validateConfig(): void {
-  // apiUrl vacío es válido para same-origin (prod); en dev debe ser localhost
+  // apiUrl vacío es válido para same-origin (prod web); en dev y desktop debe ser una URL explícita
   if (import.meta.env.DEV && !config.apiUrl) {
     throw new Error('VITE_API_URL no está configurado para desarrollo');
+  }
+  if (import.meta.env.MODE === 'desktop' && !config.apiUrl) {
+    throw new Error('VITE_API_URL no está configurado para el build de escritorio. Verificar .env.desktop');
   }
 
   // En producción, verificar que Stripe esté configurado si está habilitado
