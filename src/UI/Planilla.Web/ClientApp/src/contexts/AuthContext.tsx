@@ -211,10 +211,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } else {
       setPermissions([]);
     }
-
-    // Recargar la página para que todos los componentes montados re-fetchen
-    // con el nuevo tenant. useEffect([]) solo corre al montar, no al cambiar contexto.
-    window.location.reload();
+    // Nota: la navegación/reload post-selección es responsabilidad del caller
+    // (AuthLayout.handleSwitchTenant o TenantSelectorPage.handleSelectTenant)
+    // para garantizar que cada flujo navegue a la URL correcta.
   };
 
   const logout = () => {

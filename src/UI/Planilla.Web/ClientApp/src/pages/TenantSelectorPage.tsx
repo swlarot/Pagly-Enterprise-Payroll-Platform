@@ -89,8 +89,9 @@ export default function TenantSelectorPage() {
     try {
       await selectTenant(tenantId);
       localStorage.setItem(LAST_TENANT_KEY, tenantId.toString());
-      toast.success('Empresa seleccionada exitosamente');
-      navigate('/dashboard', { replace: true });
+      // Full page navigation a /dashboard: recarga la app con el JWT del nuevo tenant,
+      // evitando el reload en /select-tenant que causaba la pantalla "Sin Empresas".
+      window.location.href = '/dashboard';
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Error al seleccionar empresa';
       toast.error(message);
