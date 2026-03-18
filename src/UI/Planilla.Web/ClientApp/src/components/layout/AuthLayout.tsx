@@ -47,10 +47,11 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       setSwitchingTenant(true);
       setUserDropdownOpen(false);
       await selectTenant(tenantId);
-      navigate('/dashboard');
+      // Full page navigation a /dashboard: garantiza que todos los componentes
+      // re-fetchen datos del nuevo tenant (useEffect([]) no re-corre en cambios de contexto).
+      window.location.href = '/dashboard';
     } catch {
       // error silencioso — api.ts ya muestra toast
-    } finally {
       setSwitchingTenant(false);
     }
   };
