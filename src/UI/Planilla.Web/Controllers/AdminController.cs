@@ -302,6 +302,11 @@ public class AdminController : ControllerBase
                 return BadRequest(new { message = "Error actualizando correo", details = errors });
             }
 
+            // Confirmar email automáticamente — cambio iniciado por admin, no requiere verificación
+            // Previene bloqueo futuro si se activa RequireConfirmedEmail = true
+            var confirmToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+            await _userManager.ConfirmEmailAsync(user, confirmToken);
+
             // SetUserNameAsync normaliza y persiste el username
             var setUserNameResult = await _userManager.SetUserNameAsync(user, dto.Email);
             if (!setUserNameResult.Succeeded)
