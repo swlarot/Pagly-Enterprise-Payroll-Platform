@@ -25,6 +25,20 @@ Requerido para el CLI de Tauri.
 
 ---
 
+## Variables de entorno
+
+El archivo `.env.desktop` **no está en el repositorio** (está en `.gitignore`). Debes crearlo manualmente:
+
+```bash
+# Para desarrollo local (apunta al backend local)
+echo "VITE_API_URL=http://localhost:5039" > src/UI/Planilla.Desktop/.env.desktop
+
+# Para producción (build del instalador)
+echo "VITE_API_URL=https://app.pagly.clau.com.pa" > src/UI/Planilla.Desktop/.env.desktop
+```
+
+---
+
 ## Desarrollo local
 
 ```bash
