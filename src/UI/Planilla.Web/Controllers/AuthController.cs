@@ -529,14 +529,13 @@ public class AuthController : ControllerBase
                 return Unauthorized(new { message = "Tenant no identificado. Por favor selecciona tu empresa o inicia sesión de nuevo." });
             }
 
-            // DEV-165: Una sola query con IgnoreQueryFilters trae todos los tenants del usuario.
-            // El tenant activo del JWT se extrae de la lista (evita 2 round-trips a la DB).
-            // IgnoreQueryFilters: el JWT ya tiene tenant_id → el global filter filtraría a 1 solo.
+            // DEV-165/DEV-169: Una sola query trae todos los tenants para el switcher (sin Subscription,
+            // que solo se necesita para el tenant activo). IgnoreQueryFilters: el global filter
+            // filtraría a 1 solo tenant porque el JWT ya tiene tenant_id.
             var allTenantsMe = await _context.TenantUsers
                 .IgnoreQueryFilters()
                 .Where(tu => tu.UserId == userId && tu.IsActive && tu.Tenant.IsActive)
                 .Include(tu => tu.Tenant)
-                    .ThenInclude(t => t.Subscription)
                 .OrderBy(tu => tu.JoinedAt)
                 .ToListAsync();
 
@@ -547,7 +546,10 @@ public class AuthController : ControllerBase
                 return NotFound(new { message = "Acceso al tenant no encontrado" });
             }
 
-            var subscriptionMe = tenantUser.Tenant?.Subscription;
+            // DEV-169: Cargar Subscription solo para el tenant activo, evitando el JOIN
+            // innecesario en todos los demás tenants del usuario.
+            var subscriptionMe = await _context.Subscriptions
+                .FirstOrDefaultAsync(s => s.TenantId == tenantId);
             if (subscriptionMe == null)
                 return StatusCode(500, new { message = "Suscripción del tenant no encontrada" });
             var limits = PlanFeatures.GetLimits(subscriptionMe.Plan);
