@@ -111,6 +111,12 @@ export default function SystemUsersPage() {
       return;
     }
 
+    const emailTrimmed = editFormData.email.trim();
+    if (emailTrimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
+      toast.error('El formato del correo electrónico no es válido');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       await systemAdminService.updateUser(editingUser.id, {
