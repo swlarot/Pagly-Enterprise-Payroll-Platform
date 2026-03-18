@@ -349,22 +349,21 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                         );
                       })}
                     </div>
+                    {/* DEV-166: aviso solo visible cuando el switcher está visible */}
+                    <div className="px-3 py-1.5">
+                      <p className="text-[9px] text-gray-600 leading-tight">
+                        ¿No ves todas tus empresas?{' '}
+                        <button
+                          onClick={() => { setUserDropdownOpen(false); handleLogout(); }}
+                          className="text-gray-500 underline hover:text-gray-300"
+                        >
+                          Reinicia sesión
+                        </button>
+                      </p>
+                    </div>
                     <div className="mx-3 border-t border-white/[0.06]" />
                   </>
                 )}
-
-                {/* Aviso sesión desactualizada — siempre visible para cualquier usuario autenticado */}
-                <div className="px-3 py-1.5 border-t border-white/[0.06]">
-                    <p className="text-[9px] text-gray-600 leading-tight">
-                      ¿No ves todas tus empresas?{' '}
-                      <button
-                        onClick={() => { setUserDropdownOpen(false); handleLogout(); }}
-                        className="text-gray-500 underline hover:text-gray-300"
-                      >
-                        Reinicia sesión
-                      </button>
-                    </p>
-                  </div>
 
                 {/* Cerrar sesión */}
                 <div className="p-1.5">
