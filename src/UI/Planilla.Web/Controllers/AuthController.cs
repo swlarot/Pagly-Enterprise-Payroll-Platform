@@ -988,7 +988,10 @@ public class AuthController : ControllerBase
             }
 
             // 3. Verificar que el usuario tiene acceso al tenant solicitado
+            // IgnoreQueryFilters: TenantUser implementa ITenantEntity, por lo que el global filter
+            // filtraría por el tenant ACTUAL del JWT, impidiendo cambiar a otro tenant
             var tenantUser = await _context.TenantUsers
+                .IgnoreQueryFilters()
                 .Include(tu => tu.Tenant)
                     .ThenInclude(t => t.Subscription)
                 .FirstOrDefaultAsync(tu => tu.UserId == userId
@@ -1020,7 +1023,10 @@ public class AuthController : ControllerBase
             var limits = PlanFeatures.GetLimits(subscriptionSelect.Plan);
 
             // 8. Obtener lista de todos los tenants del usuario (para mantener disponibilidad)
+            // IgnoreQueryFilters: TenantUser implementa ITenantEntity — el global filter filtraría
+            // por el tenant NUEVO del JWT, devolviendo solo 1 tenant y ocultando los demás
             var allUserTenants = await _context.TenantUsers
+                .IgnoreQueryFilters()
                 .Where(tu => tu.UserId == userId && tu.IsActive)
                 .Include(tu => tu.Tenant)
                 .OrderBy(tu => tu.JoinedAt)
