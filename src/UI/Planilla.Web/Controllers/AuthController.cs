@@ -285,7 +285,11 @@ public class AuthController : ControllerBase
             }
 
             // 4. Obtener TODOS los tenants activos del usuario
+            // IgnoreQueryFilters: durante Login no hay JWT → _tenantContext.TenantId == 0 → el global
+            // filter ya pasaría todas las filas, pero usamos IgnoreQueryFilters para hacerlo explícito
+            // y desacoplar este comportamiento de la condición implícita del TenantId==0.
             var userTenants = await _context.TenantUsers
+                .IgnoreQueryFilters()
                 .Include(tu => tu.Tenant)
                     .ThenInclude(t => t.Subscription)
                 .Where(tu => tu.UserId == user.Id && tu.IsActive && tu.Tenant.IsActive)
@@ -474,7 +478,10 @@ public class AuthController : ControllerBase
             var requiresSelectionClaim = User.FindFirst("requires_tenant_selection")?.Value;
             if (requiresSelectionClaim == "true")
             {
+                // IgnoreQueryFilters: token requires_tenant_selection no tiene tenant_id — el global
+                // filter dependería de TenantId==0 para pasar, usamos IgnoreQueryFilters explícitamente.
                 var userTenantsForMe = await _context.TenantUsers
+                    .IgnoreQueryFilters()
                     .Include(tu => tu.Tenant)
                     .Where(tu => tu.UserId == userId && tu.IsActive && tu.Tenant != null && tu.Tenant.IsActive)
                     .OrderBy(tu => tu.JoinedAt)
@@ -1023,11 +1030,12 @@ public class AuthController : ControllerBase
             var limits = PlanFeatures.GetLimits(subscriptionSelect.Plan);
 
             // 8. Obtener lista de todos los tenants del usuario (para mantener disponibilidad)
-            // IgnoreQueryFilters: TenantUser implementa ITenantEntity — el global filter filtraría
-            // por el tenant NUEVO del JWT, devolviendo solo 1 tenant y ocultando los demás
+            // IgnoreQueryFilters: TenantUser implementa ITenantEntity — el global filter solo filtra
+            // por TenantId (no hay soft-delete filter en TenantUser). Al ignorarlo, los filtros
+            // de IsActive y Tenant.IsActive se aplican manualmente en el Where para cubrir ambos casos.
             var allUserTenants = await _context.TenantUsers
                 .IgnoreQueryFilters()
-                .Where(tu => tu.UserId == userId && tu.IsActive)
+                .Where(tu => tu.UserId == userId && tu.IsActive && tu.Tenant.IsActive)
                 .Include(tu => tu.Tenant)
                 .OrderBy(tu => tu.JoinedAt)
                 .ToListAsync();
