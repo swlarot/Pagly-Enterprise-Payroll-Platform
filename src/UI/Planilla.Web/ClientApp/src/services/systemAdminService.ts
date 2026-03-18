@@ -10,6 +10,7 @@ import type {
   AssignUserToTenantDto,
   AuditLogPagedResultDto,
   SystemUserPagedResultDto,
+  UpdateSystemUserDto,
 } from '../types/api';
 
 export const systemAdminService = {
@@ -38,6 +39,9 @@ export const systemAdminService = {
     correo: string;
     telefono?: string;
   }) => api.post('/api/admin/users', data),
+
+  updateUser: (userId: string, data: UpdateSystemUserDto) =>
+    api.put(`/api/admin/users/${userId}`, data),
 
   deleteUser: (userId: string) => api.delete(`/api/admin/users/${userId}`),
 

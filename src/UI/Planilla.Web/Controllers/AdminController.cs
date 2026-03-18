@@ -262,6 +262,79 @@ public class AdminController : ControllerBase
     }
 
     /// <summary>
+    /// PUT /api/admin/users/{userId} - Edita datos de un usuario del sistema
+    /// Requiere: IsSystemAdmin = true
+    /// </summary>
+    [HttpPut("users/{userId}")]
+    public async Task<IActionResult> UpdateUser(string userId, [FromBody] UpdateSystemUserDto? dto)
+    {
+        if (dto == null)
+            return BadRequest(new { message = "El cuerpo de la solicitud es requerido" });
+
+        if (string.IsNullOrWhiteSpace(userId))
+            return BadRequest(new { message = "El ID del usuario es requerido" });
+
+        if (string.IsNullOrWhiteSpace(dto.NombreCompleto))
+            return BadRequest(new { message = "El nombre completo es requerido" });
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null || user.IsDeleted)
+            return NotFound(new { message = "Usuario no encontrado" });
+
+        // Actualizar campos no-Identity directamente
+        user.NombreCompleto = dto.NombreCompleto;
+        user.Telefono = dto.Telefono;
+
+        // Cambio de email: usar SetEmailAsync/SetUserNameAsync para actualizar
+        // NormalizedEmail y NormalizedUserName correctamente en la base de datos
+        if (!string.IsNullOrWhiteSpace(dto.Email) &&
+            !string.Equals(dto.Email, user.Email, StringComparison.OrdinalIgnoreCase))
+        {
+            var existing = await _userManager.FindByEmailAsync(dto.Email);
+            if (existing != null && existing.Id != user.Id)
+                return BadRequest(new { message = "Ya existe otro usuario con ese correo" });
+
+            // SetEmailAsync normaliza y persiste (llama UpdateAsync internamente)
+            var setEmailResult = await _userManager.SetEmailAsync(user, dto.Email);
+            if (!setEmailResult.Succeeded)
+            {
+                var errors = string.Join(", ", setEmailResult.Errors.Select(e => e.Description));
+                return BadRequest(new { message = "Error actualizando correo", details = errors });
+            }
+
+            // SetUserNameAsync normaliza y persiste el username
+            var setUserNameResult = await _userManager.SetUserNameAsync(user, dto.Email);
+            if (!setUserNameResult.Succeeded)
+            {
+                var errors = string.Join(", ", setUserNameResult.Errors.Select(e => e.Description));
+                return BadRequest(new { message = "Error actualizando nombre de usuario", details = errors });
+            }
+        }
+        else
+        {
+            // Sin cambio de email: persistir solo los campos básicos
+            var result = await _userManager.UpdateAsync(user);
+            if (!result.Succeeded)
+            {
+                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                return BadRequest(new { message = "Error actualizando usuario", details = errors });
+            }
+        }
+
+        _logger.LogInformation("SystemAdmin updated user {UserId} ({Email})", user.Id, user.Email);
+
+        return Ok(new SystemUserDto
+        {
+            UserId = user.Id,
+            Email = user.Email ?? string.Empty,
+            FullName = user.NombreCompleto ?? user.Email ?? "Sin nombre",
+            CreatedAt = DateTime.UtcNow,
+            IsActive = !user.IsDeleted,
+            IsSystemAdmin = user.IsSystemAdmin
+        });
+    }
+
+    /// <summary>
     /// POST /api/admin/tenants - Crea un nuevo tenant (SIN owner - se asigna después)
     /// Requiere: IsSystemAdmin = true
     /// </summary>
