@@ -1,7 +1,7 @@
 # Planilla Desktop (Tauri v2)
 
 App de escritorio de Pagly - Sistema de Planilla, empaquetada con Tauri v2.
-Se conecta al backend en la nube (`https://app.pagly.io`) — no funciona offline.
+Se conecta al backend en la nube (`https://app.pagly.clau.com.pa`) — no funciona offline.
 
 ## Prerequisitos
 
@@ -53,7 +53,7 @@ La app abrirá cargando `http://localhost:5173` (configurado en `tauri.conf.json
 # 1. Build del frontend con la URL de producción
 cd src/UI/Planilla.Web/ClientApp
 npm run build:desktop
-# Genera el SPA en ../wwwroot/ con VITE_API_URL=https://app.pagly.io
+# Genera el SPA en ../wwwroot/ con VITE_API_URL=https://app.pagly.clau.com.pa
 
 # 2. Build del instalador Tauri
 cd src/UI/Planilla.Desktop
@@ -77,7 +77,7 @@ npm run tauri:build
 Agregar en CapRover → App → Environment Variables:
 
 ```
-Cors__AllowedOrigins=https://app.pagly.io,tauri://localhost,https://tauri.localhost
+Cors__AllowedOrigins=https://app.pagly.clau.com.pa,tauri://localhost,https://tauri.localhost
 ```
 
 Los orígenes `tauri://localhost` y `https://tauri.localhost` son los que usa la WebView de Tauri
