@@ -281,12 +281,16 @@ public class AdminController : ControllerBase
         if (user == null || user.IsDeleted)
             return NotFound(new { message = "Usuario no encontrado" });
 
-        // Actualizar campos no-Identity directamente
+        // DEV-163: Defensa en profundidad — impedir edición de SystemAdmins via API directa
+        if (user.IsSystemAdmin)
+            return BadRequest(new { message = "No se puede editar un administrador del sistema" });
+
+        // Actualizar campos básicos en memoria
         user.NombreCompleto = dto.NombreCompleto;
         user.Telefono = dto.Telefono;
 
-        // Cambio de email: usar SetEmailAsync/SetUserNameAsync para actualizar
-        // NormalizedEmail y NormalizedUserName correctamente en la base de datos
+        // Cambio de email: actualizar Email, UserName y sus versiones normalizadas
+        // en un solo UpdateAsync para garantizar atomicidad (DEV-164)
         if (!string.IsNullOrWhiteSpace(dto.Email) &&
             !string.Equals(dto.Email, user.Email, StringComparison.OrdinalIgnoreCase))
         {
@@ -294,36 +298,23 @@ public class AdminController : ControllerBase
             if (existing != null && existing.Id != user.Id)
                 return BadRequest(new { message = "Ya existe otro usuario con ese correo" });
 
-            // SetEmailAsync normaliza y persiste (llama UpdateAsync internamente)
-            var setEmailResult = await _userManager.SetEmailAsync(user, dto.Email);
-            if (!setEmailResult.Succeeded)
-            {
-                var errors = string.Join(", ", setEmailResult.Errors.Select(e => e.Description));
-                return BadRequest(new { message = "Error actualizando correo", details = errors });
-            }
-
+            // Asignar email y username directamente en el objeto antes del UpdateAsync
+            // Esto evita llamar SetEmailAsync + SetUserNameAsync por separado, que harían
+            // dos UpdateAsync independientes y dejarían inconsistencia si el segundo falla.
+            user.Email = dto.Email;
+            user.NormalizedEmail = _userManager.NormalizeEmail(dto.Email);
+            user.UserName = dto.Email;
+            user.NormalizedUserName = _userManager.NormalizeName(dto.Email);
             // Confirmar email automáticamente — cambio iniciado por admin, no requiere verificación
-            // Previene bloqueo futuro si se activa RequireConfirmedEmail = true
-            var confirmToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
-            await _userManager.ConfirmEmailAsync(user, confirmToken);
-
-            // SetUserNameAsync normaliza y persiste el username
-            var setUserNameResult = await _userManager.SetUserNameAsync(user, dto.Email);
-            if (!setUserNameResult.Succeeded)
-            {
-                var errors = string.Join(", ", setUserNameResult.Errors.Select(e => e.Description));
-                return BadRequest(new { message = "Error actualizando nombre de usuario", details = errors });
-            }
+            user.EmailConfirmed = true;
         }
-        else
+
+        // Un solo UpdateAsync cubre todos los campos: NombreCompleto, Telefono, Email (si cambió)
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
         {
-            // Sin cambio de email: persistir solo los campos básicos
-            var result = await _userManager.UpdateAsync(user);
-            if (!result.Succeeded)
-            {
-                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
-                return BadRequest(new { message = "Error actualizando usuario", details = errors });
-            }
+            var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+            return BadRequest(new { message = "Error actualizando usuario", details = errors });
         }
 
         _logger.LogInformation("SystemAdmin updated user {UserId} ({Email})", user.Id, user.Email);
