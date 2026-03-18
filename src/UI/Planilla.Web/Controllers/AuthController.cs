@@ -544,6 +544,15 @@ public class AuthController : ControllerBase
                 return StatusCode(500, new { message = "Suscripción del tenant no encontrada" });
             var limits = PlanFeatures.GetLimits(subscriptionMe.Plan);
 
+            // Obtener todos los tenants activos del usuario para el dropdown del tenant switcher.
+            // IgnoreQueryFilters: el JWT ya tiene tenant_id → el global filter filtraría a 1 solo.
+            var allTenantsMe = await _context.TenantUsers
+                .IgnoreQueryFilters()
+                .Where(tu => tu.UserId == userId && tu.IsActive && tu.Tenant.IsActive)
+                .Include(tu => tu.Tenant)
+                .OrderBy(tu => tu.JoinedAt)
+                .ToListAsync();
+
             var response = new AuthResponseDto
             {
                 Token = string.Empty,  // No devolver token en /me
@@ -578,7 +587,15 @@ public class AuthController : ControllerBase
                     CanExportPdf = limits.CanExportPdf,
                     CanUseApi = limits.CanUseApi,
                     MonthlyPrice = subscriptionMe.MonthlyPrice
-                }
+                },
+                AvailableTenants = allTenantsMe.Select(tu => new TenantSummaryDto
+                {
+                    Id = tu.TenantId,
+                    Name = tu.Tenant.Name,
+                    Role = tu.Role,
+                    RoleName = tu.Role.ToString(),
+                    Subdomain = tu.Tenant.Subdomain
+                }).ToList()
             };
 
             return Ok(response);
