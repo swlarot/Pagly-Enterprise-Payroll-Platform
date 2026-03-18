@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { TenantRole } from '../../types/api';
@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Users, Users2, User, Building2, Building, Briefcase,
   DollarSign, CreditCard, Minus, Clock, XCircle, TreePalm,
   ClipboardList, BarChart3, ShieldCheck, FileText, Settings,
-  ChevronDown, ChevronRight, Search, Bell, LogOut, Banknote,
+  ChevronDown, ChevronRight, Search, Bell, LogOut, Banknote, Check, Loader2,
 } from 'lucide-react';
 
 interface AuthLayoutProps {
@@ -21,11 +21,39 @@ interface AuthLayoutProps {
 const PRIMARY_ROUTES = ['/dashboard', '/empleados', '/departamentos', '/posiciones'];
 
 export default function AuthLayout({ children }: AuthLayoutProps) {
-  const { user, tenant, logout, hasRole, isSystemAdmin, permissions } = useAuth();
+  const { user, tenant, availableTenants, logout, hasRole, isSystemAdmin, permissions, selectTenant } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
   const [searchOpen, setSearchOpen] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [switchingTenant, setSwitchingTenant] = useState(false);
+  const userDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar dropdown al hacer click fuera
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userDropdownRef.current && !userDropdownRef.current.contains(e.target as Node)) {
+        setUserDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSwitchTenant = async (tenantId: number) => {
+    if (switchingTenant) return;
+    try {
+      setSwitchingTenant(true);
+      setUserDropdownOpen(false);
+      await selectTenant(tenantId);
+      navigate('/dashboard');
+    } catch {
+      // error silencioso — api.ts ya muestra toast
+    } finally {
+      setSwitchingTenant(false);
+    }
+  };
 
   // Shortcut global Ctrl+K / ⌘K para abrir búsqueda
   useEffect(() => {
@@ -256,16 +284,103 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           {/* Divider */}
           <div className="w-px h-4 bg-white/[0.08]" />
 
-          {/* Usuario */}
-          <div className="flex items-center gap-1.5 pl-0.5">
-            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center ring-1 ring-white/10">
-              <span className="text-white text-[9px] font-bold">{userInitials}</span>
-            </div>
-            <div className="leading-none hidden lg:block">
-              <p className="text-[11px] font-semibold text-gray-100">{userName}</p>
-              <p className="text-[9px] text-gray-500 mt-0.5">{user?.roleName}</p>
-            </div>
-            <ChevronDown className="w-2.5 h-2.5 text-gray-600" />
+          {/* Usuario — dropdown */}
+          <div className="relative" ref={userDropdownRef}>
+            <button
+              onClick={() => setUserDropdownOpen(prev => !prev)}
+              aria-haspopup="menu"
+              aria-expanded={userDropdownOpen}
+              aria-label="Menú de usuario"
+              className="flex items-center gap-1.5 pl-0.5 pr-1 py-1 rounded-lg hover:bg-white/[0.06] transition-all duration-150"
+            >
+              <div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center ring-1 ring-white/10">
+                {switchingTenant
+                  ? <Loader2 className="w-3 h-3 text-white animate-spin" />
+                  : <span className="text-white text-[9px] font-bold">{userInitials}</span>
+                }
+              </div>
+              <div className="leading-none hidden lg:block">
+                <p className="text-[11px] font-semibold text-gray-100">{userName}</p>
+                <p className="text-[9px] text-gray-500 mt-0.5">{user?.roleName}</p>
+              </div>
+              <ChevronDown className={`w-2.5 h-2.5 text-gray-600 transition-transform duration-150 ${userDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {userDropdownOpen && (
+              <div role="menu" className="absolute right-0 top-full mt-1.5 w-56 bg-navy-900 border border-white/[0.08] rounded-xl shadow-2xl shadow-black/40 z-50 overflow-hidden">
+                {/* Header */}
+                <div className="px-3 py-2.5 border-b border-white/[0.06]">
+                  <p className="text-[12px] font-semibold text-gray-100 truncate">{userName || user?.email}</p>
+                  <p className="text-[10px] text-gray-500 truncate mt-0.5">{user?.email}</p>
+                </div>
+
+                {/* Tenant switcher — solo si tiene más de 1 tenant */}
+                {availableTenants.length > 1 && (
+                  <>
+                    <div className="px-3 pt-2 pb-1">
+                      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Cambiar empresa</p>
+                    </div>
+                    <div className="px-1.5 pb-1 flex flex-col gap-0.5">
+                      {availableTenants.map((t) => {
+                        const isActive = t.id === tenant?.id;
+                        return (
+                          <button
+                            key={t.id}
+                            role="menuitem"
+                            onClick={() => !isActive && handleSwitchTenant(t.id)}
+                            disabled={isActive || switchingTenant}
+                            className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left transition-all duration-150 ${
+                              isActive
+                                ? 'bg-primary-500/15 text-primary-300 cursor-default'
+                                : 'text-gray-300 hover:bg-white/[0.06] hover:text-gray-100'
+                            }`}
+                          >
+                            <div className="w-5 h-5 rounded-md bg-gradient-to-br from-primary-600 to-accent-600 flex items-center justify-center flex-shrink-0">
+                              <span className="text-white text-[8px] font-bold">
+                                {t.name.substring(0, 2).toUpperCase()}
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[11px] font-medium truncate">{t.name}</p>
+                              <p className="text-[9px] text-gray-500 truncate">{t.roleName}</p>
+                            </div>
+                            {isActive && <Check className="w-3 h-3 text-primary-400 flex-shrink-0" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="mx-3 border-t border-white/[0.06]" />
+                  </>
+                )}
+
+                {/* Aviso sesión desactualizada */}
+                {availableTenants.length > 0 && (
+                  <div className="px-3 py-1.5 border-t border-white/[0.06]">
+                    <p className="text-[9px] text-gray-600 leading-tight">
+                      ¿No ves todas tus empresas?{' '}
+                      <button
+                        onClick={() => { setUserDropdownOpen(false); handleLogout(); }}
+                        className="text-gray-500 underline hover:text-gray-300"
+                      >
+                        Reinicia sesión
+                      </button>
+                    </p>
+                  </div>
+                )}
+
+                {/* Cerrar sesión */}
+                <div className="p-1.5">
+                  <button
+                    role="menuitem"
+                    onClick={() => { setUserDropdownOpen(false); handleLogout(); }}
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[12px] text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all duration-150"
+                  >
+                    <LogOut className="w-3.5 h-3.5 flex-shrink-0" />
+                    Cerrar sesión
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </header>
