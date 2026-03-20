@@ -1390,4 +1390,220 @@ public class ExportacionService
                 .Text(tipo).FontSize(4.5f).Bold().FontColor("#ffffff");
         });
     }
+
+    // ====================================================================
+    // REPORTE 6: Desglose Décimo Tercer Mes — Excel (DEV-171)
+    // ====================================================================
+
+    public byte[] ExportarExcelDesgloseDecimo(ReporteDesgloseDecimoDto reporte)
+    {
+        if (!reporte.Empleados.Any())
+            return Array.Empty<byte>();
+
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Desglose Décimo");
+
+        const int cols = 9;
+        AplicarEstiloEncabezado(ws, $"DÉCIMO TERCER MES — PARTIDA {reporte.Partida} — {reporte.Estado}", reporte.NombreEmpresa, reporte.Ruc, reporte.Periodo, cols);
+        ws.Cell("A5").Value = $"Generado: {DateTimeHelper.NowPanama():dd/MM/yyyy HH:mm}  |  N° Décimo: {reporte.NumeroDecimo}  |  Fecha de Pago: {reporte.FechaPago:dd/MM/yyyy}";
+
+        var hr = 7;
+        ws.Cell(hr, 1).Value = "Cédula";
+        ws.Cell(hr, 2).Value = "Nombre";
+        ws.Cell(hr, 3).Value = "Total Devengado";
+        ws.Cell(hr, 4).Value = "Monto Décimo";
+        ws.Cell(hr, 5).Value = "CSS 7.25%";
+        ws.Cell(hr, 6).Value = "SE 1.25%";
+        ws.Cell(hr, 7).Value = "ISR";
+        ws.Cell(hr, 8).Value = "Total Deduc.";
+        ws.Cell(hr, 9).Value = "Neto a Pagar";
+        AplicarEstiloHeaderFila(ws, hr, cols);
+
+        var row = hr + 1;
+        foreach (var emp in reporte.Empleados)
+        {
+            ws.Cell(row, 1).Value = emp.Cedula;
+            ws.Cell(row, 2).Value = emp.NombreCompleto;
+            ws.Cell(row, 3).Value = emp.TotalDevengado;
+            ws.Cell(row, 4).Value = emp.MontoDecimo;
+            ws.Cell(row, 5).Value = emp.CssEmpleado;
+            ws.Cell(row, 6).Value = emp.SeEmpleado;
+            ws.Cell(row, 7).Value = emp.ISR;
+            ws.Cell(row, 8).Value = emp.TotalDeducciones;
+            ws.Cell(row, 9).Value = emp.NetoPago;
+            ws.Range(row, 3, row, 9).Style.NumberFormat.Format = "#,##0.00";
+            row++;
+
+            // Sub-tabla: desglose por período de pago
+            if (emp.Periodos.Count > 0)
+            {
+                ws.Cell(row, 2).Value = "  N° Planilla";
+                ws.Cell(row, 3).Value = "Desde";
+                ws.Cell(row, 4).Value = "Hasta";
+                ws.Cell(row, 5).Value = "Tipo";
+                ws.Cell(row, 6).Value = "Bruto";
+                var hdr = ws.Range(row, 2, row, 6);
+                hdr.Style.Font.Bold = true;
+                hdr.Style.Font.FontSize = 8;
+                hdr.Style.Fill.BackgroundColor = XLColor.LightCyan;
+                row++;
+
+                foreach (var p in emp.Periodos)
+                {
+                    ws.Cell(row, 2).Value = $"    {p.NumeroPlanilla}";
+                    ws.Cell(row, 3).Value = p.PeriodoDesde.ToString("dd/MM/yyyy");
+                    ws.Cell(row, 4).Value = p.PeriodoHasta.ToString("dd/MM/yyyy");
+                    ws.Cell(row, 5).Value = p.TipoPeriodo;
+                    ws.Cell(row, 6).Value = p.SalarioBruto;
+                    ws.Range(row, 2, row, 6).Style.Font.FontSize = 8;
+                    ws.Cell(row, 2).Style.Font.Italic = true;
+                    ws.Cell(row, 6).Style.NumberFormat.Format = "#,##0.00";
+                    ws.Cell(row, 6).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                    row++;
+                }
+            }
+        }
+
+        ws.Cell(row, 2).Value = "TOTALES";
+        ws.Cell(row, 3).Value = reporte.Totales.TotalDevengado;
+        ws.Cell(row, 4).Value = reporte.Totales.TotalDecimo;
+        ws.Cell(row, 5).Value = reporte.Totales.TotalCss;
+        ws.Cell(row, 6).Value = reporte.Totales.TotalSe;
+        ws.Cell(row, 7).Value = reporte.Totales.TotalIsr;
+        ws.Cell(row, 8).Value = reporte.Totales.TotalDeducciones;
+        ws.Cell(row, 9).Value = reporte.Totales.TotalNeto;
+        AplicarEstiloTotales(ws, row, cols);
+        ws.Range(row, 3, row, 9).Style.NumberFormat.Format = "#,##0.00";
+
+        ws.Columns().AdjustToContents();
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    // ====================================================================
+    // REPORTE 6: Desglose Décimo Tercer Mes — PDF (DEV-171)
+    // ====================================================================
+
+    public byte[] ExportarPdfDesgloseDecimo(ReporteDesgloseDecimoDto reporte)
+    {
+        if (!reporte.Empleados.Any())
+            return Array.Empty<byte>();
+
+        var document = Document.Create(container =>
+        {
+            container.Page(page =>
+            {
+                page.Size(PageSizes.Letter.Landscape());
+                page.Margin(1, Unit.Centimetre);
+
+                page.Header().Column(col =>
+                {
+                    col.Item().Height(4).Background(PdfTheme.PrimaryDark);
+                    col.Item().PaddingTop(4).Text(reporte.NombreEmpresa).FontSize(14).Bold();
+                    col.Item().Text($"RUC: {reporte.Ruc}").FontSize(9);
+                    col.Item().Text($"DÉCIMO TERCER MES — PARTIDA {reporte.Partida} — {reporte.NumeroDecimo} — {reporte.Periodo} — {reporte.Estado}").FontSize(11).Bold();
+                    col.Item().Background("#f1f5f9").Padding(4).Row(infoRow =>
+                    {
+                        infoRow.RelativeItem().Text($"N° Décimo: {reporte.NumeroDecimo}").FontSize(8);
+                        infoRow.RelativeItem().AlignCenter().Text($"Período: {reporte.Periodo}").FontSize(8);
+                        infoRow.RelativeItem().AlignRight().Text($"Fecha de Pago: {reporte.FechaPago:dd/MM/yyyy}").FontSize(8);
+                    });
+                    col.Item().PaddingBottom(6);
+                });
+
+                page.Content().Table(table =>
+                {
+                    table.ColumnsDefinition(cols =>
+                    {
+                        cols.RelativeColumn(1.5f); // Cédula
+                        cols.RelativeColumn(3f);   // Nombre
+                        cols.RelativeColumn(2f);   // Devengado
+                        cols.RelativeColumn(2f);   // Décimo
+                        cols.RelativeColumn(1.8f); // CSS 7.25%
+                        cols.RelativeColumn(1.5f); // SE
+                        cols.RelativeColumn(1.5f); // ISR
+                        cols.RelativeColumn(2f);   // Neto
+                    });
+
+                    table.Header(header =>
+                    {
+                        var bg = PdfTheme.PrimaryDark;
+                        header.Cell().Background(bg).Padding(4).Text("Cédula").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).Text("Nombre").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Devengado").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Décimo").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("CSS 7.25%").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("SE 1.25%").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("ISR").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Neto").Bold().FontSize(8).FontColor("#ffffff");
+                    });
+
+                    var altRow = 0;
+                    foreach (var emp in reporte.Empleados)
+                    {
+                        var rowBg = (altRow++ % 2 == 0) ? "#ffffff" : "#f8fafc";
+                        table.Cell().Background(rowBg).Padding(3).Text(emp.Cedula).FontSize(8);
+                        table.Cell().Background(rowBg).Padding(3).Text(emp.NombreCompleto).FontSize(8);
+                        table.Cell().Background(rowBg).Padding(3).AlignRight().Text($"B/.{emp.TotalDevengado:N2}").FontSize(8);
+                        table.Cell().Background(rowBg).Padding(3).AlignRight().Text($"B/.{emp.MontoDecimo:N2}").FontSize(8);
+                        table.Cell().Background(rowBg).Padding(3).AlignRight().Text($"B/.{emp.CssEmpleado:N2}").FontSize(8);
+                        table.Cell().Background(rowBg).Padding(3).AlignRight().Text(emp.SeEmpleado > 0 ? $"B/.{emp.SeEmpleado:N2}" : "").FontSize(8);
+                        table.Cell().Background(rowBg).Padding(3).AlignRight().Text(emp.ISR > 0 ? $"B/.{emp.ISR:N2}" : "").FontSize(8);
+                        table.Cell().Background(rowBg).Padding(3).AlignRight().Text($"B/.{emp.NetoPago:N2}").FontSize(8);
+
+                        // Sub-tabla con desglose de períodos
+                        if (emp.Periodos.Count > 0)
+                        {
+                            table.Cell().ColumnSpan(8).PaddingLeft(20).PaddingBottom(4).Table(inner =>
+                            {
+                                inner.ColumnsDefinition(ic =>
+                                {
+                                    ic.RelativeColumn(2.5f); // N° Planilla
+                                    ic.RelativeColumn(1.8f); // Desde
+                                    ic.RelativeColumn(1.8f); // Hasta
+                                    ic.RelativeColumn(1.5f); // Tipo
+                                    ic.RelativeColumn(2f);   // Bruto
+                                });
+
+                                inner.Header(ih =>
+                                {
+                                    var hbg = Colors.LightBlue.Lighten3;
+                                    ih.Cell().Background(hbg).Padding(2).Text("N° Planilla").Bold().FontSize(7);
+                                    ih.Cell().Background(hbg).Padding(2).AlignCenter().Text("Desde").Bold().FontSize(7);
+                                    ih.Cell().Background(hbg).Padding(2).AlignCenter().Text("Hasta").Bold().FontSize(7);
+                                    ih.Cell().Background(hbg).Padding(2).AlignCenter().Text("Tipo").Bold().FontSize(7);
+                                    ih.Cell().Background(hbg).Padding(2).AlignRight().Text("Bruto").Bold().FontSize(7);
+                                });
+
+                                foreach (var p in emp.Periodos)
+                                {
+                                    inner.Cell().Padding(2).Text(p.NumeroPlanilla).FontSize(7);
+                                    inner.Cell().Padding(2).AlignCenter().Text(p.PeriodoDesde.ToString("dd/MM/yyyy")).FontSize(7);
+                                    inner.Cell().Padding(2).AlignCenter().Text(p.PeriodoHasta.ToString("dd/MM/yyyy")).FontSize(7);
+                                    inner.Cell().Padding(2).AlignCenter().Text(p.TipoPeriodo).FontSize(7);
+                                    inner.Cell().Padding(2).AlignRight().Text($"B/.{p.SalarioBruto:N2}").FontSize(7);
+                                }
+                            });
+                        }
+                    }
+
+                    // Fila totales
+                    var totBg = Colors.Yellow.Lighten3;
+                    table.Cell().Background(totBg).Padding(3).Text($"Total: {reporte.Totales.TotalEmpleados} emp.").Bold().FontSize(8);
+                    table.Cell().Background(totBg).Padding(3).Text("TOTALES").Bold().FontSize(8);
+                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.TotalDevengado:N2}").Bold().FontSize(8);
+                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.TotalDecimo:N2}").Bold().FontSize(8);
+                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.TotalCss:N2}").Bold().FontSize(8);
+                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.TotalSe:N2}").Bold().FontSize(8);
+                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.TotalIsr:N2}").Bold().FontSize(8);
+                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.TotalNeto:N2}").Bold().FontSize(8);
+                });
+
+                BuildProfessionalFooter(page, reporte.NombreEmpresa);
+            });
+        });
+
+        return document.GeneratePdf();
+    }
 }

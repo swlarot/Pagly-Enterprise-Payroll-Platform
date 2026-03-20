@@ -485,4 +485,105 @@ public class ReportesService
 
         return lineas;
     }
+
+    // ====================================================================
+    // REPORTE 6: Desglose Décimo Tercer Mes (DEV-171)
+    // ====================================================================
+
+    public async Task<ReporteDesgloseDecimoDto> GenerarReporteDesgloseDecimo(int planillaDecimoId)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var (nombre, ruc) = await GetTenantInfo();
+
+        var planilla = await _context.PlanillasDecimo
+            .Include(p => p.Detalles)
+                .ThenInclude(d => d.Empleado)
+            .FirstOrDefaultAsync(p => p.Id == planillaDecimoId && p.TenantId == tenantId)
+            ?? throw new InvalidOperationException($"Planilla de décimo {planillaDecimoId} no encontrada");
+
+        // Query batch: un solo viaje a BD para todos los PayrollDetails del período
+        var empleadoIds = planilla.Detalles.Select(d => d.EmpleadoId).ToList();
+
+        var allDetails = await _context.PayrollDetails
+            .Include(d => d.PayrollHeader)
+            .Where(d => d.TenantId == tenantId
+                && empleadoIds.Contains(d.EmpleadoId)
+                && d.PayrollHeader.PeriodStartDate >= planilla.PeriodoDesde
+                && d.PayrollHeader.PeriodEndDate <= planilla.PeriodoHasta)
+            .OrderBy(d => d.EmpleadoId)
+                .ThenBy(d => d.PayrollHeader.PeriodStartDate)
+            .ToListAsync();
+
+        var detailsPorEmpleado = allDetails
+            .GroupBy(d => d.EmpleadoId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var partida = planilla.FechaPago.Month switch
+        {
+            4 => 1,
+            8 => 2,
+            12 => 3,
+            _ => 0
+        };
+
+        var empleadoItems = planilla.Detalles
+            .OrderBy(d => d.Empleado.Apellido)
+                .ThenBy(d => d.Empleado.Nombre)
+            .Select(detalle =>
+            {
+                var periodos = detailsPorEmpleado.TryGetValue(detalle.EmpleadoId, out var dets)
+                    ? dets.Select(d => new PeriodoPagoDecimoItem(
+                        d.PayrollHeader.PayrollNumber,
+                        d.PayrollHeader.PeriodStartDate,
+                        d.PayrollHeader.PeriodEndDate,
+                        GetTipoPeriodoTexto(d.PayrollHeader.PayPeriodType),
+                        d.GrossPay
+                    )).ToList()
+                    : new List<PeriodoPagoDecimoItem>();
+
+                return new EmpleadoDesgloseDecimoItem(
+                    detalle.Empleado.NumeroIdentificacion ?? "—",
+                    $"{detalle.Empleado.Nombre} {detalle.Empleado.Apellido}".Trim(),
+                    periodos,
+                    detalle.TotalDevengado,
+                    detalle.MontoDecimo,
+                    detalle.CssEmpleado,
+                    detalle.SeEmpleado,
+                    detalle.ISR,
+                    detalle.TotalDeducciones,
+                    detalle.NetoPago
+                );
+            }).ToList();
+
+        var totales = new TotalesDesgloseDecimo(
+            empleadoItems.Count,
+            planilla.TotalDevengado,
+            planilla.TotalDecimo,
+            planilla.TotalCssEmpleado,
+            planilla.TotalSeEmpleado,
+            planilla.TotalISR,
+            planilla.TotalCssEmpleado + planilla.TotalSeEmpleado + planilla.TotalISR,
+            planilla.TotalNetoPago
+        );
+
+        return new ReporteDesgloseDecimoDto(
+            nombre, ruc,
+            planilla.Numero,
+            $"{planilla.PeriodoDesde:dd/MM/yyyy} - {planilla.PeriodoHasta:dd/MM/yyyy}",
+            planilla.FechaPago,
+            planilla.Estado.ToString(),
+            partida,
+            empleadoItems,
+            totales
+        );
+    }
+
+    private static string GetTipoPeriodoTexto(PayPeriodType type) => type switch
+    {
+        PayPeriodType.Quincenal => "Quincenal",
+        PayPeriodType.Mensual => "Mensual",
+        PayPeriodType.Semanal => "Semanal",
+        PayPeriodType.Bisemanal => "Bisemanal",
+        _ => type.ToString()
+    };
 }

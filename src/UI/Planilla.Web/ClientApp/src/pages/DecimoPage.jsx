@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, Plus, Calculator, CheckCircle, ChevronDown, ChevronRight, Calendar, DollarSign, Users } from 'lucide-react';
+import { Loader2, Plus, Calculator, CheckCircle, ChevronDown, ChevronRight, Calendar, DollarSign, Users, FileDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
 
@@ -113,6 +113,22 @@ export default function DecimoPage() {
       toast.error(e.response?.data?.message || 'Error al calcular');
     } finally {
       setCalculando(false);
+    }
+  };
+
+  // ── DESCARGAR REPORTE DESGLOSE ──
+  const handleDescargar = async (planillaDecimoId, formato) => {
+    try {
+      const ext = formato === 'pdf' ? 'pdf' : 'excel';
+      const res = await api.get(`/api/reportes/desglose-decimo/${planillaDecimoId}/${ext}`, { responseType: 'blob' });
+      const blob = new Blob([res.data]);
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `DesgloseDecimo_${planillaDecimoId}.${formato === 'pdf' ? 'pdf' : 'xlsx'}`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch {
+      toast.error('Error al descargar el reporte');
     }
   };
 
@@ -321,6 +337,22 @@ export default function DecimoPage() {
                   >
                     <CheckCircle className="w-4 h-4" /> Marcar Pagada
                   </button>
+                )}
+                {viewPlanilla.estado !== 'Borrador' && (
+                  <>
+                    <button
+                      onClick={() => handleDescargar(viewPlanilla.id, 'pdf')}
+                      className="flex items-center gap-2 px-3 py-2 bg-red-700 hover:bg-red-800 text-white rounded-lg text-sm font-medium transition-colors"
+                    >
+                      <FileDown className="w-4 h-4" /> PDF
+                    </button>
+                    <button
+                      onClick={() => handleDescargar(viewPlanilla.id, 'excel')}
+                      className="flex items-center gap-2 px-3 py-2 bg-green-700 hover:bg-green-800 text-white rounded-lg text-sm font-medium transition-colors"
+                    >
+                      <FileDown className="w-4 h-4" /> Excel
+                    </button>
+                  </>
                 )}
                 <button onClick={() => setViewPlanilla(null)} className="text-gray-400 hover:text-white text-xl">✕</button>
               </div>

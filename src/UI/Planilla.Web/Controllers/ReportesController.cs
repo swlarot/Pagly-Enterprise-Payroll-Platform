@@ -412,4 +412,75 @@ public class ReportesController : ControllerBase
             return StatusCode(500, new { message = $"Error al exportar: {ex.Message}" });
         }
     }
+
+    // ====================================================================
+    // REPORTE 6: Desglose Décimo Tercer Mes (DEV-171)
+    // ====================================================================
+
+    /// <summary>Obtiene el reporte de desglose del Décimo Tercer Mes en formato JSON.</summary>
+    [HttpGet("desglose-decimo/{planillaDecimoId}")]
+    public async Task<IActionResult> GetDesgloseDecimo(int planillaDecimoId)
+    {
+        try
+        {
+            var reporte = await _reportesService.GenerarReporteDesgloseDecimo(planillaDecimoId);
+            return Ok(reporte);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Error al generar reporte: {ex.Message}" });
+        }
+    }
+
+    /// <summary>Exporta el reporte de desglose del Décimo Tercer Mes a Excel.</summary>
+    [HttpGet("desglose-decimo/{planillaDecimoId}/excel")]
+    [PlanLimits(PlanLimitType.ExportExcel)]
+    public async Task<IActionResult> ExportarDesgloseDecimoExcel(int planillaDecimoId)
+    {
+        try
+        {
+            var reporte = await _reportesService.GenerarReporteDesgloseDecimo(planillaDecimoId);
+            var bytes = _exportacionService.ExportarExcelDesgloseDecimo(reporte);
+            if (bytes.Length == 0)
+                return BadRequest(new { message = "No hay datos para exportar." });
+            var fileName = $"DesgloseDecimo_{planillaDecimoId}_{DateTimeHelper.NowPanama():yyyyMMdd_HHmmss}.xlsx";
+            return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Error al exportar: {ex.Message}" });
+        }
+    }
+
+    /// <summary>Exporta el reporte de desglose del Décimo Tercer Mes a PDF.</summary>
+    [HttpGet("desglose-decimo/{planillaDecimoId}/pdf")]
+    [PlanLimits(PlanLimitType.ExportPdf)]
+    public async Task<IActionResult> ExportarDesgloseDecimoPdf(int planillaDecimoId)
+    {
+        try
+        {
+            var reporte = await _reportesService.GenerarReporteDesgloseDecimo(planillaDecimoId);
+            var bytes = _exportacionService.ExportarPdfDesgloseDecimo(reporte);
+            if (bytes.Length == 0)
+                return BadRequest(new { message = "No hay datos para exportar." });
+            var fileName = $"DesgloseDecimo_{planillaDecimoId}_{DateTimeHelper.NowPanama():yyyyMMdd_HHmmss}.pdf";
+            return File(bytes, "application/pdf", fileName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Error al exportar: {ex.Message}" });
+        }
+    }
 }
