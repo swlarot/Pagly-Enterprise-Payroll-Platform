@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
-using Vorluno.Planilla.Application.Helpers;
+using Vorluno.Planilla.Application.DTOs;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
@@ -18,16 +18,16 @@ public class DecimoController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly ITenantContext _tenantContext;
-    private readonly IPayrollConfigProvider _configProvider;
+    private readonly IDecimoCalculationService _decimoCalculationService;
 
     public DecimoController(
         ApplicationDbContext context,
         ITenantContext tenantContext,
-        IPayrollConfigProvider configProvider)
+        IDecimoCalculationService decimoCalculationService)
     {
         _context = context;
         _tenantContext = tenantContext;
-        _configProvider = configProvider;
+        _decimoCalculationService = decimoCalculationService;
     }
 
     // ====================================================================
@@ -141,6 +141,10 @@ public class DecimoController : ControllerBase
         if (request.PeriodoDesde >= request.PeriodoHasta)
             return BadRequest(new { message = "La fecha de inicio debe ser anterior a la fecha de fin" });
 
+        // DEV-174: validar que FechaPago corresponde a una partida válida
+        if (request.FechaPago.Month != 4 && request.FechaPago.Month != 8 && request.FechaPago.Month != 12)
+            return BadRequest(new { message = "La fecha de pago debe ser en abril (partida 1), agosto (partida 2) o diciembre (partida 3)" });
+
         // Generar número correlativo
         var count = await _context.PlanillasDecimo
             .CountAsync(p => p.TenantId == tenantId && p.FechaPago.Year == request.FechaPago.Year);
@@ -176,156 +180,15 @@ public class DecimoController : ControllerBase
     public async Task<ActionResult> Calcular(int id)
     {
         var tenantId = _tenantContext.TenantId;
-
-        var planilla = await _context.PlanillasDecimo
-            .Include(p => p.Detalles)
-            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
-
-        if (planilla == null)
-            return NotFound(new { message = "Planilla de décimo no encontrada" });
-
-        if (planilla.Estado == EstadoDecimo.Pagada)
-            return BadRequest(new { message = "No se puede recalcular una planilla ya pagada" });
-
-        var empleados = await _context.Empleados
-            .Where(e => e.TenantId == tenantId && e.EstaActivo)
-            .ToListAsync();
-
-        // Cargar tax config para ISR (usamos fecha de pago como fecha referencia)
-        var taxConfig = await _configProvider.GetTaxConfigAsync(tenantId, planilla.FechaPago);
-        var taxBrackets = await _configProvider.GetTaxBracketsAsync(tenantId, planilla.FechaPago.Year);
-
-        // Limpiar detalles existentes para recalcular
-        if (planilla.Detalles.Any())
+        try
         {
-            _context.DetallesDecimo.RemoveRange(planilla.Detalles);
-            planilla.Detalles.Clear();
+            var resultado = await _decimoCalculationService.CalcularAsync(id, tenantId);
+            return Ok(new { message = $"Décimo calculado para {resultado.EmpleadosProcesados} empleados", totalDecimo = resultado.TotalDecimo });
         }
-
-        decimal totalDevengado = 0;
-        decimal totalDecimo = 0;
-        decimal totalCssEmp = 0;
-        decimal totalCssPat = 0;
-        decimal totalSeEmp = 0;
-        decimal totalSePat = 0;
-        decimal totalIsr = 0;
-        decimal totalNeto = 0;
-
-        foreach (var empleado in empleados)
+        catch (InvalidOperationException ex)
         {
-            // 1. Obtener PayrollDetails del empleado dentro del período (solo planillas regulares)
-            var details = await _context.PayrollDetails
-                .Include(d => d.PayrollHeader)
-                .Where(d => d.TenantId == tenantId
-                         && d.EmpleadoId == empleado.Id
-                         && d.PayrollHeader.PeriodStartDate >= planilla.PeriodoDesde
-                         && d.PayrollHeader.PeriodEndDate <= planilla.PeriodoHasta)
-                .ToListAsync();
-
-            if (details.Count == 0)
-                continue;
-
-            // 2. Desglose mensual: agrupar por año+mes según PeriodStartDate del header
-            var desgloseMensual = details
-                .GroupBy(d => new { d.PayrollHeader.PeriodStartDate.Year, d.PayrollHeader.PeriodStartDate.Month })
-                .Select(g => new DesgloseMensualItem(g.Key.Year, g.Key.Month, g.Sum(d => d.GrossPay)))
-                .OrderBy(x => x.Ano).ThenBy(x => x.Mes)
-                .ToList();
-
-            decimal totalDev = details.Sum(d => d.GrossPay);
-
-            // 3. MontoDecimo = TotalDevengado / 12
-            decimal montoDecimo = Math.Round(totalDev / 12m, 2);
-
-            // 4. CSS especiales (Art. 59 Ley 29/1976)
-            decimal cssEmp = Math.Round(montoDecimo * PayrollConstants.CssTasaDecimoEmpleado, 2);
-            decimal cssPat = Math.Round(montoDecimo * PayrollConstants.CssTasaDecimoPatronal, 2);
-
-            // 5. Seguro Educativo (mismo que regular)
-            bool seActivo = empleado.IsSubjectToEducationalInsurance;
-            decimal seEmp = seActivo ? Math.Round(montoDecimo * PayrollConstants.SeTasaEmpleado, 2) : 0;
-            decimal sePat = seActivo ? Math.Round(montoDecimo * PayrollConstants.SeTasaPatronal, 2) : 0;
-
-            // 6. ISR del décimo: (última quincena + monto_décimo) × 13 → tramos → / 13
-            decimal isr = 0;
-            if (empleado.IsSubjectToIncomeTax && taxBrackets.Count > 0)
-            {
-                var ultimaQuincena = await _context.PayrollDetails
-                    .Where(d => d.TenantId == tenantId
-                             && d.EmpleadoId == empleado.Id
-                             && d.PayrollHeader.PeriodEndDate <= planilla.PeriodoHasta)
-                    .OrderByDescending(d => d.PayrollHeader.PeriodEndDate)
-                    .Select(d => d.GrossPay)
-                    .FirstOrDefaultAsync();
-
-                decimal baseDecimo = ultimaQuincena + montoDecimo;
-                decimal annualBase = baseDecimo * 13m;
-
-                // Deducción por dependientes
-                decimal depDeduccion = 0;
-                if (taxConfig != null)
-                {
-                    var validDeps = Math.Min(empleado.Dependents, taxConfig.MaxDependents);
-                    depDeduccion = validDeps * taxConfig.DependentDeductionAmount;
-                }
-
-                decimal netGravable = Math.Max(0, annualBase - depDeduccion);
-                decimal isrAnual = CalcularIsrAnual(netGravable, taxBrackets);
-                isr = Math.Round(isrAnual / 13m, 2);
-            }
-
-            // 7. Totales
-            decimal totalDedEmp = cssEmp + seEmp + isr;
-            decimal neto = montoDecimo - totalDedEmp;
-
-            // 8. Guardar DesgloseMensual como JSON
-            var desgloseJson = JsonSerializer.Serialize(desgloseMensual);
-
-            var detalle = new DetalleDecimo
-            {
-                TenantId = tenantId,
-                PlanillaDecimoId = planilla.Id,
-                EmpleadoId = empleado.Id,
-                DesgloseMensualJson = desgloseJson,
-                TotalDevengado = totalDev,
-                MontoDecimo = montoDecimo,
-                CssEmpleado = cssEmp,
-                CssPatrono = cssPat,
-                SeEmpleado = seEmp,
-                SePatrono = sePat,
-                ISR = isr,
-                TotalDeducciones = totalDedEmp,
-                NetoPago = neto,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            _context.DetallesDecimo.Add(detalle);
-
-            totalDevengado += totalDev;
-            totalDecimo += montoDecimo;
-            totalCssEmp += cssEmp;
-            totalCssPat += cssPat;
-            totalSeEmp += seEmp;
-            totalSePat += sePat;
-            totalIsr += isr;
-            totalNeto += neto;
+            return BadRequest(new { message = ex.Message });
         }
-
-        // 9. Actualizar cabecera
-        planilla.TotalDevengado = totalDevengado;
-        planilla.TotalDecimo = totalDecimo;
-        planilla.TotalCssEmpleado = totalCssEmp;
-        planilla.TotalCssPatrono = totalCssPat;
-        planilla.TotalSeEmpleado = totalSeEmp;
-        planilla.TotalSePatrono = totalSePat;
-        planilla.TotalISR = totalIsr;
-        planilla.TotalNetoPago = totalNeto;
-        planilla.Estado = EstadoDecimo.Calculada;
-        planilla.UpdatedAt = DateTime.UtcNow;
-
-        await _context.SaveChangesAsync();
-
-        return Ok(new { message = $"Décimo calculado para {empleados.Count} empleados", totalDecimo });
     }
 
     // ====================================================================
@@ -354,28 +217,6 @@ public class DecimoController : ControllerBase
         return Ok(new { message = "Planilla de décimo marcada como pagada" });
     }
 
-    // ====================================================================
-    // Cálculo ISR anual con tramos progresivos (igual que IncomeTaxService)
-    // ====================================================================
-    private static decimal CalcularIsrAnual(decimal netGravable, List<Vorluno.Planilla.Application.DTOs.TaxBracketDto> brackets)
-    {
-        var ordered = brackets.OrderBy(b => b.MinIncome).ToList();
-
-        Vorluno.Planilla.Application.DTOs.TaxBracketDto? bracket = null;
-        foreach (var b in ordered)
-        {
-            if (netGravable > b.MinIncome)
-                bracket = b;
-            else
-                break;
-        }
-
-        if (bracket == null) return 0m;
-
-        var excess = netGravable - bracket.MinIncome;
-        var bracketTax = Math.Round(excess * bracket.Rate / 100m, 2);
-        return Math.Round(bracket.FixedAmount + bracketTax, 2);
-    }
 }
 
 // ====================================================================
@@ -435,4 +276,4 @@ public record DetalleDecimoDto(
     decimal NetoPago
 );
 
-public record DesgloseMensualItem(int Ano, int Mes, decimal Bruto);
+// DesgloseMensualItem movido a Vorluno.Planilla.Application.DTOs.DesgloseMensualItem (DEV-173)
