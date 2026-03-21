@@ -509,7 +509,9 @@ public class ReportesService
             .Where(d => d.TenantId == tenantId
                 && empleadoIds.Contains(d.EmpleadoId)
                 && d.PayrollHeader.PeriodStartDate >= planilla.PeriodoDesde
-                && d.PayrollHeader.PeriodEndDate <= planilla.PeriodoHasta)
+                && d.PayrollHeader.PeriodEndDate <= planilla.PeriodoHasta
+                && (d.PayrollHeader.Status == PayrollStatus.Approved
+                    || d.PayrollHeader.Status == PayrollStatus.Paid))
             .OrderBy(d => d.EmpleadoId)
                 .ThenBy(d => d.PayrollHeader.PeriodStartDate)
             .ToListAsync();

@@ -127,8 +127,8 @@ export default function DecimoPage() {
       link.download = `DesgloseDecimo_${planillaDecimoId}.${formato === 'pdf' ? 'pdf' : 'xlsx'}`;
       link.click();
       URL.revokeObjectURL(link.href);
-    } catch {
-      toast.error('Error al descargar el reporte');
+    } catch (e) {
+      toast.error(e?.response?.data?.message || 'Error al descargar el reporte');
     }
   };
 
