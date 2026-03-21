@@ -118,8 +118,8 @@ En la app → **App Configs** → **Environment Variables** añade:
 |----------|-------|-------------|
 | `ConnectionStrings__DefaultConnection` | `Host=...;Port=5432;Database=PlanillaDB;Username=...;Password=...` | PostgreSQL |
 | `Jwt__Key` | Clave secreta ≥32 caracteres | Para firmar JWTs |
-| `App__BaseUrl` | `https://pagly.clau.com.pa` | URL pública de la app |
-| `Cors__AllowedOrigins` | `https://pagly.clau.com.pa` | Origen permitido para CORS |
+| `App__BaseUrl` | `https://app.pagly.clau.com.pa` | URL pública de la app |
+| `Cors__AllowedOrigins` | `https://app.pagly.clau.com.pa,tauri://localhost,https://tauri.localhost` | Orígenes permitidos para CORS (web + desktop) |
 
 ### Opcionales (según uso)
 
@@ -130,8 +130,8 @@ En la app → **App Configs** → **Environment Variables** añade:
 | `Stripe__SecretKey` | Si usas pagos |
 | `Stripe__PublishableKey` | Si usas pagos |
 | `Stripe__WebhookSecret` | Si usas webhooks |
-| `Stripe__SuccessUrl` | `https://pagly.clau.com.pa/dashboard?checkout=success` |
-| `Stripe__CancelUrl` | `https://pagly.clau.com.pa/billing?checkout=cancel` |
+| `Stripe__SuccessUrl` | `https://app.pagly.clau.com.pa/dashboard?checkout=success` |
+| `Stripe__CancelUrl` | `https://app.pagly.clau.com.pa/billing?checkout=cancel` |
 | `Brevo__ApiKey` | API Key de Brevo |
 | `Brevo__SenderEmail` | ej. `noreply@clau.com.pa` |
 | `Brevo__SenderName` | `Pagly` |
@@ -171,9 +171,9 @@ Las migraciones de EF Core se ejecutan **automáticamente al arrancar** la app (
 
 | Concepto | Valor |
 |----------|-------|
-| URL pública | `https://pagly.clau.com.pa` |
-| API | `https://pagly.clau.com.pa/api/...` (mismo origen) |
-| Health | `https://pagly.clau.com.pa/health` |
+| URL pública | `https://app.pagly.clau.com.pa` |
+| API | `https://app.pagly.clau.com.pa/api/...` (mismo origen) |
+| Health | `https://app.pagly.clau.com.pa/health` |
 | Despliegue | Push a GitHub → build en servidor → deploy |
 
 ---
@@ -186,7 +186,7 @@ Las migraciones de EF Core se ejecutan **automáticamente al arrancar** la app (
 - [ ] Variables: `ConnectionStrings__DefaultConnection`, `Jwt__Key`, `App__BaseUrl`, `Cors__AllowedOrigins`.
 - [ ] Base de datos PostgreSQL accesible desde el contenedor.
 - [ ] Health check responde 200 en `/health`.
-- [ ] Login y navegación funcionan en `https://pagly.clau.com.pa`.
+- [ ] Login y navegación funcionan en `https://app.pagly.clau.com.pa`.
 
 ---
 
