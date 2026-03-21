@@ -46,8 +46,12 @@ jobs:
           cache: 'npm'
           cache-dependency-path: src/UI/Planilla.Web/ClientApp/package-lock.json
 
-      - name: Instalar dependencias npm
+      - name: Instalar dependencias npm (ClientApp)
         working-directory: src/UI/Planilla.Web/ClientApp
+        run: npm ci
+
+      - name: Instalar dependencias npm (Desktop — Tauri CLI)
+        working-directory: src/UI/Planilla.Desktop
         run: npm ci
 
       - name: Build frontend (modo desktop)
