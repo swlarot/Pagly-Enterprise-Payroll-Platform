@@ -164,6 +164,7 @@ builder.Services.AddScoped<IEmployeeDeletionValidationService, EmployeeDeletionV
 builder.Services.AddScoped<Vorluno.Planilla.Application.Interfaces.IAsistenciaCalculationService, Vorluno.Planilla.Infrastructure.Services.AsistenciaCalculationService>();
 builder.Services.AddScoped<Vorluno.Planilla.Infrastructure.Services.PanamaHolidayService>();
 builder.Services.AddScoped<Vorluno.Planilla.Application.Interfaces.IOvertimeFactorService, Vorluno.Planilla.Infrastructure.Services.OvertimeFactorService>();
+builder.Services.AddScoped<Vorluno.Planilla.Application.Interfaces.IDecimoCalculationService, Vorluno.Planilla.Infrastructure.Services.DecimoCalculationService>();
 
 // --- FIN DE NUESTRA CONFIGURACIÓN PRINCIPAL ---
 
