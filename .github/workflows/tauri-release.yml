@@ -83,7 +83,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: src/UI/Planilla.Desktop
-          tauriScript: npm run tauri:build
+          tauriScript: npx tauri
           tagName: ${{ github.ref_name }}
           releaseName: 'Pagly Desktop ${{ github.ref_name }}'
           releaseBody: |
