@@ -100,3 +100,32 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || '' }}
+
+      # ── Alias estáticos (sin versión) para URLs permanentes en el sitio web ─
+      - name: Upload alias Windows
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          exe=$(find src/UI/Planilla.Desktop/src-tauri/target -name "*_x64-setup.exe" | head -1)
+          cp "$exe" /tmp/Pagly-Windows-Setup.exe
+          gh release upload ${{ github.ref_name }} /tmp/Pagly-Windows-Setup.exe --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload alias macOS
+        if: matrix.platform == 'macos-latest'
+        run: |
+          dmg=$(find src/UI/Planilla.Desktop/src-tauri/target -name "*.dmg" | head -1)
+          cp "$dmg" /tmp/Pagly-macOS.dmg
+          gh release upload ${{ github.ref_name }} /tmp/Pagly-macOS.dmg --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload alias Linux
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          appimage=$(find src/UI/Planilla.Desktop/src-tauri/target -name "*.AppImage" | head -1)
+          cp "$appimage" /tmp/Pagly-Linux.AppImage
+          gh release upload ${{ github.ref_name }} /tmp/Pagly-Linux.AppImage --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
