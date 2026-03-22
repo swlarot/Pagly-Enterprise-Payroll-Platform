@@ -22,7 +22,7 @@ export interface AppConfig {
 
 // VITE_API_URL vacío = same-origin (SPA y API en mismo dominio)
 const config: AppConfig = {
-  apiUrl: import.meta.env.VITE_API_URL !== undefined
+  apiUrl: (import.meta.env.VITE_API_URL !== undefined && import.meta.env.VITE_API_URL !== '')
     ? String(import.meta.env.VITE_API_URL)
     : (import.meta.env.DEV ? 'http://localhost:5039' : ''),
 
