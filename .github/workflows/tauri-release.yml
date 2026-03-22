@@ -102,48 +102,57 @@ jobs:
           args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || '' }}
 
       # ── Alias estáticos en repo PÚBLICO vorluno/pagly-releases ────────────────
-      - name: Upload alias Windows (repo público)
+      - name: Preparar alias Windows
         if: matrix.platform == 'windows-latest'
         shell: bash
         run: |
           exe=$(find src/UI/Planilla.Desktop/src-tauri/target -name "*_x64-setup.exe" | head -1)
           [ -z "$exe" ] && echo "ERROR: installer not found" && exit 1
-          cp "$exe" /tmp/Pagly-Windows-Setup.exe
-          gh release create ${{ github.ref_name }} --repo vorluno/pagly-releases \
-            --title "Pagly Desktop ${{ github.ref_name }}" \
-            --notes "Descarga desde [vorluno.dev/productos/pagly](https://vorluno.dev/productos/pagly)" \
-            2>/dev/null || true
-          gh release upload ${{ github.ref_name }} /tmp/Pagly-Windows-Setup.exe \
-            --repo vorluno/pagly-releases --clobber
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
+          cp "$exe" Pagly-Windows-Setup.exe
 
-      - name: Upload alias macOS (repo público)
+      - name: Publicar alias Windows en repo público
+        if: matrix.platform == 'windows-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: vorluno/pagly-releases
+          tag_name: ${{ github.ref_name }}
+          name: "Pagly Desktop ${{ github.ref_name }}"
+          body: "Descarga desde [vorluno.dev/productos/pagly](https://vorluno.dev/productos/pagly)"
+          files: Pagly-Windows-Setup.exe
+          token: ${{ secrets.RELEASES_PAT }}
+
+      - name: Preparar alias macOS
         if: matrix.platform == 'macos-latest'
         run: |
           dmg=$(find src/UI/Planilla.Desktop/src-tauri/target -name "*.dmg" | head -1)
           [ -z "$dmg" ] && echo "ERROR: dmg not found" && exit 1
-          cp "$dmg" /tmp/Pagly-macOS.dmg
-          gh release create ${{ github.ref_name }} --repo vorluno/pagly-releases \
-            --title "Pagly Desktop ${{ github.ref_name }}" \
-            --notes "Descarga desde [vorluno.dev/productos/pagly](https://vorluno.dev/productos/pagly)" \
-            2>/dev/null || true
-          gh release upload ${{ github.ref_name }} /tmp/Pagly-macOS.dmg \
-            --repo vorluno/pagly-releases --clobber
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
+          cp "$dmg" Pagly-macOS.dmg
 
-      - name: Upload alias Linux (repo público)
+      - name: Publicar alias macOS en repo público
+        if: matrix.platform == 'macos-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: vorluno/pagly-releases
+          tag_name: ${{ github.ref_name }}
+          name: "Pagly Desktop ${{ github.ref_name }}"
+          body: "Descarga desde [vorluno.dev/productos/pagly](https://vorluno.dev/productos/pagly)"
+          files: Pagly-macOS.dmg
+          token: ${{ secrets.RELEASES_PAT }}
+
+      - name: Preparar alias Linux
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           appimage=$(find src/UI/Planilla.Desktop/src-tauri/target -name "*.AppImage" | head -1)
           [ -z "$appimage" ] && echo "ERROR: AppImage not found" && exit 1
-          cp "$appimage" /tmp/Pagly-Linux.AppImage
-          gh release create ${{ github.ref_name }} --repo vorluno/pagly-releases \
-            --title "Pagly Desktop ${{ github.ref_name }}" \
-            --notes "Descarga desde [vorluno.dev/productos/pagly](https://vorluno.dev/productos/pagly)" \
-            2>/dev/null || true
-          gh release upload ${{ github.ref_name }} /tmp/Pagly-Linux.AppImage \
-            --repo vorluno/pagly-releases --clobber
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
+          cp "$appimage" Pagly-Linux.AppImage
+
+      - name: Publicar alias Linux en repo público
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: vorluno/pagly-releases
+          tag_name: ${{ github.ref_name }}
+          name: "Pagly Desktop ${{ github.ref_name }}"
+          body: "Descarga desde [vorluno.dev/productos/pagly](https://vorluno.dev/productos/pagly)"
+          files: Pagly-Linux.AppImage
+          token: ${{ secrets.RELEASES_PAT }}
