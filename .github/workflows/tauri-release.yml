@@ -101,31 +101,49 @@ jobs:
           prerelease: false
           args: ${{ matrix.platform == 'macos-latest' && '--target universal-apple-darwin' || '' }}
 
-      # ── Alias estáticos (sin versión) para URLs permanentes en el sitio web ─
-      - name: Upload alias Windows
+      # ── Alias estáticos en repo PÚBLICO vorluno/pagly-releases ────────────────
+      - name: Upload alias Windows (repo público)
         if: matrix.platform == 'windows-latest'
         shell: bash
         run: |
           exe=$(find src/UI/Planilla.Desktop/src-tauri/target -name "*_x64-setup.exe" | head -1)
+          [ -z "$exe" ] && echo "ERROR: installer not found" && exit 1
           cp "$exe" /tmp/Pagly-Windows-Setup.exe
-          gh release upload ${{ github.ref_name }} /tmp/Pagly-Windows-Setup.exe --clobber
+          gh release create ${{ github.ref_name }} --repo vorluno/pagly-releases \
+            --title "Pagly Desktop ${{ github.ref_name }}" \
+            --notes "Descarga desde [vorluno.dev/productos/pagly](https://vorluno.dev/productos/pagly)" \
+            2>/dev/null || true
+          gh release upload ${{ github.ref_name }} /tmp/Pagly-Windows-Setup.exe \
+            --repo vorluno/pagly-releases --clobber
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
 
-      - name: Upload alias macOS
+      - name: Upload alias macOS (repo público)
         if: matrix.platform == 'macos-latest'
         run: |
           dmg=$(find src/UI/Planilla.Desktop/src-tauri/target -name "*.dmg" | head -1)
+          [ -z "$dmg" ] && echo "ERROR: dmg not found" && exit 1
           cp "$dmg" /tmp/Pagly-macOS.dmg
-          gh release upload ${{ github.ref_name }} /tmp/Pagly-macOS.dmg --clobber
+          gh release create ${{ github.ref_name }} --repo vorluno/pagly-releases \
+            --title "Pagly Desktop ${{ github.ref_name }}" \
+            --notes "Descarga desde [vorluno.dev/productos/pagly](https://vorluno.dev/productos/pagly)" \
+            2>/dev/null || true
+          gh release upload ${{ github.ref_name }} /tmp/Pagly-macOS.dmg \
+            --repo vorluno/pagly-releases --clobber
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
 
-      - name: Upload alias Linux
+      - name: Upload alias Linux (repo público)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           appimage=$(find src/UI/Planilla.Desktop/src-tauri/target -name "*.AppImage" | head -1)
+          [ -z "$appimage" ] && echo "ERROR: AppImage not found" && exit 1
           cp "$appimage" /tmp/Pagly-Linux.AppImage
-          gh release upload ${{ github.ref_name }} /tmp/Pagly-Linux.AppImage --clobber
+          gh release create ${{ github.ref_name }} --repo vorluno/pagly-releases \
+            --title "Pagly Desktop ${{ github.ref_name }}" \
+            --notes "Descarga desde [vorluno.dev/productos/pagly](https://vorluno.dev/productos/pagly)" \
+            2>/dev/null || true
+          gh release upload ${{ github.ref_name }} /tmp/Pagly-Linux.AppImage \
+            --repo vorluno/pagly-releases --clobber
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASES_PAT }}
