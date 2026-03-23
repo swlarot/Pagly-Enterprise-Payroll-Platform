@@ -119,7 +119,7 @@ En la app → **App Configs** → **Environment Variables** añade:
 | `ConnectionStrings__DefaultConnection` | `Host=...;Port=5432;Database=PlanillaDB;Username=...;Password=...` | PostgreSQL |
 | `Jwt__Key` | Clave secreta ≥32 caracteres | Para firmar JWTs |
 | `App__BaseUrl` | `https://app.pagly.clau.com.pa` | URL pública de la app |
-| `Cors__AllowedOrigins` | `https://app.pagly.clau.com.pa,tauri://localhost,https://tauri.localhost` | Orígenes permitidos para CORS (web + desktop) |
+| `Cors__AllowedOrigins` | `https://app.pagly.clau.com.pa,tauri://localhost,https://tauri.localhost,http://tauri.localhost` | Orígenes permitidos para CORS (web + desktop) |
 
 ### Opcionales (según uso)
 
