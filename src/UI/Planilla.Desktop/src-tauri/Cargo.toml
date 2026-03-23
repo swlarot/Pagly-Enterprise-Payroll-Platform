@@ -1,6 +1,6 @@
 [package]
 name = "planilla-desktop"
-version = "1.0.2"
+version = "1.0.3"
 description = "Pagly - Sistema de Planilla (App de Escritorio)"
 authors = ["Vorluno <dev@vorluno.dev>"]
 license = "Proprietary"

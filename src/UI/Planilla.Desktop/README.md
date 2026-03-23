@@ -91,11 +91,12 @@ npm run tauri:build
 Agregar en CapRover → App → Environment Variables:
 
 ```
-Cors__AllowedOrigins=https://app.pagly.clau.com.pa,tauri://localhost,https://tauri.localhost
+Cors__AllowedOrigins=https://app.pagly.clau.com.pa,tauri://localhost,https://tauri.localhost,http://tauri.localhost
 ```
 
 Los orígenes `tauri://localhost` y `https://tauri.localhost` son los que usa la WebView de Tauri
-cuando carga el frontend empaquetado (`frontendDist`).
+cuando carga el frontend empaquetado (`frontendDist`). En Windows, WebView2 envía
+`http://tauri.localhost` (HTTP sin S), por lo que ese origen también es necesario.
 
 ---
 
