@@ -28,6 +28,13 @@ import ConfirmModal from '../components/ConfirmModal';
 import { formatCurrency } from '../utils/currency';
 import { PAY_PERIOD_CONFIG } from '../constants/payroll';
 
+// Parsea fechas ISO de la API sin desplazamiento de timezone (UTC-5 Panama)
+const parseUTCDate = (dateStr) => {
+    if (!dateStr) return new Date();
+    const d = new Date(dateStr);
+    return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+};
+
 // Pasos del workflow de la planilla
 const WORKFLOW_STEPS = [
     { status: 0, label: 'Borrador', icon: Circle },
@@ -511,7 +518,7 @@ const PlanillasPage = () => {
     // Formatea la etiqueta del selector de planilla
     const formatPlanillaOption = (planilla) => {
         const periodoLabel = PAY_PERIOD_CONFIG[planilla.payPeriodType]?.name || '';
-        const fechaLabel = new Date(planilla.periodStartDate).toLocaleDateString('es-PA', { month: 'short', year: 'numeric' });
+        const fechaLabel = parseUTCDate(planilla.periodStartDate).toLocaleDateString('es-PA', { month: 'short', year: 'numeric' });
         return `${planilla.payrollNumber} — ${fechaLabel}${periodoLabel ? ` (${periodoLabel})` : ''}`;
     };
 
@@ -600,10 +607,10 @@ const PlanillasPage = () => {
                             )}
                         </div>
                         <p className="text-sm text-gray-400 mt-0.5">
-                            Período: {new Date(selectedPlanilla.periodStartDate).toLocaleDateString('es-PA')} — {new Date(selectedPlanilla.periodEndDate).toLocaleDateString('es-PA')}
+                            Período: {parseUTCDate(selectedPlanilla.periodStartDate).toLocaleDateString('es-PA')} — {parseUTCDate(selectedPlanilla.periodEndDate).toLocaleDateString('es-PA')}
                             {selectedPlanilla.payDate && (
                                 <span className="ml-3 text-gray-500">
-                                    Fecha de pago: {new Date(selectedPlanilla.payDate).toLocaleDateString('es-PA')}
+                                    Fecha de pago: {parseUTCDate(selectedPlanilla.payDate).toLocaleDateString('es-PA')}
                                 </span>
                             )}
                         </p>
@@ -1366,9 +1373,9 @@ const PlanillasPage = () => {
                                             </div>
                                         </td>
                                         <td className="py-4 px-6 text-sm text-gray-500">
-                                            {new Date(planilla.periodStartDate).toLocaleDateString('es-PA', { day: '2-digit', month: 'short' })}
+                                            {parseUTCDate(planilla.periodStartDate).toLocaleDateString('es-PA', { day: '2-digit', month: 'short' })}
                                             {' — '}
-                                            {new Date(planilla.periodEndDate).toLocaleDateString('es-PA', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                            {parseUTCDate(planilla.periodEndDate).toLocaleDateString('es-PA', { day: '2-digit', month: 'short', year: 'numeric' })}
                                         </td>
                                         <td className="py-4 px-6 text-sm text-gray-300">{planilla.employeeCount || empleadosCount}</td>
                                         {/* Montos con font-mono y prefijo B/. */}
@@ -1556,7 +1563,7 @@ const PlanillasPage = () => {
                                 <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Bruto Total</p>
                                 <p className="font-bold text-lg text-emerald-400 font-mono">{formatCurrency(planillaDetails.totalGrossPay)}</p>
                                 <p className="text-xs text-gray-500 mt-1">
-                                    {new Date(planillaDetails.periodStartDate).toLocaleDateString('es-PA')} — {new Date(planillaDetails.periodEndDate).toLocaleDateString('es-PA')}
+                                    {parseUTCDate(planillaDetails.periodStartDate).toLocaleDateString('es-PA')} — {parseUTCDate(planillaDetails.periodEndDate).toLocaleDateString('es-PA')}
                                 </p>
                             </div>
                             <div className="bg-navy-800 rounded-xl p-4 border border-amber-700/30">

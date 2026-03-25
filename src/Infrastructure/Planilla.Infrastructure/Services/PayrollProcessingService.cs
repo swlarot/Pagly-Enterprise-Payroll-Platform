@@ -113,7 +113,7 @@ public class PayrollProcessingService
 
         var deduccionesResult = await GetDeduccionesAdicionalesConPrelacionAsync(
             empleado.Id, grossPayAjustado, netoPostLegal,
-            empleado.PayPeriodType, payrollPeriodStart);
+            empleado.PayPeriodType, payrollPeriodStart, payrollPeriodEnd);
 
         // ====================================================================
         // PASO 5: Calcular totales
@@ -427,7 +427,7 @@ public class PayrollProcessingService
     /// </summary>
     private async Task<DeduccionesResult> GetDeduccionesAdicionalesConPrelacionAsync(
         int empleadoId, decimal grossPay, decimal netoPostLegal,
-        PayPeriodType payPeriodType, DateTime fechaPlanilla)
+        PayPeriodType payPeriodType, DateTime fechaPlanilla, DateTime fechaPlanillaFin)
     {
         // Cargar salario minimo legal de la configuracion vigente
         var taxConfig = await _context.PayrollTaxConfigurations
@@ -503,11 +503,12 @@ public class PayrollProcessingService
             });
         }
 
-        // 3. Anticipos aprobados para esta fecha
+        // 3. Anticipos aprobados cuya FechaDescuento cae dentro del rango del periodo
         var anticipos = await _context.Anticipos
             .Where(a => a.EmpleadoId == empleadoId &&
                         a.Estado == EstadoAnticipo.Aprobado &&
-                        a.FechaDescuento.Date == fechaPlanilla.Date)
+                        a.FechaDescuento.Date >= fechaPlanilla.Date &&
+                        a.FechaDescuento.Date <= fechaPlanillaFin.Date)
             .ToListAsync();
 
         foreach (var anticipo in anticipos)
@@ -596,10 +597,13 @@ public class PayrollProcessingService
             prestamo.CuotasPagadas++;
             prestamo.UpdatedAt = DateTime.UtcNow;
 
-            if (prestamo.CuotasPagadas >= prestamo.NumeroCuotas || prestamo.MontoPendiente <= 0m)
+            // Solo marcar como Pagado cuando el saldo llega a cero.
+            // No usar CuotasPagadas >= NumeroCuotas como única condición porque cuotas
+            // parciales (por límite 50%) acumularían cuotas sin saldar el saldo real.
+            if (prestamo.MontoPendiente <= 0m)
             {
                 prestamo.Estado = EstadoPrestamo.Pagado;
-                prestamo.MontoPendiente = 0;
+                prestamo.MontoPendiente = 0m;
             }
 
             _context.Prestamos.Update(prestamo);
