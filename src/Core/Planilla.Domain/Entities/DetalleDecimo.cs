@@ -6,7 +6,7 @@ namespace Vorluno.Planilla.Domain.Entities;
 /// <summary>
 /// Detalle por empleado de una planilla de Décimo Tercer Mes.
 /// Incluye desglose mensual (JSON), cálculos CSS/SE/ISR y neto a pagar.
-/// Tasas CSS especiales: empleado 7.25%, patrono 10.75% (vs 9.75%/13.25% regular).
+/// Tasas CSS especiales: empleado 7.25%, patrono 10.75% (vs 9.75%/12.25% regular).
 /// </summary>
 public class DetalleDecimo : ITenantEntity
 {
@@ -42,7 +42,7 @@ public class DetalleDecimo : ITenantEntity
     [Column(TypeName = "decimal(18,2)")]
     public decimal SePatrono { get; set; }
 
-    /// <summary>ISR del período: (última quincena + monto décimo) × 13 → tramos → / 13</summary>
+    /// <summary>ISR del período: (salario mensual equiv. + monto décimo) × 13 → tramos → / 13</summary>
     [Column(TypeName = "decimal(18,2)")]
     public decimal ISR { get; set; }
 
