@@ -8,6 +8,7 @@ using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
 using Vorluno.Planilla.Web.Authorization;
+using Vorluno.Planilla.Web.Extensions;
 
 namespace Vorluno.Planilla.Web.Controllers;
 
@@ -137,7 +138,8 @@ public class AnticiposController : ControllerBase
             return BadRequest(new { message = "El motivo es requerido" });
         }
 
-        if (request.FechaDescuento < DateTime.Today)
+        // Solo Owner puede registrar anticipos con fecha pasada (ingreso retroactivo)
+        if (request.FechaDescuento < DateTime.Today && !this.HasAnyRole(TenantRole.Owner))
         {
             return BadRequest(new { message = "La fecha de descuento no puede ser anterior a hoy" });
         }
