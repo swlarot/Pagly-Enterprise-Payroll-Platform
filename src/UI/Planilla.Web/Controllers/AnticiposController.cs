@@ -37,6 +37,7 @@ public class AnticiposController : ControllerBase
     /// <param name="estado">Filtrar por estado (opcional).</param>
     /// <returns>Lista de anticipos.</returns>
     [HttpGet]
+    [RequirePermission(SystemPermission.AdvancesManage)]
     public async Task<IActionResult> GetAll([FromQuery] int? empleadoId, [FromQuery] EstadoAnticipo? estado)
     {
         var tenantId = _tenantContext.TenantId;
@@ -67,6 +68,7 @@ public class AnticiposController : ControllerBase
     /// <param name="id">ID del anticipo.</param>
     /// <returns>Detalles del anticipo.</returns>
     [HttpGet("{id}")]
+    [RequirePermission(SystemPermission.AdvancesManage)]
     public async Task<IActionResult> GetById(int id)
     {
         var tenantId = _tenantContext.TenantId;
@@ -90,6 +92,7 @@ public class AnticiposController : ControllerBase
     /// </summary>
     /// <returns>Lista de anticipos pendientes.</returns>
     [HttpGet("pendientes")]
+    [RequirePermission(SystemPermission.AdvancesManage)]
     public async Task<IActionResult> GetPendientes()
     {
         var tenantId = _tenantContext.TenantId;
