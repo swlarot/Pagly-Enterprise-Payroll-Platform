@@ -57,6 +57,7 @@ public class DecimoCalculationService : IDecimoCalculationService
         decimal totalCssEmp = 0, totalCssPat = 0;
         decimal totalSeEmp = 0, totalSePat = 0;
         decimal totalIsr = 0, totalNeto = 0;
+        int empleadosProcesados = 0;
 
         foreach (var empleado in empleados)
         {
@@ -95,12 +96,13 @@ public class DecimoCalculationService : IDecimoCalculationService
             decimal seEmp = seActivo ? Math.Round(montoDecimo * PayrollConstants.SeTasaEmpleado, 2) : 0;
             decimal sePat = seActivo ? Math.Round(montoDecimo * PayrollConstants.SeTasaPatronal, 2) : 0;
 
-            // 6. ISR del décimo: (última quincena + décimo) × 13 → tramos → / 13
+            // 6. ISR del décimo: (salario mensual + décimo) × 13 → tramos → / 13
             decimal isr = 0;
             if (empleado.IsSubjectToIncomeTax && taxBrackets.Count > 0)
             {
-                // DEV-172: solo planillas Approved/Paid para la última quincena
-                var ultimaQuincena = await _context.PayrollDetails
+                // DEV-185: se obtiene el GrossPay del último período y se convierte a mensual
+                // usando PayPeriodType del empleado, para no subestimar el ISR en empleados quincenales.
+                var ultimoPeriodoGross = await _context.PayrollDetails
                     .Where(d => d.TenantId == tenantId
                              && d.EmpleadoId == empleado.Id
                              && d.PayrollHeader.PeriodEndDate <= planilla.PeriodoHasta
@@ -110,7 +112,9 @@ public class DecimoCalculationService : IDecimoCalculationService
                     .Select(d => d.GrossPay)
                     .FirstOrDefaultAsync();
 
-                decimal baseDecimo = ultimaQuincena + montoDecimo;
+                int periodsPerYear = PayrollConstants.GetPeriodsPerYear(empleado.PayPeriodType);
+                decimal salarioMensual = ultimoPeriodoGross * periodsPerYear / 12m;
+                decimal baseDecimo = salarioMensual + montoDecimo;
                 decimal annualBase = baseDecimo * 13m;
 
                 decimal depDeduccion = 0;
@@ -155,6 +159,7 @@ public class DecimoCalculationService : IDecimoCalculationService
             totalSePat += sePat;
             totalIsr += isr;
             totalNeto += neto;
+            empleadosProcesados++;
         }
 
         // 8. Actualizar cabecera
@@ -171,7 +176,7 @@ public class DecimoCalculationService : IDecimoCalculationService
 
         await _context.SaveChangesAsync();
 
-        return new DecimoCalculationSummary(empleados.Count, totalDecimo);
+        return new DecimoCalculationSummary(empleadosProcesados, totalDecimo);
     }
 
     private static decimal CalcularIsrAnual(decimal netGravable, List<TaxBracketDto> brackets)
