@@ -1588,7 +1588,15 @@ const PlanillasPage = () => {
                         </div>
 
                         {/* Details Table con filas expandibles */}
-                        {planillaDetails.details && planillaDetails.details.length > 0 ? (
+                        {planillaDetails.details && planillaDetails.details.length > 0 ? (() => {
+                            const _det = planillaDetails.details;
+                            const hasPension   = _det.some(d => (d.pensionAlimenticia || 0) > 0);
+                            const hasEmbargos  = _det.some(d => (d.embargos || 0) > 0);
+                            const hasFijas     = _det.some(d => (d.deduccionesFijas || 0) > 0);
+                            const hasPrestamos = _det.some(d => (d.prestamos || 0) > 0);
+                            const hasAnticipos = _det.some(d => (d.anticipos || 0) > 0);
+                            const colSpan = 8 + [hasPension, hasEmbargos, hasFijas, hasPrestamos, hasAnticipos].filter(Boolean).length;
+                            return (
                             <div className="overflow-x-auto">
                                 <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
                                     <span className="text-gray-400">▸</span> Haz clic en una fila para ver el desglose detallado del cálculo
@@ -1602,9 +1610,11 @@ const PlanillasPage = () => {
                                             <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">CSS</th>
                                             <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">SE</th>
                                             <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">ISR</th>
-                                            <th className="text-right py-3 px-3 text-xs font-medium text-red-400 uppercase">Pensión</th>
-                                            <th className="text-right py-3 px-3 text-xs font-medium text-orange-400 uppercase">Embargos</th>
-                                            <th className="text-right py-3 px-3 text-xs font-medium text-blue-400 uppercase">Volunt.</th>
+                                            {hasPension   && <th className="text-right py-3 px-3 text-xs font-medium text-red-400 uppercase">Pensión</th>}
+                                            {hasEmbargos  && <th className="text-right py-3 px-3 text-xs font-medium text-orange-400 uppercase">Embargos</th>}
+                                            {hasFijas     && <th className="text-right py-3 px-3 text-xs font-medium text-blue-400 uppercase">Ded. Fijas</th>}
+                                            {hasPrestamos && <th className="text-right py-3 px-3 text-xs font-medium text-purple-400 uppercase">Préstamos</th>}
+                                            {hasAnticipos && <th className="text-right py-3 px-3 text-xs font-medium text-teal-400 uppercase">Anticipos</th>}
                                             <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">Total Ded.</th>
                                             <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">Neto</th>
                                         </tr>
@@ -1632,9 +1642,11 @@ const PlanillasPage = () => {
                                                         <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.cssEmployee)}</td>
                                                         <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.educationalInsuranceEmployee)}</td>
                                                         <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.incomeTax)}</td>
-                                                        <td className="py-3 px-3 text-sm text-right text-red-400 font-mono">{formatCurrency(detail.pensionAlimenticia || 0)}</td>
-                                                        <td className="py-3 px-3 text-sm text-right text-orange-400 font-mono">{formatCurrency(detail.embargos || 0)}</td>
-                                                        <td className="py-3 px-3 text-sm text-right text-blue-400 font-mono">{formatCurrency(detail.deduccionesVoluntarias || 0)}</td>
+                                                        {hasPension   && <td className="py-3 px-3 text-sm text-right text-red-400 font-mono">{formatCurrency(detail.pensionAlimenticia || 0)}</td>}
+                                                        {hasEmbargos  && <td className="py-3 px-3 text-sm text-right text-orange-400 font-mono">{formatCurrency(detail.embargos || 0)}</td>}
+                                                        {hasFijas     && <td className="py-3 px-3 text-sm text-right text-blue-400 font-mono">{formatCurrency(detail.deduccionesFijas || 0)}</td>}
+                                                        {hasPrestamos && <td className="py-3 px-3 text-sm text-right text-purple-400 font-mono">{formatCurrency(detail.prestamos || 0)}</td>}
+                                                        {hasAnticipos && <td className="py-3 px-3 text-sm text-right text-teal-400 font-mono">{formatCurrency(detail.anticipos || 0)}</td>}
                                                         <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.totalDeductions)}</td>
                                                         <td className="py-3 px-3 text-sm text-right font-medium font-mono">
                                                             <span className="text-gray-100">{formatCurrency(detail.netPay)}</span>
@@ -1648,7 +1660,7 @@ const PlanillasPage = () => {
                                                     {/* Fila de desglose expandida */}
                                                     {isExpanded && (
                                                         <tr className="bg-navy-950/60">
-                                                            <td colSpan={11} className="p-0">
+                                                            <td colSpan={colSpan} className="p-0">
                                                                 {isLoadingThis || !bd ? (
                                                                     <div className="flex items-center justify-center py-6">
                                                                         <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mr-2"></div>
@@ -1752,16 +1764,19 @@ const PlanillasPage = () => {
                                             <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.cssEmployee || 0), 0) || 0)}</td>
                                             <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.educationalInsuranceEmployee || 0), 0) || 0)}</td>
                                             <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.incomeTax || 0), 0) || 0)}</td>
-                                            <td className="py-3 px-3 text-sm text-right font-bold text-red-400 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.pensionAlimenticia || 0), 0) || 0)}</td>
-                                            <td className="py-3 px-3 text-sm text-right font-bold text-orange-400 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.embargos || 0), 0) || 0)}</td>
-                                            <td className="py-3 px-3 text-sm text-right font-bold text-blue-400 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.deduccionesVoluntarias || 0), 0) || 0)}</td>
+                                            {hasPension   && <td className="py-3 px-3 text-sm text-right font-bold text-red-400 font-mono">{formatCurrency(_det.reduce((sum, d) => sum + (d.pensionAlimenticia || 0), 0))}</td>}
+                                            {hasEmbargos  && <td className="py-3 px-3 text-sm text-right font-bold text-orange-400 font-mono">{formatCurrency(_det.reduce((sum, d) => sum + (d.embargos || 0), 0))}</td>}
+                                            {hasFijas     && <td className="py-3 px-3 text-sm text-right font-bold text-blue-400 font-mono">{formatCurrency(_det.reduce((sum, d) => sum + (d.deduccionesFijas || 0), 0))}</td>}
+                                            {hasPrestamos && <td className="py-3 px-3 text-sm text-right font-bold text-purple-400 font-mono">{formatCurrency(_det.reduce((sum, d) => sum + (d.prestamos || 0), 0))}</td>}
+                                            {hasAnticipos && <td className="py-3 px-3 text-sm text-right font-bold text-teal-400 font-mono">{formatCurrency(_det.reduce((sum, d) => sum + (d.anticipos || 0), 0))}</td>}
                                             <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalDeductions)}</td>
                                             <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalNetPay)}</td>
                                         </tr>
                                     </tfoot>
                                 </table>
                             </div>
-                        ) : (
+                            );
+                        })() : (
                             <div className="text-center py-8 text-gray-500">
                                 No hay detalles de empleados para esta planilla
                             </div>
