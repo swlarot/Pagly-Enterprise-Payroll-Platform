@@ -361,7 +361,8 @@ public class PayrollHeadersController : ControllerBase
 
             var anticiposMap = (await _context.Anticipos
                 .Where(a => employeeIds.Contains(a.EmpleadoId) && a.Estado == EstadoAnticipo.Aprobado &&
-                            a.FechaDescuento.Date == payrollHeader.PeriodStartDate.Date)
+                            a.FechaDescuento.Date >= payrollHeader.PeriodStartDate.Date &&
+                            a.FechaDescuento.Date <= payrollHeader.PeriodEndDate.Date)
                 .ToListAsync())
                 .GroupBy(a => a.EmpleadoId)
                 .ToDictionary(g => g.Key, g => g.ToList());
@@ -610,8 +611,9 @@ public class PayrollHeadersController : ControllerBase
                     .GroupBy(d => d.PrestamoId!.Value)
                     .ToDictionary(g => g.Key, g => g.Sum(x => x.MontoAplicado));
 
+                // Solo procesar anticipos que realmente tuvieron monto descontado
                 var anticipoIds = deducciones
-                    .Where(d => d.AnticipoId.HasValue)
+                    .Where(d => d.AnticipoId.HasValue && d.MontoAplicado > 0m)
                     .Select(d => d.AnticipoId!.Value)
                     .Distinct()
                     .ToList();
@@ -1187,8 +1189,9 @@ public class PayrollHeadersController : ControllerBase
         if (payrollHeader == null)
             return NotFound(new { message = "Planilla no encontrada." });
 
-        // Para planillas con datos calculados, revertir préstamos y anticipos
-        if (payrollHeader.Status >= PayrollStatus.Calculated)
+        // Solo revertir préstamos y anticipos si la planilla fue efectivamente pagada
+        // (es cuando ProcessPrestamosAsync/ProcessAnticiposAsync realmente modificaron los saldos)
+        if (payrollHeader.Status == PayrollStatus.Paid)
         {
             var payrollDetailIds = await _context.PayrollDetails
                 .Where(pd => pd.PayrollHeaderId == id)
@@ -1201,13 +1204,19 @@ public class PayrollHeadersController : ControllerBase
 
             // Revertir préstamos
             var prestamoIds = deduccionesAplicadas
-                .Where(d => d.PrestamoId != null)
+                .Where(d => d.PrestamoId != null && d.MontoAplicado > 0m)
                 .Select(d => d.PrestamoId!.Value)
                 .Distinct()
                 .ToList();
 
             if (prestamoIds.Any())
             {
+                // Eliminar PagoPrestamo vinculados a esta planilla antes de revertir saldos
+                var pagosARevertir = await _context.PagosPrestamos
+                    .Where(p => p.PlanillaDetailId.HasValue && payrollDetailIds.Contains(p.PlanillaDetailId.Value))
+                    .ToListAsync();
+                _context.PagosPrestamos.RemoveRange(pagosARevertir);
+
                 var prestamos = await _context.Prestamos
                     .Where(p => prestamoIds.Contains(p.Id) && p.TenantId == tenantId)
                     .ToListAsync();
@@ -1215,17 +1224,20 @@ public class PayrollHeadersController : ControllerBase
                 foreach (var prestamo in prestamos)
                 {
                     var montoRevertir = deduccionesAplicadas
-                        .Where(d => d.PrestamoId == prestamo.Id)
+                        .Where(d => d.PrestamoId == prestamo.Id && d.MontoAplicado > 0m)
                         .Sum(d => d.MontoAplicado);
                     prestamo.MontoPendiente += montoRevertir;
                     if (prestamo.CuotasPagadas > 0)
                         prestamo.CuotasPagadas -= 1;
+                    // Si estaba marcado como Pagado, reactivar
+                    if (prestamo.Estado == EstadoPrestamo.Pagado)
+                        prestamo.Estado = EstadoPrestamo.Activo;
                 }
             }
 
-            // Revertir anticipos
+            // Revertir anticipos a Aprobado (estaban aprobados antes de ser descontados)
             var anticipoIds = deduccionesAplicadas
-                .Where(d => d.AnticipoId != null)
+                .Where(d => d.AnticipoId != null && d.MontoAplicado > 0m)
                 .Select(d => d.AnticipoId!.Value)
                 .Distinct()
                 .ToList();
@@ -1238,7 +1250,7 @@ public class PayrollHeadersController : ControllerBase
 
                 foreach (var anticipo in anticipos)
                 {
-                    anticipo.Estado = EstadoAnticipo.Pendiente;
+                    anticipo.Estado = EstadoAnticipo.Aprobado;
                 }
             }
         }
