@@ -1,0 +1,45 @@
+# OWASP ZAP — Contexto de autenticación para Planilla (Pagly)
+# Usar con: ZAP GUI → Import → ZAP Context
+# O referenciado por los scripts de línea de comandos
+
+env:
+  contexts:
+    - name: "Planilla-Staging"
+      urls:
+        - "https://staging-planilla.vorluno.dev"
+      includePaths:
+        - "https://staging-planilla.vorluno.dev/api/.*"
+      excludePaths:
+        - "https://staging-planilla.vorluno.dev/api/stripe/webhook"
+        - "https://staging-planilla.vorluno.dev/health"
+        - "https://staging-planilla.vorluno.dev/api/health"
+        - "https://staging-planilla.vorluno.dev/api/auth/dev/.*"
+      authentication:
+        method: "json"
+        parameters:
+          loginPageUrl: "https://staging-planilla.vorluno.dev/api/auth/login"
+          loginRequestData: '{"email":"{%username%}","password":"{%password%}"}'
+          loginIndicatorRegex: "\\QaccessToken\\E"
+          logoutIndicatorRegex: "\\QUnauthorized\\E"
+        verification:
+          method: "response"
+          loggedInRegex: "\\QaccessToken\\E"
+          loggedOutRegex: "\\QUnauthorized\\E"
+      sessionManagement:
+        method: "httpAuthSessionManagement"
+        parameters:
+          headerName: "Authorization"
+          headerValue: "Bearer {%json:accessToken%}"
+      users:
+        - name: "tenant-a"
+          credentials:
+            username: "admin-a@staging-test.com"
+            password: "REEMPLAZAR_PASSWORD_TENANT_A"
+        - name: "tenant-b"
+          credentials:
+            username: "admin-b@staging-test.com"
+            password: "REEMPLAZAR_PASSWORD_TENANT_B"
+
+  parameters:
+    failOnError: true
+    progressToStdout: true
