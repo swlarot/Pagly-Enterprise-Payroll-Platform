@@ -98,14 +98,18 @@ public class IncomeTaxCalculationServicePortable
 
     /// <summary>
     /// Proyecta el ingreso anual basado en el salario del período y la frecuencia de pago.
+    /// Incluye décimo tercer mes en la proyección (×13 meses) para distribuir
+    /// uniformemente la retención de ISR del décimo en todos los períodos de pago.
     /// </summary>
     /// <param name="periodIncome">Salario del período</param>
     /// <param name="payFrequency">Frecuencia de pago (Mensual, Quincenal, Semanal)</param>
-    /// <returns>Ingreso anual proyectado</returns>
+    /// <returns>Ingreso anual proyectado incluyendo décimo tercer mes</returns>
     private decimal ProjectAnnualIncome(decimal periodIncome, string payFrequency)
     {
         var periodsPerYear = PayrollConstants.GetPeriodsPerYear(payFrequency);
-        return periodIncome * periodsPerYear;
+        // Convertir salario del período a mensual, luego proyectar a 13 meses (12 + décimo)
+        var monthlySalary = periodIncome * periodsPerYear / 12m;
+        return monthlySalary * PayrollConstants.MonthsIncludingDecimo;
     }
 
     /// <summary>

@@ -30,6 +30,12 @@ public static class PayrollConstants
         { "Bisemanal", 26 }   // 2 pagos por mes (cada 2 semanas exactas)
     };
 
+    /// <summary>
+    /// Meses incluyendo décimo tercer mes para proyección anual de ISR.
+    /// La DGI permite distribuir el ISR del décimo uniformemente en todos los períodos.
+    /// </summary>
+    public const int MonthsIncludingDecimo = 13;
+
     // ====================================================================
     // Tasas CSS / Seguro Educativo — Ley 462
     // ====================================================================
