@@ -62,6 +62,11 @@ public class PayrollHeader : ITenantEntity
     public PayPeriodType PayPeriodType { get; set; } = PayPeriodType.Quincenal;
 
     /// <summary>
+    /// Tipo de planilla: Regular (con deducciones legales) o SinDeducciones (solo bruto + deducciones adicionales).
+    /// </summary>
+    public TipoPlanilla TipoPlanilla { get; set; } = TipoPlanilla.Regular;
+
+    /// <summary>
     /// Estado actual de la planilla en el workflow.
     /// </summary>
     public PayrollStatus Status { get; set; } = PayrollStatus.Draft;

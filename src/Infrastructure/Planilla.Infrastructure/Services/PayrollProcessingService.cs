@@ -51,7 +51,8 @@ public class PayrollProcessingService
         Empleado empleado,
         DateTime payrollPeriodStart,
         DateTime payrollPeriodEnd,
-        int payrollHeaderId)
+        int payrollHeaderId,
+        TipoPlanilla tipoPlanilla = TipoPlanilla.Regular)
     {
         // ====================================================================
         // PASO 1: Calcular conceptos de asistencia
@@ -88,19 +89,33 @@ public class PayrollProcessingService
         // PASO 3: Calcular deducciones legales (CSS, SE, ISR)
         // ====================================================================
 
-        var payrollResult = await _orchestrator.CalculateEmployeePayrollAsync(
-            companyId,
-            grossPayAjustado,
-            empleado.PayFrequency,
-            empleado.YearsCotized,
-            empleado.AverageSalaryLast10Years > 0 ? empleado.AverageSalaryLast10Years : grossPayAjustado,
-            empleado.CssRiskPercentage,
-            empleado.Dependents,
-            empleado.IsSubjectToCss,
-            empleado.IsSubjectToEducationalInsurance,
-            empleado.IsSubjectToIncomeTax,
-            payrollPeriodStart
-        );
+        PayrollCalculationResult payrollResult;
+        if (tipoPlanilla == TipoPlanilla.SinDeducciones)
+        {
+            // Sin deducciones legales: CSS, SE, ISR = 0
+            payrollResult = new PayrollCalculationResult(
+                GrossPay: grossPayAjustado,
+                CssEmployee: 0, EducationalInsuranceEmployee: 0, IncomeTax: 0,
+                TotalDeductions: 0, NetPay: grossPayAjustado,
+                CssEmployer: 0, EducationalInsuranceEmployer: 0,
+                RiskContribution: 0, TotalEmployerCost: 0);
+        }
+        else
+        {
+            payrollResult = await _orchestrator.CalculateEmployeePayrollAsync(
+                companyId,
+                grossPayAjustado,
+                empleado.PayFrequency,
+                empleado.YearsCotized,
+                empleado.AverageSalaryLast10Years > 0 ? empleado.AverageSalaryLast10Years : grossPayAjustado,
+                empleado.CssRiskPercentage,
+                empleado.Dependents,
+                empleado.IsSubjectToCss,
+                empleado.IsSubjectToEducationalInsurance,
+                empleado.IsSubjectToIncomeTax,
+                payrollPeriodStart
+            );
+        }
 
         // ====================================================================
         // PASO 4: Calcular deducciones adicionales con motor de prelacion
@@ -169,6 +184,8 @@ public class PayrollProcessingService
             HorasExtraNocturnas = horasNocturnas,
             HorasExtraDomingoFeriado = horasDomingoFeriado,
             MontoHorasExtra = montoHorasExtra,
+            HorasExtraExceso = horasRegistradas?.OvertimeExcessHours ?? 0m,
+            MontoHorasExtraExceso = horasRegistradas?.OvertimeExcessPay ?? 0m,
             DiasAusenciaInjustificada = diasAusencia,
             MontoDescuentoAusencias = descuentoAusencias,
             DiasVacaciones = diasVacaciones,
@@ -265,19 +282,33 @@ public class PayrollProcessingService
         // PASO 2: Deducciones legales CSS + SE + ISR
         // DEV-24 FIX: usar PayPeriodType de la planilla, no PayFrequency del empleado
         // ====================================================================
-        var calculationResult = await _orchestrator.CalculateEmployeePayrollAsync(
-            companyId: tenantId,
-            grossPay: grossPay,
-            payFrequency: payrollHeader.PayPeriodType.ToString(),
-            yearsCotized: employee.YearsCotized,
-            averageSalaryLast10Years: employee.AverageSalaryLast10Years,
-            cssRiskPercentage: employee.CssRiskPercentage,
-            dependents: employee.Dependents,
-            isSubjectToCss: employee.IsSubjectToCss,
-            isSubjectToEducationalInsurance: employee.IsSubjectToEducationalInsurance,
-            isSubjectToIncomeTax: employee.IsSubjectToIncomeTax,
-            calculationDate: DateTime.UtcNow
-        );
+        PayrollCalculationResult calculationResult;
+        if (payrollHeader.TipoPlanilla == TipoPlanilla.SinDeducciones)
+        {
+            // Sin deducciones legales: CSS, SE, ISR = 0
+            calculationResult = new PayrollCalculationResult(
+                GrossPay: grossPay,
+                CssEmployee: 0, EducationalInsuranceEmployee: 0, IncomeTax: 0,
+                TotalDeductions: 0, NetPay: grossPay,
+                CssEmployer: 0, EducationalInsuranceEmployer: 0,
+                RiskContribution: 0, TotalEmployerCost: 0);
+        }
+        else
+        {
+            calculationResult = await _orchestrator.CalculateEmployeePayrollAsync(
+                companyId: tenantId,
+                grossPay: grossPay,
+                payFrequency: payrollHeader.PayPeriodType.ToString(),
+                yearsCotized: employee.YearsCotized,
+                averageSalaryLast10Years: employee.AverageSalaryLast10Years,
+                cssRiskPercentage: employee.CssRiskPercentage,
+                dependents: employee.Dependents,
+                isSubjectToCss: employee.IsSubjectToCss,
+                isSubjectToEducationalInsurance: employee.IsSubjectToEducationalInsurance,
+                isSubjectToIncomeTax: employee.IsSubjectToIncomeTax,
+                calculationDate: DateTime.UtcNow
+            );
+        }
 
         // ====================================================================
         // PASO 3: Deducciones adicionales con motor de prelación (datos pre-cargados)
@@ -310,7 +341,8 @@ public class PayrollProcessingService
 
         foreach (var prestamo in prestamosActivos)
         {
-            var montoCuotaPeriodo = Math.Round(prestamo.CuotaMensual * 12m / periodsPerYear, 2);
+            var loanPeriodsPerYear = PayrollConstants.GetPeriodsPerYear(prestamo.FrecuenciaCuota);
+            var montoCuotaPeriodo = Math.Round(prestamo.CuotaMensual * loanPeriodsPerYear / periodsPerYear, 2);
             montoCuotaPeriodo = Math.Min(montoCuotaPeriodo, prestamo.MontoPendiente);
 
             deduccionesPendientes.Add(new DeduccionPendiente
@@ -396,6 +428,8 @@ public class PayrollProcessingService
             HorasExtraNocturnas = horasExtraNocturnas,
             HorasExtraDomingoFeriado = horasExtraDomingoFeriado,
             MontoHorasExtra = overtimePay,
+            HorasExtraExceso = hours?.OvertimeExcessHours ?? 0m,
+            MontoHorasExtraExceso = hours?.OvertimeExcessPay ?? 0m,
             CssEmployee = calculationResult.CssEmployee,
             CssEmployer = calculationResult.CssEmployer,
             RiskContribution = calculationResult.RiskContribution,
@@ -485,7 +519,8 @@ public class PayrollProcessingService
 
         foreach (var prestamo in prestamos)
         {
-            var montoCuotaPeriodo = Math.Round(prestamo.CuotaMensual * 12m / periodsPerYear, 2);
+            var loanPeriodsPerYear = PayrollConstants.GetPeriodsPerYear(prestamo.FrecuenciaCuota);
+            var montoCuotaPeriodo = Math.Round(prestamo.CuotaMensual * loanPeriodsPerYear / periodsPerYear, 2);
             montoCuotaPeriodo = Math.Min(montoCuotaPeriodo, prestamo.MontoPendiente);
 
             deduccionesPendientes.Add(new DeduccionPendiente
@@ -691,14 +726,16 @@ public class PayrollProcessingService
         Empleado empleado,
         DateTime payrollPeriodStart,
         DateTime payrollPeriodEnd,
-        int payrollHeaderId)
+        int payrollHeaderId,
+        TipoPlanilla tipoPlanilla = TipoPlanilla.Regular)
     {
         var (detail, prestamoIds, anticipoIds, horasExtra, ausencias, vacaciones, deduccionesResult) = await CalculateForEmployeeAsync(
             companyId,
             empleado,
             payrollPeriodStart,
             payrollPeriodEnd,
-            payrollHeaderId
+            payrollHeaderId,
+            tipoPlanilla
         );
 
         // Guardar el detalle de planilla
