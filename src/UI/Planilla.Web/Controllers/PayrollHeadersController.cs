@@ -212,6 +212,7 @@ public class PayrollHeadersController : ControllerBase
             PeriodEndDate = DateTime.SpecifyKind(request.PeriodEndDate, DateTimeKind.Utc),
             PayDate = DateTime.SpecifyKind(request.PayDate, DateTimeKind.Utc),
             PayPeriodType = request.PayPeriodType,
+            TipoPlanilla = request.TipoPlanilla,
             Status = PayrollStatus.Draft,
             CreatedAt = DateTime.UtcNow
         };
@@ -1322,7 +1323,9 @@ public class PayrollHeadersController : ControllerBase
         // --- ISR ---
         var payPeriodType = detail.PayrollHeader?.PayPeriodType ?? Vorluno.Planilla.Domain.Enums.PayPeriodType.Quincenal;
         int periodosAlAno = Vorluno.Planilla.Application.Helpers.PayrollConstants.GetPeriodsPerYear(payPeriodType);
-        decimal salarioAnualizado = detail.GrossPay * periodosAlAno;
+        // Proyección anual incluyendo décimo tercer mes (×13)
+        decimal salarioMensual = detail.GrossPay * periodosAlAno / 12m;
+        decimal salarioAnualizado = salarioMensual * Vorluno.Planilla.Application.Helpers.PayrollConstants.MonthsIncludingDecimo;
         decimal isrAnual = detail.IncomeTax * periodosAlAno;
 
         var isr = new IsrBreakdownDto(
@@ -1370,7 +1373,8 @@ public record CreatePayrollHeaderRequest(
     DateTime PeriodStartDate,
     DateTime PeriodEndDate,
     DateTime PayDate,
-    PayPeriodType PayPeriodType = PayPeriodType.Quincenal
+    PayPeriodType PayPeriodType = PayPeriodType.Quincenal,
+    TipoPlanilla TipoPlanilla = TipoPlanilla.Regular
 );
 
 public record UpsertEmployeeHoursRequest(

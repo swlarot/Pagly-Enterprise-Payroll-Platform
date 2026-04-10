@@ -58,6 +58,7 @@ const PlanillasPage = () => {
     const [formData, setFormData] = useState({
         payrollNumber: '',
         payPeriodType: 2,
+        tipoPlanilla: 0,
         periodStartDate: '',
         periodEndDate: '',
         payDate: '',
@@ -400,6 +401,7 @@ const PlanillasPage = () => {
         setFormData({
             payrollNumber: generatePayrollNumber(),
             payPeriodType: 2,
+            tipoPlanilla: 0,
             periodStartDate: '',
             periodEndDate: '',
             payDate: '',
@@ -600,6 +602,11 @@ const PlanillasPage = () => {
                             {selectedPlanilla.payPeriodType !== undefined && selectedPlanilla.payPeriodType !== null &&
                                 getPayPeriodBadge(selectedPlanilla.payPeriodType)
                             }
+                            {selectedPlanilla.tipoPlanilla === 1 && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-500/15 text-orange-400 border border-orange-500/20 ml-1">
+                                    Sin Deducciones Legales
+                                </span>
+                            )}
                             {selectedPlanilla.status === 4 && (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/15 text-red-400 border border-red-500/20 ml-1">
                                     Cancelada
@@ -1370,6 +1377,11 @@ const PlanillasPage = () => {
                                                 {planilla.payPeriodType !== undefined && planilla.payPeriodType !== null &&
                                                     getPayPeriodBadge(planilla.payPeriodType)
                                                 }
+                                                {planilla.tipoPlanilla === 1 && (
+                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-500/15 text-orange-400 border border-orange-500/20">
+                                                        Sin Ded. Legales
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="py-4 px-6 text-sm text-gray-500">
@@ -1484,6 +1496,24 @@ const PlanillasPage = () => {
                             </select>
                             <p className="mt-1 text-xs text-gray-500">
                                 Define la frecuencia de pago para esta planilla
+                            </p>
+                        </div>
+
+                        {/* Tipo de Planilla */}
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-gray-300 mb-2">
+                                Tipo de Planilla
+                            </label>
+                            <select
+                                value={formData.tipoPlanilla}
+                                onChange={(e) => setFormData({ ...formData, tipoPlanilla: parseInt(e.target.value) })}
+                                className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
+                            >
+                                <option value={0}>Regular (con deducciones legales)</option>
+                                <option value={1}>Sin Deducciones Legales (solo bruto + ded. adicionales)</option>
+                            </select>
+                            <p className="mt-1 text-xs text-gray-500">
+                                Sin Deducciones omite CSS, SE e ISR. Las deducciones voluntarias y judiciales se mantienen.
                             </p>
                         </div>
 
