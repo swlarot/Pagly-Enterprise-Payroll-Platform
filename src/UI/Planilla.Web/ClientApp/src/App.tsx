@@ -41,6 +41,7 @@ import DecimoPage from './pages/DecimoPage.jsx';
 import ConfiguracionPage from './pages/ConfiguracionPage.jsx';
 import SalarioMinimoPage from './pages/SalarioMinimoPage.jsx';
 import ReportesPage from './pages/ReportesPage.jsx';
+import LiquidacionesPage from './pages/LiquidacionesPage.jsx';
 
 function App() {
   return (
@@ -350,6 +351,17 @@ function App() {
             <ProtectedRoute>
               <AuthLayout>
                 <DecimoPage />
+              </AuthLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/liquidaciones"
+          element={
+            <ProtectedRoute>
+              <AuthLayout>
+                <LiquidacionesPage />
               </AuthLayout>
             </ProtectedRoute>
           }

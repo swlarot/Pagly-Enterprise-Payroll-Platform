@@ -77,6 +77,9 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     public DbSet<PlanillaDecimo> PlanillasDecimo { get; set; }
     public DbSet<DetalleDecimo> DetallesDecimo { get; set; }
 
+    // Liquidaciones laborales (settlements)
+    public DbSet<Liquidacion> Liquidaciones { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Esta l�nea es crucial al heredar de IdentityDbContext
@@ -603,6 +606,46 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             entity.HasOne(s => s.Empleado)
                 .WithMany()
                 .HasForeignKey(s => s.EmpleadoId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()
+        });
+
+        // Liquidaciones laborales (settlements)
+        modelBuilder.Entity<Liquidacion>(entity =>
+        {
+            entity.HasIndex(l => new { l.TenantId, l.EmpleadoId })
+                .HasDatabaseName("IX_Liquidacion_TenantId_EmpleadoId");
+
+            entity.HasIndex(l => new { l.TenantId, l.Estado })
+                .HasDatabaseName("IX_Liquidacion_TenantId_Estado");
+
+            entity.HasIndex(l => new { l.TenantId, l.Numero })
+                .IsUnique()
+                .HasDatabaseName("IX_Liquidacion_TenantId_Numero");
+
+            entity.Property(l => l.SalarioBase).HasPrecision(18, 2);
+            entity.Property(l => l.SalarioPromedio).HasPrecision(18, 2);
+            entity.Property(l => l.AnosServicio).HasPrecision(8, 4);
+            entity.Property(l => l.Indemnizacion).HasPrecision(18, 2);
+            entity.Property(l => l.Preaviso).HasPrecision(18, 2);
+            entity.Property(l => l.VacacionesProporcionales).HasPrecision(18, 2);
+            entity.Property(l => l.DiasVacacionesProporcionales).HasPrecision(8, 2);
+            entity.Property(l => l.DecimoTercerMesProporcional).HasPrecision(18, 2);
+            entity.Property(l => l.SalarioPendiente).HasPrecision(18, 2);
+            entity.Property(l => l.DiasSalarioPendiente).HasPrecision(8, 2);
+            entity.Property(l => l.CssEmpleado).HasPrecision(18, 2);
+            entity.Property(l => l.SeEmpleado).HasPrecision(18, 2);
+            entity.Property(l => l.Isr).HasPrecision(18, 2);
+            entity.Property(l => l.CssPatronal).HasPrecision(18, 2);
+            entity.Property(l => l.SePatronal).HasPrecision(18, 2);
+            entity.Property(l => l.TotalBruto).HasPrecision(18, 2);
+            entity.Property(l => l.TotalDeducciones).HasPrecision(18, 2);
+            entity.Property(l => l.TotalNeto).HasPrecision(18, 2);
+
+            entity.HasOne(l => l.Empleado)
+                .WithMany()
+                .HasForeignKey(l => l.EmpleadoId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             // Global query filter aplicado automáticamente por ApplyGlobalQueryFilters()

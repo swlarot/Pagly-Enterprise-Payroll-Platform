@@ -166,6 +166,9 @@ builder.Services.AddScoped<Vorluno.Planilla.Infrastructure.Services.PanamaHolida
 builder.Services.AddScoped<Vorluno.Planilla.Application.Interfaces.IOvertimeFactorService, Vorluno.Planilla.Infrastructure.Services.OvertimeFactorService>();
 builder.Services.AddScoped<Vorluno.Planilla.Application.Interfaces.IDecimoCalculationService, Vorluno.Planilla.Infrastructure.Services.DecimoCalculationService>();
 
+// Liquidaciones laborales (settlements)
+builder.Services.AddScoped<Vorluno.Planilla.Application.Services.LiquidacionCalculationService>();
+
 // --- FIN DE NUESTRA CONFIGURACIÓN PRINCIPAL ---
 
 // 13. CONFIGURAR CORS (desarrollo: localhost; producción: Cors:AllowedOrigins desde env/config)
