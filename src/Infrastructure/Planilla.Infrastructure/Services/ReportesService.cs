@@ -85,6 +85,8 @@ public class ReportesService
                     ? horas.OvertimeDayHours + horas.OvertimeNightHours + horas.OvertimeHolidayHours
                       + horas.OvertimeMixedHours + horas.OvertimeExcessHours
                     : 0m;
+                var horasExtraExceso = d.HorasExtraExceso;
+                var montoExceso = d.MontoHorasExtraExceso;
 
                 var totalAcreedores = d.DeduccionesAplicadas.Sum(da => da.MontoAplicado);
                 var razonLimitacion = d.TuvoLimitacionSalarioMinimo
@@ -100,11 +102,17 @@ public class ReportesService
                     horas?.SundayHours ?? 0,
                     horas?.HolidayHours ?? 0,
                     horasExtra,
+                    horasExtraExceso,
+                    montoExceso,
                     d.GrossPay,
                     d.CssEmployee,
                     d.EducationalInsuranceEmployee,
                     d.IncomeTax,
                     totalAcreedores,
+                    d.PensionAlimenticia,
+                    d.Embargos,
+                    d.DeduccionesVoluntarias,
+                    d.TotalDeductions,
                     d.NetPay,
                     d.TuvoLimitacionSalarioMinimo,
                     razonLimitacion,
@@ -121,7 +129,13 @@ public class ReportesService
             empleados.Sum(e => e.SeEmpleado),
             empleados.Sum(e => e.Isr),
             empleados.Sum(e => e.TotalAcreedores),
-            empleados.Sum(e => e.SalarioNeto)
+            empleados.Sum(e => e.PensionAlimenticia),
+            empleados.Sum(e => e.Embargos),
+            empleados.Sum(e => e.DeduccionesVoluntarias),
+            empleados.Sum(e => e.TotalDeducciones),
+            empleados.Sum(e => e.SalarioNeto),
+            empleados.Sum(e => e.HorasExtraExceso),
+            empleados.Sum(e => e.MontoHorasExtraExceso)
         );
 
         return new ReportePlanillaRegularDto(
@@ -130,7 +144,8 @@ public class ReportesService
             $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
             planilla.PayDate,
             GetEstadoTexto(planilla.Status),
-            empleados, totales
+            empleados, totales,
+            EsSinDeducciones: planilla.TipoPlanilla == TipoPlanilla.SinDeducciones
         );
     }
 
@@ -170,6 +185,10 @@ public class ReportesService
                     d.EducationalInsuranceEmployee,
                     d.IncomeTax,
                     TotalAcreedores = d.DeduccionesAplicadas.Sum(da => da.MontoAplicado),
+                    d.PensionAlimenticia,
+                    d.Embargos,
+                    d.DeduccionesVoluntarias,
+                    d.TotalDeductions,
                     d.NetPay
                 }))
             .ToListAsync();
@@ -187,6 +206,10 @@ public class ReportesService
                     g.Sum(d => d.EducationalInsuranceEmployee),
                     g.Sum(d => d.IncomeTax),
                     g.Sum(d => d.TotalAcreedores),
+                    g.Sum(d => d.PensionAlimenticia),
+                    g.Sum(d => d.Embargos),
+                    g.Sum(d => d.DeduccionesVoluntarias),
+                    g.Sum(d => d.TotalDeductions),
                     g.Sum(d => d.NetPay)
                 );
             })
@@ -203,6 +226,10 @@ public class ReportesService
             empleados.Sum(e => e.TotalSe),
             empleados.Sum(e => e.TotalIsr),
             empleados.Sum(e => e.TotalAcreedores),
+            empleados.Sum(e => e.TotalPensionAlimenticia),
+            empleados.Sum(e => e.TotalEmbargos),
+            empleados.Sum(e => e.TotalDeduccionesVoluntarias),
+            empleados.Sum(e => e.TotalDeducciones),
             empleados.Sum(e => e.TotalNeto)
         );
 
@@ -425,6 +452,18 @@ public class ReportesService
 
                 var totalAcreedores = lineasAcreedores.Sum(l => l.Monto);
 
+                // Agregar líneas de deducción para pensión alimenticia, embargos y voluntarias
+                var lineasDeduccionesExtra = new List<LineaDeduccionComprobante>();
+                if (d.PensionAlimenticia > 0)
+                    lineasDeduccionesExtra.Add(new LineaDeduccionComprobante("Pensión Alimenticia", "PensionAlimenticia", "Pensión alimenticia", d.PensionAlimenticia));
+                if (d.Embargos > 0)
+                    lineasDeduccionesExtra.Add(new LineaDeduccionComprobante("Embargos", "Embargo", "Embargos judiciales", d.Embargos));
+                if (d.DeduccionesVoluntarias > 0)
+                    lineasDeduccionesExtra.Add(new LineaDeduccionComprobante("Deducciones Voluntarias", "Voluntaria", "Deducciones voluntarias", d.DeduccionesVoluntarias));
+
+                var todasLineasAcreedores = lineasAcreedores.Concat(lineasDeduccionesExtra).ToList();
+                var totalTodasAcreedores = todasLineasAcreedores.Sum(l => l.Monto);
+
                 // Reserva décimo = 1/12 del salario bruto (referencial, no deducción)
                 var reservaDecimo = Math.Round(d.GrossPay / 12m, 2);
 
@@ -441,8 +480,11 @@ public class ReportesService
                     d.CssEmployee,
                     d.EducationalInsuranceEmployee,
                     d.IncomeTax,
-                    lineasAcreedores,
-                    totalAcreedores,
+                    d.PensionAlimenticia,
+                    d.Embargos,
+                    d.DeduccionesVoluntarias,
+                    todasLineasAcreedores,
+                    totalTodasAcreedores,
                     d.TotalDeductions,
                     d.NetPay,
                     reservaDecimo,
@@ -457,7 +499,8 @@ public class ReportesService
             planilla.PayrollNumber,
             $"{planilla.PeriodStartDate:dd/MM/yyyy} - {planilla.PeriodEndDate:dd/MM/yyyy}",
             planilla.PayDate,
-            comprobantes
+            comprobantes,
+            EsSinDeducciones: planilla.TipoPlanilla == TipoPlanilla.SinDeducciones
         );
     }
 

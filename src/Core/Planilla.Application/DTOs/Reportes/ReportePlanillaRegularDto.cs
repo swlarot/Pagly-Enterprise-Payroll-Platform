@@ -9,7 +9,8 @@ public record ReportePlanillaRegularDto(
     string NombreEmpresa, string Ruc, string NumeroPlanilla,
     string Periodo, DateTime FechaPago, string Estado,
     List<EmpleadoPlanillaRegularItem> Empleados,
-    TotalesPlanillaRegular Totales
+    TotalesPlanillaRegular Totales,
+    bool EsSinDeducciones = false
 );
 
 public record LineaDesgloseHoras(
@@ -22,8 +23,12 @@ public record LineaDesgloseHoras(
 public record EmpleadoPlanillaRegularItem(
     string Cedula, string NombreCompleto,
     decimal HorasRegulares, decimal HorasDomingo, decimal HorasFeriado, decimal HorasExtra,
+    decimal HorasExtraExceso, decimal MontoHorasExtraExceso,
     decimal SalarioBruto, decimal CssEmpleado, decimal SeEmpleado, decimal Isr,
-    decimal TotalAcreedores, decimal SalarioNeto,
+    decimal TotalAcreedores,
+    decimal PensionAlimenticia, decimal Embargos, decimal DeduccionesVoluntarias,
+    decimal TotalDeducciones,
+    decimal SalarioNeto,
     bool TuvoLimitacion, string? RazonLimitacion,
     List<LineaDesgloseHoras> DesgloseHoras
 );
@@ -31,5 +36,9 @@ public record EmpleadoPlanillaRegularItem(
 public record TotalesPlanillaRegular(
     int TotalEmpleados, decimal TotalBruto,
     decimal TotalCss, decimal TotalSe, decimal TotalIsr,
-    decimal TotalAcreedores, decimal TotalNeto
+    decimal TotalAcreedores,
+    decimal TotalPensionAlimenticia, decimal TotalEmbargos, decimal TotalDeduccionesVoluntarias,
+    decimal TotalDeducciones,
+    decimal TotalNeto,
+    decimal TotalHorasExtraExceso, decimal TotalMontoHorasExtraExceso
 );

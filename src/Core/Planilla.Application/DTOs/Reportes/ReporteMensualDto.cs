@@ -16,11 +16,17 @@ public record ReporteMensualDto(
 public record EmpleadoMensualItem(
     string Cedula, string NombreCompleto,
     decimal TotalBruto, decimal TotalCss, decimal TotalSe, decimal TotalIsr,
-    decimal TotalAcreedores, decimal TotalNeto
+    decimal TotalAcreedores,
+    decimal TotalPensionAlimenticia, decimal TotalEmbargos, decimal TotalDeduccionesVoluntarias,
+    decimal TotalDeducciones,
+    decimal TotalNeto
 );
 
 public record TotalesMensual(
     int TotalEmpleados, decimal GranTotalBruto,
     decimal GranTotalCss, decimal GranTotalSe, decimal GranTotalIsr,
-    decimal GranTotalAcreedores, decimal GranTotalNeto
+    decimal GranTotalAcreedores,
+    decimal GranTotalPensionAlimenticia, decimal GranTotalEmbargos, decimal GranTotalDeduccionesVoluntarias,
+    decimal GranTotalDeducciones,
+    decimal GranTotalNeto
 );

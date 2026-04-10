@@ -201,6 +201,17 @@ public class PayrollDetail : ITenantEntity
     /// </summary>
     public decimal MontoHorasExtra { get; set; }
 
+    /// <summary>
+    /// Horas extra con exceso (3ra/9na semana — Art. 48 Código de Trabajo).
+    /// Se aplica recargo adicional 1.75x cuando se exceden 3h/día o 9h/semana.
+    /// </summary>
+    public decimal HorasExtraExceso { get; set; }
+
+    /// <summary>
+    /// Monto pagado por horas extra con exceso (factor 2.1875x = 1.25 × 1.75).
+    /// </summary>
+    public decimal MontoHorasExtraExceso { get; set; }
+
     // ====================================================================
     // Asistencia: Ausencias
     // ====================================================================
@@ -235,7 +246,8 @@ public class PayrollDetail : ITenantEntity
 
     /// <summary>
     /// Total de deducciones al empleado.
-    /// Suma de: CssEmployee + EducationalInsuranceEmployee + IncomeTax + OtherDeductions + DeduccionesFijas + Prestamos + Anticipos.
+    /// Suma de: CssEmployee + EducationalInsuranceEmployee + IncomeTax + OtherDeductions + DeduccionesFijas + Prestamos + Anticipos + PensionAlimenticia + Embargos + DeduccionesVoluntarias.
+    /// Nota: MontoHorasExtraExceso NO es una deducción — es un ingreso adicional incluido en GrossPay/OvertimePay.
     /// </summary>
     public decimal TotalDeductions { get; set; }
 

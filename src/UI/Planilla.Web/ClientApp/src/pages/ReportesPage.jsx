@@ -226,6 +226,10 @@ const ReportesPage = () => {
                                 <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">SE</th>
                                 <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">ISR</th>
                                 <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Acreed.</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P.Alim</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Embar.</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Volunt.</th>
+                                <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Tot.Ded</th>
                                 <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Neto</th>
                             </tr>
                         </thead>
@@ -257,11 +261,15 @@ const ReportesPage = () => {
                                             <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.seEmpleado)}</td>
                                             <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.isr)}</td>
                                             <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.totalAcreedores)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.pensionAlimenticia)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.embargos)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.deduccionesVoluntarias)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-red-400">{formatCurrency(emp.totalDeducciones)}</td>
                                             <td className="px-3 py-2 text-right font-bold font-mono text-green-400">{formatCurrency(emp.salarioNeto)}</td>
                                         </tr>
                                         {isExpanded && hasDesglose && (
                                             <tr>
-                                                <td colSpan="13" className="px-0 py-0 bg-navy-900/60">
+                                                <td colSpan="17" className="px-0 py-0 bg-navy-900/60">
                                                     <div className="ml-10 mr-4 my-1">
                                                         <table className="w-full text-xs border border-navy-700 rounded">
                                                             <thead>
@@ -298,6 +306,10 @@ const ReportesPage = () => {
                                 <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.totalSe)}</td>
                                 <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.totalIsr)}</td>
                                 <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.totalAcreedores)}</td>
+                                <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.totalPensionAlimenticia)}</td>
+                                <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.totalEmbargos)}</td>
+                                <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.totalDeduccionesVoluntarias)}</td>
+                                <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.totalDeducciones)}</td>
                                 <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.totalNeto)}</td>
                             </tr>
                         </tbody>
@@ -453,6 +465,10 @@ const ReportesPage = () => {
                                     <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Total SE</th>
                                     <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Total ISR</th>
                                     <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Acreed.</th>
+                                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">P.Alim</th>
+                                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Embar.</th>
+                                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Volunt.</th>
+                                    <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Tot.Ded</th>
                                     <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Total Neto</th>
                                 </tr>
                             </thead>
@@ -466,12 +482,16 @@ const ReportesPage = () => {
                                         <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.totalSe)}</td>
                                         <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.totalIsr)}</td>
                                         <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.totalAcreedores)}</td>
+                                        <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.totalPensionAlimenticia)}</td>
+                                        <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.totalEmbargos)}</td>
+                                        <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.totalDeduccionesVoluntarias)}</td>
+                                        <td className="px-3 py-2 text-right font-mono text-red-400">{formatCurrency(emp.totalDeducciones)}</td>
                                         <td className="px-3 py-2 text-right font-bold font-mono text-green-400">{formatCurrency(emp.totalNeto)}</td>
                                     </tr>
                                 ))}
                                 {reporteData.empleados?.length === 0 && (
                                     <tr>
-                                        <td colSpan="8" className="px-3 py-8 text-center text-gray-500">
+                                        <td colSpan="12" className="px-3 py-8 text-center text-gray-500">
                                             No hay planillas calculadas para {MESES.find(m => m.value === selMes)?.label} {selAnio}
                                         </td>
                                     </tr>
@@ -486,6 +506,10 @@ const ReportesPage = () => {
                                         <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.granTotalSe)}</td>
                                         <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.granTotalIsr)}</td>
                                         <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.granTotalAcreedores)}</td>
+                                        <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.granTotalPensionAlimenticia)}</td>
+                                        <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.granTotalEmbargos)}</td>
+                                        <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.granTotalDeduccionesVoluntarias)}</td>
+                                        <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.granTotalDeducciones)}</td>
                                         <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.granTotalNeto)}</td>
                                     </tr>
                                 )}

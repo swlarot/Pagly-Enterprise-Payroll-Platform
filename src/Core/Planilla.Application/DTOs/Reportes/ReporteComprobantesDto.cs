@@ -8,7 +8,8 @@ namespace Vorluno.Planilla.Application.DTOs.Reportes;
 public record ReporteComprobantesDto(
     string NombreEmpresa, string Ruc,
     string NumeroPlanilla, string Periodo, DateTime FechaPago,
-    List<ComprobanteEmpleado> Comprobantes
+    List<ComprobanteEmpleado> Comprobantes,
+    bool EsSinDeducciones = false
 );
 
 public record ComprobanteEmpleado(
@@ -16,6 +17,7 @@ public record ComprobanteEmpleado(
     decimal SalarioBase, decimal PagoHorasDomingo, decimal PagoHorasFeriado,
     decimal PagoHorasExtra, decimal SalarioBruto,
     decimal CssEmpleado, decimal SeEmpleado, decimal Isr,
+    decimal PensionAlimenticia, decimal Embargos, decimal DeduccionesVoluntarias,
     List<LineaDeduccionComprobante> DeduccionesAcreedores,
     decimal TotalDeduccionesAcreedores,
     decimal TotalDeducciones, decimal SalarioNeto,
