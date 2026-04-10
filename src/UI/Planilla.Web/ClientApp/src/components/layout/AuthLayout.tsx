@@ -110,6 +110,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       '/vacaciones': 'Gestión de Vacaciones',
       '/planillas': 'Gestión de Planillas',
       '/decimo': 'Planilla de Décimo Tercer Mes',
+      '/liquidaciones': 'Liquidaciones Laborales',
       '/reportes': 'Reportes de Planilla',
       '/configuracion': 'Configuración del Sistema',
       '/roles': 'Roles y Permisos',
@@ -517,6 +518,20 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
               >
                 <Banknote className="w-[19px] h-[19px] flex-shrink-0 text-amber-400" />
                 <span>Décimo 13°</span>
+              </NavLink>
+            )}
+
+            {/* Liquidaciones */}
+            {canAccessModuleCheck('planillas') && (
+              <NavLink to="/liquidaciones" className={({ isActive }) =>
+                `flex items-center gap-2.5 px-2.5 py-2 rounded-lg font-semibold text-[13px] transition-all duration-150 border-l-2 ${
+                  isActive
+                    ? 'bg-white/[0.08] border-red-400 text-white'
+                    : 'border-transparent text-gray-400 hover:bg-white/[0.04] hover:text-gray-100 hover:border-red-500/40'
+                }`}
+              >
+                <FileText className="w-[19px] h-[19px] flex-shrink-0 text-red-400" />
+                <span>Liquidaciones</span>
               </NavLink>
             )}
 
