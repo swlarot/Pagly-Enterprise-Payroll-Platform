@@ -126,8 +126,11 @@ public class ExportacionService
         using var workbook = new XLWorkbook();
         var ws = workbook.Worksheets.Add("Planilla Regular");
 
-        const int cols = 14;
-        AplicarEstiloEncabezado(ws, $"PLANILLA REGULAR — {reporte.Estado}", reporte.NombreEmpresa, reporte.Ruc, reporte.Periodo, cols);
+        const int cols = 20;
+        var tituloExcel = reporte.EsSinDeducciones
+            ? $"PLANILLA SIN DEDUCCIONES LEGALES — {reporte.Estado}"
+            : $"PLANILLA REGULAR — {reporte.Estado}";
+        AplicarEstiloEncabezado(ws, tituloExcel, reporte.NombreEmpresa, reporte.Ruc, reporte.Periodo, cols);
         ws.Cell("A5").Value = $"Generado: {DateTimeHelper.NowPanama():dd/MM/yyyy HH:mm}  |  N° Planilla: {reporte.NumeroPlanilla}  |  Fecha de Pago: {reporte.FechaPago:dd/MM/yyyy}";
 
         var hr = 7;
@@ -137,14 +140,20 @@ public class ExportacionService
         ws.Cell(hr, 4).Value = "H. Domingo";
         ws.Cell(hr, 5).Value = "H. Feriado";
         ws.Cell(hr, 6).Value = "H. Extra";
-        ws.Cell(hr, 7).Value = "Sal. Bruto";
-        ws.Cell(hr, 8).Value = "CSS Emp.";
-        ws.Cell(hr, 9).Value = "SE Emp.";
-        ws.Cell(hr, 10).Value = "ISR";
-        ws.Cell(hr, 11).Value = "Acreedores";
-        ws.Cell(hr, 12).Value = "Sal. Neto";
-        ws.Cell(hr, 13).Value = "Limitación";
-        ws.Cell(hr, 14).Value = "Razón";
+        ws.Cell(hr, 7).Value = "H. Exceso";
+        ws.Cell(hr, 8).Value = "Monto Exceso";
+        ws.Cell(hr, 9).Value = "Sal. Bruto";
+        ws.Cell(hr, 10).Value = "CSS Emp.";
+        ws.Cell(hr, 11).Value = "SE Emp.";
+        ws.Cell(hr, 12).Value = "ISR";
+        ws.Cell(hr, 13).Value = "Acreedores";
+        ws.Cell(hr, 14).Value = "P. Alim.";
+        ws.Cell(hr, 15).Value = "Embargos";
+        ws.Cell(hr, 16).Value = "Volunt.";
+        ws.Cell(hr, 17).Value = "Total Ded.";
+        ws.Cell(hr, 18).Value = "Sal. Neto";
+        ws.Cell(hr, 19).Value = "Limitación";
+        ws.Cell(hr, 20).Value = "Razón";
         AplicarEstiloHeaderFila(ws, hr, cols);
 
         var row = hr + 1;
@@ -156,20 +165,26 @@ public class ExportacionService
             ws.Cell(row, 4).Value = emp.HorasDomingo;
             ws.Cell(row, 5).Value = emp.HorasFeriado;
             ws.Cell(row, 6).Value = emp.HorasExtra;
-            ws.Cell(row, 7).Value = emp.SalarioBruto;
-            ws.Cell(row, 8).Value = emp.CssEmpleado;
-            ws.Cell(row, 9).Value = emp.SeEmpleado;
-            ws.Cell(row, 10).Value = emp.Isr;
-            ws.Cell(row, 11).Value = emp.TotalAcreedores;
-            ws.Cell(row, 12).Value = emp.SalarioNeto;
-            ws.Cell(row, 13).Value = emp.TuvoLimitacion ? "SI" : "";
-            ws.Cell(row, 14).Value = emp.RazonLimitacion ?? "";
+            ws.Cell(row, 7).Value = emp.HorasExtraExceso;
+            ws.Cell(row, 8).Value = emp.MontoHorasExtraExceso;
+            ws.Cell(row, 9).Value = emp.SalarioBruto;
+            ws.Cell(row, 10).Value = emp.CssEmpleado;
+            ws.Cell(row, 11).Value = emp.SeEmpleado;
+            ws.Cell(row, 12).Value = emp.Isr;
+            ws.Cell(row, 13).Value = emp.TotalAcreedores;
+            ws.Cell(row, 14).Value = emp.PensionAlimenticia;
+            ws.Cell(row, 15).Value = emp.Embargos;
+            ws.Cell(row, 16).Value = emp.DeduccionesVoluntarias;
+            ws.Cell(row, 17).Value = emp.TotalDeducciones;
+            ws.Cell(row, 18).Value = emp.SalarioNeto;
+            ws.Cell(row, 19).Value = emp.TuvoLimitacion ? "SI" : "";
+            ws.Cell(row, 20).Value = emp.RazonLimitacion ?? "";
 
-            ws.Range(row, 3, row, 6).Style.NumberFormat.Format = "#,##0.00";
-            ws.Range(row, 7, row, 12).Style.NumberFormat.Format = "#,##0.00";
+            ws.Range(row, 3, row, 8).Style.NumberFormat.Format = "#,##0.00";
+            ws.Range(row, 9, row, 18).Style.NumberFormat.Format = "#,##0.00";
 
             if (emp.TuvoLimitacion)
-                ws.Cell(row, 13).Style.Fill.BackgroundColor = XLColor.Orange;
+                ws.Cell(row, 19).Style.Fill.BackgroundColor = XLColor.Orange;
 
             row++;
 
@@ -205,14 +220,20 @@ public class ExportacionService
 
         ws.Cell(row, 2).Value = "TOTALES";
         ws.Cell(row, 3).Value = reporte.Totales.TotalEmpleados;
-        ws.Cell(row, 7).Value = reporte.Totales.TotalBruto;
-        ws.Cell(row, 8).Value = reporte.Totales.TotalCss;
-        ws.Cell(row, 9).Value = reporte.Totales.TotalSe;
-        ws.Cell(row, 10).Value = reporte.Totales.TotalIsr;
-        ws.Cell(row, 11).Value = reporte.Totales.TotalAcreedores;
-        ws.Cell(row, 12).Value = reporte.Totales.TotalNeto;
+        ws.Cell(row, 7).Value = reporte.Totales.TotalHorasExtraExceso;
+        ws.Cell(row, 8).Value = reporte.Totales.TotalMontoHorasExtraExceso;
+        ws.Cell(row, 9).Value = reporte.Totales.TotalBruto;
+        ws.Cell(row, 10).Value = reporte.Totales.TotalCss;
+        ws.Cell(row, 11).Value = reporte.Totales.TotalSe;
+        ws.Cell(row, 12).Value = reporte.Totales.TotalIsr;
+        ws.Cell(row, 13).Value = reporte.Totales.TotalAcreedores;
+        ws.Cell(row, 14).Value = reporte.Totales.TotalPensionAlimenticia;
+        ws.Cell(row, 15).Value = reporte.Totales.TotalEmbargos;
+        ws.Cell(row, 16).Value = reporte.Totales.TotalDeduccionesVoluntarias;
+        ws.Cell(row, 17).Value = reporte.Totales.TotalDeducciones;
+        ws.Cell(row, 18).Value = reporte.Totales.TotalNeto;
         AplicarEstiloTotales(ws, row, cols);
-        ws.Range(row, 7, row, 12).Style.NumberFormat.Format = "#,##0.00";
+        ws.Range(row, 7, row, 18).Style.NumberFormat.Format = "#,##0.00";
 
         ws.Columns().AdjustToContents();
         using var stream = new MemoryStream();
@@ -242,7 +263,10 @@ public class ExportacionService
                     col.Item().Height(4).Background(PdfTheme.PrimaryDark);
                     col.Item().PaddingTop(4).Text(reporte.NombreEmpresa).FontSize(14).Bold();
                     col.Item().Text($"RUC: {reporte.Ruc}").FontSize(9);
-                    col.Item().Text($"PLANILLA REGULAR — {reporte.NumeroPlanilla} — {reporte.Periodo} — {reporte.Estado}").FontSize(11).Bold();
+                    var tituloPdf = reporte.EsSinDeducciones
+                        ? $"PLANILLA SIN DEDUCCIONES LEGALES — {reporte.NumeroPlanilla} — {reporte.Periodo} — {reporte.Estado}"
+                        : $"PLANILLA REGULAR — {reporte.NumeroPlanilla} — {reporte.Periodo} — {reporte.Estado}";
+                    col.Item().Text(tituloPdf).FontSize(11).Bold();
                     col.Item().Background("#f1f5f9").Padding(4).Row(infoRow =>
                     {
                         infoRow.RelativeItem().Text($"N° Planilla: {reporte.NumeroPlanilla}").FontSize(8);
@@ -256,35 +280,47 @@ public class ExportacionService
                 {
                     table.ColumnsDefinition(cols =>
                     {
-                        cols.RelativeColumn(1.5f); // Cédula
-                        cols.RelativeColumn(3);    // Nombre
-                        cols.RelativeColumn(1.2f); // H. Reg
-                        cols.RelativeColumn(1.2f); // H. Dom
-                        cols.RelativeColumn(1.2f); // H. Fer
-                        cols.RelativeColumn(1.2f); // H. Ext
-                        cols.RelativeColumn(2);    // Bruto
-                        cols.RelativeColumn(1.8f); // CSS
-                        cols.RelativeColumn(1.8f); // SE
-                        cols.RelativeColumn(1.8f); // ISR
-                        cols.RelativeColumn(2);    // Acreed
-                        cols.RelativeColumn(2);    // Neto
+                        cols.RelativeColumn(1.4f); // Cédula
+                        cols.RelativeColumn(2.5f); // Nombre
+                        cols.RelativeColumn(0.9f); // H. Reg
+                        cols.RelativeColumn(0.9f); // H. Dom
+                        cols.RelativeColumn(0.9f); // H. Fer
+                        cols.RelativeColumn(0.9f); // H. Ext
+                        cols.RelativeColumn(0.9f); // H. Exc
+                        cols.RelativeColumn(1.2f); // Mto. Exc
+                        cols.RelativeColumn(1.5f); // Bruto
+                        cols.RelativeColumn(1.3f); // CSS
+                        cols.RelativeColumn(1.3f); // SE
+                        cols.RelativeColumn(1.3f); // ISR
+                        cols.RelativeColumn(1.3f); // Acreed
+                        cols.RelativeColumn(1.1f); // P.Alim
+                        cols.RelativeColumn(1.1f); // Embar
+                        cols.RelativeColumn(1.1f); // Volunt
+                        cols.RelativeColumn(1.3f); // Tot.Ded
+                        cols.RelativeColumn(1.5f); // Neto
                     });
 
                     table.Header(header =>
                     {
                         var bg = PdfTheme.PrimaryDark;
-                        header.Cell().Background(bg).Padding(4).Text("Cédula").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).Text("Nombre").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).AlignCenter().Text("H.Reg").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).AlignCenter().Text("H.Dom").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).AlignCenter().Text("H.Fer").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).AlignCenter().Text("H.Ext").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Bruto").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("CSS").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("SE").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("ISR").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Acreed.").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Neto").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).Text("Cédula").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).Text("Nombre").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignCenter().Text("H.Reg").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignCenter().Text("H.Dom").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignCenter().Text("H.Fer").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignCenter().Text("H.Ext").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignCenter().Text("H.Exc").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("Mto.Exc").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("Bruto").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("CSS").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("SE").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("ISR").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("Acreed.").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("P.Alim").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("Embar.").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("Volunt.").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("Tot.Ded").Bold().FontSize(6).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("Neto").Bold().FontSize(6).FontColor("#ffffff");
                     });
 
                     var altRow = 0;
@@ -292,23 +328,29 @@ public class ExportacionService
                     {
                         var baseRowBg = (altRow++ % 2 == 0) ? "#ffffff" : "#f8fafc";
                         var rowBg = emp.TuvoLimitacion ? "#fff3e0" : baseRowBg;  // Orange.Lighten4 ≈ #fff3e0
-                        table.Cell().Background(rowBg).Padding(3).Text(emp.Cedula).FontSize(8);
-                        table.Cell().Background(rowBg).Padding(3).Text(emp.NombreCompleto).FontSize(8);
-                        table.Cell().Background(rowBg).Padding(3).AlignCenter().Text(emp.HorasRegulares > 0 ? $"{emp.HorasRegulares:N1}" : "").FontSize(8);
-                        table.Cell().Background(rowBg).Padding(3).AlignCenter().Text(emp.HorasDomingo > 0 ? $"{emp.HorasDomingo:N1}" : "").FontSize(8);
-                        table.Cell().Background(rowBg).Padding(3).AlignCenter().Text(emp.HorasFeriado > 0 ? $"{emp.HorasFeriado:N1}" : "").FontSize(8);
-                        table.Cell().Background(rowBg).Padding(3).AlignCenter().Text(emp.HorasExtra > 0 ? $"{emp.HorasExtra:N1}" : "").FontSize(8);
-                        table.Cell().Background(rowBg).Padding(3).AlignRight().Text($"B/.{emp.SalarioBruto:N2}").FontSize(8);
-                        table.Cell().Background(rowBg).Padding(3).AlignRight().Text($"B/.{emp.CssEmpleado:N2}").FontSize(8);
-                        table.Cell().Background(rowBg).Padding(3).AlignRight().Text($"B/.{emp.SeEmpleado:N2}").FontSize(8);
-                        table.Cell().Background(rowBg).Padding(3).AlignRight().Text(emp.Isr > 0 ? $"B/.{emp.Isr:N2}" : "").FontSize(8);
-                        table.Cell().Background(rowBg).Padding(3).AlignRight().Text(emp.TotalAcreedores > 0 ? $"B/.{emp.TotalAcreedores:N2}" : "").FontSize(8);
-                        table.Cell().Background(rowBg).Padding(3).AlignRight().Text($"B/.{emp.SalarioNeto:N2}").FontSize(8);
+                        table.Cell().Background(rowBg).Padding(2).Text(emp.Cedula).FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).Text(emp.NombreCompleto).FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).AlignCenter().Text(emp.HorasRegulares > 0 ? $"{emp.HorasRegulares:N1}" : "").FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).AlignCenter().Text(emp.HorasDomingo > 0 ? $"{emp.HorasDomingo:N1}" : "").FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).AlignCenter().Text(emp.HorasFeriado > 0 ? $"{emp.HorasFeriado:N1}" : "").FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).AlignCenter().Text(emp.HorasExtra > 0 ? $"{emp.HorasExtra:N1}" : "").FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).AlignCenter().Text(emp.HorasExtraExceso > 0 ? $"{emp.HorasExtraExceso:N1}" : "").FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).AlignRight().Text(emp.MontoHorasExtraExceso > 0 ? $"B/.{emp.MontoHorasExtraExceso:N2}" : "").FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).AlignRight().Text($"B/.{emp.SalarioBruto:N2}").FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).AlignRight().Text($"B/.{emp.CssEmpleado:N2}").FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).AlignRight().Text($"B/.{emp.SeEmpleado:N2}").FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).AlignRight().Text(emp.Isr > 0 ? $"B/.{emp.Isr:N2}" : "").FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).AlignRight().Text(emp.TotalAcreedores > 0 ? $"B/.{emp.TotalAcreedores:N2}" : "").FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).AlignRight().Text(emp.PensionAlimenticia > 0 ? $"B/.{emp.PensionAlimenticia:N2}" : "").FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).AlignRight().Text(emp.Embargos > 0 ? $"B/.{emp.Embargos:N2}" : "").FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).AlignRight().Text(emp.DeduccionesVoluntarias > 0 ? $"B/.{emp.DeduccionesVoluntarias:N2}" : "").FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).AlignRight().Text($"B/.{emp.TotalDeducciones:N2}").FontSize(6);
+                        table.Cell().Background(rowBg).Padding(2).AlignRight().Text($"B/.{emp.SalarioNeto:N2}").FontSize(6);
 
-                        // Desglose de horas: ocupa las 12 columnas con una mini-tabla
+                        // Desglose de horas: ocupa las 18 columnas con una mini-tabla
                         if (emp.DesgloseHoras.Count > 0)
                         {
-                            table.Cell().ColumnSpan(12).PaddingLeft(20).PaddingBottom(4).Table(inner =>
+                            table.Cell().ColumnSpan(18).PaddingLeft(20).PaddingBottom(4).Table(inner =>
                             {
                                 inner.ColumnsDefinition(ic =>
                                 {
@@ -340,18 +382,24 @@ public class ExportacionService
 
                     // Fila totales
                     var totBg = Colors.Yellow.Lighten3;
-                    table.Cell().Background(totBg).Padding(3).Text($"Total: {reporte.Totales.TotalEmpleados} emp.").Bold().FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).Text("TOTALES").Bold().FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).Text("").FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).Text("").FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).Text("").FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).Text("").FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.TotalBruto:N2}").Bold().FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.TotalCss:N2}").Bold().FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.TotalSe:N2}").Bold().FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.TotalIsr:N2}").Bold().FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.TotalAcreedores:N2}").Bold().FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.TotalNeto:N2}").Bold().FontSize(8);
+                    table.Cell().Background(totBg).Padding(2).Text($"Total: {reporte.Totales.TotalEmpleados} emp.").Bold().FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).Text("TOTALES").Bold().FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).Text("").FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).Text("").FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).Text("").FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).Text("").FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).AlignCenter().Text(reporte.Totales.TotalHorasExtraExceso > 0 ? $"{reporte.Totales.TotalHorasExtraExceso:N1}" : "").Bold().FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text(reporte.Totales.TotalMontoHorasExtraExceso > 0 ? $"B/.{reporte.Totales.TotalMontoHorasExtraExceso:N2}" : "").Bold().FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text($"B/.{reporte.Totales.TotalBruto:N2}").Bold().FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text($"B/.{reporte.Totales.TotalCss:N2}").Bold().FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text($"B/.{reporte.Totales.TotalSe:N2}").Bold().FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text($"B/.{reporte.Totales.TotalIsr:N2}").Bold().FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text($"B/.{reporte.Totales.TotalAcreedores:N2}").Bold().FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text(reporte.Totales.TotalPensionAlimenticia > 0 ? $"B/.{reporte.Totales.TotalPensionAlimenticia:N2}" : "").Bold().FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text(reporte.Totales.TotalEmbargos > 0 ? $"B/.{reporte.Totales.TotalEmbargos:N2}" : "").Bold().FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text(reporte.Totales.TotalDeduccionesVoluntarias > 0 ? $"B/.{reporte.Totales.TotalDeduccionesVoluntarias:N2}" : "").Bold().FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text($"B/.{reporte.Totales.TotalDeducciones:N2}").Bold().FontSize(6);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text($"B/.{reporte.Totales.TotalNeto:N2}").Bold().FontSize(6);
                 });
 
                 BuildProfessionalFooter(page, reporte.NombreEmpresa);
@@ -374,7 +422,7 @@ public class ExportacionService
         using var workbook = new XLWorkbook();
         var ws = workbook.Worksheets.Add("Reporte Mensual");
 
-        const int cols = 8;
+        const int cols = 12;
         AplicarEstiloEncabezado(ws, $"REPORTE MENSUAL — {reporte.NombreMes} {reporte.Anio}", reporte.NombreEmpresa, reporte.Ruc, $"{reporte.NombreMes} {reporte.Anio}", cols);
 
         if (reporte.PeriodosIncluidos.Any())
@@ -388,7 +436,11 @@ public class ExportacionService
         ws.Cell(hr, 5).Value = "Total SE";
         ws.Cell(hr, 6).Value = "Total ISR";
         ws.Cell(hr, 7).Value = "Acreedores";
-        ws.Cell(hr, 8).Value = "Total Neto";
+        ws.Cell(hr, 8).Value = "P. Alim.";
+        ws.Cell(hr, 9).Value = "Embargos";
+        ws.Cell(hr, 10).Value = "Volunt.";
+        ws.Cell(hr, 11).Value = "Total Ded.";
+        ws.Cell(hr, 12).Value = "Total Neto";
         AplicarEstiloHeaderFila(ws, hr, cols);
 
         var row = hr + 1;
@@ -401,8 +453,12 @@ public class ExportacionService
             ws.Cell(row, 5).Value = emp.TotalSe;
             ws.Cell(row, 6).Value = emp.TotalIsr;
             ws.Cell(row, 7).Value = emp.TotalAcreedores;
-            ws.Cell(row, 8).Value = emp.TotalNeto;
-            ws.Range(row, 3, row, 8).Style.NumberFormat.Format = "#,##0.00";
+            ws.Cell(row, 8).Value = emp.TotalPensionAlimenticia;
+            ws.Cell(row, 9).Value = emp.TotalEmbargos;
+            ws.Cell(row, 10).Value = emp.TotalDeduccionesVoluntarias;
+            ws.Cell(row, 11).Value = emp.TotalDeducciones;
+            ws.Cell(row, 12).Value = emp.TotalNeto;
+            ws.Range(row, 3, row, 12).Style.NumberFormat.Format = "#,##0.00";
             row++;
         }
 
@@ -412,9 +468,13 @@ public class ExportacionService
         ws.Cell(row, 5).Value = reporte.Totales.GranTotalSe;
         ws.Cell(row, 6).Value = reporte.Totales.GranTotalIsr;
         ws.Cell(row, 7).Value = reporte.Totales.GranTotalAcreedores;
-        ws.Cell(row, 8).Value = reporte.Totales.GranTotalNeto;
+        ws.Cell(row, 8).Value = reporte.Totales.GranTotalPensionAlimenticia;
+        ws.Cell(row, 9).Value = reporte.Totales.GranTotalEmbargos;
+        ws.Cell(row, 10).Value = reporte.Totales.GranTotalDeduccionesVoluntarias;
+        ws.Cell(row, 11).Value = reporte.Totales.GranTotalDeducciones;
+        ws.Cell(row, 12).Value = reporte.Totales.GranTotalNeto;
         AplicarEstiloTotales(ws, row, cols);
-        ws.Range(row, 3, row, 8).Style.NumberFormat.Format = "#,##0.00";
+        ws.Range(row, 3, row, 12).Style.NumberFormat.Format = "#,##0.00";
 
         ws.Columns().AdjustToContents();
         using var stream = new MemoryStream();
@@ -458,52 +518,68 @@ public class ExportacionService
                 {
                     table.ColumnsDefinition(cols =>
                     {
-                        cols.RelativeColumn(1.5f);
-                        cols.RelativeColumn(3);
-                        cols.RelativeColumn(2);
-                        cols.RelativeColumn(2);
-                        cols.RelativeColumn(2);
-                        cols.RelativeColumn(2);
-                        cols.RelativeColumn(2);
-                        cols.RelativeColumn(2);
+                        cols.RelativeColumn(1.5f);  // Cédula
+                        cols.RelativeColumn(2.8f);  // Nombre
+                        cols.RelativeColumn(1.8f);  // Bruto
+                        cols.RelativeColumn(1.5f);  // CSS
+                        cols.RelativeColumn(1.5f);  // SE
+                        cols.RelativeColumn(1.5f);  // ISR
+                        cols.RelativeColumn(1.5f);  // Acreed
+                        cols.RelativeColumn(1.3f);  // P.Alim
+                        cols.RelativeColumn(1.3f);  // Embar
+                        cols.RelativeColumn(1.3f);  // Volunt
+                        cols.RelativeColumn(1.5f);  // Tot.Ded
+                        cols.RelativeColumn(1.8f);  // Neto
                     });
 
                     table.Header(header =>
                     {
                         var bg = PdfTheme.PrimaryDark;
-                        header.Cell().Background(bg).Padding(4).Text("Cédula").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).Text("Nombre").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Total Bruto").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("CSS").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("SE").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("ISR").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Acreed.").Bold().FontSize(8).FontColor("#ffffff");
-                        header.Cell().Background(bg).Padding(4).AlignRight().Text("Total Neto").Bold().FontSize(8).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).Text("Cédula").Bold().FontSize(7).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).Text("Nombre").Bold().FontSize(7).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("Total Bruto").Bold().FontSize(7).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("CSS").Bold().FontSize(7).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("SE").Bold().FontSize(7).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("ISR").Bold().FontSize(7).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("Acreed.").Bold().FontSize(7).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("P.Alim").Bold().FontSize(7).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("Embar.").Bold().FontSize(7).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("Volunt.").Bold().FontSize(7).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("Tot.Ded").Bold().FontSize(7).FontColor("#ffffff");
+                        header.Cell().Background(bg).Padding(3).AlignRight().Text("Total Neto").Bold().FontSize(7).FontColor("#ffffff");
                     });
 
                     var altRowM = 0;
                     foreach (var emp in reporte.Empleados)
                     {
                         var rowBgM = (altRowM++ % 2 == 0) ? "#ffffff" : "#f8fafc";
-                        table.Cell().Background(rowBgM).Padding(3).Text(emp.Cedula).FontSize(8);
-                        table.Cell().Background(rowBgM).Padding(3).Text(emp.NombreCompleto).FontSize(8);
-                        table.Cell().Background(rowBgM).Padding(3).AlignRight().Text($"B/.{emp.TotalBruto:N2}").FontSize(8);
-                        table.Cell().Background(rowBgM).Padding(3).AlignRight().Text($"B/.{emp.TotalCss:N2}").FontSize(8);
-                        table.Cell().Background(rowBgM).Padding(3).AlignRight().Text($"B/.{emp.TotalSe:N2}").FontSize(8);
-                        table.Cell().Background(rowBgM).Padding(3).AlignRight().Text(emp.TotalIsr > 0 ? $"B/.{emp.TotalIsr:N2}" : "").FontSize(8);
-                        table.Cell().Background(rowBgM).Padding(3).AlignRight().Text(emp.TotalAcreedores > 0 ? $"B/.{emp.TotalAcreedores:N2}" : "").FontSize(8);
-                        table.Cell().Background(rowBgM).Padding(3).AlignRight().Text($"B/.{emp.TotalNeto:N2}").FontSize(8);
+                        table.Cell().Background(rowBgM).Padding(2).Text(emp.Cedula).FontSize(7);
+                        table.Cell().Background(rowBgM).Padding(2).Text(emp.NombreCompleto).FontSize(7);
+                        table.Cell().Background(rowBgM).Padding(2).AlignRight().Text($"B/.{emp.TotalBruto:N2}").FontSize(7);
+                        table.Cell().Background(rowBgM).Padding(2).AlignRight().Text($"B/.{emp.TotalCss:N2}").FontSize(7);
+                        table.Cell().Background(rowBgM).Padding(2).AlignRight().Text($"B/.{emp.TotalSe:N2}").FontSize(7);
+                        table.Cell().Background(rowBgM).Padding(2).AlignRight().Text(emp.TotalIsr > 0 ? $"B/.{emp.TotalIsr:N2}" : "").FontSize(7);
+                        table.Cell().Background(rowBgM).Padding(2).AlignRight().Text(emp.TotalAcreedores > 0 ? $"B/.{emp.TotalAcreedores:N2}" : "").FontSize(7);
+                        table.Cell().Background(rowBgM).Padding(2).AlignRight().Text(emp.TotalPensionAlimenticia > 0 ? $"B/.{emp.TotalPensionAlimenticia:N2}" : "").FontSize(7);
+                        table.Cell().Background(rowBgM).Padding(2).AlignRight().Text(emp.TotalEmbargos > 0 ? $"B/.{emp.TotalEmbargos:N2}" : "").FontSize(7);
+                        table.Cell().Background(rowBgM).Padding(2).AlignRight().Text(emp.TotalDeduccionesVoluntarias > 0 ? $"B/.{emp.TotalDeduccionesVoluntarias:N2}" : "").FontSize(7);
+                        table.Cell().Background(rowBgM).Padding(2).AlignRight().Text($"B/.{emp.TotalDeducciones:N2}").FontSize(7);
+                        table.Cell().Background(rowBgM).Padding(2).AlignRight().Text($"B/.{emp.TotalNeto:N2}").FontSize(7);
                     }
 
                     var totBg = Colors.Yellow.Lighten3;
-                    table.Cell().Background(totBg).Padding(3).Text($"{reporte.Totales.TotalEmpleados} emp.").Bold().FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).Text("TOTALES").Bold().FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.GranTotalBruto:N2}").Bold().FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.GranTotalCss:N2}").Bold().FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.GranTotalSe:N2}").Bold().FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.GranTotalIsr:N2}").Bold().FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.GranTotalAcreedores:N2}").Bold().FontSize(8);
-                    table.Cell().Background(totBg).Padding(3).AlignRight().Text($"B/.{reporte.Totales.GranTotalNeto:N2}").Bold().FontSize(8);
+                    table.Cell().Background(totBg).Padding(2).Text($"{reporte.Totales.TotalEmpleados} emp.").Bold().FontSize(7);
+                    table.Cell().Background(totBg).Padding(2).Text("TOTALES").Bold().FontSize(7);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text($"B/.{reporte.Totales.GranTotalBruto:N2}").Bold().FontSize(7);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text($"B/.{reporte.Totales.GranTotalCss:N2}").Bold().FontSize(7);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text($"B/.{reporte.Totales.GranTotalSe:N2}").Bold().FontSize(7);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text($"B/.{reporte.Totales.GranTotalIsr:N2}").Bold().FontSize(7);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text($"B/.{reporte.Totales.GranTotalAcreedores:N2}").Bold().FontSize(7);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text(reporte.Totales.GranTotalPensionAlimenticia > 0 ? $"B/.{reporte.Totales.GranTotalPensionAlimenticia:N2}" : "").Bold().FontSize(7);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text(reporte.Totales.GranTotalEmbargos > 0 ? $"B/.{reporte.Totales.GranTotalEmbargos:N2}" : "").Bold().FontSize(7);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text(reporte.Totales.GranTotalDeduccionesVoluntarias > 0 ? $"B/.{reporte.Totales.GranTotalDeduccionesVoluntarias:N2}" : "").Bold().FontSize(7);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text($"B/.{reporte.Totales.GranTotalDeducciones:N2}").Bold().FontSize(7);
+                    table.Cell().Background(totBg).Padding(2).AlignRight().Text($"B/.{reporte.Totales.GranTotalNeto:N2}").Bold().FontSize(7);
                 });
 
                 BuildProfessionalFooter(page, reporte.NombreEmpresa);
@@ -954,7 +1030,10 @@ public class ExportacionService
                             });
                             row.ConstantItem(190).Background(PdfTheme.DarkBg).Padding(6).AlignRight().Column(c =>
                             {
-                                c.Item().Text("COMPROBANTE DE PAGO").FontSize(12).Bold().FontColor("#ffffff");
+                                var tituloComprobante = reporte.EsSinDeducciones
+                                    ? "COMPROBANTE DE PAGO\nSIN DEDUCCIONES LEGALES"
+                                    : "COMPROBANTE DE PAGO";
+                                c.Item().Text(tituloComprobante).FontSize(12).Bold().FontColor("#ffffff");
                                 c.Item().Text($"N° Planilla: {reporte.NumeroPlanilla}").FontSize(9).FontColor("#dbeafe");
                                 c.Item().Text($"Período: {reporte.Periodo}").FontSize(9).FontColor("#dbeafe");
                                 c.Item().Text($"Fecha Pago: {reporte.FechaPago:dd/MM/yyyy}").FontSize(9).Bold().FontColor("#ffffff");
@@ -1066,6 +1145,33 @@ public class ExportacionService
                                 table.Cell().Padding(4).Text("").FontSize(9);
                                 table.Cell().Padding(4).Text("").FontSize(9);
                             }
+                            // Pensión Alimenticia (si aplica)
+                            if (comp.PensionAlimenticia > 0)
+                            {
+                                table.Cell().Padding(4).Text("").FontSize(9);
+                                table.Cell().Padding(4).Text("").FontSize(9);
+                                table.Cell().Padding(4).Text("Pensión Alimenticia").FontSize(9);
+                                table.Cell().Padding(4).AlignRight().Text($"B/.{comp.PensionAlimenticia:N2}").FontSize(9);
+                            }
+
+                            // Embargos (si aplica)
+                            if (comp.Embargos > 0)
+                            {
+                                table.Cell().Padding(4).Text("").FontSize(9);
+                                table.Cell().Padding(4).Text("").FontSize(9);
+                                table.Cell().Padding(4).Text("Embargos").FontSize(9);
+                                table.Cell().Padding(4).AlignRight().Text($"B/.{comp.Embargos:N2}").FontSize(9);
+                            }
+
+                            // Deducciones Voluntarias (si aplica)
+                            if (comp.DeduccionesVoluntarias > 0)
+                            {
+                                table.Cell().Padding(4).Text("").FontSize(9);
+                                table.Cell().Padding(4).Text("").FontSize(9);
+                                table.Cell().Padding(4).Text("Deducciones Voluntarias").FontSize(9);
+                                table.Cell().Padding(4).AlignRight().Text($"B/.{comp.DeduccionesVoluntarias:N2}").FontSize(9);
+                            }
+
                             // Primera deducción acreedor (si aplica)
                             var primeraDeduccion = comp.DeduccionesAcreedores.FirstOrDefault();
                             if (primeraDeduccion != null)
@@ -1256,8 +1362,9 @@ public class ExportacionService
                 row.RelativeItem().Text(reporte.NombreEmpresa ?? "Empresa").FontSize(6.5f).Bold().FontColor(PdfTheme.PrimaryMedium);
                 row.RelativeItem().AlignRight().Text(reporte.Periodo).FontSize(5);
             });
+            var tituloSlip = reporte.EsSinDeducciones ? "COMPROBANTE DE PAGO — SIN DED. LEGALES" : "COMPROBANTE DE PAGO";
             col.Item().Background(PdfTheme.DarkBg).PaddingVertical(1).AlignCenter()
-                .Text("COMPROBANTE DE PAGO").FontSize(5).Bold().FontColor("#ffffff");
+                .Text(tituloSlip).FontSize(5).Bold().FontColor("#ffffff");
             col.Item().PaddingBottom(2);
 
             // Datos del empleado con fondo verde suave
@@ -1326,6 +1433,29 @@ public class ExportacionService
                     table.Cell().AlignRight().Text($"{comp.PagoHorasExtra:N2}").FontSize(5.5f);
                     table.Cell().PaddingLeft(5).Text("").FontSize(5.5f);
                     table.Cell().Text("").FontSize(5.5f);
+                }
+
+                // Pensión Alimenticia, Embargos, Voluntarias
+                if (comp.PensionAlimenticia > 0)
+                {
+                    table.Cell().Text("").FontSize(5.5f);
+                    table.Cell().Text("").FontSize(5.5f);
+                    table.Cell().PaddingLeft(5).Text("P. Alimenticia").FontSize(5.5f);
+                    table.Cell().AlignRight().Text($"{comp.PensionAlimenticia:N2}").FontSize(5.5f);
+                }
+                if (comp.Embargos > 0)
+                {
+                    table.Cell().Text("").FontSize(5.5f);
+                    table.Cell().Text("").FontSize(5.5f);
+                    table.Cell().PaddingLeft(5).Text("Embargos").FontSize(5.5f);
+                    table.Cell().AlignRight().Text($"{comp.Embargos:N2}").FontSize(5.5f);
+                }
+                if (comp.DeduccionesVoluntarias > 0)
+                {
+                    table.Cell().Text("").FontSize(5.5f);
+                    table.Cell().Text("").FontSize(5.5f);
+                    table.Cell().PaddingLeft(5).Text("Ded. Voluntarias").FontSize(5.5f);
+                    table.Cell().AlignRight().Text($"{comp.DeduccionesVoluntarias:N2}").FontSize(5.5f);
                 }
 
                 // Acreedores (hasta 3, para no desbordar el espacio disponible)
