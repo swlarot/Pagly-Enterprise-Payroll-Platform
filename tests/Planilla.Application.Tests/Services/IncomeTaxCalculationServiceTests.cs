@@ -2,8 +2,9 @@
 // Planilla - IncomeTaxCalculationServiceTests
 // Source: Core360 Stage 5, Sección 2.4
 // Creado: 2025-12-26
+// Actualizado: 2026-04-09 — Ajustado para ×13 (incluye décimo tercer mes)
 // Descripción: Tests unitarios del servicio de ISR
-// Valida brackets progresivos, deducciones, proyección anual
+// Valida brackets progresivos, deducciones, proyección anual con décimo
 // ====================================================================
 
 using FluentAssertions;
@@ -16,6 +17,7 @@ namespace Vorluno.Planilla.Application.Tests.Services;
 /// <summary>
 /// Tests unitarios del servicio de Impuesto Sobre la Renta (ISR).
 /// Valida brackets progresivos según regulaciones de la DGI de Panamá.
+/// La proyección anual usa ×13 meses (12 + décimo tercer mes).
 /// </summary>
 public class IncomeTaxCalculationServiceTests
 {
@@ -29,8 +31,8 @@ public class IncomeTaxCalculationServiceTests
         var mockProvider = new MockPayrollConfigProvider();
         var service = new IncomeTaxCalculationServicePortable(mockProvider);
 
-        // Salario mensual que proyecta a < B/. 11,000 anual
-        var grossPay = 900m; // 900 * 12 = 10,800 anual
+        // Salario mensual que proyecta a < B/. 11,000 anual (con ×13)
+        var grossPay = 840m; // 840 * 13 = 10,920 anual (exento)
         var payFrequency = "Mensual";
         var dependents = 0;
         var isSubject = true;
@@ -46,9 +48,9 @@ public class IncomeTaxCalculationServiceTests
         );
 
         // Assert
-        result.TaxableIncome.Should().Be(10800m); // 900 * 12
+        result.TaxableIncome.Should().Be(10920m); // 840 * 13
         result.DependentDeduction.Should().Be(0);
-        result.NetTaxableIncome.Should().Be(10800m);
+        result.NetTaxableIncome.Should().Be(10920m);
         result.TaxAmount.Should().Be(0); // Tramo exento
         result.EffectiveTaxRate.Should().Be(0);
     }
@@ -61,7 +63,7 @@ public class IncomeTaxCalculationServiceTests
         var service = new IncomeTaxCalculationServicePortable(mockProvider);
 
         // Salario mensual que proyecta al tramo 15%
-        var grossPay = 3000m; // 3000 * 12 = 36,000 anual
+        var grossPay = 3000m; // 3000 * 13 = 39,000 anual
         var payFrequency = "Mensual";
         var dependents = 0;
         var isSubject = true;
@@ -77,11 +79,11 @@ public class IncomeTaxCalculationServiceTests
         );
 
         // Assert
-        result.TaxableIncome.Should().Be(36000m); // 3000 * 12
-        result.NetTaxableIncome.Should().Be(36000m);
-        // ISR: (36,000 - 11,000) * 15% = 25,000 * 0.15 = 3,750 anual
-        // Por mes: 3,750 / 12 = 312.50
-        result.TaxAmount.Should().Be(312.50m);
+        result.TaxableIncome.Should().Be(39000m); // 3000 * 13
+        result.NetTaxableIncome.Should().Be(39000m);
+        // ISR: (39,000 - 11,000) * 15% = 28,000 * 0.15 = 4,200 anual
+        // Por mes: 4,200 / 12 = 350.00
+        result.TaxAmount.Should().Be(350.00m);
     }
 
     [Fact]
@@ -92,7 +94,7 @@ public class IncomeTaxCalculationServiceTests
         var service = new IncomeTaxCalculationServicePortable(mockProvider);
 
         // Salario mensual que proyecta al tramo 25%
-        var grossPay = 6000m; // 6000 * 12 = 72,000 anual
+        var grossPay = 6000m; // 6000 * 13 = 78,000 anual
         var payFrequency = "Mensual";
         var dependents = 0;
         var isSubject = true;
@@ -108,15 +110,14 @@ public class IncomeTaxCalculationServiceTests
         );
 
         // Assert
-        result.TaxableIncome.Should().Be(72000m);
-        result.NetTaxableIncome.Should().Be(72000m);
+        result.TaxableIncome.Should().Be(78000m);
+        result.NetTaxableIncome.Should().Be(78000m);
         // ISR:
-        // Tramo 1 (0-11,000): 0
-        // Tramo 2 (11,001-50,000): (50,000 - 11,000) * 15% = 5,850
-        // Tramo 3 (50,001-72,000): (72,000 - 50,000) * 25% = 5,500
-        // Total anual: 5,850 + 5,500 = 11,350
-        // Por mes: 11,350 / 12 = 945.83
-        result.TaxAmount.Should().Be(945.83m);
+        // Tramo 2 (11,001-50,000): FixedAmount = 5,850
+        // Tramo 3: (78,000 - 50,000) * 25% = 7,000
+        // Total anual: 5,850 + 7,000 = 12,850
+        // Por mes: 12,850 / 12 = 1,070.83
+        result.TaxAmount.Should().Be(1070.83m);
     }
 
     [Fact]
@@ -126,7 +127,7 @@ public class IncomeTaxCalculationServiceTests
         var mockProvider = new MockPayrollConfigProvider();
         var service = new IncomeTaxCalculationServicePortable(mockProvider);
 
-        var grossPay = 3000m; // 3000 * 12 = 36,000 anual
+        var grossPay = 3000m; // 3000 * 13 = 39,000 anual
         var payFrequency = "Mensual";
         var dependents = 2; // 2 dependientes = B/. 1,600 deducción
         var isSubject = true;
@@ -142,12 +143,12 @@ public class IncomeTaxCalculationServiceTests
         );
 
         // Assert
-        result.TaxableIncome.Should().Be(36000m);
+        result.TaxableIncome.Should().Be(39000m);
         result.DependentDeduction.Should().Be(1600m); // 800 * 2
-        result.NetTaxableIncome.Should().Be(34400m); // 36,000 - 1,600
-        // ISR: (34,400 - 11,000) * 15% = 23,400 * 0.15 = 3,510 anual
-        // Por mes: 3,510 / 12 = 292.50
-        result.TaxAmount.Should().Be(292.50m);
+        result.NetTaxableIncome.Should().Be(37400m); // 39,000 - 1,600
+        // ISR: (37,400 - 11,000) * 15% = 26,400 * 0.15 = 3,960 anual
+        // Por mes: 3,960 / 12 = 330.00
+        result.TaxAmount.Should().Be(330.00m);
     }
 
     [Fact]
@@ -177,7 +178,7 @@ public class IncomeTaxCalculationServiceTests
     }
 
     [Fact]
-    public async Task CalculateIncomeTax__FrecuenciaMensual__Proyecta12Periodos()
+    public async Task CalculateIncomeTax__FrecuenciaMensual__ProyectaCon13Meses()
     {
         // Arrange
         var mockProvider = new MockPayrollConfigProvider();
@@ -199,17 +200,17 @@ public class IncomeTaxCalculationServiceTests
         );
 
         // Assert
-        result.TaxableIncome.Should().Be(12000m); // 1000 * 12
+        result.TaxableIncome.Should().Be(13000m); // 1000 * 13
     }
 
     [Fact]
-    public async Task CalculateIncomeTax__FrecuenciaQuincenal__Proyecta24Periodos()
+    public async Task CalculateIncomeTax__FrecuenciaQuincenal__ProyectaCon13Meses()
     {
         // Arrange
         var mockProvider = new MockPayrollConfigProvider();
         var service = new IncomeTaxCalculationServicePortable(mockProvider);
 
-        var grossPay = 500m;
+        var grossPay = 500m; // quincenal
         var payFrequency = "Quincenal";
         var dependents = 0;
         var isSubject = true;
@@ -225,17 +226,18 @@ public class IncomeTaxCalculationServiceTests
         );
 
         // Assert
-        result.TaxableIncome.Should().Be(12000m); // 500 * 24
+        // 500 * 24 / 12 = 1,000 mensual → 1,000 * 13 = 13,000 anual
+        result.TaxableIncome.Should().Be(13000m);
     }
 
     [Fact]
-    public async Task CalculateIncomeTax__FrecuenciaSemanal__Proyecta52Periodos()
+    public async Task CalculateIncomeTax__FrecuenciaSemanal__ProyectaCon13Meses()
     {
         // Arrange
         var mockProvider = new MockPayrollConfigProvider();
         var service = new IncomeTaxCalculationServicePortable(mockProvider);
 
-        var grossPay = 250m;
+        var grossPay = 250m; // semanal
         var payFrequency = "Semanal";
         var dependents = 0;
         var isSubject = true;
@@ -251,7 +253,8 @@ public class IncomeTaxCalculationServiceTests
         );
 
         // Assert
-        result.TaxableIncome.Should().Be(13000m); // 250 * 52
+        // 250 * 52 / 12 = 1,083.33... mensual → 1,083.33... * 13 = 14,083.33...
+        result.TaxableIncome.Should().BeApproximately(14083.33m, 0.01m);
     }
 
     [Fact]
@@ -347,8 +350,8 @@ public class IncomeTaxCalculationServiceTests
         var mockProvider = new MockPayrollConfigProvider();
         var service = new IncomeTaxCalculationServicePortable(mockProvider);
 
-        // Salario que proyecta justo por debajo de B/. 11,000 (exento)
-        var grossPay = 900m; // 900 * 12 = 10,800
+        // Salario que proyecta justo por debajo de B/. 11,000 con ×13
+        var grossPay = 846m; // 846 * 13 = 10,998 (exento)
         var payFrequency = "Mensual";
         var dependents = 0;
         var isSubject = true;
@@ -364,7 +367,7 @@ public class IncomeTaxCalculationServiceTests
         );
 
         // Assert
-        result.TaxableIncome.Should().Be(10800m); // 900 * 12
+        result.TaxableIncome.Should().Be(10998m); // 846 * 13
         // Dentro del tramo exento, no debe pagar impuesto
         result.TaxAmount.Should().Be(0);
     }
@@ -376,8 +379,8 @@ public class IncomeTaxCalculationServiceTests
         var mockProvider = new MockPayrollConfigProvider();
         var service = new IncomeTaxCalculationServicePortable(mockProvider);
 
-        // Salario que proyecta exactamente a B/. 50,000
-        var grossPay = 4166.67m; // ~50,000 / 12
+        // Salario que proyecta exactamente al límite entre tramo 15% y 25%
+        var grossPay = 3846.15m; // 3846.15 * 13 = 49,999.95 (todavía en tramo 15%)
         var payFrequency = "Mensual";
         var dependents = 0;
         var isSubject = true;
@@ -393,10 +396,10 @@ public class IncomeTaxCalculationServiceTests
         );
 
         // Assert
-        result.TaxableIncome.Should().Be(50000.04m); // 4166.67 * 12
-        // Exactamente en el límite, debe aplicar tramo 15% completo
-        // (50,000 - 11,000) * 15% = 5,850 anual
-        // Por mes: 5,850 / 12 = 487.50
+        result.TaxableIncome.Should().Be(49999.95m); // 3846.15 * 13
+        // Justo en el límite del tramo 15%
+        // (49,999.95 - 11,000) * 15% = 38,999.95 * 0.15 = 5,849.99 anual
+        // Por mes: 5,849.99 / 12 ≈ 487.50
         result.TaxAmount.Should().BeApproximately(487.50m, 0.10m);
     }
 
@@ -434,8 +437,8 @@ public class IncomeTaxCalculationServiceTests
         var mockProvider = new MockPayrollConfigProvider();
         var service = new IncomeTaxCalculationServicePortable(mockProvider);
 
-        // Salario mensual muy alto
-        var grossPay = 10000m; // 10,000 * 12 = 120,000 anual
+        // Salario mensual alto
+        var grossPay = 10000m; // 10,000 * 13 = 130,000 anual
         var payFrequency = "Mensual";
         var dependents = 0;
         var isSubject = true;
@@ -451,14 +454,13 @@ public class IncomeTaxCalculationServiceTests
         );
 
         // Assert
-        result.TaxableIncome.Should().Be(120000m);
+        result.TaxableIncome.Should().Be(130000m);
         // ISR:
-        // Tramo 1: 0
-        // Tramo 2: 5,850 (fixed amount del tramo 3)
-        // Tramo 3: (120,000 - 50,000) * 25% = 17,500
-        // Total anual: 5,850 + 17,500 = 23,350
-        // Por mes: 23,350 / 12 = 1,945.83
-        result.TaxAmount.Should().Be(1945.83m);
+        // Tramo 2: FixedAmount = 5,850
+        // Tramo 3: (130,000 - 50,000) * 25% = 20,000
+        // Total anual: 5,850 + 20,000 = 25,850
+        // Por mes: 25,850 / 12 = 2,154.17
+        result.TaxAmount.Should().Be(2154.17m);
     }
 
     [Fact]
@@ -468,7 +470,7 @@ public class IncomeTaxCalculationServiceTests
         var mockProvider = new MockPayrollConfigProvider();
         var service = new IncomeTaxCalculationServicePortable(mockProvider);
 
-        var grossPay = 6000m; // 72,000 anual
+        var grossPay = 6000m; // 78,000 anual (con ×13)
         var payFrequency = "Mensual";
         var dependents = 0;
         var isSubject = true;
@@ -484,8 +486,8 @@ public class IncomeTaxCalculationServiceTests
         );
 
         // Assert
-        // Impuesto anual: 11,350 (de test anterior)
-        // Tasa efectiva: (11,350 / 72,000) * 100 = 15.76%
-        result.EffectiveTaxRate.Should().BeApproximately(15.76m, 0.05m);
+        // Impuesto anual: 12,850
+        // Tasa efectiva: (12,850 / 78,000) * 100 = 16.47%
+        result.EffectiveTaxRate.Should().BeApproximately(16.47m, 0.05m);
     }
 }
