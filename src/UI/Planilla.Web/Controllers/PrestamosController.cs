@@ -171,6 +171,7 @@ public class PrestamosController : ControllerBase
             MontoOriginal = request.MontoOriginal,
             MontoPendiente = request.MontoOriginal,
             CuotaMensual = request.CuotaMensual,
+            FrecuenciaCuota = request.FrecuenciaCuota,
             TasaInteres = request.TasaInteres,
             FechaInicio = request.FechaInicio,
             NumeroCuotas = request.NumeroCuotas,
@@ -262,6 +263,7 @@ public class PrestamosController : ControllerBase
 
         prestamo.Descripcion = request.Descripcion;
         prestamo.CuotaMensual = request.CuotaMensual;
+        prestamo.FrecuenciaCuota = request.FrecuenciaCuota;
         prestamo.TasaInteres = request.TasaInteres;
         prestamo.Referencia = request.Referencia;
         prestamo.Observaciones = request.Observaciones;
@@ -438,7 +440,9 @@ public class PrestamosController : ControllerBase
             Estado: prestamo.Estado,
             EstadoNombre: prestamo.Estado.ToNombre(),
             Referencia: prestamo.Referencia,
-            PorcentajePagado: porcentajePagado
+            PorcentajePagado: porcentajePagado,
+            FrecuenciaCuota: prestamo.FrecuenciaCuota,
+            FrecuenciaCuotaNombre: prestamo.FrecuenciaCuota.ToString()
         );
     }
 

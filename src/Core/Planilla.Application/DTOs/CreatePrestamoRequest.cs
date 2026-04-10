@@ -1,3 +1,5 @@
+using Vorluno.Planilla.Domain.Enums;
+
 namespace Vorluno.Planilla.Application.DTOs;
 
 /// <summary>
@@ -12,5 +14,6 @@ public record CreatePrestamoRequest(
     DateTime FechaInicio,
     int NumeroCuotas,
     string? Referencia,
-    string? Observaciones
+    string? Observaciones,
+    PayPeriodType FrecuenciaCuota = PayPeriodType.Mensual
 );
