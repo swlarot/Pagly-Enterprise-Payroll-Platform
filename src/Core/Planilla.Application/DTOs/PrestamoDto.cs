@@ -22,5 +22,7 @@ public record PrestamoDto(
     EstadoPrestamo Estado,
     string EstadoNombre,  // Nombre legible del estado
     string? Referencia,
-    decimal PorcentajePagado  // Calculado
+    decimal PorcentajePagado,  // Calculado
+    PayPeriodType FrecuenciaCuota,
+    string FrecuenciaCuotaNombre
 );

@@ -31,8 +31,16 @@ const PrestamosPage = () => {
         tasaInteres: '0',
         fechaInicio: new Date().toISOString().split('T')[0],
         referencia: '',
-        observaciones: ''
+        observaciones: '',
+        frecuenciaCuota: '3'
     });
+
+    const frecuenciaOptions = [
+        { value: '0', label: 'Semanal' },
+        { value: '1', label: 'Bisemanal' },
+        { value: '2', label: 'Quincenal' },
+        { value: '3', label: 'Mensual' }
+    ];
 
     useEffect(() => {
         fetchPrestamos();
@@ -127,7 +135,8 @@ const PrestamosPage = () => {
                 tasaInteres: parseFloat(formData.tasaInteres),
                 fechaInicio: formData.fechaInicio,
                 referencia: formData.referencia || null,
-                observaciones: formData.observaciones || null
+                observaciones: formData.observaciones || null,
+                frecuenciaCuota: parseInt(formData.frecuenciaCuota)
             };
 
             if (editingId) {
@@ -155,7 +164,8 @@ const PrestamosPage = () => {
             tasaInteres: prestamo.tasaInteres.toString(),
             fechaInicio: new Date(prestamo.fechaInicio).toISOString().split('T')[0],
             referencia: prestamo.referencia || '',
-            observaciones: prestamo.observaciones || ''
+            observaciones: prestamo.observaciones || '',
+            frecuenciaCuota: (prestamo.frecuenciaCuota ?? 3).toString()
         });
         setEditingId(prestamo.id);
         setShowModal(true);
@@ -207,7 +217,8 @@ const PrestamosPage = () => {
             tasaInteres: '0',
             fechaInicio: new Date().toISOString().split('T')[0],
             referencia: '',
-            observaciones: ''
+            observaciones: '',
+            frecuenciaCuota: '3'
         });
     };
 
@@ -367,7 +378,8 @@ const PrestamosPage = () => {
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Monto Original</th>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Pendiente</th>
-                                <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Cuota Mensual</th>
+                                <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Cuota</th>
+                                <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Frecuencia</th>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Progreso</th>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
                                 <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
@@ -387,6 +399,7 @@ const PrestamosPage = () => {
                                         <td className="py-4 px-6 text-sm font-medium font-mono text-gray-100">{formatCurrency(prestamo.montoOriginal)}</td>
                                         <td className="py-4 px-6 text-sm font-medium font-mono text-green-400">{formatCurrency(prestamo.montoPendiente)}</td>
                                         <td className="py-4 px-6 text-sm font-mono text-gray-100">{formatCurrency(prestamo.cuotaMensual)}</td>
+                                        <td className="py-4 px-6 text-sm text-gray-300">{prestamo.frecuenciaCuotaNombre || 'Mensual'}</td>
                                         <td className="py-4 px-6">
                                             <div className="space-y-1">
                                                 <div className="flex items-center gap-2">
@@ -575,6 +588,22 @@ const PrestamosPage = () => {
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Frecuencia de Cuota <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        required
+                                        value={formData.frecuenciaCuota}
+                                        onChange={(e) => setFormData({ ...formData, frecuenciaCuota: e.target.value })}
+                                        className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                    >
+                                        {frecuenciaOptions.map(opt => (
+                                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
                                         Número de Cuotas <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -696,8 +725,12 @@ const PrestamosPage = () => {
                                     <p className="font-medium font-mono text-green-400">{formatCurrency(selectedPrestamo.montoPendiente)}</p>
                                 </div>
                                 <div>
-                                    <p className="text-sm text-gray-400">Cuota Mensual</p>
+                                    <p className="text-sm text-gray-400">Cuota</p>
                                     <p className="font-medium font-mono text-gray-100">{formatCurrency(selectedPrestamo.cuotaMensual)}</p>
+                                </div>
+                                <div>
+                                    <p className="text-sm text-gray-400">Frecuencia de Cuota</p>
+                                    <p className="font-medium text-gray-100">{selectedPrestamo.frecuenciaCuotaNombre || 'Mensual'}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-400">Número de Cuotas</p>

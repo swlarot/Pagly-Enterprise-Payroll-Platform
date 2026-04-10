@@ -42,6 +42,12 @@ public class Prestamo : ITenantEntity
     public decimal CuotaMensual { get; set; }
 
     /// <summary>
+    /// Frecuencia de la cuota del préstamo (Mensual, Quincenal, etc.).
+    /// Determina cómo se prorratea la cuota al descontar en planilla.
+    /// </summary>
+    public PayPeriodType FrecuenciaCuota { get; set; } = PayPeriodType.Mensual;
+
+    /// <summary>
     /// Tasa de interés anual (en porcentaje, ej: 5.0 = 5%)
     /// </summary>
     public decimal TasaInteres { get; set; }
