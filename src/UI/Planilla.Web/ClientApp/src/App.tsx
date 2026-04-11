@@ -17,6 +17,7 @@ import AdminDashboardPage from './pages/AdminDashboardPage';
 import AuditLogPage from './pages/AuditLogPage';
 import RolesAndPermissionsPage from './pages/RolesAndPermissionsPage';
 import MiPerfilPage from './pages/MiPerfilPage';
+import ApiKeysPage from './pages/ApiKeysPage';
 
 // System Admin Pages
 import SystemAdminDashboardPage from './pages/SystemAdminDashboardPage';
@@ -215,6 +216,20 @@ function App() {
               <RoleGuard allowedRoles={[TenantRole.Owner]}>
                 <AuthLayout>
                   <RolesAndPermissionsPage />
+                </AuthLayout>
+              </RoleGuard>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* API Keys — Owner Only (API Platform B2B self-service) */}
+        <Route
+          path="/settings/api-keys"
+          element={
+            <ProtectedRoute>
+              <RoleGuard allowedRoles={[TenantRole.Owner]}>
+                <AuthLayout>
+                  <ApiKeysPage />
                 </AuthLayout>
               </RoleGuard>
             </ProtectedRoute>
