@@ -3,6 +3,11 @@
 // Source: Core360 Stage 2
 // Portado: 2025-12-26
 // Descripción: Proveedor de configuración de planilla desde base de datos
+//
+// DEV — Refactor API Platform: eliminado fallback silencioso a ITenantContext.
+// Ahora si companyId <= 0 se lanza ArgumentException explícita. Esto cierra un
+// vector de tenant leakage: antes, un endpoint stateless que llamara con
+// companyId=0 leía config del tenant del HttpContext actual (otro cliente).
 // ====================================================================
 
 using Microsoft.EntityFrameworkCore;
@@ -15,30 +20,36 @@ namespace Vorluno.Planilla.Infrastructure.Services;
 /// <summary>
 /// Implementación de IPayrollConfigProvider que obtiene configuración desde ApplicationDbContext.
 /// Utiliza AsNoTracking() para queries de solo lectura (mejor performance).
-/// En sistema multi-tenant, obtiene TenantId automáticamente del contexto.
+/// Requiere companyId explícito — ya NO hace fallback a ITenantContext.
 /// </summary>
 public class PayrollConfigProvider : IPayrollConfigProvider
 {
     private readonly ApplicationDbContext _context;
-    private readonly ITenantContext _tenantContext;
 
-    public PayrollConfigProvider(ApplicationDbContext context, ITenantContext tenantContext)
+    public PayrollConfigProvider(ApplicationDbContext context)
     {
         _context = context;
-        _tenantContext = tenantContext;
     }
 
     /// <summary>
     /// Obtiene la configuración de tasas vigente para una fecha específica.
     /// Busca config donde effectiveDate esté entre EffectiveStartDate y EffectiveEndDate (o End sea null).
     /// </summary>
-    /// <param name="companyId">ID del tenant (mantenido por compatibilidad, usa TenantContext si es 0)</param>
+    /// <param name="companyId">ID del tenant (requerido, &gt; 0)</param>
     /// <param name="effectiveDate">Fecha para determinar configuración vigente</param>
     /// <returns>Configuración vigente o null si no existe</returns>
+    /// <exception cref="ArgumentException">Si companyId &lt;= 0</exception>
     public async Task<PayrollTaxConfigDto?> GetTaxConfigAsync(int companyId, DateTime effectiveDate)
     {
-        // Usar TenantContext si companyId no se proporciona (parámetro por defecto = 0)
-        var tenantId = companyId > 0 ? companyId : _tenantContext.TenantId;
+        if (companyId <= 0)
+        {
+            throw new ArgumentException(
+                "companyId debe ser mayor a 0. PayrollConfigProvider requiere un tenant explícito. " +
+                "Si necesita configuración stateless use StaticPayrollConfigProvider.",
+                nameof(companyId));
+        }
+
+        var tenantId = companyId;
 
         var config = await _context.PayrollTaxConfigurations
             .AsNoTracking()
@@ -78,13 +89,21 @@ public class PayrollConfigProvider : IPayrollConfigProvider
     /// Obtiene los brackets de ISR para un año fiscal específico.
     /// Retorna brackets ordenados por Order ASC para cálculo secuencial.
     /// </summary>
-    /// <param name="companyId">ID del tenant (mantenido por compatibilidad, usa TenantContext si es 0)</param>
+    /// <param name="companyId">ID del tenant (requerido, &gt; 0)</param>
     /// <param name="year">Año fiscal (ej: 2025)</param>
     /// <returns>Lista de brackets ordenados. Lista vacía si no existen brackets.</returns>
+    /// <exception cref="ArgumentException">Si companyId &lt;= 0</exception>
     public async Task<List<TaxBracketDto>> GetTaxBracketsAsync(int companyId, int year)
     {
-        // Usar TenantContext si companyId no se proporciona (parámetro por defecto = 0)
-        var tenantId = companyId > 0 ? companyId : _tenantContext.TenantId;
+        if (companyId <= 0)
+        {
+            throw new ArgumentException(
+                "companyId debe ser mayor a 0. PayrollConfigProvider requiere un tenant explícito. " +
+                "Si necesita configuración stateless use StaticPayrollConfigProvider.",
+                nameof(companyId));
+        }
+
+        var tenantId = companyId;
 
         var brackets = await _context.TaxBrackets
             .AsNoTracking()
