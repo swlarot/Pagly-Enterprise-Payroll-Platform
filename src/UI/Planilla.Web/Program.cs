@@ -149,6 +149,9 @@ if (stripeOptions != null)
 builder.Services.AddScoped<IStripeBillingService, StripeBillingService>();
 builder.Services.AddScoped<IPlanLimitService, PlanLimitService>();
 
+// API Platform B2B — servicio de gestión de keys (Stripe-like: prefijo + hash SHA256)
+builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
+
 // 11.1. REGISTRAR SERVICIO DE EMAIL (BREVO)
 builder.Services.AddScoped<IBrevoEmailService, BrevoEmailService>();
 

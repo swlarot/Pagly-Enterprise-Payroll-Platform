@@ -80,6 +80,9 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     // Liquidaciones laborales (settlements)
     public DbSet<Liquidacion> Liquidaciones { get; set; }
 
+    // API Platform B2B — api keys emitidas a tenants para consumir /v1/*
+    public DbSet<ApiKey> ApiKeys { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Esta l�nea es crucial al heredar de IdentityDbContext
@@ -757,6 +760,34 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .OnDelete(DeleteBehavior.SetNull);
 
             // NO aplicar query filter (necesitamos procesar todos los webhooks)
+        });
+
+        // ====================================================================
+        // API Platform — ApiKey Configuration
+        // ====================================================================
+        modelBuilder.Entity<ApiKey>(entity =>
+        {
+            // Índice único global en KeyPrefix: es la base del lookup O(1) al validar
+            // una request. El prefix es público y no es secreto — lo único secreto es
+            // el hash del secret en KeyHash.
+            entity.HasIndex(k => k.KeyPrefix)
+                .IsUnique()
+                .HasDatabaseName("IX_ApiKey_KeyPrefix");
+
+            // Índice compuesto para el dashboard del tenant (listar sus keys activas).
+            entity.HasIndex(k => new { k.TenantId, k.IsActive })
+                .HasDatabaseName("IX_ApiKey_TenantId_IsActive");
+
+            // Relación con Tenant (obligatoria — cada key pertenece a un tenant).
+            entity.HasOne(k => k.Tenant)
+                .WithMany()
+                .HasForeignKey(k => k.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Global query filter se aplica automáticamente en ApplyGlobalQueryFilters()
+            // porque ApiKey implementa ITenantEntity. PERO: el handler de autenticación
+            // necesita buscar keys ANTES de conocer el tenant (el lookup por prefix
+            // determina el tenant). Para esas queries debe usar IgnoreQueryFilters().
         });
 
         // ====================================================================
