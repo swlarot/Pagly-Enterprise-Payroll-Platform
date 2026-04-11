@@ -1,10 +1,15 @@
 # API Platform B2B — Roadmap completo
 
-> **Este archivo vive en `C:\Planilla` (repo Pagly).**
-> Documenta todo el plan del API Platform B2B, dividido en **Track A** (código, en este repo)
-> y **Track B** (marketing, en `C:\vorluno-pagina web\vorluno-web`).
-> Este repo solo ejecuta Track A. Track B se ejecuta en el otro repo — su propio archivo
-> hermano vive allá.
+> **Este archivo vive en `C:\Planilla` (repo Pagly) y es el master del plan completo.**
+>
+> Documenta todo el plan del API Platform B2B, dividido en:
+> - **Track A** — código del producto (backend + frontend dashboard), en `C:\Planilla`.
+> - **Track B** — marketing (landing, developer portal, blog), en `C:\vorluno-pagina web\vorluno-web`.
+>
+> **Ambos tracks se ejecutan desde la misma sesión de Claude Code.** Cuando toca Track B,
+> Claude hace `cd` a `vorluno-web`, ejecuta los cambios, corre build y tests, y commitea
+> en **ese** repo. Cuando toca Track A, vuelve a `C:\Planilla`. **Este archivo es la fuente
+> única de verdad del plan**; no existe un "archivo hermano" duplicado en vorluno-web.
 
 ---
 
@@ -200,14 +205,55 @@ curl https://app.pagly.clau.com.pa/swagger/v1_public/swagger.json | jq '.paths |
 
 ## 6. Track B — Marketing del API Platform (repo `vorluno-web`)
 
-**Estos chunks NO se ejecutan en este repo.** Se ejecutan en la otra terminal.
-Están listados aquí para que tengas la foto completa del plan.
+**Estos chunks se ejecutan en `C:\vorluno-pagina web\vorluno-web`.**
 
-| Chunk | Descripción | Esfuerzo | Depende de |
-|---|---|---|---|
-| **14** | Sección "Para developers" en la landing actual (`/productos/pagly`). Nueva sección entre `PaglyFeatures` y `PaglyPricing` con: headline, 3 bullets técnicos (cálculo Ley 462 en una llamada, response <100ms, RFC 7807 errores), un bloque **code switcher** (curl / TypeScript / Python / PHP) con ejemplo real del endpoint, link "Ver docs completas →" al Swagger público. **No altera nada del landing existente — solo agrega.** | 2-3h | **Chunk 10** (necesita que `/v1/docs` exista). |
-| **15** | **Developer portal dedicado** `/productos/pagly/api`. Página nueva con: hero "API de planilla Panamá para tu producto", "Quickstart en 5 minutos", 4 pasos (obtener key → instalar client → 1 request → recibir breakdown), comparación vs. construir tu propio calculador (tiempo, compliance, costo de bugs), SEO focus en "API planilla Panama" / "calcular CSS API" / "integrar ISR Panama". Schema.org `Product` con `offers` tipo `OfferCatalog`. | 3-4h | **Chunk 10** + idealmente **Chunk 11** (golden tests dan confianza para afirmar "shape estable"). |
-| **16** | **Blog post técnico**: *"Integrar Pagly API en tu backend Node.js: cálculos de planilla Panamá con una llamada HTTP"*. SEO long-tail. Code real ejecutable, screenshots del dashboard, link al developer portal. | 2h | **Chunks 10 + 15** (linkea al portal). |
+Claude hace `cd /c/vorluno-pagina\ web/vorluno-web` al empezar el chunk, ejecuta todos
+los cambios ahí, corre `npm run build` / `npm run lint` en ese repo, y commitea en
+**ese** repo. El roadmap master sigue siendo este archivo — los commits de vorluno-web
+lo referencian en su mensaje como `ver pagly/docs/API-PLATFORM-ROADMAP.md`.
+
+| Chunk | Descripción | Esfuerzo | Depende de | Estado |
+|---|---|---|---|---|
+| **14** | Sección "Para developers" en la landing actual (`/productos/pagly`). Nueva sección entre `PaglyFeatures` y `PaglyPricing` con: headline, 3 bullets técnicos (cálculo Ley 462 en una llamada, response <100ms, RFC 7807 errores), un bloque **code switcher** (curl / TypeScript / Python / PHP) con ejemplo real del endpoint, link "Ver docs completas →" al Swagger público. **No altera nada del landing existente — solo agrega.** | 2-3h | **Chunk 10** ✅ | ⏳ |
+| **15** | **Developer portal dedicado** `/productos/pagly/api`. Página nueva con: hero "API de planilla Panamá para tu producto", "Quickstart en 5 minutos", 4 pasos (obtener key → instalar client → 1 request → recibir breakdown), comparación vs. construir tu propio calculador (tiempo, compliance, costo de bugs), SEO focus en "API planilla Panama" / "calcular CSS API" / "integrar ISR Panama". Schema.org `Product` con `offers` tipo `OfferCatalog`. | 3-4h | **Chunk 10** ✅ + idealmente **Chunk 11** (golden tests dan confianza para afirmar "shape estable"). | ⏳ |
+| **16** | **Blog post técnico**: *"Integrar Pagly API en tu backend Node.js: cálculos de planilla Panamá con una llamada HTTP"*. SEO long-tail. Code real ejecutable, screenshots del dashboard, link al developer portal. | 2h | **Chunks 10 ✅ + 15** (linkea al portal). | ⏳ |
+
+### Workflow de Claude en Track B
+
+Cuando el usuario dice "continúa con chunk 14" (o 15/16):
+
+1. **`cd`** a `C:\vorluno-pagina web\vorluno-web` (path con espacio — usar comillas o escape).
+2. Leer el estado del repo: `git status`, `git log --oneline -5`, `ls app/productos/pagly/`.
+3. Ejecutar el chunk: editar/crear archivos dentro de `vorluno-web/*`.
+4. Build: `npm run build` (o `bun run build` si `bun.lock` existe — verificar primero).
+5. Lint si existe: `npm run lint`.
+6. Commit en `vorluno-web` con mensaje tipo:
+   ```
+   feat: [descripción del chunk]
+
+   Chunk N del API Platform roadmap.
+   Ver referencia en pagly-repo/docs/API-PLATFORM-ROADMAP.md sección 6.
+   ```
+7. **`cd`** de vuelta a `C:\Planilla`.
+8. Actualizar este archivo (sección 4 changelog + sección 6 estado) con el commit hash del repo vorluno-web.
+9. Commit en `C:\Planilla` solo del cambio al roadmap:
+   ```
+   docs: roadmap — mark chunk N done (commit <hash> in vorluno-web)
+   ```
+
+### Reglas que Claude sigue automáticamente en Track B
+
+- **NO duplica código** entre los dos repos. Si el chunk 14 necesita el JSON de
+  `PayrollCalculateResponse`, no copia el record C# — escribe un ejemplo en TypeScript/JSON
+  hardcoded o importa el tipo generado desde el OpenAPI spec.
+- **NO hace requests HTTP reales** al backend durante el build — los ejemplos de código
+  son estáticos (literals).
+- **Las URLs del API** en la landing son **hardcoded** a `https://app.pagly.clau.com.pa/v1/*`
+  (no variables de entorno por ahora — YAGNI).
+- **Imágenes/screenshots** del dashboard → si los chunks los necesitan, Claude pide al
+  usuario que los aporte (o usa placeholders existentes del repo vorluno-web).
+- **No toca `vorluno-web/app/productos/pagly/page.tsx` existente** más allá de agregar
+  la nueva sección del chunk 14. Preserva todo lo demás intacto.
 
 ---
 
@@ -304,25 +350,43 @@ Después de **Track A completo** (chunks 10-13 en este repo), **pausa obligatori
 
 ## 10. Cómo ejecutar el siguiente chunk
 
-Cuando quieras avanzar, me dices:
+Cuando el usuario dice:
 
-> **"Continúa con Chunk N"** (ej: "Continúa con Chunk 10")
+> **"Continúa con Chunk N"** (ej: "Continúa con Chunk 11")
 
-Y yo:
-1. Releo este archivo para saber dónde estamos.
-2. Ejecuto el chunk punto por punto.
-3. Actualizo la sección 4 (changelog) al completarlo.
-4. Corro `dotnet build` + `dotnet test` verdes antes de commit.
-5. Si toca frontend: `npm run build` antes de commit.
-6. Commit con prefijo `feat:` / `refactor:` / `docs:`.
-7. Te reporto el resultado con el hash del commit.
+Claude determina automáticamente **en qué repo vive ese chunk** según el número:
 
-**Reglas que sigo automáticamente:**
-- Un commit por chunk (no acumulo varios en uno).
-- Nunca toco archivos fuera del alcance del chunk.
-- **Nunca toco nada en `vorluno-web` desde este repo.**
-- Tests verdes siempre antes de commit.
-- Sin `Co-Authored-By` en los commits (memoria del usuario).
+| Rango | Repo | Lenguaje / Stack |
+|---|---|---|
+| Chunks 10–13 | `C:\Planilla` | .NET 9 + React + PostgreSQL |
+| Chunks 14–16 | `C:\vorluno-pagina web\vorluno-web` | Next.js 16 + Tailwind + GSAP |
+
+### Workflow genérico (aplica a ambos tracks)
+
+1. **Verificar repo correcto**: `pwd` → si no está en el repo del chunk, hacer `cd`.
+2. **Leer estado**: `git status`, `git log --oneline -5`, `ls` de la carpeta relevante.
+3. **Releer este archivo** (`docs/API-PLATFORM-ROADMAP.md`) — siempre vive en `C:\Planilla`,
+   así que si Claude está en vorluno-web, usa la ruta absoluta para leerlo.
+4. **Ejecutar el chunk** editando/creando archivos del repo actual.
+5. **Build** en el repo actual:
+   - Track A backend: `dotnet build` + `dotnet test`.
+   - Track A frontend: `cd src/UI/Planilla.Web/ClientApp && npx tsc --noEmit && npm run build`.
+   - Track B: `npm run build` (o `bun run build` si hay `bun.lock`).
+6. **Commit en el repo actual** con prefijo `feat:` / `refactor:` / `docs:`.
+7. **Si el chunk es del Track B**: hacer `cd` de vuelta a `C:\Planilla`, actualizar este
+   archivo (sección 4 + 6), commit del roadmap como `docs:`.
+8. **Reportar al usuario** el hash del commit (o los dos si Track B) + estado de tests.
+
+### Reglas invariables (ambos tracks)
+
+- **Un commit por chunk** en el repo al que pertenece. No acumular.
+- **Tests verdes siempre** antes de commit. Sin regresiones.
+- **Sin `Co-Authored-By`** en los commits (memoria del usuario).
+- **Nunca duplicar código** entre los dos repos — si necesitas data del otro, hardcodea
+  el valor o usa el OpenAPI spec como fuente de verdad.
+- **Al cambiar de repo**, `cd` con el path absoluto completo. Nunca `cd ..` a ciegas.
+- **El archivo `.claude/scheduled_tasks.lock`** solo existe en `C:\Planilla` — ignorar.
+- **Archivos no versionados** (`.agents-backup/`, `CLAUDE.local.md`, etc.) → nunca agregar al commit.
 
 ---
 
@@ -354,30 +418,66 @@ Y yo:
 
 ---
 
-## 12. Archivo hermano para Track B
+## 12. Un solo roadmap master (este archivo)
 
-El roadmap equivalente del Track B debería vivir en:
+**No hay archivo hermano en `vorluno-web`.** El roadmap master es este archivo
+(`C:\Planilla\docs\API-PLATFORM-ROADMAP.md`) — fuente única de verdad del plan completo
+Track A + Track B.
 
+**¿Por qué un solo archivo?**
+- Evita desincronización entre dos documentos (el mayor enemigo de la documentación).
+- El plan es un documento evolutivo: el usuario pregunta "¿dónde estamos?" y Claude
+  abre **un** archivo, no dos.
+- Los commits de vorluno-web pueden referenciar este archivo en su mensaje
+  (ruta: `pagly/docs/API-PLATFORM-ROADMAP.md`) sin duplicar contenido.
+
+**¿Cómo encuentra Claude este archivo cuando está trabajando en vorluno-web?**
+Usa la ruta absoluta: `C:\Planilla\docs\API-PLATFORM-ROADMAP.md`. Claude puede leerlo
+con el tool `Read` sin importar en qué directorio esté el shell.
+
+**¿Y si el usuario busca el roadmap desde vorluno-web?**
+Puede abrir cualquier commit reciente de vorluno-web, leer el mensaje del commit, y
+ahí verá la referencia al archivo master. Alternativamente, el `README.md` de
+`vorluno-web/app/productos/pagly/api/` (cuando exista, chunk 15) linkeará al master
+con un comentario tipo:
+
+```markdown
+<!-- Plan completo del API Platform: ../../../../C:/Planilla/docs/API-PLATFORM-ROADMAP.md -->
 ```
-C:\vorluno-pagina web\vorluno-web\docs\API-PLATFORM-MARKETING-ROADMAP.md
-```
 
-(Se crea cuando abras esa terminal y lo pidas — aún no existe.)
-
-Ese archivo documentará solo los chunks 14, 15, 16. Linkeará a este archivo como
-"repo hermano" y mencionará que el backend del API vive en `app.pagly.clau.com.pa` —
-nunca replica código.
-
-**Regla**: los dos roadmaps se referencian mutuamente pero nunca se pisan. Cada terminal
-mira solo su archivo.
+(O mejor: un link a un doc público si el repo Pagly está en GitHub — por ahora es privado,
+así que el comentario local basta.)
 
 ---
 
 ## 13. Estado actual en una sola línea
 
-> **API Platform B2B funcional en producción con docs navegables. 10 chunks commiteados, 206 tests verdes. Siguiente: Chunk 11 (Contract / golden tests).**
+> **Track A: 10/13 chunks done. Track B: 0/3 chunks done. Claude ejecuta ambos tracks desde la misma sesión. Siguiente: Chunk 11 (contract/golden tests) en `C:\Planilla`.**
+
+### Resumen por track
+
+| Track | Repo | Chunks | Done | Pending | Tests |
+|---|---|---|---|---|---|
+| **A** (producto) | `C:\Planilla` | 10-13 (4 chunks) | 10 ✅ | 11, 12, 13 | 206 verdes |
+| **B** (marketing) | `C:\vorluno-pagina web\vorluno-web` | 14-16 (3 chunks) | ninguno | 14, 15, 16 | N/A (Next.js build) |
+
+### Orden recomendado a futuro
+
+Claude ejecuta en este orden cuando el usuario avance:
+
+1. **Chunk 11** (Planilla) — contract tests. ~1h.
+2. **Chunk 12** (Planilla) — 429 frontend. ~30 min.
+3. **Chunk 13** (Planilla) — bar chart. ~1h.
+4. **Parada opcional**: revisar Track A completo antes de cambiar de repo.
+5. **Chunk 14** (vorluno-web) — sección devs en landing. ~2-3h.
+6. **Chunk 15** (vorluno-web) — developer portal dedicado. ~3-4h.
+7. **Chunk 16** (vorluno-web) — blog post. ~2h.
+
+El usuario puede saltar chunks (ej: "continúa con chunk 14") y Claude hará `cd` al
+repo correcto automáticamente, pero **para Track B es obligatorio que Chunk 10 esté
+done** (ya está ✅).
 
 ---
 
-*Última actualización: chunk 10 commiteado — feat: Swagger público `/v1/docs` (`DocInclusionPredicate` filtra por path, security scheme `X-Api-Key`, XML comments habilitados).*
-*Próximo: Chunk 11 (Contract / golden tests para proteger el shape del response).*
+*Última actualización: chunk 10 commiteado — feat: Swagger público `/v1/docs` (`DocInclusionPredicate` filtra por path, security scheme `X-Api-Key`, XML comments habilitados). Roadmap reformado para reflejar que Claude ejecuta ambos tracks.*
+*Próximo: Chunk 11 (contract / golden tests para proteger el shape del response).*
