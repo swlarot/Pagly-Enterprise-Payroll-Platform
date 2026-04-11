@@ -641,3 +641,43 @@ export interface SystemUserViewModel {
   emailConfirmed: boolean;
   tenantAssignments?: { tenantName: string; role: string }[];
 }
+
+// ============================================================================
+// API Platform — API Keys
+// Matches src/Core/Planilla.Application/DTOs/ApiKeys/*.cs
+// ============================================================================
+
+/**
+ * Representación de una API key para el dashboard. Nunca incluye el hash
+ * ni el plaintext — el prefix es público (para display e identificación
+ * visual), el secret solo se retorna en el response del POST /api/api-keys
+ * y nunca más se puede recuperar.
+ */
+export interface ApiKeyDto {
+  id: number;
+  name: string;
+  keyPrefix: string;
+  mode: 'Test' | 'Live';
+  expiresAt?: string | null;
+  lastUsedAt?: string | null;
+  revokedAt?: string | null;
+  revocationReason?: string | null;
+  isActive: boolean;
+  totalRequests: number;
+  createdAt: string;
+}
+
+export interface CreateApiKeyRequest {
+  name: string;
+  mode: 'Test' | 'Live';
+  expiresInDays?: number | null;
+}
+
+export interface CreateApiKeyResponse {
+  key: ApiKeyDto;
+  /**
+   * Plaintext completo (pk_live_abc12345...). Solo se retorna en el response
+   * del create — NO se puede recuperar después. Si se pierde, rotar la key.
+   */
+  plaintextKey: string;
+}
