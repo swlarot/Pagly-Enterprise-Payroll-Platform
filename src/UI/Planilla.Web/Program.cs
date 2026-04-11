@@ -326,14 +326,61 @@ builder.Services.AddControllers()
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    // ================================================================================
+    // TWO SWAGGER DOCS — interno (SaaS admin) vs público (API Platform B2B).
+    //
+    // - "v1_internal": todos los endpoints /api/* del SaaS. Protegido con JWT Bearer.
+    //   Expuesto solo en /swagger (dev) o con gate en prod.
+    //
+    // - "v1_public": endpoints /v1/* del API Platform. Security X-Api-Key header.
+    //   Expuesto abiertamente en /v1/docs — es la documentación pública que verán
+    //   los developers clientes (linkeado desde vorluno.dev/productos/pagly/api).
+    //
+    // Un DocInclusionPredicate filtra cada endpoint por su path para incluirlo en
+    // la spec correcta.
+    // ================================================================================
+
+    options.SwaggerDoc("v1_internal", new Microsoft.OpenApi.Models.OpenApiInfo
     {
-        Title = "Pagly API",
+        Title = "Pagly Internal API",
         Version = "v1",
-        Description = "Multi-tenant Payroll SaaS API for Panama - Admin-managed users only"
+        Description = "Multi-tenant Payroll SaaS API for Panama — internal endpoints. Requires JWT Bearer."
     });
 
-    // Configure JWT Bearer authentication
+    options.SwaggerDoc("v1_public", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "Pagly API v1",
+        Version = "v1",
+        Description = "Stateless payroll calculations for Panama. Authenticate with the X-Api-Key header " +
+                      "using a key generated from your Pagly dashboard (Settings → API Keys). " +
+                      "All calculations follow Ley 462 (Reforma CSS) and DGI tax brackets.",
+        Contact = new Microsoft.OpenApi.Models.OpenApiContact
+        {
+            Name = "Vorluno",
+            Url = new Uri("https://vorluno.dev/productos/pagly")
+        },
+        License = new Microsoft.OpenApi.Models.OpenApiLicense
+        {
+            Name = "Commercial — see terms of service"
+        }
+    });
+
+    // DocInclusionPredicate: decide en qué doc va cada endpoint.
+    //   /v1/*  → solo en v1_public
+    //   resto  → solo en v1_internal
+    options.DocInclusionPredicate((docName, apiDesc) =>
+    {
+        var path = apiDesc.RelativePath ?? string.Empty;
+        var isV1 = path.StartsWith("v1/", StringComparison.OrdinalIgnoreCase);
+        return docName switch
+        {
+            "v1_public" => isV1,
+            "v1_internal" => !isV1,
+            _ => false
+        };
+    });
+
+    // ---- Security scheme JWT Bearer (usado en v1_internal) ----
     options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token.",
@@ -344,6 +391,20 @@ builder.Services.AddSwaggerGen(options =>
         BearerFormat = "JWT"
     });
 
+    // ---- Security scheme X-Api-Key header (usado en v1_public) ----
+    options.AddSecurityDefinition("ApiKey", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Description = "Pagly API key. Generate one from your dashboard (Settings → API Keys) " +
+                      "and send it in the X-Api-Key header. Example: pk_live_abc12345...",
+        Name = "X-Api-Key",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey
+    });
+
+    // Security requirement global: por convención aplicamos ambos schemes a TODOS
+    // los endpoints. Cada endpoint usa solo el que le corresponde (el otro queda
+    // ignorado por el framework de auth). Esto hace que el botón "Authorize" de
+    // Swagger UI muestre ambos campos al developer.
     options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
     {
         {
@@ -356,15 +417,26 @@ builder.Services.AddSwaggerGen(options =>
                 }
             },
             Array.Empty<string>()
+        },
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "ApiKey"
+                }
+            },
+            Array.Empty<string>()
         }
     });
 
-    // Enable XML comments if available
+    // XML comments — habilitados en csproj con <GenerateDocumentationFile>true</>.
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = System.IO.Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (System.IO.File.Exists(xmlPath))
     {
-        options.IncludeXmlComments(xmlPath);
+        options.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
     }
 });
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
@@ -450,9 +522,6 @@ if (!app.Environment.IsEnvironment("Testing"))
 
 if (app.Environment.IsDevelopment())
 {
-    // En desarrollo, muestra p�ginas de error detalladas para la base de datos.
-    app.UseSwagger();
-    app.UseSwaggerUI();
     app.UseMigrationsEndPoint();
 }
 else
@@ -460,6 +529,48 @@ else
     // En producci�n, usa un manejador de errores gen�rico y fuerza el uso de HTTPS.
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
+}
+
+// ================================================================================
+// Swagger — dos exposures con distintos niveles de acceso.
+//
+// 1. /v1/docs  → Swagger UI PÚBLICO con solo los endpoints /v1/* del API Platform.
+//                Expuesto tanto en dev como en prod. Es el developer portal oficial
+//                linkeado desde vorluno.dev/productos/pagly/api.
+//
+// 2. /swagger  → Swagger UI INTERNO con los endpoints /api/* del SaaS.
+//                Expuesto solo en Development (no prod) para evitar exposición
+//                accidental del surface interno.
+//
+// El backend sirve los raw specs en /swagger/v1_public/swagger.json y
+// /swagger/v1_internal/swagger.json independientemente del UI.
+// ================================================================================
+app.UseSwagger(options =>
+{
+    // Rutas de los specs: /swagger/{documentName}/swagger.json
+    // Esto es el default de Swashbuckle, lo dejamos explícito para claridad.
+    options.RouteTemplate = "swagger/{documentName}/swagger.json";
+});
+
+// Public developer docs — abierto en cualquier environment.
+app.UseSwaggerUI(options =>
+{
+    options.SwaggerEndpoint("/swagger/v1_public/swagger.json", "Pagly API v1 (public)");
+    options.RoutePrefix = "v1/docs";
+    options.DocumentTitle = "Pagly API v1 — Docs";
+    options.DefaultModelsExpandDepth(-1); // oculta el panel "Schemas" para UI más limpia
+    options.DisplayRequestDuration();
+});
+
+// Internal SaaS docs — solo en dev.
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v1_internal/swagger.json", "Pagly Internal API v1");
+        options.RoutePrefix = "swagger";
+        options.DocumentTitle = "Pagly Internal Docs";
+    });
 }
 
 // RequestId debe ir ANTES de cualquier middleware que quiera loguearlo o incluirlo
