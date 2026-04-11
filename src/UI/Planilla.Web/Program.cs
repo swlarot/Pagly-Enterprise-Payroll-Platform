@@ -439,6 +439,11 @@ app.UseTenantMiddleware();
 
 app.UseAuthorization();
 
+// API Platform usage tracking: solo trackea /v1/*, solo respuestas 2xx con
+// claim api_key_id. Debe ir DESPUÉS de Authentication (necesita el claim)
+// y DESPUÉS de Authorization (para contar solo las requests autorizadas).
+app.UseApiUsageTrackingMiddleware();
+
 // Health: /health con checks (PostgreSQL + multi-tenant) en JSON para CapRover
 app.MapHealthChecks("/health", new HealthCheckOptions
 {
