@@ -61,6 +61,99 @@ public class ApiKeysControllerTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     // ====================================================================
+    // Plan gate (CanUseApi enforcement)
+    // ====================================================================
+
+    [Fact]
+    public async Task Create_FreeActivePlan_Returns403()
+    {
+        // Free + Active → CanUseApi=false (PlanFeatures.GetLimits(Free).CanUseApi).
+        // Status Trialing bypasea el gate en PlanLimitService, así que usamos Active.
+        var (client, _) = await RegisterAndAuthenticateAsync(
+            SubscriptionPlan.Free,
+            SubscriptionStatus.Active);
+
+        var response = await client.PostAsJsonAsync("/api/api-keys", new CreateApiKeyRequest
+        {
+            Name = "should-fail",
+            Mode = "Live"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var body = await response.Content.ReadAsStringAsync();
+        body.Should().Contain("plan_does_not_include_api");
+        body.Should().Contain("Professional");
+    }
+
+    [Fact]
+    public async Task Create_StarterActivePlan_Returns403()
+    {
+        var (client, _) = await RegisterAndAuthenticateAsync(
+            SubscriptionPlan.Starter,
+            SubscriptionStatus.Active);
+
+        var response = await client.PostAsJsonAsync("/api/api-keys", new CreateApiKeyRequest
+        {
+            Name = "should-fail",
+            Mode = "Live"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Create_ProfessionalActivePlan_Returns201()
+    {
+        var (client, _) = await RegisterAndAuthenticateAsync(
+            SubscriptionPlan.Professional,
+            SubscriptionStatus.Active);
+
+        var response = await client.PostAsJsonAsync("/api/api-keys", new CreateApiKeyRequest
+        {
+            Name = "professional-key",
+            Mode = "Live"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task Create_EnterpriseActivePlan_Returns201()
+    {
+        var (client, _) = await RegisterAndAuthenticateAsync(
+            SubscriptionPlan.Enterprise,
+            SubscriptionStatus.Active);
+
+        var response = await client.PostAsJsonAsync("/api/api-keys", new CreateApiKeyRequest
+        {
+            Name = "enterprise-key",
+            Mode = "Live"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public async Task Create_FreeTrialingPlan_BypassesGate()
+    {
+        // Diseño intencional de PlanLimitService.CanUseApiAsync: durante Trial,
+        // CUALQUIER plan puede usar API. Este test documenta ese comportamiento.
+        var (client, _) = await RegisterAndAuthenticateAsync(
+            SubscriptionPlan.Free,
+            SubscriptionStatus.Trialing);
+
+        var response = await client.PostAsJsonAsync("/api/api-keys", new CreateApiKeyRequest
+        {
+            Name = "free-trial-bypass",
+            Mode = "Live"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created,
+            "durante trial, todos los planes tienen API habilitada");
+    }
+
+    // ====================================================================
     // Happy path
     // ====================================================================
 
@@ -270,8 +363,16 @@ public class ApiKeysControllerTests : IClassFixture<CustomWebApplicationFactory>
     /// Seedea un nuevo tenant con subscription + dummy AppUser Owner, y retorna
     /// un HttpClient con JWT Bearer firmado manualmente. Evita depender de
     /// <c>/api/auth/register</c> que está deshabilitado hardcoded (retorna 403).
+    ///
+    /// Por default: Professional Trialing (tiene CanUseApi=true). Para probar
+    /// el enforcement del plan gate, usar <see cref="RegisterAndAuthenticateAsync(SubscriptionPlan, SubscriptionStatus)"/>.
     /// </summary>
-    private async Task<(HttpClient client, int tenantId)> RegisterAndAuthenticateAsync()
+    private Task<(HttpClient client, int tenantId)> RegisterAndAuthenticateAsync()
+        => RegisterAndAuthenticateAsync(SubscriptionPlan.Professional, SubscriptionStatus.Trialing);
+
+    private async Task<(HttpClient client, int tenantId)> RegisterAndAuthenticateAsync(
+        SubscriptionPlan plan,
+        SubscriptionStatus status)
     {
         int tenantId;
         string userId;
@@ -293,14 +394,14 @@ public class ApiKeysControllerTests : IClassFixture<CustomWebApplicationFactory>
             db.Tenants.Add(tenant);
             await db.SaveChangesAsync();
 
-            // 2. Subscription Professional (trial) para que CanUseApi esté true
+            // 2. Subscription con el plan/status pedido
             var subscription = new Subscription
             {
                 TenantId = tenant.Id,
-                Plan = SubscriptionPlan.Professional,
-                Status = SubscriptionStatus.Trialing,
+                Plan = plan,
+                Status = status,
                 StartDate = DateTime.UtcNow,
-                TrialEndsAt = DateTime.UtcNow.AddDays(14),
+                TrialEndsAt = status == SubscriptionStatus.Trialing ? DateTime.UtcNow.AddDays(14) : null,
                 CreatedAt = DateTime.UtcNow
             };
             db.Subscriptions.Add(subscription);

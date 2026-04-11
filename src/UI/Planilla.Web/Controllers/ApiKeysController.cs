@@ -31,17 +31,20 @@ public class ApiKeysController : ControllerBase
     private readonly IApiKeyService _apiKeyService;
     private readonly ITenantContext _tenantContext;
     private readonly ICurrentUserService _currentUserService;
+    private readonly IPlanLimitService _planLimitService;
     private readonly ApplicationDbContext _db;
 
     public ApiKeysController(
         IApiKeyService apiKeyService,
         ITenantContext tenantContext,
         ICurrentUserService currentUserService,
+        IPlanLimitService planLimitService,
         ApplicationDbContext db)
     {
         _apiKeyService = apiKeyService;
         _tenantContext = tenantContext;
         _currentUserService = currentUserService;
+        _planLimitService = planLimitService;
         _db = db;
     }
 
@@ -51,6 +54,7 @@ public class ApiKeysController : ControllerBase
     /// </summary>
     [HttpPost]
     [ProducesResponseType(typeof(CreateApiKeyResponse), 201)]
+    [ProducesResponseType(403)]
     public async Task<ActionResult<CreateApiKeyResponse>> Create(
         [FromBody] CreateApiKeyRequest request,
         CancellationToken cancellationToken)
@@ -59,6 +63,21 @@ public class ApiKeysController : ControllerBase
         if (tenantId <= 0)
         {
             return BadRequest(new { message = "No se pudo determinar el tenant actual." });
+        }
+
+        // Plan gate: solo planes con CanUseApi=true pueden generar keys.
+        // Hoy: Professional + Enterprise. Free y Starter reciben 403.
+        // El check también valida que la suscripción esté Active o en Trial.
+        var canUseApi = await _planLimitService.CanUseApiAsync(tenantId);
+        if (!canUseApi)
+        {
+            return StatusCode(403, new
+            {
+                error = "plan_does_not_include_api",
+                message = "Tu plan actual no incluye acceso al API Platform. " +
+                          "Actualiza a Professional o Enterprise para generar API keys.",
+                upgradeUrl = "/billing"
+            });
         }
 
         var expiresAt = request.ExpiresInDays.HasValue
