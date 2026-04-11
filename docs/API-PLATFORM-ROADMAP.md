@@ -132,7 +132,8 @@ alternes entre terminales.
 | 9 | `7124036` | feat: rate limiter sliding window                            | +3  |
 | 10 | `7c16295` | feat: Swagger público `/v1/docs` con DocInclusionPredicate | — |
 | 11 | `f5f801a` | test: contract/golden test de `PayrollCalculateResponse` | +1 |
-| **12** | *(next)* | **feat: handle del 429 en el dashboard frontend** | — |
+| 12 | `64a1234` | feat: handle del 429 en el dashboard frontend | — |
+| **13** | *(next)* | **feat: bar chart "Uso por API key" en `ApiKeysPage`** | — |
 
 **Estado global:**
 - ✅ Build verde (0 errores .NET, 0 errores TypeScript).
@@ -164,7 +165,9 @@ Estos chunks viven en `C:\Planilla`. **No tocan `vorluno-web`**.
 | **10** | Swagger público `/v1/docs` separado del interno. Dos `SwaggerDoc`, `DocInclusionPredicate` por path `/v1/*`. Expuesto en producción con header `X-Api-Key`. XML comments en DTOs. Título "Pagly API v1". | 2-3h | **SÍ** — el landing debe linkear a docs reales. | ✅ **Done** |
 | **11** | Contract / golden tests para `PayrollCalculateResponse`. Snapshot del shape canónico (campos + orden + precisión decimal). Falla si alguien rename un field por accidente. | 1h | No bloquea, pero lo quiero antes de exponer públicamente. | ✅ **Done** |
 | **12** | Handle del 429 en el dashboard frontend. En `api.ts` detectar status 429 → toast especial con countdown al `Retry-After`. En `ApiKeysPage` señal visual si el Owner genera spam. | 30 min | No bloquea. | ✅ **Done** |
-| **13** | Dashboard charts mínimo: en `ApiKeysPage` agregar un bar chart "Top keys by usage" (Recharts) con `totalRequests` de la lista actual. Sin timeseries todavía — eso requiere tabla `ApiUsageRecord` que no agrego sin demanda real. | 1h | No bloquea. | ⏳ Next |
+| **13** | Dashboard charts mínimo: en `ApiKeysPage` agregar un bar chart "Top keys by usage" (Recharts) con `totalRequests` de la lista actual. Sin timeseries todavía — eso requiere tabla `ApiUsageRecord` que no agrego sin demanda real. | 1h | No bloquea. | ✅ **Done** |
+
+**Track A completo 13/13 ✅.** Siguiente: Track B — Chunk 14 en `C:\vorluno-pagina web\vorluno-web`.
 
 **Orden dentro del track**: 10 → 11 → 12 → 13.
 
@@ -454,13 +457,13 @@ así que el comentario local basta.)
 
 ## 13. Estado actual en una sola línea
 
-> **Track A: 12/13 chunks done. Track B: 0/3 chunks done. Claude ejecuta ambos tracks desde la misma sesión. Siguiente: Chunk 13 (bar chart "Top keys" en `ApiKeysPage`) en `C:\Planilla`.**
+> **🎯 Track A completo (13/13) ✅. Track B: 0/3. Siguiente: Chunk 14 (sección "Para developers" en la landing de Pagly) en `C:\vorluno-pagina web\vorluno-web`.**
 
 ### Resumen por track
 
 | Track | Repo | Chunks | Done | Pending | Tests |
 |---|---|---|---|---|---|
-| **A** (producto) | `C:\Planilla` | 10-13 (4 chunks) | 10, 11, 12 ✅ | 13 | 207 verdes |
+| **A** (producto) | `C:\Planilla` | 10-13 (4 chunks) | 10, 11, 12, 13 ✅ **completo** | — | 207 verdes |
 | **B** (marketing) | `C:\vorluno-pagina web\vorluno-web` | 14-16 (3 chunks) | ninguno | 14, 15, 16 | N/A (Next.js build) |
 
 ### Orden recomendado a futuro
@@ -481,5 +484,5 @@ done** (ya está ✅).
 
 ---
 
-*Última actualización: chunk 12 commiteado — feat: handle del 429 en el dashboard frontend (listener global `rateLimitExceeded` en App.tsx + soporte de body RFC 7807 en api.ts).*
-*Próximo: Chunk 13 (bar chart "Top keys by usage" en `ApiKeysPage`).*
+*Última actualización: chunk 13 commiteado — feat: bar chart "Uso por API key" en `ApiKeysPage` con Recharts. **Track A completo 13/13 ✅**.*
+*Próximo: Chunk 14 (sección "Para developers" en la landing de Pagly en `vorluno-web` — cambio de repo).*
