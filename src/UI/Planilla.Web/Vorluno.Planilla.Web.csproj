@@ -6,6 +6,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>aspnet-Planilla.Web-1a0fcdd3-dfba-4b1f-a325-1324652deb75</UserSecretsId>
 
+    <!-- XML documentation para Swagger — permite que SwaggerGen incluya
+         los <summary> de controllers y DTOs en la spec pública /v1/docs. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Warnings de XML docs legacy en otros controllers (HorasExtra, Vacaciones,
+         PlanLimitsAttribute) — son de XML malformados que existen desde antes de
+         habilitar GenerateDocumentationFile. No afectan runtime, son deuda técnica
+         separada del API Platform. Suprimidos para no contaminar el output del build.
+           CS1570: XML malformado.
+           CS1573: Parámetro sin etiqueta <param> correspondiente.
+           CS1591: Missing XML comment for publicly visible type/member. -->
+    <NoWarn>$(NoWarn);1570;1573;1591</NoWarn>
+
     <!-- Metadatos de Vorluno -->
     <Company>Vorluno</Company>
     <Product>Vorluno Planilla - VOR-PLAN</Product>
