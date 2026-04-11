@@ -369,6 +369,15 @@ else
     app.UseHsts();
 }
 
+// RequestId debe ir ANTES de cualquier middleware que quiera loguearlo o incluirlo
+// en responses de error. Es cheap (asigna un GUID por request).
+app.UseRequestIdMiddleware();
+
+// ApiProblemDetailsMiddleware: RFC 7807 + errorCode + requestId, solo para /v1/*
+// (futuro API Platform B2B). Para otras rutas delega al ExceptionHandlingMiddleware
+// legacy sin interferir con el shape de error del SaaS actual.
+app.UseApiProblemDetailsMiddleware();
+
 app.UseExceptionHandlingMiddleware();
 
 app.UseHttpsRedirection();
