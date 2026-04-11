@@ -1,0 +1,14 @@
+{
+  "grossPay": 2000,
+  "cssEmployee": 146.25,
+  "educationalInsuranceEmployee": 25.00,
+  "incomeTax": 187.50,
+  "totalDeductions": 358.75,
+  "netPay": 1641.25,
+  "cssEmployer": 198.75,
+  "educationalInsuranceEmployer": 30.00,
+  "riskContribution": 0,
+  "totalEmployerCost": 228.75,
+  "version": "2026.1",
+  "calculationDate": "2026-06-01T00:00:00Z"
+}
