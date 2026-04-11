@@ -102,7 +102,13 @@ builder.Services.AddAuthentication(options =>
         ClockSkew = TimeSpan.Zero, // Elimina el buffer de 5 minutos por defecto
         RoleClaimType = "tenant_role" // Map "tenant_role" claim to Role for [Authorize(Roles=...)]
     };
-});
+})
+// API Platform B2B: scheme "ApiKey" lee header X-Api-Key y lo valida contra la tabla ApiKeys.
+// Endpoints /v1/* lo activan con [Authorize(AuthenticationSchemes = "ApiKey")].
+.AddScheme<Vorluno.Planilla.Web.Authentication.ApiKeyAuthenticationOptions,
+          Vorluno.Planilla.Web.Authentication.ApiKeyAuthenticationHandler>(
+    Vorluno.Planilla.Web.Authentication.ApiKeyAuthenticationHandler.SchemeName,
+    _ => { });
 
 // 6. CONFIGURAR AUTHORIZATION POLICIES MULTI-TENANT
 // Estrategia: solo dos roles a nivel sistema (Owner, User). El resto se controla por permisos (CustomTenantRole).
@@ -151,6 +157,21 @@ builder.Services.AddScoped<IPlanLimitService, PlanLimitService>();
 
 // API Platform B2B — servicio de gestión de keys (Stripe-like: prefijo + hash SHA256)
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
+
+// API Platform B2B — orchestrator stateless para el CalculatorController.
+// Construye manualmente los 3 portable services usando el StaticPayrollConfigProvider
+// para garantizar que los cálculos no tocan BD ni leen config multi-tenant.
+// El controller lo inyecta con [FromKeyedServices("static")].
+builder.Services.AddKeyedScoped<Vorluno.Planilla.Application.Services.PayrollCalculationOrchestratorPortable>(
+    "static",
+    (sp, _) =>
+    {
+        var staticProvider = sp.GetRequiredKeyedService<Vorluno.Planilla.Application.Interfaces.IPayrollConfigProvider>("static");
+        return new Vorluno.Planilla.Application.Services.PayrollCalculationOrchestratorPortable(
+            new Vorluno.Planilla.Application.Services.CssCalculationServicePortable(staticProvider),
+            new Vorluno.Planilla.Application.Services.EducationalInsuranceServicePortable(staticProvider),
+            new Vorluno.Planilla.Application.Services.IncomeTaxCalculationServicePortable(staticProvider));
+    });
 
 // 11.1. REGISTRAR SERVICIO DE EMAIL (BREVO)
 builder.Services.AddScoped<IBrevoEmailService, BrevoEmailService>();
