@@ -28,7 +28,23 @@ namespace Vorluno.Planilla.Web.Extensions
             services.AddScoped<PlanillaService>();
 
             // Phase A: Proveedor de configuraci�n de planilla (tasas CSS, SE, ISR)
-            services.AddScoped<IPayrollConfigProvider, PayrollConfigProvider>();
+            //
+            // Se registran dos implementaciones con keyed DI (.NET 8+):
+            //   - Default unkeyed: PayrollConfigProvider (lee BD multi-tenant).
+            //     Los servicios SaaS existentes siguen recibi�ndolo via constructor.
+            //   - Keyed "db": mismo provider, expuesto expl�citamente por llave.
+            //   - Keyed "static": StaticPayrollConfigProvider con config hardcoded
+            //     Panam� 2026 (Ley 462, 3 fases). Lo usar� el API Platform B2B
+            //     para c�lculos stateless sin acceso a BD.
+            //
+            // Contexto: refactor identificado como blocker #1 en la evaluaci�n CTO
+            // del API Platform � el provider antiguo hac�a fallback silencioso a
+            // ITenantContext, lo que generaba tenant leakage en endpoints con API key.
+            services.AddScoped<PayrollConfigProvider>();
+            services.AddScoped<StaticPayrollConfigProvider>();
+            services.AddScoped<IPayrollConfigProvider>(sp => sp.GetRequiredService<PayrollConfigProvider>());
+            services.AddKeyedScoped<IPayrollConfigProvider>("db", (sp, _) => sp.GetRequiredService<PayrollConfigProvider>());
+            services.AddKeyedScoped<IPayrollConfigProvider>("static", (sp, _) => sp.GetRequiredService<StaticPayrollConfigProvider>());
 
             // Phase B: Servicios de c�lculo de planilla (CSS, SE, ISR)
             services.AddScoped<CssCalculationServicePortable>();
