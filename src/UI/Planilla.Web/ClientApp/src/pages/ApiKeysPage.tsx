@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import {
   Key,
@@ -8,7 +8,18 @@ import {
   Check,
   AlertTriangle,
   Loader2,
+  BarChart3,
 } from 'lucide-react';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  Cell,
+} from 'recharts';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -55,6 +66,28 @@ export default function ApiKeysPage() {
   useEffect(() => {
     loadKeys();
   }, []);
+
+  // Top 5 keys por totalRequests, excluyendo keys sin uso. Memoizado para evitar
+  // recalcular en cada render cuando otros state cambian (modales, etc).
+  const topKeysData = useMemo(() => {
+    return keys
+      .filter((k) => k.totalRequests > 0)
+      .sort((a, b) => b.totalRequests - a.totalRequests)
+      .slice(0, 5)
+      .map((k) => ({
+        // Truncamos el nombre a 18 chars para que el label del eje X no se salga.
+        name: k.name.length > 18 ? k.name.slice(0, 17) + '…' : k.name,
+        fullName: k.name,
+        requests: k.totalRequests,
+        mode: k.mode,
+        prefix: k.keyPrefix,
+      }));
+  }, [keys]);
+
+  const totalRequestsAllKeys = useMemo(
+    () => keys.reduce((sum, k) => sum + k.totalRequests, 0),
+    [keys]
+  );
 
   const loadKeys = async () => {
     try {
@@ -224,6 +257,76 @@ export default function ApiKeysPage() {
           Nueva API key
         </Button>
       </div>
+
+      {/* Usage chart — solo se muestra si ya tienes al menos 1 key con uso.
+          Si todas las keys están en 0, lo ocultamos — ver un chart vacío es ruido
+          informativo y no agrega valor. */}
+      {!isLoading && topKeysData.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-violet-400" />
+                <h2 className="text-lg font-semibold text-gray-100">Uso por API key</h2>
+              </div>
+              <div className="text-sm text-gray-400">
+                <span className="tabular-nums font-semibold text-gray-100">
+                  {totalRequestsAllKeys.toLocaleString('es-PA')}
+                </span>
+                {' '}requests acumulados
+              </div>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={topKeysData}
+                  margin={{ top: 8, right: 16, bottom: 8, left: 0 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="#1e293b"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fill: '#94a3b8', fontSize: 12 }}
+                    axisLine={{ stroke: '#334155' }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fill: '#94a3b8', fontSize: 12 }}
+                    axisLine={{ stroke: '#334155' }}
+                    tickLine={false}
+                    tickFormatter={(value: number) =>
+                      value >= 1000 ? `${(value / 1000).toFixed(1)}k` : value.toString()
+                    }
+                  />
+                  <RechartsTooltip
+                    content={<TopKeysTooltip />}
+                    cursor={{ fill: 'rgba(139, 92, 246, 0.08)' }}
+                  />
+                  <Bar dataKey="requests" radius={[6, 6, 0, 0]}>
+                    {topKeysData.map((entry, index) => (
+                      <Cell
+                        key={entry.prefix}
+                        fill={entry.mode === 'Live' ? '#8b5cf6' : '#64748b'}
+                        opacity={1 - index * 0.12}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="mt-3 text-xs text-gray-500">
+              Top 5 keys por uso. Las barras violetas son Live; las grises, Test.
+              El contador se incrementa en cada request 2xx al endpoint{' '}
+              <span className="font-mono text-gray-400">/v1/payroll/calculate</span>.
+            </p>
+          </CardBody>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -406,6 +509,42 @@ export default function ApiKeysPage() {
           </div>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+// ============================================================================
+// Custom tooltip para el BarChart de Recharts
+// ============================================================================
+
+interface TopKeysTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    payload: {
+      fullName: string;
+      prefix: string;
+      mode: 'Test' | 'Live';
+      requests: number;
+    };
+  }>;
+}
+
+function TopKeysTooltip({ active, payload }: TopKeysTooltipProps) {
+  if (!active || !payload || payload.length === 0) return null;
+  const data = payload[0].payload;
+
+  return (
+    <div className="rounded-lg border border-navy-700 bg-navy-900/95 backdrop-blur-sm p-3 shadow-xl">
+      <div className="font-semibold text-gray-100 text-sm mb-0.5">{data.fullName}</div>
+      <div className="text-xs text-gray-500 font-mono mb-2">
+        pk_{data.mode.toLowerCase()}_{data.prefix}••••
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-400">Requests:</span>
+        <span className="text-sm font-semibold tabular-nums text-violet-300">
+          {data.requests.toLocaleString('es-PA')}
+        </span>
+      </div>
     </div>
   );
 }
