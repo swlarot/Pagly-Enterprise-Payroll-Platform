@@ -23,6 +23,10 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
         builder.UseSetting("Jwt:Issuer", "https://test.planilla.vorluno.dev");
         builder.UseSetting("Jwt:Audience", "https://test.planilla.vorluno.dev");
 
+        // CORS: Program.cs falla al arrancar si no hay origins configuradas en non-Development.
+        // Testing environment no es Development ni Production, así que debemos setear algo.
+        builder.UseSetting("Cors:AllowedOrigins", "http://localhost");
+
         builder.ConfigureServices(services =>
         {
             // Add test DbContext with in-memory database
