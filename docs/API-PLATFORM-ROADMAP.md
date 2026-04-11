@@ -117,7 +117,7 @@ alternes entre terminales.
 
 ---
 
-## 4. Lo que YA está hecho (10 chunks commiteados)
+## 4. Lo que YA está hecho (11 chunks commiteados)
 
 | # | Commit  | Descripción                                                  | Tests |
 |---|---------|--------------------------------------------------------------|-------|
@@ -130,7 +130,8 @@ alternes entre terminales.
 | 7 | `c220ed5` | feat: dashboard React `ApiKeysPage`                          | —   |
 | 8 | `8e67c53` | feat: plan gate `CanUseApi` (Free/Starter → 403)             | +5  |
 | 9 | `7124036` | feat: rate limiter sliding window                            | +3  |
-| **10** | *(next)* | **feat: Swagger público `/v1/docs` con DocInclusionPredicate** | — |
+| 10 | `7c16295` | feat: Swagger público `/v1/docs` con DocInclusionPredicate | — |
+| **11** | *(next)* | **test: contract/golden test de `PayrollCalculateResponse`** | +1 |
 
 **Estado global:**
 - ✅ Build verde (0 errores .NET, 0 errores TypeScript).
@@ -160,8 +161,8 @@ Estos chunks viven en `C:\Planilla`. **No tocan `vorluno-web`**.
 | Chunk | Descripción | Esfuerzo | Bloquea Track B | Estado |
 |---|---|---|---|---|
 | **10** | Swagger público `/v1/docs` separado del interno. Dos `SwaggerDoc`, `DocInclusionPredicate` por path `/v1/*`. Expuesto en producción con header `X-Api-Key`. XML comments en DTOs. Título "Pagly API v1". | 2-3h | **SÍ** — el landing debe linkear a docs reales. | ✅ **Done** |
-| **11** | Contract / golden tests para `PayrollCalculateResponse`. Snapshot del shape canónico (campos + orden + precisión decimal). Falla si alguien rename un field por accidente. | 1h | No bloquea, pero lo quiero antes de exponer públicamente. | ⏳ Next |
-| **12** | Handle del 429 en el dashboard frontend. En `api.ts` detectar status 429 → toast especial con countdown al `Retry-After`. En `ApiKeysPage` señal visual si el Owner genera spam. | 30 min | No bloquea. | ⏳ |
+| **11** | Contract / golden tests para `PayrollCalculateResponse`. Snapshot del shape canónico (campos + orden + precisión decimal). Falla si alguien rename un field por accidente. | 1h | No bloquea, pero lo quiero antes de exponer públicamente. | ✅ **Done** |
+| **12** | Handle del 429 en el dashboard frontend. En `api.ts` detectar status 429 → toast especial con countdown al `Retry-After`. En `ApiKeysPage` señal visual si el Owner genera spam. | 30 min | No bloquea. | ⏳ Next |
 | **13** | Dashboard charts mínimo: en `ApiKeysPage` agregar un bar chart "Top keys by usage" (Recharts) con `totalRequests` de la lista actual. Sin timeseries todavía — eso requiere tabla `ApiUsageRecord` que no agrego sin demanda real. | 1h | No bloquea. | ⏳ |
 
 **Orden dentro del track**: 10 → 11 → 12 → 13.
@@ -452,13 +453,13 @@ así que el comentario local basta.)
 
 ## 13. Estado actual en una sola línea
 
-> **Track A: 10/13 chunks done. Track B: 0/3 chunks done. Claude ejecuta ambos tracks desde la misma sesión. Siguiente: Chunk 11 (contract/golden tests) en `C:\Planilla`.**
+> **Track A: 11/13 chunks done. Track B: 0/3 chunks done. Claude ejecuta ambos tracks desde la misma sesión. Siguiente: Chunk 12 (handle del 429 en el frontend) en `C:\Planilla`.**
 
 ### Resumen por track
 
 | Track | Repo | Chunks | Done | Pending | Tests |
 |---|---|---|---|---|---|
-| **A** (producto) | `C:\Planilla` | 10-13 (4 chunks) | 10 ✅ | 11, 12, 13 | 206 verdes |
+| **A** (producto) | `C:\Planilla` | 10-13 (4 chunks) | 10, 11 ✅ | 12, 13 | 207 verdes |
 | **B** (marketing) | `C:\vorluno-pagina web\vorluno-web` | 14-16 (3 chunks) | ninguno | 14, 15, 16 | N/A (Next.js build) |
 
 ### Orden recomendado a futuro
@@ -479,5 +480,5 @@ done** (ya está ✅).
 
 ---
 
-*Última actualización: chunk 10 commiteado — feat: Swagger público `/v1/docs` (`DocInclusionPredicate` filtra por path, security scheme `X-Api-Key`, XML comments habilitados). Roadmap reformado para reflejar que Claude ejecuta ambos tracks.*
-*Próximo: Chunk 11 (contract / golden tests para proteger el shape del response).*
+*Última actualización: chunk 11 commiteado — test: contract/golden test del `PayrollCalculateResponse` snapshot. Protege el shape (nombres, orden, precisión decimal, tipos) contra refactors accidentales.*
+*Próximo: Chunk 12 (handle del 429 en el dashboard frontend).*
