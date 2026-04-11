@@ -115,8 +115,12 @@ async function handleResponse<T>(response: Response, originalRequest?: {
 
   // Handle non-OK responses
   if (!response.ok) {
-    const errorCode = data?.error || data?.code;
-    const message = data?.message || data?.error || data?.title || 'Error en la solicitud';
+    // El body puede venir en dos shapes distintos:
+    //   1) SaaS legacy: { message, error?, code? }
+    //   2) API Platform v1 (RFC 7807 problem+json): { type, title, status, detail, instance, errorCode, requestId }
+    // Aceptamos ambos.
+    const errorCode = data?.error || data?.code || data?.errorCode;
+    const message = data?.message || data?.detail || data?.error || data?.title || 'Error en la solicitud';
 
     // Dispatch specific error events
     if (errorCode === 'PLAN_LIMIT_REACHED') {
@@ -138,6 +142,22 @@ async function handleResponse<T>(response: Response, originalRequest?: {
           message,
           status: data?.status,
           billingUrl: data?.billingUrl || '/billing',
+        }
+      }));
+    }
+
+    // Rate limit del API Platform (/v1/*). Detectado por status code — el backend retorna
+    // un body RFC 7807 con errorCode="rate_limit_error" + header Retry-After.
+    // El listener global en App.tsx muestra un toast con countdown.
+    if (response.status === 429) {
+      const retryAfterHeader = response.headers.get('Retry-After') ?? response.headers.get('retry-after');
+      const retryAfterSeconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : NaN;
+      window.dispatchEvent(new CustomEvent('rateLimitExceeded', {
+        detail: {
+          message: data?.detail || data?.title || 'Has alcanzado el límite de requests.',
+          retryAfterSeconds: Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : 60,
+          path: data?.instance ?? '',
+          requestId: data?.requestId ?? '',
         }
       }));
     }

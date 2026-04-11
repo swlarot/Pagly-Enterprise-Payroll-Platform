@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import toast, { Toaster, ToastBar } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
@@ -45,6 +46,44 @@ import ReportesPage from './pages/ReportesPage.jsx';
 import LiquidacionesPage from './pages/LiquidacionesPage.jsx';
 
 function App() {
+  // Listener global del evento `rateLimitExceeded` emitido por api.ts cuando
+  // el backend responde con 429 (API Platform /v1/*). Muestra un toast warning
+  // con el mensaje del server + tiempo de retry. El `id` del toast es fijo para
+  // que requests consecutivos rate-limited no apilen múltiples toasts — react-hot-toast
+  // actualiza el toast existente con el mismo id.
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const custom = event as CustomEvent<{
+        message: string;
+        retryAfterSeconds: number;
+        path: string;
+        requestId: string;
+      }>;
+      const detail = custom.detail;
+      const secs = detail.retryAfterSeconds;
+      const humanTime = secs >= 60 ? `${Math.ceil(secs / 60)} min` : `${secs}s`;
+
+      toast.error(
+        `${detail.message}\nReintenta en ${humanTime}.`,
+        {
+          id: 'rate-limit-v1',
+          icon: '⏱️',
+          // Toast visible por máx 8s aunque el retry-after sea 60s — el usuario
+          // solo necesita ver el mensaje una vez para entender la situación.
+          duration: Math.min(secs * 1000, 8000),
+          style: {
+            background: '#2d1b0e',
+            color: '#fef3c7',
+            border: '1px solid #78350f',
+          },
+        }
+      );
+    };
+
+    window.addEventListener('rateLimitExceeded', handler);
+    return () => window.removeEventListener('rateLimitExceeded', handler);
+  }, []);
+
   return (
     <AuthProvider>
       <Toaster
