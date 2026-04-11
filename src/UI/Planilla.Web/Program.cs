@@ -245,6 +245,75 @@ builder.Services.AddHealthChecks()
     .AddDbContextCheck<ApplicationDbContext>("postgres", tags: new[] { "db", "ready" })
     .AddCheck<MultiTenantHealthCheck>("multi_tenant", tags: new[] { "ready" });
 
+// API Platform B2B — Rate Limiter .NET 9 nativo
+// Política "calculator-v1": sliding window, particionado por api_key_id del claim.
+// Configurable via ApiRateLimit:PerMinute (default 60). Fallback a IP si no hay claim
+// (defensa para requests pre-auth o con JWT sin api_key_id).
+// OnRejected retorna 429 con error shape tipo RFC 7807 + Retry-After header.
+var apiRateLimitPerMinute = builder.Configuration.GetValue<int?>("ApiRateLimit:PerMinute") ?? 60;
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = 429;
+
+    options.AddPolicy("calculator-v1", httpContext =>
+    {
+        // Partition key: el api_key_id del claim (scheme "ApiKey") o la IP como fallback.
+        var partitionKey = httpContext.User.FindFirst(
+            Vorluno.Planilla.Web.Authentication.ApiKeyAuthenticationHandler.ClaimApiKeyId)?.Value
+            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "anonymous";
+
+        return System.Threading.RateLimiting.RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey,
+            _ => new System.Threading.RateLimiting.SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = apiRateLimitPerMinute,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6, // cada segmento = 10s — balance granularidad/memoria
+                QueueLimit = 0, // no encolar — rechazar inmediatamente con 429
+                QueueProcessingOrder = System.Threading.RateLimiting.QueueProcessingOrder.OldestFirst
+            });
+    });
+
+    options.OnRejected = async (ctx, cancellationToken) =>
+    {
+        ctx.HttpContext.Response.StatusCode = 429;
+        ctx.HttpContext.Response.ContentType = "application/problem+json";
+
+        // Retry-After header: 60s (una ventana completa).
+        if (ctx.Lease.TryGetMetadata(System.Threading.RateLimiting.MetadataName.RetryAfter, out var retryAfter))
+        {
+            ctx.HttpContext.Response.Headers["Retry-After"] = ((int)retryAfter.TotalSeconds).ToString();
+        }
+        else
+        {
+            ctx.HttpContext.Response.Headers["Retry-After"] = "60";
+        }
+
+        // Shape consistente con ApiProblemDetailsMiddleware.
+        var requestId = ctx.HttpContext.Items.TryGetValue("RequestId", out var rid) && rid is string s
+            ? s
+            : string.Empty;
+
+        var problem = new
+        {
+            type = "https://pagly.com/errors/rate_limit_error",
+            title = "Too many requests",
+            status = 429,
+            detail = $"Rate limit exceeded: {apiRateLimitPerMinute} requests per minute. Retry after the window resets.",
+            instance = ctx.HttpContext.Request.Path.Value ?? string.Empty,
+            errorCode = "rate_limit_error",
+            requestId
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(problem, new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+        });
+        await ctx.HttpContext.Response.WriteAsync(json, cancellationToken);
+    };
+});
+
 // RISK: Removing Blazor services - Web API + Identity backend only
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -438,6 +507,11 @@ app.UseAuthentication(); // Must come before UseAuthorization
 app.UseTenantMiddleware();
 
 app.UseAuthorization();
+
+// Rate limiter debe ir DESPUÉS de Authentication (necesita el claim api_key_id
+// para particionar) y ANTES de MapControllers (para rechazar antes del endpoint).
+// Solo actúa en endpoints anotados con [EnableRateLimiting("...")].
+app.UseRateLimiter();
 
 // API Platform usage tracking: solo trackea /v1/*, solo respuestas 2xx con
 // claim api_key_id. Debe ir DESPUÉS de Authentication (necesita el claim)
