@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Vorluno.Planilla.Application.Configuration;
 using Vorluno.Planilla.Application.DTOs.Calculator;
 using Vorluno.Planilla.Application.Services;
@@ -30,6 +31,7 @@ namespace Vorluno.Planilla.Web.Controllers.V1;
 [ApiController]
 [Route("v1/payroll")]
 [Authorize(AuthenticationSchemes = ApiKeyAuthenticationHandler.SchemeName)]
+[EnableRateLimiting("calculator-v1")]
 public class CalculatorController : ControllerBase
 {
     private readonly PayrollCalculationOrchestratorPortable _orchestrator;
