@@ -1,4 +1,6 @@
+using System.Diagnostics;
 using Microsoft.EntityFrameworkCore;
+using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Infrastructure.Data;
 using Vorluno.Planilla.Web.Authentication;
 
@@ -8,42 +10,22 @@ namespace Vorluno.Planilla.Web.Middleware;
 /// Middleware de tracking de uso del API Platform B2B.
 ///
 /// <para>
-/// Scope: solo rutas que empiezan con <c>/v1/</c>. Otras rutas (SaaS actual,
-/// healthchecks, SPA) pasan sin tocar nada.
+/// Scope: solo rutas que empiezan con <c>/v1/</c>. Otras rutas pasan sin tocar nada.
 /// </para>
 ///
 /// <para>
-/// Comportamiento: después de que el controller retorna, si:
+/// Dos responsabilidades:
 /// <list type="bullet">
-///   <item>El path empezó con <c>/v1/</c></item>
-///   <item>La request fue autenticada con scheme <c>"ApiKey"</c> (claim <c>api_key_id</c> presente)</item>
-///   <item>El status code es 2xx (llamada exitosa, el cálculo se ejecutó)</item>
-/// </list>
-/// …entonces ejecuta un UPDATE atómico en la tabla <c>ApiKeys</c>:
-/// <c>TotalRequests = TotalRequests + 1, LastUsedAt = UtcNow</c>.
-/// </para>
-///
-/// <para>
-/// Por qué atómico con <c>ExecuteUpdateAsync</c> en vez de SELECT+SaveChanges:
-/// <list type="bullet">
-///   <item>Evita race conditions bajo concurrencia (dos requests simultáneos).</item>
-///   <item>Sin tracking overhead de EF change tracker.</item>
-///   <item>Single round-trip a la DB.</item>
+///   <item><b>ApiUsageRecord</b>: inserta una fila por CADA request (200, 400, 401, 429, 500)
+///         con endpoint, method, status code, latencia. Es la base de datos de analytics.</item>
+///   <item><b>TotalRequests counter</b>: UPDATE atómico en ApiKey solo para 2xx (cálculos
+///         ejecutados exitosamente). Es el contador rápido del dashboard.</item>
 /// </list>
 /// </para>
 ///
 /// <para>
-/// Por qué solo 2xx (no 4xx): un 400 es una llamada mal formada del cliente,
-/// no un cálculo ejecutado. No lo cobramos ni lo contamos. Un 401 falla antes
-/// de este middleware (la auth nunca setea el claim <c>api_key_id</c>).
-/// Protección contra abuso de 400s se debe hacer con rate limiting,
-/// no contando requests.
-/// </para>
-///
-/// <para>
-/// Errores del UPDATE son log+swallow: el tracking es best-effort, no bloquea
-/// la respuesta. Si la DB está caída para escrituras, el cálculo ya se ejecutó
-/// y retornamos al cliente — perder un contador es tolerable, bloquear no.
+/// Ambas operaciones son best-effort (log+swallow en caso de error de DB). El response
+/// al cliente ya se envió — no bloqueamos por fallos de tracking.
 /// </para>
 /// </summary>
 public class ApiUsageTrackingMiddleware
@@ -63,68 +45,87 @@ public class ApiUsageTrackingMiddleware
 
     public async Task InvokeAsync(HttpContext context, ApplicationDbContext db)
     {
-        // Scope guard: solo trackeamos rutas del API Platform.
+        // Scope guard: solo rutas del API Platform.
         if (!context.Request.Path.StartsWithSegments(ApiPathPrefix))
         {
             await _next(context);
             return;
         }
 
+        // Cronometrar el request completo (controller + middlewares downstream).
+        var stopwatch = Stopwatch.StartNew();
+
         await _next(context);
 
-        // Después del controller — decide si contar.
-        if (!ShouldTrack(context, out var apiKeyId))
+        stopwatch.Stop();
+
+        // Extraer datos del request para el record.
+        var statusCode = context.Response.StatusCode;
+        var endpoint = context.Request.Path.Value ?? string.Empty;
+        var method = context.Request.Method;
+        var responseTimeMs = (int)stopwatch.ElapsedMilliseconds;
+
+        // Intentar obtener el api_key_id del claim (puede ser null si auth falló).
+        int? apiKeyId = null;
+        int tenantId = 0;
+        var keyIdClaim = context.User.FindFirst(ApiKeyAuthenticationHandler.ClaimApiKeyId);
+        var tenantIdClaim = context.User.FindFirst(ApiKeyAuthenticationHandler.ClaimTenantId);
+
+        if (keyIdClaim is not null && int.TryParse(keyIdClaim.Value, out var parsedKeyId) && parsedKeyId > 0)
         {
-            return;
+            apiKeyId = parsedKeyId;
         }
 
+        if (tenantIdClaim is not null && int.TryParse(tenantIdClaim.Value, out var parsedTenantId))
+        {
+            tenantId = parsedTenantId;
+        }
+
+        // ── 1. Insertar ApiUsageRecord (TODOS los status codes) ──
         try
         {
-            var now = DateTime.UtcNow;
-            var updated = await db.ApiKeys
-                .IgnoreQueryFilters() // IX_ApiKey_KeyPrefix es global, no por tenant
-                .Where(k => k.Id == apiKeyId)
-                .ExecuteUpdateAsync(setters => setters
-                    .SetProperty(k => k.TotalRequests, k => k.TotalRequests + 1)
-                    .SetProperty(k => k.LastUsedAt, now));
-
-            if (updated == 0)
+            var record = new ApiUsageRecord
             {
-                _logger.LogWarning(
-                    "ApiUsageTracking: no se encontró ApiKey {ApiKeyId} para incrementar contador. " +
-                    "Posible revocación concurrente.",
-                    apiKeyId);
-            }
+                TenantId = tenantId,
+                ApiKeyId = apiKeyId,
+                Endpoint = endpoint.Length > 200 ? endpoint[..200] : endpoint,
+                Method = method,
+                StatusCode = statusCode,
+                ResponseTimeMs = responseTimeMs,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            db.ApiUsageRecords.Add(record);
+            await db.SaveChangesAsync();
         }
         catch (Exception ex)
         {
-            // Best-effort: log y swallow. No bloqueamos el response.
             _logger.LogWarning(ex,
-                "ApiUsageTracking: falló incremento de contador para ApiKey {ApiKeyId}. " +
-                "El cálculo ya se retornó al cliente — este contador se perdió.",
-                apiKeyId);
+                "ApiUsageTracking: falló inserción de ApiUsageRecord para {Method} {Endpoint} (status {StatusCode}). " +
+                "El request ya se retornó al cliente — este record de analytics se perdió.",
+                method, endpoint, statusCode);
         }
-    }
 
-    /// <summary>
-    /// Decide si esta request debe contarse. Condiciones:
-    ///  1. Status 2xx (cálculo exitoso)
-    ///  2. Auth por scheme "ApiKey" con claim <c>api_key_id</c> parseable a int
-    /// </summary>
-    private static bool ShouldTrack(HttpContext context, out int apiKeyId)
-    {
-        apiKeyId = 0;
-
-        var status = context.Response.StatusCode;
-        if (status < 200 || status >= 300)
+        // ── 2. Incrementar TotalRequests solo para 2xx con api_key_id ──
+        if (statusCode >= 200 && statusCode < 300 && apiKeyId.HasValue)
         {
-            return false;
+            try
+            {
+                var now = DateTime.UtcNow;
+                await db.ApiKeys
+                    .IgnoreQueryFilters()
+                    .Where(k => k.Id == apiKeyId.Value)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(k => k.TotalRequests, k => k.TotalRequests + 1)
+                        .SetProperty(k => k.LastUsedAt, now));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "ApiUsageTracking: falló incremento de TotalRequests para ApiKey {ApiKeyId}.",
+                    apiKeyId);
+            }
         }
-
-        var claim = context.User.FindFirst(ApiKeyAuthenticationHandler.ClaimApiKeyId);
-        if (claim is null) return false;
-
-        return int.TryParse(claim.Value, out apiKeyId) && apiKeyId > 0;
     }
 }
 

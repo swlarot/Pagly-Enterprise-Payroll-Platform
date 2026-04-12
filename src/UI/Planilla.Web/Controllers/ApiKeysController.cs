@@ -163,6 +163,142 @@ public class ApiKeysController : ControllerBase
         return NoContent();
     }
 
+    /// <summary>
+    /// Datos agregados de uso del API Platform para el tenant actual.
+    /// Alimenta el dashboard de analytics (charts de uso por día, breakdown de status codes,
+    /// top keys, latencia promedio y p95).
+    /// </summary>
+    /// <param name="since">Inicio del período (default: hace 30 días).</param>
+    /// <param name="until">Fin del período (default: ahora).</param>
+    [HttpGet("usage")]
+    [ProducesResponseType(typeof(ApiUsageStatsDto), 200)]
+    public async Task<ActionResult<ApiUsageStatsDto>> GetUsageStats(
+        [FromQuery] DateTime? since = null,
+        [FromQuery] DateTime? until = null,
+        CancellationToken cancellationToken = default)
+    {
+        var tenantId = _tenantContext.TenantId;
+        if (tenantId <= 0)
+        {
+            return BadRequest(new { message = "No se pudo determinar el tenant actual." });
+        }
+
+        var periodEnd = until ?? DateTime.UtcNow;
+        var periodStart = since ?? periodEnd.AddDays(-30);
+
+        // Query base: records del tenant en el período.
+        // ApiUsageRecord NO tiene global query filter (ver config en DbContext),
+        // así que filtramos manualmente por TenantId.
+        var records = _db.ApiUsageRecords
+            .Where(r => r.TenantId == tenantId
+                     && r.CreatedAt >= periodStart
+                     && r.CreatedAt <= periodEnd);
+
+        // 1. Daily usage (para line chart)
+        // GroupBy + Select sin named args (expression trees no los soportan).
+        var dailyRaw = await records
+            .GroupBy(r => r.CreatedAt.Date)
+            .Select(g => new
+            {
+                Date = g.Key,
+                Count = g.Count(),
+                SuccessCount = g.Count(r => r.StatusCode >= 200 && r.StatusCode < 300),
+                ErrorCount = g.Count(r => r.StatusCode >= 400)
+            })
+            .OrderBy(d => d.Date)
+            .ToListAsync(cancellationToken);
+
+        var dailyUsage = dailyRaw
+            .Select(d => new DailyUsageDto(d.Date, d.Count, d.SuccessCount, d.ErrorCount))
+            .ToList();
+
+        // 2. Status breakdown (para donut chart)
+        // Materializa primero, mapea labels en memoria (switch no va en expression tree).
+        var statusRaw = await records
+            .GroupBy(r => r.StatusCode)
+            .Select(g => new { StatusCode = g.Key, Count = g.Count() })
+            .OrderByDescending(s => s.Count)
+            .ToListAsync(cancellationToken);
+
+        var statusBreakdown = statusRaw
+            .Select(s => new StatusBreakdownDto(
+                s.StatusCode,
+                s.Count,
+                s.StatusCode switch
+                {
+                    200 => "OK",
+                    400 => "Bad Request",
+                    401 => "Unauthorized",
+                    429 => "Rate Limited",
+                    >= 500 => "Server Error",
+                    _ => $"HTTP {s.StatusCode}"
+                }
+            ))
+            .ToList();
+
+        // 3. Top keys por uso (para bar chart)
+        var topKeys = await records
+            .Where(r => r.ApiKeyId != null)
+            .GroupBy(r => r.ApiKeyId)
+            .Select(g => new
+            {
+                KeyId = g.Key!.Value,
+                TotalRequests = g.Count(),
+                AvgResponseTimeMs = (int)g.Average(r => r.ResponseTimeMs)
+            })
+            .OrderByDescending(k => k.TotalRequests)
+            .Take(10)
+            .ToListAsync(cancellationToken);
+
+        // Enriquecer con nombres de keys
+        var keyIds = topKeys.Select(k => k.KeyId).ToList();
+        var keyNames = await _db.ApiKeys
+            .Where(k => keyIds.Contains(k.Id))
+            .Select(k => new { k.Id, k.Name, k.KeyPrefix })
+            .ToDictionaryAsync(k => k.Id, cancellationToken);
+
+        var topKeysDto = topKeys.Select(k => new KeyUsageDto(
+            KeyId: k.KeyId,
+            KeyName: keyNames.TryGetValue(k.KeyId, out var info) ? info.Name : "Unknown",
+            KeyPrefix: keyNames.TryGetValue(k.KeyId, out var info2) ? info2.KeyPrefix : "",
+            TotalRequests: k.TotalRequests,
+            AvgResponseTimeMs: k.AvgResponseTimeMs
+        )).ToList();
+
+        // 4. Summary
+        var allResponseTimes = await records
+            .Select(r => r.ResponseTimeMs)
+            .ToListAsync(cancellationToken);
+
+        var totalCount = allResponseTimes.Count;
+        var successCount = await records.CountAsync(r => r.StatusCode >= 200 && r.StatusCode < 300, cancellationToken);
+        var clientErrors = await records.CountAsync(r => r.StatusCode >= 400 && r.StatusCode < 500, cancellationToken);
+        var serverErrors = await records.CountAsync(r => r.StatusCode >= 500, cancellationToken);
+
+        var avgMs = totalCount > 0 ? (int)allResponseTimes.Average() : 0;
+        var p95Ms = totalCount > 0
+            ? allResponseTimes.OrderBy(t => t).ElementAt((int)(totalCount * 0.95))
+            : 0;
+
+        var summary = new UsageSummaryDto(
+            TotalRequests: totalCount,
+            SuccessfulRequests: successCount,
+            ClientErrors: clientErrors,
+            ServerErrors: serverErrors,
+            AvgResponseTimeMs: avgMs,
+            P95ResponseTimeMs: p95Ms,
+            PeriodStart: periodStart,
+            PeriodEnd: periodEnd
+        );
+
+        return Ok(new ApiUsageStatsDto(
+            DailyUsage: dailyUsage,
+            StatusBreakdown: statusBreakdown,
+            TopKeys: topKeysDto,
+            Summary: summary
+        ));
+    }
+
     private static ApiKeyDto ToDto(ApiKey entity) => new(
         Id: entity.Id,
         Name: entity.Name,
