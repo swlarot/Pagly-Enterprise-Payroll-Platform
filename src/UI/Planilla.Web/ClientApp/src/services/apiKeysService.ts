@@ -3,6 +3,7 @@ import type {
   ApiKeyDto,
   CreateApiKeyRequest,
   CreateApiKeyResponse,
+  ApiUsageStatsDto,
 } from '../types/api';
 
 /**
@@ -37,5 +38,16 @@ export const apiKeysService = {
    */
   async revoke(keyId: number): Promise<void> {
     return api.delete<void>(`/api/api-keys/${keyId}`);
+  },
+
+  /**
+   * Datos agregados de uso del API Platform: requests/día, breakdown por status,
+   * top keys, latencia promedio y p95. Alimenta el dashboard de analytics.
+   */
+  async getUsageStats(days: number = 30): Promise<ApiUsageStatsDto> {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const sinceStr = since.toISOString();
+    return api.get<ApiUsageStatsDto>(`/api/api-keys/usage?since=${sinceStr}`);
   },
 };

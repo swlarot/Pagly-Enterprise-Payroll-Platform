@@ -681,3 +681,47 @@ export interface CreateApiKeyResponse {
    */
   plaintextKey: string;
 }
+
+// ============================================================================
+// API Platform — Analytics / Usage Stats
+// Matches src/Core/Planilla.Application/DTOs/ApiKeys/ApiUsageStatsDto.cs
+// ============================================================================
+
+export interface ApiUsageStatsDto {
+  dailyUsage: DailyUsageDto[];
+  statusBreakdown: StatusBreakdownDto[];
+  topKeys: KeyUsageDto[];
+  summary: UsageSummaryDto;
+}
+
+export interface DailyUsageDto {
+  date: string;
+  count: number;
+  successCount: number;
+  errorCount: number;
+}
+
+export interface StatusBreakdownDto {
+  statusCode: number;
+  count: number;
+  label: string;
+}
+
+export interface KeyUsageDto {
+  keyId: number;
+  keyName: string;
+  keyPrefix: string;
+  totalRequests: number;
+  avgResponseTimeMs: number;
+}
+
+export interface UsageSummaryDto {
+  totalRequests: number;
+  successfulRequests: number;
+  clientErrors: number;
+  serverErrors: number;
+  avgResponseTimeMs: number;
+  p95ResponseTimeMs: number;
+  periodStart: string;
+  periodEnd: string;
+}
