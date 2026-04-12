@@ -11,7 +11,7 @@ import {
   DollarSign, CreditCard, Minus, Clock, XCircle, TreePalm,
   ClipboardList, BarChart3, ShieldCheck, FileText, Settings,
   ChevronDown, ChevronRight, Search, Bell, LogOut, Banknote, Check, Loader2,
-  Key,
+  Key, Activity,
 } from 'lucide-react';
 
 interface AuthLayoutProps {
@@ -117,6 +117,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       '/roles': 'Roles y Permisos',
       '/audit': 'Registro de Auditoría',
       '/settings/api-keys': 'API Keys',
+      '/settings/api-usage': 'Uso del API',
       '/mi-perfil': 'Mi Perfil',
     };
     return routes[location.pathname] || 'Dashboard';
@@ -128,7 +129,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
     if (PRIMARY_ROUTES.includes(path)) return null;
     if (['/anticipos', '/prestamos', '/deducciones', '/acreedores'].includes(path)) return 'Novedades';
     if (['/horas-extra', '/ausencias', '/vacaciones'].includes(path)) return 'Asistencia';
-    if (['/roles', '/audit', '/configuracion', '/settings/api-keys'].includes(path)) return 'Admin';
+    if (['/roles', '/audit', '/configuracion', '/settings/api-keys', '/settings/api-usage'].includes(path)) return 'Admin';
     return null;
   };
 
@@ -577,6 +578,11 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                 <NavLink to="/settings/api-keys" className={adminItemClass}>
                   <Key className="w-4 h-4 flex-shrink-0 text-violet-400" />
                   API Keys
+                </NavLink>
+
+                <NavLink to="/settings/api-usage" className={adminItemClass}>
+                  <Activity className="w-4 h-4 flex-shrink-0 text-violet-400" />
+                  Uso del API
                 </NavLink>
 
                 {canAccessModuleCheck('audit') && (

@@ -19,6 +19,7 @@ import AuditLogPage from './pages/AuditLogPage';
 import RolesAndPermissionsPage from './pages/RolesAndPermissionsPage';
 import MiPerfilPage from './pages/MiPerfilPage';
 import ApiKeysPage from './pages/ApiKeysPage';
+import ApiUsageDashboardPage from './pages/ApiUsageDashboardPage';
 
 // System Admin Pages
 import SystemAdminDashboardPage from './pages/SystemAdminDashboardPage';
@@ -269,6 +270,20 @@ function App() {
               <RoleGuard allowedRoles={[TenantRole.Owner]}>
                 <AuthLayout>
                   <ApiKeysPage />
+                </AuthLayout>
+              </RoleGuard>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* API Usage Analytics — Owner Only */}
+        <Route
+          path="/settings/api-usage"
+          element={
+            <ProtectedRoute>
+              <RoleGuard allowedRoles={[TenantRole.Owner]}>
+                <AuthLayout>
+                  <ApiUsageDashboardPage />
                 </AuthLayout>
               </RoleGuard>
             </ProtectedRoute>
