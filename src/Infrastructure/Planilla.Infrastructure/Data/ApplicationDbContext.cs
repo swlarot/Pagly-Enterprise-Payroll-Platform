@@ -83,6 +83,9 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     // API Platform B2B — api keys emitidas a tenants para consumir /v1/*
     public DbSet<ApiKey> ApiKeys { get; set; } = null!;
 
+    // API Platform B2B — registro de uso por request (analytics, billing, auditoría)
+    public DbSet<ApiUsageRecord> ApiUsageRecords { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Esta l�nea es crucial al heredar de IdentityDbContext
@@ -788,6 +791,34 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             // porque ApiKey implementa ITenantEntity. PERO: el handler de autenticación
             // necesita buscar keys ANTES de conocer el tenant (el lookup por prefix
             // determina el tenant). Para esas queries debe usar IgnoreQueryFilters().
+        });
+
+        // ====================================================================
+        // API Platform — ApiUsageRecord Configuration
+        // ====================================================================
+        modelBuilder.Entity<ApiUsageRecord>(entity =>
+        {
+            // Índice para queries de analytics del dashboard:
+            // "requests por día de la key X en el último mes"
+            entity.HasIndex(r => new { r.ApiKeyId, r.CreatedAt })
+                .HasDatabaseName("IX_ApiUsageRecord_ApiKeyId_CreatedAt");
+
+            // Índice para queries del tenant:
+            // "total de requests del tenant este mes" (usado por cuota billing)
+            entity.HasIndex(r => new { r.TenantId, r.CreatedAt })
+                .HasDatabaseName("IX_ApiUsageRecord_TenantId_CreatedAt");
+
+            // FK a ApiKey (nullable — un 401 no tiene key identificada)
+            entity.HasOne(r => r.ApiKey)
+                .WithMany()
+                .HasForeignKey(r => r.ApiKeyId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // NO aplica global query filter de ITenantEntity porque ApiUsageRecord
+            // no implementa ITenantEntity (no tiene la interface). El filtrado se
+            // hace explícitamente en los queries del endpoint de analytics pasando
+            // el TenantId del JWT. Razón: el middleware necesita insertar records
+            // para cualquier tenant sin depender del HttpContext tenant filter.
         });
 
         // ====================================================================
