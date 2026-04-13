@@ -5,6 +5,7 @@ using Vorluno.Planilla.Application.Configuration;
 using Vorluno.Planilla.Application.DTOs.Calculator;
 using Vorluno.Planilla.Application.Services;
 using Vorluno.Planilla.Web.Authentication;
+using Vorluno.Planilla.Web.Filters;
 
 namespace Vorluno.Planilla.Web.Controllers.V1;
 
@@ -66,9 +67,11 @@ public class CalculatorController : ControllerBase
     /// <response code="401">Header <c>X-Api-Key</c> faltante, malformado, revocado o expirado. El mensaje de error es opaco — no revela si la key no existe, fue revocada o el secret es incorrecto.</response>
     /// <response code="429">Rate limit excedido para esta API key. Retorna <c>Retry-After</c> header indicando segundos hasta que se pueda reintentar. Por default el límite es 60 requests/minuto por key.</response>
     [HttpPost("calculate")]
+    [Idempotent]
     [ProducesResponseType(typeof(PayrollCalculateResponse), 200)]
     [ProducesResponseType(typeof(Vorluno.Planilla.Web.Middleware.ApiProblemDetails), 400)]
     [ProducesResponseType(typeof(Vorluno.Planilla.Web.Middleware.ApiProblemDetails), 401)]
+    [ProducesResponseType(typeof(Vorluno.Planilla.Web.Middleware.ApiProblemDetails), 422)]
     [ProducesResponseType(typeof(Vorluno.Planilla.Web.Middleware.ApiProblemDetails), 429)]
     public async Task<ActionResult<PayrollCalculateResponse>> Calculate(
         [FromBody] PayrollCalculateRequest request,

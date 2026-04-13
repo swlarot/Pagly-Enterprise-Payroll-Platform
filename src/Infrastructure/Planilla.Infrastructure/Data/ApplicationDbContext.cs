@@ -86,6 +86,12 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     // API Platform B2B — registro de uso por request (analytics, billing, auditoría)
     public DbSet<ApiUsageRecord> ApiUsageRecords { get; set; } = null!;
 
+    // API Platform B2B — cache de respuestas por Idempotency-Key (retention 24h)
+    public DbSet<IdempotencyRecord> IdempotencyRecords { get; set; } = null!;
+
+    // API Platform B2B — dedup de alertas de cuota (1 email por threshold por mes)
+    public DbSet<QuotaAlertSent> QuotaAlertsSent { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Esta l�nea es crucial al heredar de IdentityDbContext
@@ -819,6 +825,52 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             // hace explícitamente en los queries del endpoint de analytics pasando
             // el TenantId del JWT. Razón: el middleware necesita insertar records
             // para cualquier tenant sin depender del HttpContext tenant filter.
+        });
+
+        // ====================================================================
+        // API Platform — IdempotencyRecord Configuration
+        // ====================================================================
+        modelBuilder.Entity<IdempotencyRecord>(entity =>
+        {
+            // Match exacto del par (ApiKeyId, IdempotencyKey) es la clave del sistema.
+            // Dos tenants pueden enviar el mismo UUID sin colisionar porque ApiKeyId
+            // diferencia. Unique para forzar idempotencia a nivel de schema.
+            entity.HasIndex(r => new { r.ApiKeyId, r.IdempotencyKey })
+                .IsUnique()
+                .HasDatabaseName("IX_IdempotencyRecord_ApiKey_Key_Unique");
+
+            // Índice para el background cleanup de expirados
+            entity.HasIndex(r => r.ExpiresAt)
+                .HasDatabaseName("IX_IdempotencyRecord_ExpiresAt");
+
+            entity.HasOne(r => r.ApiKey)
+                .WithMany()
+                .HasForeignKey(r => r.ApiKeyId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // ResponseJson puede ser grande — text sin cap
+            entity.Property(r => r.ResponseJson).HasColumnType("text");
+
+            // NO aplica global query filter — el filter natural es por ApiKeyId
+            // (que ya identifica al tenant implícitamente).
+        });
+
+        // ====================================================================
+        // API Platform — QuotaAlertSent Configuration
+        // ====================================================================
+        modelBuilder.Entity<QuotaAlertSent>(entity =>
+        {
+            // Unique composite: un tenant recibe UN email por umbral por mes.
+            // Los inserts concurrentes son idempotentes (solo uno gana, evita spam).
+            entity.HasIndex(q => new
+            {
+                q.TenantId,
+                q.PeriodYear,
+                q.PeriodMonth,
+                q.Threshold
+            })
+            .IsUnique()
+            .HasDatabaseName("IX_QuotaAlertSent_TenantMonthThreshold_Unique");
         });
 
         // ====================================================================

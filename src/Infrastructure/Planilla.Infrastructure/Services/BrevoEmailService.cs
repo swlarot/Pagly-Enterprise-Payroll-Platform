@@ -20,6 +20,26 @@ public interface IBrevoEmailService
     /// <param name="tenantName">Nombre de la empresa/tenant</param>
     /// <returns>True si el email se envió correctamente</returns>
     Task<bool> SendInvitationEmailAsync(string toEmail, string toName, string invitationLink, string tenantName);
+
+    /// <summary>
+    /// Envía una alerta al Owner de un tenant cuando el uso del API Platform
+    /// cruza un umbral (80% o 100% de su cuota mensual).
+    /// </summary>
+    /// <param name="toEmail">Email del Owner.</param>
+    /// <param name="toName">Nombre del Owner.</param>
+    /// <param name="tenantName">Nombre del tenant.</param>
+    /// <param name="threshold">80 o 100 (porcentaje).</param>
+    /// <param name="currentRequests">Requests consumidos este mes.</param>
+    /// <param name="limit">Límite mensual del plan actual.</param>
+    /// <param name="planName">Nombre del plan ("Professional", "Enterprise").</param>
+    Task<bool> SendQuotaAlertEmailAsync(
+        string toEmail,
+        string toName,
+        string tenantName,
+        int threshold,
+        int currentRequests,
+        int limit,
+        string planName);
 }
 
 /// <summary>
@@ -231,6 +251,123 @@ public class BrevoEmailService : IBrevoEmailService
                 ex.Message);
             return false;
         }
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> SendQuotaAlertEmailAsync(
+        string toEmail,
+        string toName,
+        string tenantName,
+        int threshold,
+        int currentRequests,
+        int limit,
+        string planName)
+    {
+        if (string.IsNullOrWhiteSpace(toEmail))
+        {
+            _logger.LogError("No se puede enviar alerta de cuota: email destinatario vacío");
+            return false;
+        }
+
+        try
+        {
+            sib_api_v3_sdk.Client.Configuration.Default.ApiKey["api-key"] = _apiKey;
+            var apiInstance = new TransactionalEmailsApi();
+
+            var subject = threshold >= 100
+                ? $"[Pagly API] {tenantName} alcanzó 100% de su cuota mensual"
+                : $"[Pagly API] {tenantName} está al {threshold}% de su cuota mensual";
+
+            var sendSmtpEmail = new SendSmtpEmail
+            {
+                Sender = new SendSmtpEmailSender(_senderName, _senderEmail),
+                To = new List<SendSmtpEmailTo> { new SendSmtpEmailTo(toEmail, toName) },
+                Subject = subject,
+                HtmlContent = GenerateQuotaAlertEmailHtml(
+                    toName, tenantName, threshold, currentRequests, limit, planName)
+            };
+
+            var result = await apiInstance.SendTransacEmailAsync(sendSmtpEmail);
+            if (result != null)
+            {
+                _logger.LogInformation(
+                    "Email de alerta {Threshold}% enviado a {ToEmail} para tenant {Tenant}. MessageId: {MessageId}",
+                    threshold, toEmail, tenantName, result.MessageId);
+                return true;
+            }
+
+            _logger.LogWarning("Brevo retornó null al enviar alerta de cuota a {ToEmail}", toEmail);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Error enviando alerta de cuota {Threshold}% a {ToEmail}: {Error}",
+                threshold, toEmail, ex.Message);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// HTML del email de alerta de cuota. Diferente tono entre 80% (warning)
+    /// y 100% (crítico — se bloquearán requests adicionales del rate limiter).
+    /// </summary>
+    private string GenerateQuotaAlertEmailHtml(
+        string toName,
+        string tenantName,
+        int threshold,
+        int currentRequests,
+        int limit,
+        string planName)
+    {
+        var isAt100 = threshold >= 100;
+        var accentColor = isAt100 ? "#dc2626" : "#f59e0b"; // red-600 vs amber-500
+        var headline = isAt100
+            ? $"Alcanzaste el 100% de tu cuota de API"
+            : $"Estás al {threshold}% de tu cuota de API";
+
+        var message = isAt100
+            ? @"<p>Tu tenant consumió <b>toda</b> la cuota mensual del plan. Los siguientes
+                 requests al API podrían ser rechazados hasta el próximo ciclo de facturación
+                 o hasta que subas de plan.</p>"
+            : @"<p>Llevas consumido más del 80% de tu cuota mensual. Si mantienes el ritmo
+                 actual, alcanzarás el límite antes del cierre del mes.</p>";
+
+        var percentUsed = limit > 0
+            ? Math.Min(100, (int)Math.Round(currentRequests * 100.0 / limit))
+            : 0;
+
+        return $@"
+<!DOCTYPE html>
+<html lang='es'>
+<head><meta charset='UTF-8'><title>Alerta de cuota API</title></head>
+<body style='font-family: -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; background: #f9fafb; padding: 24px;'>
+  <div style='max-width: 560px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.05);'>
+    <div style='background: {accentColor}; padding: 24px;'>
+      <h1 style='color: white; margin: 0; font-size: 20px;'>{headline}</h1>
+      <p style='color: rgba(255,255,255,0.85); margin: 4px 0 0; font-size: 14px;'>Tenant: {tenantName}</p>
+    </div>
+    <div style='padding: 24px;'>
+      <p>Hola {toName},</p>
+      {message}
+      <div style='background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;'>
+        <p style='margin: 0 0 8px; font-size: 14px; color: #6b7280;'>Uso del mes</p>
+        <p style='margin: 0; font-size: 22px; font-weight: 700; color: #111827;'>
+          {currentRequests:N0} / {limit:N0} requests ({percentUsed}%)
+        </p>
+        <p style='margin: 8px 0 0; font-size: 13px; color: #6b7280;'>Plan actual: {planName}</p>
+      </div>
+      <p style='color: #6b7280; font-size: 13px;'>
+        Puedes ver el detalle completo en tu dashboard de API en Pagly → Settings → API Usage.
+        Si quieres aumentar tu cuota, considera upgradear al plan Enterprise.
+      </p>
+    </div>
+    <div style='padding: 16px 24px; background: #f9fafb; color: #9ca3af; font-size: 12px; text-align: center;'>
+      Este email es automático. Si recibes este aviso y no esperas uso del API, contacta al equipo de Pagly.
+    </div>
+  </div>
+</body>
+</html>";
     }
 
     /// <summary>

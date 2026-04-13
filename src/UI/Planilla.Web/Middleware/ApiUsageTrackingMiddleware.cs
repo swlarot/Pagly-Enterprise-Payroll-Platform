@@ -126,6 +126,32 @@ public class ApiUsageTrackingMiddleware
                     apiKeyId);
             }
         }
+
+        // ── 3. Evaluar alertas de cuota (80%/100%) para tenants autenticados ──
+        // Fire-and-forget: no bloqueamos el response del cliente por un email.
+        // El scope debe crearse explícitamente — este middleware ya procesó
+        // el request, los scoped services originales están por disponerse.
+        if (tenantId > 0 && statusCode >= 200 && statusCode < 300)
+        {
+            var serviceProvider = context.RequestServices.GetRequiredService<IServiceScopeFactory>();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var scope = serviceProvider.CreateScope();
+                    var quotaService = scope.ServiceProvider
+                        .GetRequiredService<Vorluno.Planilla.Application.Interfaces.IQuotaAlertService>();
+                    await quotaService.EvaluateAsync(tenantId, CancellationToken.None);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex,
+                        "QuotaAlertService.EvaluateAsync falló para tenant {TenantId}. " +
+                        "No se envió alerta de cuota — se reintentará en el próximo request.",
+                        tenantId);
+                }
+            });
+        }
     }
 }
 
