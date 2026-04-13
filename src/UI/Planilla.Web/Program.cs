@@ -158,6 +158,14 @@ builder.Services.AddScoped<IPlanLimitService, PlanLimitService>();
 // API Platform B2B — servicio de gestión de keys (Stripe-like: prefijo + hash SHA256)
 builder.Services.AddScoped<IApiKeyService, ApiKeyService>();
 
+// API Platform B2B — store de idempotency keys (cache de responses 24h en Postgres)
+builder.Services.AddScoped<Vorluno.Planilla.Application.Interfaces.IIdempotencyStore,
+    Vorluno.Planilla.Infrastructure.Services.IdempotencyStore>();
+
+// API Platform B2B — alertas de cuota 80%/100% al Owner via Brevo email
+builder.Services.AddScoped<Vorluno.Planilla.Application.Interfaces.IQuotaAlertService,
+    Vorluno.Planilla.Infrastructure.Services.QuotaAlertService>();
+
 // API Platform B2B — orchestrator stateless para el CalculatorController.
 // Construye manualmente los 3 portable services usando el StaticPayrollConfigProvider
 // para garantizar que los cálculos no tocan BD ni leen config multi-tenant.
@@ -576,6 +584,20 @@ if (app.Environment.IsDevelopment())
 // RequestId debe ir ANTES de cualquier middleware que quiera loguearlo o incluirlo
 // en responses de error. Es cheap (asigna un GUID por request).
 app.UseRequestIdMiddleware();
+
+// Buffering del request body SOLO para /v1/* — permite al IdempotentAttribute
+// leer el body sin consumir el stream antes del model binding. El costo es
+// mantener el body en memoria durante el request (aceptable: los payloads
+// de calculator son pequeños, ~1KB). Habilitado selectivamente para no
+// afectar el SaaS interno.
+app.Use(async (ctx, next) =>
+{
+    if (ctx.Request.Path.StartsWithSegments("/v1"))
+    {
+        ctx.Request.EnableBuffering();
+    }
+    await next();
+});
 
 // ApiProblemDetailsMiddleware: RFC 7807 + errorCode + requestId, solo para /v1/*
 // (futuro API Platform B2B). Para otras rutas delega al ExceptionHandlingMiddleware

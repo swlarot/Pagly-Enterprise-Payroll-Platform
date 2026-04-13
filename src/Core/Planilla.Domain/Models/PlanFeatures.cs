@@ -23,7 +23,8 @@ public static class PlanFeatures
             HasEmailNotifications = false,
             HasAuditLog = false,
             RetentionDays = 90,
-            PricePerMonth = 0m
+            PricePerMonth = 0m,
+            MonthlyApiRequests = 0 // Sin acceso al API
         },
 
         [SubscriptionPlan.Starter] = new PlanLimits
@@ -37,7 +38,8 @@ public static class PlanFeatures
             HasEmailNotifications = true,
             HasAuditLog = false,
             RetentionDays = 365,
-            PricePerMonth = 29.99m
+            PricePerMonth = 29.99m,
+            MonthlyApiRequests = 0 // Sin acceso al API
         },
 
         [SubscriptionPlan.Professional] = new PlanLimits
@@ -51,7 +53,8 @@ public static class PlanFeatures
             HasEmailNotifications = true,
             HasAuditLog = true,
             RetentionDays = 730,  // 2 años
-            PricePerMonth = 79.99m
+            PricePerMonth = 79.99m,
+            MonthlyApiRequests = 10_000 // 10k requests/mes — ajustar según pricing real
         },
 
         [SubscriptionPlan.Enterprise] = new PlanLimits
@@ -65,7 +68,8 @@ public static class PlanFeatures
             HasEmailNotifications = true,
             HasAuditLog = true,
             RetentionDays = int.MaxValue,
-            PricePerMonth = 199.99m  // Precio base, puede ser personalizado para Enterprise
+            PricePerMonth = 199.99m,  // Precio base, puede ser personalizado para Enterprise
+            MonthlyApiRequests = 100_000 // 100k/mes. Negociable con overage via Stripe metered
         }
     };
 

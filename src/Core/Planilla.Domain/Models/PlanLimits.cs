@@ -56,4 +56,12 @@ public class PlanLimits
     /// Precio mensual en USD
     /// </summary>
     public decimal PricePerMonth { get; set; }
+
+    /// <summary>
+    /// Máximo de requests al API Platform por mes calendario (UTC).
+    /// 0 = sin acceso al API (se complementa con <see cref="CanUseApi"/>).
+    /// <see cref="int.MaxValue"/> = sin límite efectivo (Enterprise).
+    /// Usado por el background job de alertas (80%/100%) y el rate limiter.
+    /// </summary>
+    public int MonthlyApiRequests { get; set; }
 }
