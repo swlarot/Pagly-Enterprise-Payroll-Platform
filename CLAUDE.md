@@ -221,3 +221,5 @@ El registro de usuarios nuevos lo hace un admin del sistema desde `/system-admin
 4. **Mover a `Done`** al terminar.
 
 Esto aplica a: bugs de una línea, cambios de texto, refactors grandes, nuevas features — **todo**.
+
+@~/.claude/CLAUDE.md
