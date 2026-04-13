@@ -54,7 +54,18 @@ nul
 .claude/settings.lightweight.json
 .claude/memory/
 .claude/todos/
+.claude/scheduled_tasks.lock
 scripts/
+
+# CLAUDE.md local del usuario (no se sube — tiene paths/puertos personales)
+CLAUDE.local.md
+
+# Agents: backup local y marketing context (work-in-progress personal)
+.agents-backup/
+.agents/
+
+# Tauri desktop build output (se regenera automáticamente)
+src/UI/Planilla.Desktop/src-tauri/gen/
 
 # Configuración local con credenciales (no subir a GitHub)
 **/appsettings.Development.json
