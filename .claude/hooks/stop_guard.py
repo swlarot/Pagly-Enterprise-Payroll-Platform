@@ -28,10 +28,10 @@ DELEGATION_REQUIRED_PATTERNS = [
     (r'(entity framework|ef core|migration|database)', 'planilla-backend-architect'),
     (r'(multi-tenant|tenantid|jwt|authentication)', 'planilla-backend-architect'),
 
-    # Payroll patterns
-    (r'(css|seguro educativo|isr|impuesto|overtime|horas extra)', 'planilla-payroll-architect'),
-    (r'(vacation|vacaciones|severance|liquidación|décimo)', 'planilla-payroll-architect'),
-    (r'(payroll|planilla|nómina|calculation)', 'planilla-payroll-architect'),
+    # Payroll patterns (no incluir "planilla" sola — es el nombre del proyecto)
+    (r'(seguro educativo|isr|impuesto sobre la renta|horas extra)', 'planilla-payroll-architect'),
+    (r'(vacaciones|liquidación|décimo tercer mes)', 'planilla-payroll-architect'),
+    (r'(payroll calculation|cálculo de nómina|cálculo salarial)', 'planilla-payroll-architect'),
 
     # Frontend patterns
     (r'(create|add|implement|modify).*(react|component|page|form|modal|ui)', 'planilla-frontend-specialist'),

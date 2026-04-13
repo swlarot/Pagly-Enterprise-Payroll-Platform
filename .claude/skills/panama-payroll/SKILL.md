@@ -9,7 +9,8 @@ description: >
 # Compliance de Planilla Panameña
 
 ## Deducciones del Empleado
-- **CSS (Seguro Social)**: 9.75% del salario bruto (tope B/.1,500 mensual)
+- **CSS (Seguro Social)**: 9.75% del salario bruto **SIN TOPE de cotizacion**
+  - Se cotiza sobre el salario completo sin limite maximo (Ley 51 Art. 96, confirmado por Ley 462)
 - **Seguro Educativo**: 1.25% del salario bruto (SIN tope)
 - **ISR (Impuesto sobre la Renta)**: escala progresiva ANUAL:
   - B/.0 — B/.11,000: 0% (exento)
@@ -21,10 +22,15 @@ description: >
 - **Seguro Educativo Patronal**: 1.50% del salario bruto (SIN tope)
 - **Riesgos Profesionales**: varía por actividad (0.56% — 5.67%)
 
-## Topes CSS (según años cotizados)
-- Estándar: B/.1,500 mensual
-- Intermedio: B/.2,000 (25+ años cotizados, promedio >= B/.2,000)
-- Alto: B/.2,500 (30+ años cotizados, promedio >= B/.2,500)
+## Topes CSS — Maximo de PENSION (no de cotizacion)
+Los B/.1,500 / B/.2,000 / B/.2,500 son el tope de la PENSION al jubilarse, NO de la cotizacion.
+
+| Condicion | Pension maxima (Subsistema SEBD) |
+|-----------|----------------------------------|
+| Estandar | B/.1,500/mes |
+| 25+ anos cotizados + promedio >= B/.2,000 | B/.2,000/mes |
+| 30+ anos cotizados + promedio >= B/.2,500 | B/.2,500/mes |
+| Nuevo sistema Ley 462 (nuevos afiliados) | Sin tope (capitalizacion individual) |
 
 ## PayPeriodType y Anualización ISR
 El ISR se anualiza según el tipo de período de la **PLANILLA** (no del empleado):
