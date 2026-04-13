@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   Building2,
   Users,
+  Activity,
   LogOut,
   ChevronDown,
 } from 'lucide-react';
@@ -23,6 +24,7 @@ export function SystemAdminLayout({ children }: SystemAdminLayoutProps) {
     { name: 'Dashboard', href: '/system-admin/dashboard', icon: LayoutDashboard },
     { name: 'Tenants', href: '/system-admin/tenants', icon: Building2 },
     { name: 'Usuarios', href: '/system-admin/users', icon: Users },
+    { name: 'Uso API', href: '/system-admin/api-usage', icon: Activity },
   ];
 
   const handleLogout = () => {

@@ -27,6 +27,7 @@ import TenantsManagementPage from './pages/TenantsManagementPage';
 import CreateTenantPage from './pages/CreateTenantPage';
 import TenantDetailsPage from './pages/TenantDetailsPage';
 import SystemUsersPage from './pages/SystemUsersPage';
+import SystemApiUsagePage from './pages/SystemApiUsagePage';
 
 // Existing Pages (.jsx)
 import EmpleadosPage from './pages/EmpleadosPage.jsx';
@@ -201,6 +202,14 @@ function App() {
           element={
             <SystemAdminRoute>
               <SystemUsersPage />
+            </SystemAdminRoute>
+          }
+        />
+        <Route
+          path="/system-admin/api-usage"
+          element={
+            <SystemAdminRoute>
+              <SystemApiUsagePage />
             </SystemAdminRoute>
           }
         />

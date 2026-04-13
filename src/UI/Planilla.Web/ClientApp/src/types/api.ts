@@ -725,3 +725,70 @@ export interface UsageSummaryDto {
   periodStart: string;
   periodEnd: string;
 }
+
+// ============================================================================
+// API Platform — System Admin Global Analytics
+// Matches src/Core/Planilla.Application/DTOs/ApiKeys/SystemApiUsageDto.cs
+// ============================================================================
+
+export interface SystemApiUsageDto {
+  summary: SystemUsageSummaryDto;
+  tenantRanking: TenantUsageRowDto[];
+  dailyUsage: DailyUsageDto[];
+  statusBreakdown: StatusBreakdownDto[];
+  planDistribution: PlanUsageSliceDto[];
+  signals: SystemUsageSignalsDto;
+}
+
+export interface SystemUsageSummaryDto {
+  totalRequests: number;
+  activeTenants: number;
+  activeKeys: number;
+  successfulRequests: number;
+  clientErrors: number;
+  serverErrors: number;
+  errorRatePercent: number;
+  avgResponseTimeMs: number;
+  p95ResponseTimeMs: number;
+  peakRequestsPerMinute: number;
+  periodStart: string;
+  periodEnd: string;
+}
+
+export interface TenantUsageRowDto {
+  tenantId: number;
+  tenantName: string;
+  subdomain: string;
+  planName: string;
+  totalRequests: number;
+  successfulRequests: number;
+  errorRequests: number;
+  errorRatePercent: number;
+  avgResponseTimeMs: number;
+  p95ResponseTimeMs: number;
+  activeKeysCount: number;
+  firstRequestAt?: string | null;
+  lastRequestAt?: string | null;
+  signals: string[];
+}
+
+export interface PlanUsageSliceDto {
+  planName: string;
+  totalRequests: number;
+  tenantCount: number;
+}
+
+export interface SystemUsageSignalsDto {
+  highErrorRate: TenantSignalDto[];
+  trafficSpikes: TenantSignalDto[];
+  possibleChurn: TenantSignalDto[];
+  noActiveKeys: TenantSignalDto[];
+}
+
+export interface TenantSignalDto {
+  tenantId: number;
+  tenantName: string;
+  planName: string;
+  metric: string;
+  reason: string;
+}
