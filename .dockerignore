@@ -35,17 +35,10 @@ docs/
 *.md
 !README.md
 
-# Scripts (dev only)
-*.ps1
-convert-api-calls.ps1
-fix-pages-api.ps1
-detener-desarrollo.ps1
-iniciar-desarrollo.ps1
-verificar-puertos.ps1
-
-# SQL / cleanup (not needed at runtime)
-*.sql
-cleanup_*.sql
+# Scripts (dev only) — toda la carpeta scripts/ + cualquier .ps1/.sql suelto
+scripts/
+**/*.ps1
+**/*.sql
 
 # Logs and temp
 **/logs.txt

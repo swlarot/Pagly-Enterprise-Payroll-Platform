@@ -30,7 +30,7 @@ Planilla requiere **DOS servidores corriendo simultáneamente**:
 
 ### Paso 1: Ejecutar el script
 ```powershell
-.\iniciar-desarrollo.ps1
+.\scripts\dev\iniciar-desarrollo.ps1
 ```
 
 ### Paso 2: Esperar
@@ -45,7 +45,7 @@ Planilla requiere **DOS servidores corriendo simultáneamente**:
 
 ### Para detener:
 ```powershell
-.\detener-desarrollo.ps1
+.\scripts\dev\detener-desarrollo.ps1
 ```
 
 ## 🔧 Método 2: Inicio Manual
@@ -82,7 +82,7 @@ http://localhost:5173
 **Solución**:
 1. Verifica que ambos servidores estén corriendo:
    ```powershell
-   .\verificar-puertos.ps1
+   .\scripts\dev\verificar-puertos.ps1
    ```
 2. Debe mostrar:
    - ✅ Backend - Puerto 5039: ACTIVO
@@ -98,10 +98,10 @@ http://localhost:5173
 Get-NetTCPConnection -LocalPort 5039 | Select-Object OwningProcess
 
 # Detener procesos antiguos
-.\detener-desarrollo.ps1
+.\scripts\dev\detener-desarrollo.ps1
 
 # Reiniciar
-.\iniciar-desarrollo.ps1
+.\scripts\dev\iniciar-desarrollo.ps1
 ```
 
 ### ❌ "Veo una página en blanco en localhost:5173"
@@ -129,7 +129,7 @@ npm run dev
 
 ```powershell
 # Ver estado de los servidores
-.\verificar-puertos.ps1
+.\scripts\dev\verificar-puertos.ps1
 ```
 
 Debe mostrar:
@@ -147,7 +147,7 @@ Debe mostrar:
 
 1. **Mañana (inicio del día)**:
    ```powershell
-   .\iniciar-desarrollo.ps1
+   .\scripts\dev\iniciar-desarrollo.ps1
    ```
 
 2. **Durante el día**:
@@ -158,7 +158,7 @@ Debe mostrar:
 
 3. **Tarde (fin del día)**:
    ```powershell
-   .\detener-desarrollo.ps1
+   .\scripts\dev\detener-desarrollo.ps1
    ```
 
 ## 🔐 Credenciales de Prueba
@@ -204,11 +204,11 @@ En producción, un solo servidor (5039) sirve tanto el API como el frontend comp
 ## 🆘 Ayuda
 
 Si nada funciona:
-1. Ejecuta `.\detener-desarrollo.ps1`
+1. Ejecuta `.\scripts\dev\detener-desarrollo.ps1`
 2. Cierra Visual Studio
 3. Cierra todas las ventanas de PowerShell
 4. Reinicia la computadora (opcional pero efectivo)
-5. Ejecuta `.\iniciar-desarrollo.ps1`
+5. Ejecuta `.\scripts\dev\iniciar-desarrollo.ps1`
 
 ---
 

@@ -8,6 +8,7 @@ backend.log
 backend-error.log
 frontend.log
 frontend-error.log
+**/logs.txt
 
 # Test scripts temporales
 test-*.ps1
@@ -55,7 +56,14 @@ nul
 .claude/memory/
 .claude/todos/
 .claude/scheduled_tasks.lock
-scripts/
+
+# scripts/ — solo ignoramos helpers sueltos no versionables (mantiene subcarpetas versionadas)
+scripts/*.bat
+scripts/*.py
+scripts/cleanup-*.ps1
+scripts/cleanup-*.sql
+scripts/run-cleanup.ps1
+scripts/verificar-db.sql
 
 # CLAUDE.md local del usuario (no se sube — tiene paths/puertos personales)
 CLAUDE.local.md

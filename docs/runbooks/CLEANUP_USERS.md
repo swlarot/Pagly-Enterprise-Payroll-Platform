@@ -44,7 +44,7 @@ pg_dump -U tu_usuario -d planilla_db > backup_antes_limpieza_$(date +%Y%m%d_%H%M
 
 ### Paso 3: Ejecutar el Script
 
-Abre `cleanup_users.sql` y:
+Abre `scripts/database/cleanup_users.sql` y:
 
 1. Reemplaza `'USER_ID_AQUI'` con el ID real del usuario que quieres eliminar
 2. Ejecuta el bloque `DO $$ ... END $$;` para cada usuario
