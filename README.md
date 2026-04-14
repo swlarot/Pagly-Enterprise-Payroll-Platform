@@ -88,8 +88,8 @@ src/
 
 ### Documentation
 
-- [Política de eliminación de datos](docs/POLITICA-ELIMINACION.md) — Eliminación física (hard delete), comportamiento por área y excepciones.
-- [Changelog de commits y cambios](docs/CHANGELOG-COMMITS.md) — Resumen de commits recientes y detalle de cambios sin documentación específica (backend, frontend, .gitignore, config).
+- [Política de eliminación de datos](docs/compliance/POLITICA-ELIMINACION.md) — Eliminación física (hard delete), comportamiento por área y excepciones.
+- [Changelog de commits y cambios](docs/changelog/CHANGELOG-COMMITS.md) — Resumen de commits recientes y detalle de cambios sin documentación específica (backend, frontend, .gitignore, config).
 
 ---
 
@@ -159,7 +159,7 @@ Para desplegar en CapRover (p. ej. droplet DigitalOcean):
 
 - **Build local:** `docker build -t planilla-test --build-arg VITE_API_URL= .`
 - **Ejecutar:** `docker run -p 8080:80 -e ConnectionStrings__DefaultConnection="..." planilla-test`
-- **Guía completa:** [DEPLOY-CAPROVER.md](DEPLOY-CAPROVER.md) (variables de entorno, deploy, health check, rollback, troubleshooting).
+- **Guía completa:** [docs/deploy/DEPLOY-CAPROVER.md](docs/deploy/DEPLOY-CAPROVER.md) (variables de entorno, deploy, health check, rollback, troubleshooting).
 
 ---
 
@@ -213,6 +213,17 @@ Para desplegar en CapRover (p. ej. droplet DigitalOcean):
 - [ ] Multi-tenant support
 - [ ] Bank integration (ACH)
 - [ ] Employee self-service portal
+
+---
+
+## 📚 Documentation
+
+Full project documentation lives in [`docs/`](./docs/README.md) — navigable index with sections organized by module (architecture, payroll, compliance, deploy, runbooks, etc.).
+
+Start here:
+- **[docs/OVERVIEW.md](./docs/OVERVIEW.md)** — complete project overview (stack, architecture, roles, compliance, accesses).
+- **[docs/README.md](./docs/README.md)** — navigable index with "Recientes" section and per-module table.
+- **[docs/onboarding/INICIO-RAPIDO.md](./docs/onboarding/INICIO-RAPIDO.md)** — local quickstart.
 
 ---
 

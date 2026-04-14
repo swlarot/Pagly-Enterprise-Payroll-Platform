@@ -2,7 +2,7 @@
 
 Guía para desplegar la aplicación multi-tenant en un servidor CapRover (por ejemplo, un droplet de DigitalOcean).
 
-> **Despliegue en pagly.clau.com.pa:** Ver la guía completa en [docs/DEPLOY-PAGLY-CLAU.md](docs/DEPLOY-PAGLY-CLAU.md), que incluye DNS en cPanel, GitHub webhook y todas las variables para ese dominio.
+> **Despliegue en pagly.clau.com.pa:** Ver la guía completa en [DEPLOY-PAGLY-CLAU.md](./DEPLOY-PAGLY-CLAU.md), que incluye DNS en cPanel, GitHub webhook y todas las variables para ese dominio.
 
 ## Requisitos
 
@@ -37,7 +37,7 @@ Configurar en la app de CapRover (App Configs > Environment Variables). **No sub
 
 CapRover clona el repo desde GitHub y hace el build en el servidor. No subes la imagen; solo haces push al repo. Más liviano y permite CI/CD automático.
 
-Ver [docs/DEPLOY-PAGLY-CLAU.md](docs/DEPLOY-PAGLY-CLAU.md) para la ruta completa con pagly.clau.com.pa.
+Ver [DEPLOY-PAGLY-CLAU.md](./DEPLOY-PAGLY-CLAU.md) para la ruta completa con pagly.clau.com.pa.
 
 ### Opción A: CLI de CapRover
 

@@ -1,6 +1,6 @@
 # Changelog de commits y cambios documentados
 
-Este documento describe los **commits** realizados en la rama `master` (febrero 2025) y los **cambios que no tienen documentación específica** en otros archivos. Para la política de eliminación física, ver [POLITICA-ELIMINACION.md](POLITICA-ELIMINACION.md).
+Este documento describe los **commits** realizados en la rama `master` (febrero 2025) y los **cambios que no tienen documentación específica** en otros archivos. Para la política de eliminación física, ver [POLITICA-ELIMINACION.md](../compliance/POLITICA-ELIMINACION.md).
 
 ---
 
@@ -18,7 +18,7 @@ Este documento describe los **commits** realizados en la rama `master` (febrero 
 
 ## 2. Cambios en backend (commit 7853cc6) sin documentación específica
 
-Además de la **eliminación física** (documentada en [POLITICA-ELIMINACION.md](POLITICA-ELIMINACION.md)), en el mismo commit se incluyeron las siguientes correcciones y mejoras.
+Además de la **eliminación física** (documentada en [POLITICA-ELIMINACION.md](../compliance/POLITICA-ELIMINACION.md)), en el mismo commit se incluyeron las siguientes correcciones y mejoras.
 
 ### 2.1 Autenticación y JWT
 
@@ -41,7 +41,7 @@ Además de la **eliminación física** (documentada en [POLITICA-ELIMINACION.md]
 
 ### 2.4 Servicios de infraestructura
 
-- **PlanLimitService** y **PlanUsageService:** Recuentos de empleados filtrados por `!e.IsDeleted` para respetar la política de “no contar eliminados” (coherente con [POLITICA-ELIMINACION.md](POLITICA-ELIMINACION.md)).
+- **PlanLimitService** y **PlanUsageService:** Recuentos de empleados filtrados por `!e.IsDeleted` para respetar la política de “no contar eliminados” (coherente con [POLITICA-ELIMINACION.md](../compliance/POLITICA-ELIMINACION.md)).
 - **EmployeeDeletionValidationService** y **CustomRolesSeeder:** Ajustes para validación de eliminación de empleados y datos iniciales de roles, alineados con los nuevos flujos.
 
 ---
@@ -95,8 +95,8 @@ Para detalles de despliegue o variables de entorno, ver la documentación de con
 
 | Tema | Dónde está documentado |
 |------|-------------------------|
-| Política de eliminación física (hard delete) | [POLITICA-ELIMINACION.md](POLITICA-ELIMINACION.md) |
-| Roles y permisos del tenant | [SISTEMA-ROLES-PERMISOS.md](SISTEMA-ROLES-PERMISOS.md), [ROLES-PERMISOS-IMPLEMENTATION.md](ROLES-PERMISOS-IMPLEMENTATION.md), `docs/implementation/` |
+| Política de eliminación física (hard delete) | [POLITICA-ELIMINACION.md](../compliance/POLITICA-ELIMINACION.md) |
+| Roles y permisos del tenant | [SISTEMA-ROLES-PERMISOS.md](../roles-permisos/SISTEMA-ROLES-PERMISOS.md), [ROLES-PERMISOS-IMPLEMENTATION.md](../roles-permisos/ROLES-PERMISOS-IMPLEMENTATION.md), `docs/implementation/` |
 | Commits y cambios sin doc específica | Este documento (CHANGELOG-COMMITS.md) |
 
 ---
