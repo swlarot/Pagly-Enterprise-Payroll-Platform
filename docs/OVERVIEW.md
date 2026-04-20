@@ -179,7 +179,7 @@ Servicios portables en `src/Core/Planilla.Application/Services/`:
 | Servicio                                    | Calcula                                                              |
 |---------------------------------------------|----------------------------------------------------------------------|
 | `CssCalculationServicePortable`             | CSS empleado + empleador (Ley 462), seguro de riesgo, topes          |
-| `EducationalInsuranceServicePortable`       | Seguro Educativo (0.75% empleado + 0.75% empleador)                  |
+| `EducationalInsuranceServicePortable`       | Seguro Educativo (1.25% empleado + 1.50% empleador, sin tope)        |
 | `IncomeTaxCalculationServicePortable`       | ISR con brackets + deducción por dependientes ($800 c/u)             |
 | `PayrollCalculationOrchestratorPortable`    | Orquestador que coordina CSS + SE + ISR en el cálculo de nómina      |
 | `OvertimeFactorService`                     | Factores de horas extra (nocturna, dominical, feriado)               |
