@@ -41,6 +41,10 @@ public class IncomeTaxCalculationServicePortable
     /// <param name="payFrequency">Frecuencia de pago (Mensual, Quincenal, Semanal)</param>
     /// <param name="dependents">Número de dependientes declarados</param>
     /// <param name="isSubjectToIncomeTax">Indica si el empleado está sujeto a ISR</param>
+    /// <param name="isSubjectToEducationalInsurance">
+    /// Indica si el empleado cotiza Seguro Educativo. Su contribución (1.25%) es deducible
+    /// de la base imponible del ISR según el Art. 709 numeral 4 del Código Fiscal.
+    /// </param>
     /// <param name="calculationDate">Fecha de cálculo (para determinar año fiscal)</param>
     /// <returns>Resultado del cálculo ISR</returns>
     public async Task<IncomeTaxResult> CalculateIncomeTaxAsync(
@@ -49,6 +53,7 @@ public class IncomeTaxCalculationServicePortable
         string payFrequency,
         int dependents,
         bool isSubjectToIncomeTax,
+        bool isSubjectToEducationalInsurance,
         DateTime calculationDate)
     {
         // Si no está sujeto a ISR, retorna ceros
@@ -57,6 +62,7 @@ public class IncomeTaxCalculationServicePortable
             return new IncomeTaxResult(
                 TaxableIncome: 0,
                 DependentDeduction: 0,
+                SeDeduction: 0,
                 NetTaxableIncome: 0,
                 TaxAmount: 0,
                 EffectiveTaxRate: 0
@@ -65,24 +71,42 @@ public class IncomeTaxCalculationServicePortable
 
         var year = calculationDate.Year;
 
-        // 1. Proyectar ingreso anual basado en la frecuencia de pago
+        // 1. Proyectar ingreso anual basado en la frecuencia de pago (incluye décimo, ×13)
         var annualIncome = ProjectAnnualIncome(grossPay, payFrequency);
 
-        // 2. Calcular deducción por dependientes
-        var dependentDeduction = await CalculateDependentDeductionAsync(
-            companyId, dependents, calculationDate);
+        // 2. Obtener configuración vigente (tasas y deducciones)
+        var config = await _configProvider.GetTaxConfigAsync(companyId, calculationDate);
+        if (config == null)
+        {
+            throw new InvalidOperationException(
+                $"No se encontró configuración de ISR para companyId={companyId} en fecha {calculationDate:yyyy-MM-dd}");
+        }
 
-        // 3. Calcular ingreso neto gravable (después de deducciones)
-        var netTaxableIncome = Math.Max(0, annualIncome - dependentDeduction);
+        // 3. Deducciones del Art. 709 del Código Fiscal que la retención de planilla aplica
+        //    ANTES de la tarifa del Art. 700 (Art. 704: numerales 1, 2, 3 y 4 del Art. 709):
+        //      - Núm. 3: deducción por dependientes.
+        //      - Núm. 4: "Las contribuciones al Seguro Educativo" (1.25% del empleado),
+        //        deducible solo si el empleado cotiza Seguro Educativo.
+        //    La CSS del empleado NO figura en el Art. 709 ⇒ NO se descuenta de la base del ISR.
+        var validDependents = Math.Min(dependents, config.MaxDependents);
+        var dependentDeduction = validDependents * config.DependentDeductionAmount;
 
-        // 4. Aplicar brackets progresivos de ISR
+        var seDeduction = isSubjectToEducationalInsurance
+            ? annualIncome * config.EducationalInsuranceEmployeeRate / 100m
+            : 0m;
+
+        // 4. Ingreso neto gravable (después de las deducciones del Art. 709).
+        //    Se mantiene el valor exacto (sin redondeo intermedio) para aplicar la tarifa.
+        var netTaxableIncome = Math.Max(0, annualIncome - dependentDeduction - seDeduction);
+
+        // 5. Aplicar brackets progresivos de ISR (Art. 700)
         var annualTax = await ApplyTaxBracketsAsync(companyId, netTaxableIncome, year);
 
-        // 5. Convertir impuesto anual a retención del período
+        // 6. Convertir impuesto anual a retención del período
         var periodsPerYear = PayrollConstants.GetPeriodsPerYear(payFrequency);
         var periodTax = RoundingPolicy.Round(annualTax / periodsPerYear, 2);
 
-        // 6. Calcular tasa efectiva de impuesto
+        // 7. Calcular tasa efectiva de impuesto
         var effectiveTaxRate = annualIncome > 0
             ? RoundingPolicy.Round((annualTax / annualIncome) * 100, 2)
             : 0;
@@ -90,7 +114,8 @@ public class IncomeTaxCalculationServicePortable
         return new IncomeTaxResult(
             TaxableIncome: annualIncome,
             DependentDeduction: dependentDeduction,
-            NetTaxableIncome: netTaxableIncome,
+            SeDeduction: RoundingPolicy.Round(seDeduction, 2),
+            NetTaxableIncome: RoundingPolicy.Round(netTaxableIncome, 2),
             TaxAmount: periodTax,
             EffectiveTaxRate: effectiveTaxRate
         );
@@ -110,36 +135,6 @@ public class IncomeTaxCalculationServicePortable
         // Convertir salario del período a mensual, luego proyectar a 13 meses (12 + décimo)
         var monthlySalary = periodIncome * periodsPerYear / 12m;
         return monthlySalary * PayrollConstants.MonthsIncludingDecimo;
-    }
-
-    /// <summary>
-    /// Calcula la deducción total por dependientes.
-    /// Limita el número de dependientes al máximo permitido por configuración.
-    /// </summary>
-    /// <param name="companyId">ID de compañía</param>
-    /// <param name="dependents">Número de dependientes declarados</param>
-    /// <param name="calculationDate">Fecha de cálculo</param>
-    /// <returns>Deducción total por dependientes</returns>
-    private async Task<decimal> CalculateDependentDeductionAsync(
-        int companyId,
-        int dependents,
-        DateTime calculationDate)
-    {
-        // Obtener configuración de deducciones
-        var config = await _configProvider.GetTaxConfigAsync(companyId, calculationDate);
-        if (config == null)
-        {
-            throw new InvalidOperationException(
-                $"No se encontró configuración de ISR para companyId={companyId} en fecha {calculationDate:yyyy-MM-dd}");
-        }
-
-        // Limitar dependientes al máximo permitido
-        var validDependents = Math.Min(dependents, config.MaxDependents);
-
-        // Calcular deducción total
-        var deduction = validDependents * config.DependentDeductionAmount;
-
-        return deduction;
     }
 
     /// <summary>
