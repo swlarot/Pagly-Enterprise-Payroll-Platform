@@ -51,9 +51,21 @@ public class Liquidacion : ITenantEntity
     // Componentes de la liquidación
     // ====================================================================
 
-    /// <summary>Indemnización Art. 225: 3.4 semanas/año (solo despido injustificado)</summary>
+    /// <summary>Prima de antigüedad Art. 224: 1 semana/año, en toda terminación de contrato indefinido</summary>
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal PrimaAntiguedad { get; set; }
+
+    /// <summary>Indemnización Art. 225: escala 3.4 sem/año (≤10 años) + 1 sem/año (&gt;10); solo si la causa lo dispara</summary>
     [Column(TypeName = "decimal(18,2)")]
     public decimal Indemnizacion { get; set; }
+
+    /// <summary>Semanas computadas para la indemnización Art. 225</summary>
+    [Column(TypeName = "decimal(8,2)")]
+    public decimal IndemnizacionSemanas { get; set; }
+
+    /// <summary>Recargo Art. 219 sobre la indemnización (reintegro ordenado y el empleador opta por pagar)</summary>
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal RecargoArt219 { get; set; }
 
     /// <summary>Preaviso Art. 212: 30 días de salario (cuando aplica)</summary>
     [Column(TypeName = "decimal(18,2)")]
@@ -70,6 +82,10 @@ public class Liquidacion : ITenantEntity
     /// <summary>Décimo tercer mes proporcional del tercio en curso</summary>
     [Column(TypeName = "decimal(18,2)")]
     public decimal DecimoTercerMesProporcional { get; set; }
+
+    /// <summary>Cesantía Fondo (Decreto 60/1995) para contratos DEFINIDO/POR_OBRA — sustituye la prima</summary>
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal Cesantia { get; set; }
 
     /// <summary>Salario pendiente por días trabajados no pagados</summary>
     [Column(TypeName = "decimal(18,2)")]

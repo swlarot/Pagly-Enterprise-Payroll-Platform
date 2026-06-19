@@ -85,16 +85,17 @@ public class DecimoCalculationService : IDecimoCalculationService
             decimal totalDev = details.Sum(d => d.GrossPay);
 
             // 3. MontoDecimo = TotalDevengado / 12
-            decimal montoDecimo = Math.Round(totalDev / 12m, 2);
+            decimal montoDecimo = RoundingPolicy.Round(totalDev / 12m);
 
-            // 4. CSS especiales (Art. 59 Ley 29/1976)
-            decimal cssEmp = Math.Round(montoDecimo * PayrollConstants.CssTasaDecimoEmpleado, 2);
-            decimal cssPat = Math.Round(montoDecimo * PayrollConstants.CssTasaDecimoPatronal, 2);
+            // 4. CSS reducida del décimo: 7.25% empleado / 10.75% patronal
+            //    (Ley 51/2005 Art. 96.4-96.5, Texto Único modif. Ley 462). El SE NO se reduce.
+            decimal cssEmp = RoundingPolicy.Round(montoDecimo * PayrollConstants.CssTasaDecimoEmpleado);
+            decimal cssPat = RoundingPolicy.Round(montoDecimo * PayrollConstants.CssTasaDecimoPatronal);
 
-            // 5. Seguro Educativo
+            // 5. Seguro Educativo (1.25% / 1.50%, sin reducción sobre el décimo)
             bool seActivo = empleado.IsSubjectToEducationalInsurance;
-            decimal seEmp = seActivo ? Math.Round(montoDecimo * PayrollConstants.SeTasaEmpleado, 2) : 0;
-            decimal sePat = seActivo ? Math.Round(montoDecimo * PayrollConstants.SeTasaPatronal, 2) : 0;
+            decimal seEmp = seActivo ? RoundingPolicy.Round(montoDecimo * PayrollConstants.SeTasaEmpleado) : 0;
+            decimal sePat = seActivo ? RoundingPolicy.Round(montoDecimo * PayrollConstants.SeTasaPatronal) : 0;
 
             // 6. ISR del décimo: (salario mensual + décimo) × 13 → tramos → / 13
             decimal isr = 0;
@@ -124,9 +125,14 @@ public class DecimoCalculationService : IDecimoCalculationService
                     depDeduccion = validDeps * taxConfig.DependentDeductionAmount;
                 }
 
-                decimal netGravable = Math.Max(0, annualBase - depDeduccion);
+                // Seguro Educativo deducible de la base del ISR (Art. 709 núm. 4 Código Fiscal),
+                // consistente con la planilla regular (IncomeTaxCalculationServicePortable).
+                decimal seDeduccion = seActivo && taxConfig != null
+                    ? annualBase * taxConfig.EducationalInsuranceEmployeeRate / 100m
+                    : 0m;
+                decimal netGravable = Math.Max(0, annualBase - depDeduccion - seDeduccion);
                 decimal isrAnual = CalcularIsrAnual(netGravable, taxBrackets);
-                isr = Math.Round(isrAnual / 13m, 2);
+                isr = RoundingPolicy.Round(isrAnual / 13m);
             }
 
             // 7. Totales del empleado
@@ -195,7 +201,7 @@ public class DecimoCalculationService : IDecimoCalculationService
         if (bracket == null) return 0m;
 
         var excess = netGravable - bracket.MinIncome;
-        var bracketTax = Math.Round(excess * bracket.Rate / 100m, 2);
-        return Math.Round(bracket.FixedAmount + bracketTax, 2);
+        var bracketTax = RoundingPolicy.CalculatePercentage(excess, bracket.Rate);
+        return RoundingPolicy.Round(bracket.FixedAmount + bracketTax);
     }
 }

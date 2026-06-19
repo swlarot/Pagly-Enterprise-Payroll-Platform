@@ -43,8 +43,13 @@ public static class PayrollConstants
     /// <summary>Tasa CSS empleado: 9.75% del salario base sujeto a CSS.</summary>
     public const decimal CssTasaEmpleado = 0.0975m;
 
-    /// <summary>Tasa CSS patronal: 12.25% del salario base sujeto a CSS.</summary>
-    public const decimal CssTasaPatronal = 0.1225m;
+    /// <summary>
+    /// Tasa CSS patronal vigente 2026: 13.25% (Ley 51/2005 Art. 96.2.a, modif. Ley 462).
+    /// Sube a 14.25% (mar-2027) y 15.25% (mar-2029). El motor de planilla resuelve la tasa
+    /// por fecha vía IPayrollConfigProvider; esta constante la consume el cálculo de
+    /// liquidaciones para el CSS patronal de vacaciones/décimo del período en curso.
+    /// </summary>
+    public const decimal CssTasaPatronal = 0.1325m;
 
     /// <summary>Tasa Seguro Educativo empleado: 1.25%.</summary>
     public const decimal SeTasaEmpleado = 0.0125m;

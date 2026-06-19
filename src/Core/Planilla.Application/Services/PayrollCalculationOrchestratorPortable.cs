@@ -101,6 +101,7 @@ public class PayrollCalculationOrchestratorPortable
             payFrequency,
             dependents,
             isSubjectToIncomeTax,
+            isSubjectToEducationalInsurance,
             calculationDate
         );
 

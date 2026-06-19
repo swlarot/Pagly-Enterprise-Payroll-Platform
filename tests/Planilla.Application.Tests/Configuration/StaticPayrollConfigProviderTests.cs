@@ -238,19 +238,20 @@ public class StaticPayrollConfigProviderTests
             payFrequency: payFrequency,
             dependents: dependents,
             isSubjectToIncomeTax: true,
+            isSubjectToEducationalInsurance: true,
             calculationDate: calculationDate
         );
 
-        // Assert — validación de sanidad
-        // El servicio usa `excedente = taxableIncome - applicableBracket.MinIncome`
+        // Assert — validación de sanidad (con SE deducible, Art. 709 núm. 4)
+        // annual = 2,000 * 13 = 26,000; SE = 26,000 * 1.25% = 325 → base 25,675
         // Bracket 2: MinIncome = 11,000.01, Rate = 15%, FixedAmount = 0
-        // Excedente = 26,000 - 11,000.01 = 14,999.99
-        // AnnualTax = 0 + 14,999.99 * 0.15 ≈ 2,249.9985 ≈ 2,250.00
-        // PeriodTax = 2,250.00 / 12 ≈ 187.50
+        // Excedente = 25,675 - 11,000.01 = 14,674.99
+        // AnnualTax = 14,674.99 * 0.15 ≈ 2,201.25 → PeriodTax = 2,201.25 / 12 ≈ 183.44
         result.TaxableIncome.Should().Be(26000m);
         result.DependentDeduction.Should().Be(0m);
-        result.NetTaxableIncome.Should().Be(26000m);
-        result.TaxAmount.Should().BeApproximately(187.50m, 0.01m);
+        result.SeDeduction.Should().Be(325m);
+        result.NetTaxableIncome.Should().Be(25675m);
+        result.TaxAmount.Should().BeApproximately(183.44m, 0.02m);
     }
 
     [Fact]
@@ -258,13 +259,14 @@ public class StaticPayrollConfigProviderTests
     {
         var service = new IncomeTaxCalculationServicePortable(_provider);
 
-        // Salario 800 mensual → proyección 800 * 13 = 10,400 anual → exento
+        // Salario 800 mensual → 800 * 13 = 10,400 anual; SE = 130 → base 10,270 → exento
         var result = await service.CalculateIncomeTaxAsync(
             companyId: 1,
             grossPay: 800m,
             payFrequency: "Mensual",
             dependents: 0,
             isSubjectToIncomeTax: true,
+            isSubjectToEducationalInsurance: true,
             calculationDate: new DateTime(2026, 6, 1)
         );
 
