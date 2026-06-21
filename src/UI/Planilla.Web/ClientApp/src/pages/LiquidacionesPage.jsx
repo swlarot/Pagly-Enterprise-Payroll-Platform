@@ -581,13 +581,40 @@ const LiquidacionesPage = () => {
                             <div>
                                 <h4 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-3">Componentes</h4>
                                 <div className="bg-navy-800 rounded-lg border border-navy-700 divide-y divide-navy-700">
+                                    {showDetail.primaAntiguedad > 0 && (
+                                        <div className="flex justify-between items-center px-4 py-3">
+                                            <div>
+                                                <p className="text-sm text-gray-200">Prima de Antigüedad (Art. 224)</p>
+                                                <p className="text-xs text-gray-500">1 semana de salario por año trabajado</p>
+                                            </div>
+                                            <p className="text-sm font-mono text-gray-100">{formatCurrency(showDetail.primaAntiguedad)}</p>
+                                        </div>
+                                    )}
+                                    {showDetail.cesantia > 0 && (
+                                        <div className="flex justify-between items-center px-4 py-3">
+                                            <div>
+                                                <p className="text-sm text-gray-200">Cesantía (Decreto 60/1995)</p>
+                                                <p className="text-xs text-gray-500">Fondo de cesantía</p>
+                                            </div>
+                                            <p className="text-sm font-mono text-gray-100">{formatCurrency(showDetail.cesantia)}</p>
+                                        </div>
+                                    )}
                                     {showDetail.indemnizacion > 0 && (
                                         <div className="flex justify-between items-center px-4 py-3">
                                             <div>
                                                 <p className="text-sm text-gray-200">Indemnización (Art. 225)</p>
-                                                <p className="text-xs text-gray-500">3.4 sem/año x {showDetail.anosServicio?.toFixed(2)} años</p>
+                                                <p className="text-xs text-gray-500">{showDetail.indemnizacionSemanas?.toFixed(1)} semanas</p>
                                             </div>
                                             <p className="text-sm font-mono text-gray-100">{formatCurrency(showDetail.indemnizacion)}</p>
+                                        </div>
+                                    )}
+                                    {showDetail.recargoArt219 > 0 && (
+                                        <div className="flex justify-between items-center px-4 py-3">
+                                            <div>
+                                                <p className="text-sm text-gray-200">Recargo por Despido (Art. 219)</p>
+                                                <p className="text-xs text-gray-500">25% sobre indemnización</p>
+                                            </div>
+                                            <p className="text-sm font-mono text-gray-100">{formatCurrency(showDetail.recargoArt219)}</p>
                                         </div>
                                     )}
                                     {showDetail.preaviso > 0 && (
