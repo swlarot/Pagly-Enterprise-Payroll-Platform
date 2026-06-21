@@ -485,6 +485,9 @@ public class HorasExtraController : ControllerBase
             TipoHoraExtra.FiestaNacionalNocturna => "Fiesta Nacional Nocturna (3.75x)",
             TipoHoraExtra.MixtaDiurnaNocturna => "Mixta Diurna-Nocturna (1.50x)",
             TipoHoraExtra.MixtaNocturnaDiurna => "Mixta Nocturna-Diurna (1.75x)",
+            TipoHoraExtra.DominicalHEDiurna => "Dominical HE Diurna (1.875x)",
+            TipoHoraExtra.FeriadoOrdinario => "Feriado Ordinario (2.50x)",
+            TipoHoraExtra.DiaSustituto => "Día Sustituto (1.50x)",
             _ => "Desconocido"
         };
     }
