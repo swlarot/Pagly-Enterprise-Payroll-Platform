@@ -40,6 +40,12 @@ public class Empleado : ITenantEntity
 
     public DateTime FechaContratacion { get; set; }
 
+    /// <summary>
+    /// Tipo de duración del contrato. Indefinido (default) → prima de antigüedad (Art.224);
+    /// Definido/PorObra → cesantía (Decreto 60/1995).
+    /// </summary>
+    public TipoContratoDuracion TipoContrato { get; set; } = TipoContratoDuracion.Indefinido;
+
     public bool EstaActivo { get; set; } = true;
 
     // ====================================================================

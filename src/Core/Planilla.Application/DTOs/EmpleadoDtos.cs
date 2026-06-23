@@ -35,7 +35,8 @@ namespace Vorluno.Planilla.Application.DTOs
         int Dependents = 0,
         decimal CssRiskPercentage = 0.56m,
         // === Pay Period numeric value para edición ===
-        int PayPeriodTypeValue = 2
+        int PayPeriodTypeValue = 2,
+        TipoContratoDuracion TipoContrato = TipoContratoDuracion.Indefinido
     );
 
     /// <summary>
@@ -81,7 +82,8 @@ namespace Vorluno.Planilla.Application.DTOs
         int Dependents = 0,
 
         [Range(0, 100)]
-        decimal CssRiskPercentage = 0.56m
+        decimal CssRiskPercentage = 0.56m,
+        TipoContratoDuracion TipoContrato = TipoContratoDuracion.Indefinido
     );
 
     /// <summary>
@@ -128,7 +130,8 @@ namespace Vorluno.Planilla.Application.DTOs
         decimal CssRiskPercentage = 0.56m,
 
         // === Fecha de Contratación (editable) ===
-        DateTime? FechaContratacion = null
+        DateTime? FechaContratacion = null,
+        TipoContratoDuracion TipoContrato = TipoContratoDuracion.Indefinido
     );
 
     /// <summary>
