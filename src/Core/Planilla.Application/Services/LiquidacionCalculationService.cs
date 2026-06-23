@@ -85,7 +85,7 @@ public class LiquidacionCalculationService
             UnpaidVacationDays = diasVacVencidas,
             // request.IncluyePreaviso indica que el preaviso fue otorgado (no se compensa).
             PreavisoOtorgado = request.IncluyePreaviso,
-            ContractDurationType = TipoContratoDuracion.Indefinido
+            ContractDurationType = empleado.TipoContrato
         });
 
         // Salario pendiente (días trabajados no pagados) — propio de Pagly, fuera de las calculadoras.

@@ -50,6 +50,7 @@ const EmpleadosPage = () => {
         averageSalaryLast10Years: '',
         dependents: 0,
         cssRiskPercentage: 0.56,
+        tipoContrato: 0,
     });
 
     // Fetch employees and departments on mount
@@ -151,6 +152,7 @@ const EmpleadosPage = () => {
                 departamentoId: formData.departamentoId ? parseInt(formData.departamentoId) : null,
                 posicionId: formData.posicionId ? parseInt(formData.posicionId) : null,
                 payPeriodType: parseInt(formData.payPeriodType),
+                tipoContrato: parseInt(formData.tipoContrato),
                 hoursPerWeek: parseFloat(formData.hoursPerWeek),
                 hoursPerPeriod: parseFloat(formData.hoursPerPeriod),
                 // Campos CSS e ISR
@@ -214,6 +216,7 @@ const EmpleadosPage = () => {
                 : '',
             dependents: empleado.dependents ?? 0,
             cssRiskPercentage: empleado.cssRiskPercentage ?? 0.56,
+            tipoContrato: empleado.tipoContrato ?? 0,
         });
         setEditingId(empleado.id);
         setShowModal(true);
@@ -343,6 +346,7 @@ const EmpleadosPage = () => {
             averageSalaryLast10Years: '',
             dependents: 0,
             cssRiskPercentage: 0.56,
+            tipoContrato: 0,
         });
     };
 
@@ -856,6 +860,24 @@ const EmpleadosPage = () => {
                                     />
                                 </div>
 
+                                {/* Tipo de Contrato */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                                        Tipo de contrato <span className="text-red-400">*</span>
+                                    </label>
+                                    <select
+                                        value={formData.tipoContrato}
+                                        onChange={(e) => setFormData({ ...formData, tipoContrato: parseInt(e.target.value) })}
+                                        className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                                        <option value={0}>Indefinido</option>
+                                        <option value={1}>Definido</option>
+                                        <option value={2}>Por Obra</option>
+                                    </select>
+                                    <p className="text-sm text-gray-400 mt-1">
+                                        Definido / Por Obra calculan cesantía (Decreto 60/1995) en vez de prima de antigüedad.
+                                    </p>
+                                </div>
+                                
                                 {/* Sección: Información de Pago */}
                                 <div className="md:col-span-2">
                                     <div className="border border-navy-600 rounded-lg p-4 bg-navy-950/50">

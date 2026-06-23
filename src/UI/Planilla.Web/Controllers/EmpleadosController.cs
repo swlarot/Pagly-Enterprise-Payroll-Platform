@@ -147,7 +147,8 @@ namespace Vorluno.Planilla.Web.Controllers
                     e.Empleado.AverageSalaryLast10Years,
                     e.Empleado.Dependents,
                     e.Empleado.CssRiskPercentage,
-                    (int)e.Empleado.PayPeriodType
+                    (int)e.Empleado.PayPeriodType,
+                    e.Empleado.TipoContrato
                 );
             }).ToList();
 
@@ -234,7 +235,8 @@ namespace Vorluno.Planilla.Web.Controllers
                 result.Empleado.AverageSalaryLast10Years,
                 result.Empleado.Dependents,
                 result.Empleado.CssRiskPercentage,
-                (int)result.Empleado.PayPeriodType
+                (int)result.Empleado.PayPeriodType,
+                result.Empleado.TipoContrato
             );
 
             return Ok(empleadoDto);
@@ -354,7 +356,8 @@ namespace Vorluno.Planilla.Web.Controllers
                 empleado.AverageSalaryLast10Years,
                 empleado.Dependents,
                 empleado.CssRiskPercentage,
-                (int)empleado.PayPeriodType
+                (int)empleado.PayPeriodType,
+                empleado.TipoContrato
             );
 
             // ✅ AUDIT LOG: Registrar creación de empleado

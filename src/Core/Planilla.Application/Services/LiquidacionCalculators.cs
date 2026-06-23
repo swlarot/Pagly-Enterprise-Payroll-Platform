@@ -13,14 +13,6 @@ using Vorluno.Planilla.Domain.Enums;
 
 namespace Vorluno.Planilla.Application.Services;
 
-/// <summary>Tipo de duración del contrato — decide prima (Art. 224) vs cesantía (Decreto 60/1995).</summary>
-public enum TipoContratoDuracion
-{
-    Indefinido = 0,
-    Definido = 1,
-    PorObra = 2
-}
-
 /// <summary>Parámetros de cálculo de una liquidación. Los salarios base llegan separados
 /// porque cada partida tiene su propia regla legal de cómputo.</summary>
 public record LiquidacionCalcInput
