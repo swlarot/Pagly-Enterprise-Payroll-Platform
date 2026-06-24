@@ -267,7 +267,9 @@ namespace Vorluno.Planilla.Web.Controllers
             }
 
             var empleado = _mapper.Map<Empleado>(empleadoDto);
-            empleado.FechaContratacion = DateTime.UtcNow; // Lógica de negocio simple
+            // Respeta la fecha de contratación capturada (clave para antigüedad e historial
+            // salarial de B5); si no se envió, usa hoy como fallback.
+            empleado.FechaContratacion = empleadoDto.FechaContratacion ?? DateTime.UtcNow;
             empleado.TenantId = tenantId; // ✅ SEGURIDAD: TenantId del token JWT
 
             // ✅ AUTO-VINCULACIÓN: Si tiene email, crear/vincular usuario
@@ -914,6 +916,32 @@ namespace Vorluno.Planilla.Web.Controllers
                 MontoDecimoAcumulado: saldo.MontoDecimoAcumulado,
                 Notas: saldo.Notas
             ));
+        }
+
+        /// <summary>
+        /// Obtiene el historial salarial de un empleado (cambios de salario en el tiempo),
+        /// base para los promedios de prima (Art. 226) e indemnización (Art. 149).
+        /// GET /api/empleados/{id}/historial-salarial
+        /// </summary>
+        [HttpGet("{id}/historial-salarial")]
+        [RequirePermission(SystemPermission.EmployeesRead)]
+        public async Task<ActionResult<IEnumerable<HistorialSalarialDto>>> GetHistorialSalarial(int id)
+        {
+            var tenantId = _tenantContext.TenantId;
+
+            var empleado = await _context.Empleados
+                .FirstOrDefaultAsync(e => e.Id == id && e.TenantId == tenantId && !e.IsDeleted);
+            if (empleado == null)
+                return NotFound(new { message = $"Empleado {id} no encontrado" });
+
+            var historial = await _context.HistorialSalarial
+                .Where(h => h.EmpleadoId == id && h.TenantId == tenantId)
+                .OrderByDescending(h => h.FechaVigencia)
+                .ThenByDescending(h => h.Id)
+                .Select(h => new HistorialSalarialDto(h.Id, h.SalarioMensual, h.FechaVigencia, h.Motivo))
+                .ToListAsync();
+
+            return Ok(historial);
         }
 
         /// <summary>
