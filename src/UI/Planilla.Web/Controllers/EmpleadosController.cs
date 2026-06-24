@@ -283,6 +283,16 @@ namespace Vorluno.Planilla.Web.Controllers
                 }
             }
 
+            // B5: registrar el salario inicial en el historial (base de promedios de liquidación)
+            empleado.HistorialSalarial.Add(new HistorialSalarial
+            {
+                SalarioMensual = empleado.SalarioBase,
+                FechaVigencia = empleado.FechaContratacion,
+                Motivo = "Contratación",
+                CreatedAt = DateTime.UtcNow,
+                TenantId = tenantId
+            });
+
             try
             {
                 await _unitOfWork.Empleados.AddAsync(empleado);
@@ -418,11 +428,27 @@ namespace Vorluno.Planilla.Web.Controllers
             // Si tiene usuario vinculado, no permitir cambiar el email del empleado (es el del usuario)
             var emailOriginal = empleado.Email;
 
+            var salarioOriginal = empleado.SalarioBase;
+
             // Mantiene NumeroIdentificacion y FechaContratacion originales - solo actualiza campos permitidos
             _mapper.Map(empleadoDto, empleado);
 
             if (!string.IsNullOrEmpty(empleado.UserId))
                 empleado.Email = emailOriginal;
+
+            // B5: si cambió el salario, registrar el nuevo valor en el historial
+            if (empleado.SalarioBase != salarioOriginal)
+            {
+                _context.HistorialSalarial.Add(new HistorialSalarial
+                {
+                    EmpleadoId = empleado.Id,
+                    SalarioMensual = empleado.SalarioBase,
+                    FechaVigencia = DateTime.UtcNow,
+                    Motivo = "Ajuste salarial",
+                    CreatedAt = DateTime.UtcNow,
+                    TenantId = tenantId
+                });
+            }
 
             _unitOfWork.Empleados.Update(empleado);
             await _unitOfWork.CompleteAsync();

@@ -185,6 +185,10 @@ public class Empleado : ITenantEntity
     // La clase ReciboDeSueldo ya est� implementada y representa cada uno de ellos.
     public virtual ICollection<ReciboDeSueldo> RecibosDeSueldo { get; set; } = new List<ReciboDeSueldo>();
 
+    // Historial de cambios de salario (B5): base para promedios de prima/indemnización.
+    public virtual ICollection<HistorialSalarial> HistorialSalarial { get; set; } = new
+    List<HistorialSalarial>();
+
     // Navigation properties para Departamento y Posicion
     public virtual Departamento? Departamento { get; set; }
     public virtual Posicion? Posicion { get; set; }

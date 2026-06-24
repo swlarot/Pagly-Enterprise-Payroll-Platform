@@ -98,6 +98,7 @@ public class LiquidacionesController : ControllerBase
         // Validar empleado
         var empleado = await _context.Empleados
             .Where(e => e.Id == request.EmpleadoId && e.TenantId == tenantId)
+            .Include(e => e.HistorialSalarial)
             .FirstOrDefaultAsync();
 
         if (empleado == null)

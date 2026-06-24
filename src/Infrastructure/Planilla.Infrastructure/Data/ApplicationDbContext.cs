@@ -39,6 +39,9 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     public DbSet<Empleado> Empleados { get; set; }
     public DbSet<ReciboDeSueldo> RecibosDeSueldo { get; set; }
 
+    // B5: Historial salarial — bases de liquidación (prima/indemnización)
+    public DbSet<HistorialSalarial> HistorialSalarial { get; set; }
+
     // Phase A: Configuraci�n de planilla (tasas CSS, SE, ISR)
     public DbSet<PayrollTaxConfiguration> PayrollTaxConfigurations { get; set; }
     public DbSet<TaxBracket> TaxBrackets { get; set; }
@@ -141,6 +144,18 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             // Índice compuesto para búsquedas por tenant y fecha
             entity.HasIndex(r => new { r.TenantId, r.FechaGeneracion })
                 .HasDatabaseName("IX_ReciboDeSueldo_TenantId_FechaGeneracion");
+        });
+
+        modelBuilder.Entity<HistorialSalarial>(entity =>
+        {
+            // Índice para leer el historial de un empleado ordenado por vigencia
+            entity.HasIndex(h => new { h.TenantId, h.EmpleadoId, h.FechaVigencia })
+            .HasDatabaseName("IX_HistorialSalarial_Tenant_Empleado_Fecha");
+
+            entity.HasOne(h => h.Empleado)
+                .WithMany(e => e.HistorialSalarial)
+                .HasForeignKey(h => h.EmpleadoId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // PayrollDetail ya tiene índice compuesto en PayrollHeaderId y EmpleadoId
