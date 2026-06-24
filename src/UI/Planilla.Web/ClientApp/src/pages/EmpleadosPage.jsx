@@ -33,6 +33,9 @@ const EmpleadosPage = () => {
         montoDecimoAcumulado: 0, notas: ''
     });
     const [savingSaldoInicial, setSavingSaldoInicial] = useState(false);
+    // B5: historial salarial del empleado en edición (read-only)
+    const [historialSalarial, setHistorialSalarial] = useState([]);
+    const [loadingHistorial, setLoadingHistorial] = useState(false);
     const [formData, setFormData] = useState({
         nombre: '',
         apellido: '',
@@ -193,7 +196,23 @@ const EmpleadosPage = () => {
     };
 
     // Handle edit — pre-carga TODOS los campos del empleado existente
+    // B5: carga el historial salarial del empleado para mostrarlo en el modal de edición
+    const loadHistorialSalarial = async (empleadoId) => {
+        try {
+            setLoadingHistorial(true);
+            const data = await api.get(`/api/empleados/${empleadoId}/historial-salarial`);
+            setHistorialSalarial(Array.isArray(data) ? data : []);
+        } catch (error) {
+            // No bloquea la edición si falla; solo no muestra el historial.
+            setHistorialSalarial([]);
+        } finally {
+            setLoadingHistorial(false);
+        }
+    };
+
     const handleEdit = (empleado) => {
+        setHistorialSalarial([]);
+        loadHistorialSalarial(empleado.id);
         setFormData({
             nombre: empleado.nombre,
             apellido: empleado.apellido,
@@ -330,6 +349,7 @@ const EmpleadosPage = () => {
     const resetForm = () => {
         setShowModal(false);
         setEditingId(null);
+        setHistorialSalarial([]);
         setFormData({
             nombre: '',
             apellido: '',
@@ -878,6 +898,37 @@ const EmpleadosPage = () => {
                                     </p>
                                 </div>
                                 
+                                {/* B5: Historial Salarial (solo en edición) */}
+                                {editingId && (
+                                    <div className="md:col-span-2">
+                                        <div className="border border-navy-600 rounded-lg p-4 bg-navy-950/50">
+                                            <h4 className="text-sm font-semibold text-emerald-400 mb-1">
+                                                Historial Salarial
+                                            </h4>
+                                            <p className="text-xs text-gray-500 mb-3">
+                                                Base de los promedios de prima (5 años, Art. 226) e indemnización (6 meses, Art. 149) en la liquidación.
+                                            </p>
+                                            {loadingHistorial ? (
+                                                <p className="text-sm text-gray-400">Cargando…</p>
+                                            ) : historialSalarial.length === 0 ? (
+                                                <p className="text-sm text-gray-400">Sin registros de salario todavía.</p>
+                                            ) : (
+                                                <ul className="space-y-2">
+                                                    {historialSalarial.map((h) => (
+                                                        <li key={h.id} className="flex items-center justify-between text-sm border-b border-navy-700/50 pb-2 last:border-0">
+                                                            <div>
+                                                                <span className="text-gray-100 font-medium">{formatBalboas(h.salarioMensual)}</span>
+                                                                {h.motivo && <span className="text-gray-500 ml-2">— {h.motivo}</span>}
+                                                            </div>
+                                                            <span className="text-gray-400">{new Date(h.fechaVigencia).toLocaleDateString('es-PA')}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Sección: Información de Pago */}
                                 <div className="md:col-span-2">
                                     <div className="border border-navy-600 rounded-lg p-4 bg-navy-950/50">
