@@ -239,7 +239,10 @@ const HorasExtraPage = () => {
             5: 'Fiesta Diurna',              // TipoHoraExtra.FiestaNacionalDiurna
             6: 'Fiesta Nocturna',            // TipoHoraExtra.FiestaNacionalNocturna
             7: 'Mixta D-N',                  // TipoHoraExtra.MixtaDiurnaNocturna
-            8: 'Mixta N-D'                   // TipoHoraExtra.MixtaNocturnaDiurna
+            8: 'Mixta N-D',                   // TipoHoraExtra.MixtaNocturnaDiurna
+            9: 'Dom. HE Diurna',            // TipoHoraExtra.DominicalHEDiurna
+            10: 'Feriado Ord.',             // TipoHoraExtra.FeriadoOrdinario
+            11: 'Día Sustituto'             // TipoHoraExtra.DiaSustituto
         };
         return tipoMap[tipoValor] || 'Desconocido';
     };
@@ -255,6 +258,9 @@ const HorasExtraPage = () => {
             6: 'bg-pink-500/15 text-pink-400 border-pink-500/20',          // Fiesta Nocturna
             7: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/20',          // Mixta D-N
             8: 'bg-orange-500/15 text-orange-400 border-orange-500/20',    // Mixta N-D
+            9: 'bg-teal-500/15 text-teal-400 border-teal-500/20',          // Dom. HE Diurna
+            10: 'bg-indigo-500/15 text-indigo-400 border-indigo-500/20',   // Feriado Ordinario
+            11: 'bg-lime-500/15 text-lime-400 border-lime-500/20',         // Día Sustituto
         };
         const color = colores[tipoValor] || 'bg-gray-500/15 text-gray-400 border-gray-500/20';
         const label = tipoNombre || getTipoDisplayName(tipoValor);
