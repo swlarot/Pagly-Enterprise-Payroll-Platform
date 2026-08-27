@@ -1,340 +1,332 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/vorluno/vorluno/main/BANNER-GITHUB.png" alt="Vorluno" width="100%">
+<img src="https://raw.githubusercontent.com/pagly/pagly/main/BANNER-GITHUB.png" alt="Pagly" width="100%">
 
-# 💼 Pagly — Vorluno Planilla
+# 💼 Pagly — Enterprise Payroll Platform
 
-### SaaS multi-tenant de gestión de nómina para Panamá
+### Multi-tenant SaaS for Complete Payroll Management in Panama
 
 [![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
-[![EF Core](https://img.shields.io/badge/EF_Core-9.0-512BD4?style=for-the-badge&logo=dotnet&logoColor=white)](https://docs.microsoft.com/en-us/ef/core/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Stripe](https://img.shields.io/badge/Stripe-Ready-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://stripe.com)
 [![Docker](https://img.shields.io/badge/Docker-CapRover-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://caprover.com/)
 [![License](https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge)](#-licencia)
 
-**Cumplimiento total con la legislación laboral panameña (CSS Ley 462, Seguro Educativo, ISR, décimo, liquidaciones)**
+**Complete compliance with Panamanian labor legislation (CSS Law 462, Educational Insurance, ISR, Settlements)**
 
-[Documentación](./docs/README.md) · [Overview del proyecto](./docs/OVERVIEW.md) · [Arranque local](./docs/onboarding/INICIO-RAPIDO.md) · [API Platform B2B](./docs/api-platform/README.md)
+[Documentation](./docs/README.md) · [Project Overview](./docs/OVERVIEW.md) · [Quick Start](./docs/onboarding/INICIO-RAPIDO.md) · [B2B API Platform](./docs/api-platform/README.md)
 
 </div>
 
 ---
 
-## 📋 Resumen
+## 📋 Summary
 
-**Pagly** (nombre de código interno: `Vorluno.Planilla`) es el producto SaaS de nómina de [Vorluno Software](https://vorluno.dev), diseñado para empresas que operan en Panamá y necesitan automatizar el ciclo completo de planilla cumpliendo con todas las regulaciones locales.
+**Pagly** is the premium payroll SaaS solution designed for businesses operating in Panama that need complete automation of:
 
-Incluye además una **API Platform B2B** (rate-limited, API keys, idempotency) para que integradores externos consuman el motor de cálculo de nómina panameña.
+- ✅ **CSS (Social Security Law 462)** — Employee & employer contributions with progressive scales
+- ✅ **Educational Insurance** — Automatic calculations and compliance
+- ✅ **Progressive ISR** — Tax brackets with dependent deductions
+- ✅ **Professional Risk** — Configurable by category
+- ✅ **Overtime & Special Pay** — 8 types (diurnal, nocturnal, weekend, holiday, etc.)
+- ✅ **13th Month & Annual Settlements** — Full compliance with liquidation rules
+- ✅ **Multi-tenant Architecture** — Complete data isolation with role-based access control
+- ✅ **B2B API Platform** — Rate-limited, idempotent payroll calculation engine for integrators
 
-> **📘 Ficha completa del proyecto** (stack, arquitectura, dominio, roles, compliance, deploy): [`docs/OVERVIEW.md`](./docs/OVERVIEW.md)
-
----
-
-## ✨ Características principales
-
-### 💰 Motor de cálculo (Panamá)
-- **CSS (Ley 462)** — 9.75% empleado / 13.25% patrono (sube a 14.25% feb 2027, 15.25% mar 2029) con topes y segmentos.
-- **Seguro Educativo** — 1.25% empleado / 1.50% patrono (sin tope máximo).
-- **ISR** — brackets progresivos con deducción por dependientes ($800/c/u).
-- **Riesgo Profesional** — configurable por categoría (0.56% — 5.39%).
-- **Décimo tercer mes** — 3 pagos anuales (abril, agosto, diciembre) con CSS/SE sobre el monto.
-- **Liquidaciones** — prima de antigüedad, vacaciones no pagadas, décimos prorrateados.
-- **Horas extra** — 8 tipos (diurna, nocturna, dominical, feriado, etc.) con factores configurables.
-
-### 👥 Gestión de empleados
-- Expedientes completos (datos laborales, fiscales, CSS, contacto).
-- Jerarquía de departamentos y posiciones.
-- Historial salarial y de contratos.
-- Ausencias, vacaciones, préstamos, anticipos, deducciones recurrentes.
-
-### 📊 Flujo de nómina
-- Estados: `Draft → Calculated → Approved → Paid`.
-- Préstamos con amortización automática y prorrateo por quincena.
-- Solicitudes de vacaciones con aprobación y cálculo de saldos.
-- Auditoría completa (`CreatedBy`, `ModifiedBy`, timestamps).
-
-### 📈 Reportes y exportaciones
-- Recibos de sueldo en PDF (QuestPDF) con formato compacto banco 2×2.
-- Reportes CSS regulatorios.
-- Declaraciones ISR.
-- Exportaciones Excel (ClosedXML).
-
-### 🏢 Multi-tenant nativo
-- Aislamiento por `TenantId` con **global query filters** de EF Core (seguridad crítica).
-- Sistema de **roles custom por tenant** con 29 permisos granulares (`SystemPermission`).
-- Invitaciones por email (Brevo) con plantillas.
-- Planes con límites y upgrades vía Stripe (Free / Starter / Professional / Enterprise).
-
-### 🔌 API Platform B2B
-- Endpoints `/v1/*` con autenticación por API key (SHA256).
-- Rate limiting por minuto + quotas mensuales por plan.
-- Idempotency keys (TTL 24 h) para reintentos seguros.
-- Quota alerts automáticas al 80% / 100% de uso.
+> **📘 Complete project datasheet** (stack, architecture, domain, roles, compliance, deployment): [`docs/OVERVIEW.md`](./docs/OVERVIEW.md)
 
 ---
 
-## 🏗️ Arquitectura
+## ✨ Core Features
 
-Clean Architecture con 4 capas y dependencias unidireccionales:
+### 💰 Advanced Payroll Engine
+- **CSS (Law 462)** — 9.75% employee / 13.25% employer (increases to 14.25% Feb 2027, 15.25% Mar 2029) with caps and segments
+- **Educational Insurance** — 1.25% employee / 1.50% employer (no maximum cap)
+- **Progressive ISR** — Multiple brackets with $800/dependent deduction
+- **Professional Risk** — Configurable per role (0.56% — 5.39%)
+- **13th Month** — 3 annual payments (April, August, December) with CSS/Insurance
+- **Full Settlements** — Seniority bonuses, unpaid leave, prorated benefits
+- **Overtime Automation** — 8 types with configurable multipliers
+
+### 👥 Employee Management
+- Complete personnel records (employment, tax, social security, contact data)
+- Department & position hierarchies
+- Salary and contract history
+- Absences, vacation requests, loans, advances, recurring deductions
+
+### 📊 Payroll Workflow
+- State machine: `Draft → Calculated → Approved → Paid`
+- Automatic loan amortization & prorated disbursement
+- Vacation request workflow with balance calculation
+- Complete audit trail (`CreatedBy`, `ModifiedBy`, timestamps)
+
+### 📈 Reports & Exports
+- PDF Receipts (QuestPDF) in compact bank 2×2 format
+- Regulatory CSS reports
+- ISR declarations
+- Excel exports (ClosedXML) for accounting integration
+
+### 🏢 Enterprise Multi-Tenancy
+- Native isolation by `TenantId` with EF Core **global query filters** (security-critical)
+- **29 granular permissions** with custom role system (`SystemPermission`)
+- Email invitations (Brevo) with templates
+- Plan-based limits with Stripe upgrades (Free / Starter / Professional / Enterprise)
+
+### 🔌 B2B API Platform
+- Endpoints `/v1/*` with SHA256 API key authentication
+- Per-minute rate limiting + monthly quotas by plan
+- Idempotency keys (24h TTL) for safe retries
+- Automatic quota alerts at 80% / 100% usage
+
+---
+
+## 🏗️ Architecture
+
+Clean Architecture with 4 unidirectional dependency layers:
 
 ```
 src/
 ├─ Core/
-│  ├─ Planilla.Domain/         # Entidades, enums, interfaces (0 dependencias)
-│  └─ Planilla.Application/    # DTOs, servicios portables (cálculos), interfaces
+│  ├─ Pagly.Domain/         # Entities, enums, domain interfaces (no dependencies)
+│  └─ Pagly.Application/    # DTOs, portable services, calculation logic
 ├─ Infrastructure/
-│  └─ Planilla.Infrastructure/ # EF Core, repositorios, Stripe, Brevo, seeders
+│  └─ Pagly.Infrastructure/ # EF Core, repositories, Stripe, Brevo, seeders
 └─ UI/
-   └─ Planilla.Web/            # Controllers + SPA React (ClientApp/)
+   └─ Pagly.Web/            # Controllers + React SPA (ClientApp/)
 tests/
-├─ Planilla.Application.Tests/       # xUnit
-└─ Planilla.Web.IntegrationTests/    # xUnit (API)
+├─ Pagly.Application.Tests/       # xUnit
+└─ Pagly.Web.IntegrationTests/    # xUnit (API)
 ```
 
-**Flujo:** `Web → Application + Infrastructure + Domain` · `Infrastructure → Application + Domain` · `Application → Domain` · `Domain → ∅`.
+**Flow:** `Web → Application + Infrastructure + Domain` · `Infrastructure → Application + Domain` · `Application → Domain` · `Domain → ∅`.
 
-| Capa | Responsabilidad |
-|------|-----------------|
-| **Domain** | Entidades, enums, value objects, interfaces de dominio. |
-| **Application** | DTOs, interfaces de servicios, servicios portables de cálculo (CSS, SE, ISR). |
-| **Infrastructure** | `DbContext`, migraciones EF Core, repos, Stripe, Brevo, seeders. |
-| **Web** | REST API, autenticación, middleware, hosting del SPA. |
+| Layer | Responsibility |
+|-------|-----------------|
+| **Domain** | Entities, enums, value objects, domain interfaces |
+| **Application** | DTOs, service interfaces, portable calculation services (CSS, ISR) |
+| **Infrastructure** | DbContext, EF Core migrations, repos, Stripe, Brevo, seeders |
+| **Web** | REST API, authentication, middleware, SPA hosting |
 
 ---
 
-## 🛠️ Stack técnico
+## 🛠️ Tech Stack
 
 ### Backend
 - **.NET 9** (ASP.NET Core Web API + Identity + JWT Bearer)
-- **Entity Framework Core 9.0.2** con **Npgsql** (PostgreSQL)
-- **AutoMapper 12** · **Swashbuckle 9** (Swagger)
-- **QuestPDF 2024.3** (recibos PDF) · **ClosedXML 0.102** (Excel)
+- **Entity Framework Core 9.0.2** with **Npgsql** (PostgreSQL)
+- **AutoMapper 12** · **Swashbuckle 9** (Swagger/OpenAPI)
+- **QuestPDF 2024.3** (PDF receipts) · **ClosedXML 0.102** (Excel)
 - **Stripe.net 50.1** (billing/webhooks) · **Brevo** (`sib_api_v3_sdk` 4.0.2, email)
-- **xUnit** + **Moq** + **FluentAssertions** (tests)
+- **xUnit** + **Moq** + **FluentAssertions** (testing)
 
 ### Frontend
 - **React 19.1** + **Vite 7** + **TypeScript 5.9**
 - **React Router v7** · **Tailwind CSS 3.4**
 - **Recharts** (dashboards) · **Lucide React** (icons) · **react-hot-toast**
-- Estado global: Context API (sin Redux/Zustand)
+- Global state: Context API (no Redux/Zustand)
 
-### Infraestructura
-- **PostgreSQL 16** (local y prod)
+### Infrastructure
+- **PostgreSQL 16** (local and production)
 - **Docker multi-stage** (node:20-alpine → dotnet/sdk:9.0 → dotnet/aspnet:9.0)
-- **CapRover** sobre **DigitalOcean** (push a `master` dispara deploy automático)
+- **CapRover** on **DigitalOcean** (push to `master` triggers automatic deployment)
 
 ---
 
-## 🚀 Arranque local
+## 🚀 Quick Start
 
-### Prerrequisitos
+### Prerequisites
 
 - [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
 - [Node.js 20+](https://nodejs.org/)
-- [PostgreSQL 16](https://www.postgresql.org/download/) corriendo en `localhost:5432`
-- Base `PlanillaDB` creada (o ajustar la cadena de conexión)
+- [PostgreSQL 16](https://www.postgresql.org/download/) running on `localhost:5432`
+- Database `PaglyDB` created (or adjust connection string)
 
-### Setup rápido
+### Setup
 
 ```bash
-# 1. Clonar repo
-git clone https://github.com/vorluno/Vorluno-Planilla.git
-cd Vorluno-Planilla
+# 1. Clone repository
+git clone https://github.com/pagly/pagly.git
+cd pagly
 
-# 2. Configurar cadena de conexión en src/UI/Planilla.Web/appsettings.json
-#    (o usar variable de entorno ConnectionStrings__DefaultConnection)
+# 2. Configure connection string in src/UI/Pagly.Web/appsettings.json
+#    (or use environment variable ConnectionStrings__DefaultConnection)
 
-# 3. Aplicar migraciones (Program.cs las aplica automáticamente al arrancar,
-#    pero también se pueden correr manualmente)
+# 3. Apply migrations
 dotnet ef database update \
-  --project src/Infrastructure/Planilla.Infrastructure \
-  --startup-project src/UI/Planilla.Web
+  --project src/Infrastructure/Pagly.Infrastructure \
+  --startup-project src/UI/Pagly.Web
 
-# 4. Instalar dependencias frontend
-cd src/UI/Planilla.Web/ClientApp && npm install && cd -
+# 4. Install frontend dependencies
+cd src/UI/Pagly.Web/ClientApp && npm install && cd -
 
-# 5a. Arrancar backend (puerto 5039)
-dotnet run --project src/UI/Planilla.Web
+# 5a. Start backend (port 5039)
+dotnet run --project src/UI/Pagly.Web
 
-# 5b. En otra terminal, arrancar frontend (puerto 5173)
-cd src/UI/Planilla.Web/ClientApp && npm run dev
+# 5b. In another terminal, start frontend (port 5173)
+cd src/UI/Pagly.Web/ClientApp && npm run dev
 ```
 
-### Helpers PowerShell (Windows)
+### Local Access
 
-```powershell
-# Arrancar backend + frontend en ventanas separadas
-./scripts/dev/iniciar-desarrollo.ps1
-
-# Verificar puertos libres
-./scripts/dev/verificar-puertos.ps1
-
-# Detener
-./scripts/dev/detener-desarrollo.ps1
-```
-
-Detalle completo en [`docs/onboarding/INICIO-RAPIDO.md`](./docs/onboarding/INICIO-RAPIDO.md) y [`docs/onboarding/COMO-INICIAR-DESARROLLO.md`](./docs/onboarding/COMO-INICIAR-DESARROLLO.md).
-
-### Accesos locales
-
-| Recurso | URL |
-|---------|-----|
+| Resource | URL |
+|----------|-----|
 | API | `http://localhost:5039` |
 | Swagger | `http://localhost:5039/swagger` |
 | Frontend (dev) | `http://localhost:5173` |
 | Health check | `http://localhost:5039/health` |
 
-> **Nota:** no existe auto-registro público. Los tenants y usuarios se crean desde `/system-admin/tenants/create` por un system admin.
+> **Note:** No public self-registration. Tenants and users are created by system admins via `/system-admin/tenants/create`.
 
 ---
 
-## 🚢 Deploy
+## 🚢 Deployment
 
-El push a `master` dispara build automático en CapRover vía GitHub webhook. El pipeline Docker aplica migraciones EF Core al arrancar (`Program.cs:MigrateAsync`).
+Push to `master` triggers automatic build on CapRover via GitHub webhook. Docker pipeline applies EF Core migrations at startup (`Program.cs:MigrateAsync`).
 
-**Variables de entorno en producción** (CapRover → App Configs):
+**Production environment variables** (CapRover → App Configs):
 
 ```
 ConnectionStrings__DefaultConnection
 Jwt__Key / Jwt__Issuer / Jwt__Audience / Jwt__ExpireHours
 Stripe__SecretKey / Stripe__WebhookSecret / Stripe__PriceId* / Stripe__SuccessUrl / Stripe__CancelUrl
 Brevo__ApiKey / Brevo__SenderEmail / Brevo__SenderName
-Cors__AllowedOrigins      (lista separada por comas)
+Cors__AllowedOrigins      (comma-separated list)
 ApiRateLimit__PerMinute   (default: 60)
 ASPNETCORE_ENVIRONMENT=Production
 ```
 
-**Rollback:** CapRover → App → Deployment → deploy de versión anterior (~30 s).
+**Rollback:** CapRover → App → Deployment → previous version (~30 seconds).
 
-Guías completas:
-- [`docs/deploy/DEPLOY-CAPROVER.md`](./docs/deploy/DEPLOY-CAPROVER.md) — variables, health check, troubleshooting.
-- [`docs/deploy/DEPLOY-PAGLY-CLAU.md`](./docs/deploy/DEPLOY-PAGLY-CLAU.md) — DNS en cPanel, GitHub webhook, dominio `pagly.clau.com.pa`.
-
----
-
-## 🔐 Autenticación y autorización
-
-- **JWT Bearer** (24 h) + **Refresh tokens** persistidos en DB.
-- **Claims emitidos:** `sub`, `email`, `tenant_id`, `tenant_role`, `is_system_admin`, `nombre_completo`.
-- **`TenantRole` enum:** `Owner (0)` / `User (1)`.
-- **Roles custom por tenant:** `CustomTenantRole` + `RolePermission` + 29 `SystemPermission` granulares.
-- **API Platform B2B:** esquema separado `ApiKey` con hash SHA256 y rate-limit.
-
-El frontend expone `hasPermission(p)`, `hasRole(...)`, `canWrite()`, `canDelete()` desde `useAuth()`.
-
-Detalle: [`docs/roles-permisos/ROLES-PERMISOS-IMPLEMENTATION.md`](./docs/roles-permisos/ROLES-PERMISOS-IMPLEMENTATION.md).
+Complete guides:
+- [`docs/deploy/DEPLOY-CAPROVER.md`](./docs/deploy/DEPLOY-CAPROVER.md)
+- [`docs/deploy/DEPLOY-PAGLY.md`](./docs/deploy/DEPLOY-PAGLY.md)
 
 ---
 
-## 💳 Planes y facturación
+## 🔐 Authentication & Authorization
 
-Límites definidos en `src/Core/Planilla.Domain/Models/PlanFeatures.cs`:
+- **JWT Bearer** (24h) + **Refresh tokens** persisted in DB
+- **Claims issued:** `sub`, `email`, `tenant_id`, `tenant_role`, `is_system_admin`, `full_name`
+- **`TenantRole` enum:** `Owner (0)` / `User (1)`
+- **Custom roles per tenant:** `CustomTenantRole` + `RolePermission` + 29 granular `SystemPermission`s
+- **B2B API Platform:** separate `ApiKey` scheme with SHA256 hashing and rate-limit
 
-| Plan | Empleados | Usuarios | Empresas | Excel | PDF | API | Precio/mes | API req/mes |
-|------|-----------|----------|----------|-------|-----|-----|-----------:|------------:|
+Frontend exposes `hasPermission(p)`, `hasRole(...)`, `canWrite()`, `canDelete()` from `useAuth()`.
+
+Details: [`docs/roles-permisos/ROLES-PERMISOS-IMPLEMENTATION.md`](./docs/roles-permisos/ROLES-PERMISOS-IMPLEMENTATION.md).
+
+---
+
+## 💳 Plans & Billing
+
+Limits defined in `src/Core/Pagly.Domain/Models/PlanFeatures.cs`:
+
+| Plan | Employees | Users | Businesses | Excel | PDF | API | Price/month | API req/month |
+|------|-----------|-------|-----------|-------|-----|-----|-----------:|------------:|
 | **Free** | 5 | 1 | 1 | ❌ | ❌ | ❌ | $0 | 0 |
 | **Starter** | 25 | 3 | 1 | ✅ | ❌ | ❌ | $29.99 | 0 |
-| **Professional** | 100 | 10 | 3 | ✅ | ✅ | ✅ | $79.99 | 10.000 |
-| **Enterprise** | ∞ | ∞ | ∞ | ✅ | ✅ | ✅ | $199.99 | 100.000 |
+| **Professional** | 100 | 10 | 3 | ✅ | ✅ | ✅ | $79.99 | 10,000 |
+| **Enterprise** | ∞ | ∞ | ∞ | ✅ | ✅ | ✅ | $199.99+ | 100,000+ |
 
-Webhooks Stripe manejados por `StripeWebhookController`: `customer.subscription.created/updated/deleted`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.trial_will_end`.
+Stripe webhooks handled by `StripeWebhookController`: `customer.subscription.created/updated/deleted`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.trial_will_end`.
 
 ---
 
-## 📝 Convenciones de desarrollo
+## 📝 Development Conventions
 
-### Reglas duras (no negociables)
-1. **Nunca hardcodear tasas/tramos** — todo viene de `PayrollTaxConfiguration` o `TaxBracket`.
-2. **Sin fallbacks silenciosos** — configuración faltante lanza `InvalidOperationException`.
-3. **Nunca borrar datos a ciegas** — soft deletes (`IsActive`/`DeletedAt`) por defecto; hard delete solo donde la [política](./docs/compliance/POLITICA-ELIMINACION.md) lo permite.
-4. **Auditar siempre** — `CreatedBy`, `CreatedAt`, `ModifiedBy`, `ModifiedAt`.
-5. **Transacciones para multi-tabla** — usar `UnitOfWork`.
-6. **`DbContext` solo en Infrastructure** — nunca en Domain ni Application.
-7. **Multi-tenancy:** toda entidad `ITenantEntity` filtra por `TenantId` automáticamente vía global query filters. Validar siempre en código nuevo.
+### Hard Rules (Non-Negotiable)
+1. **Never hardcode tax rates/brackets** — all comes from `PayrollTaxConfiguration` or `TaxBracket`
+2. **No silent fallbacks** — missing configuration raises `InvalidOperationException`
+3. **Never blind data deletion** — soft deletes (`IsActive`/`DeletedAt`) by default; hard delete only per policy
+4. **Always audit** — `CreatedBy`, `CreatedAt`, `ModifiedBy`, `ModifiedAt`
+5. **Transactions for multi-table** — use `UnitOfWork`
+6. **`DbContext` only in Infrastructure** — never in Domain or Application
+7. **Multi-tenancy:** every `ITenantEntity` filters by `TenantId` automatically via global query filters
 
-### Naming
+### Naming Conventions
 
-| Tipo | Sufijo | Ejemplo |
+| Type | Suffix | Example |
 |------|--------|---------|
-| Transfer DTO | `Dto` | `EmpleadoDto` |
-| Create/Update DTO | `Request` | `CreateEmpleadoRequest` |
-| Resultado de cálculo | `Result` | `PayrollCalculationResult` |
+| Transfer DTO | `Dto` | `EmployeeDto` |
+| Create/Update DTO | `Request` | `CreateEmployeeRequest` |
+| Calculation result | `Result` | `PayrollCalculationResult` |
 
-### Flujo Git + Linear
+### Git + Linear Workflow
 
-1. Crear ticket en Linear (team `DEV`) con la plantilla correspondiente (Bug / Feature / Tech Task) **antes de tocar código**.
-2. Mover a `In Progress`.
-3. Commits con prefijo `DEV-#:` (ej. `DEV-93: chore: reorganizar documentación`).
-4. Un commit por ticket. Sin `Co-Authored-By`. Títulos en Linear **sin** prefijo `DEV-#`.
+1. Create ticket in Linear (team `DEV`) with appropriate template **before touching code**
+2. Move to `In Progress`
+3. Commits prefixed with `DEV-#:` (e.g., `DEV-93: chore: reorganize documentation`)
+4. One commit per ticket. No `Co-Authored-By`. Linear titles **without** `DEV-#` prefix
 
-Ver `CLAUDE.md` para detalles completos de convenciones del equipo.
+Full details: see `CLAUDE.md`
 
 ---
 
-## 📚 Documentación
+## 📚 Documentation
 
-Toda la documentación técnica y operativa vive en [`docs/`](./docs/README.md), organizada por módulo:
+Complete technical and operational documentation in [`docs/`](./docs/README.md), organized by module:
 
-- **[docs/README.md](./docs/README.md)** — índice navegable con sección "Recientes".
-- **[docs/OVERVIEW.md](./docs/OVERVIEW.md)** — ficha global del proyecto.
-- **[docs/onboarding/](./docs/onboarding/)** — arranque local, setup de entorno.
-- **[docs/architecture/](./docs/architecture/)** — diseño, convenciones frontend, plan de refactor.
-- **[docs/payroll/](./docs/payroll/)** — motor de cálculo, fixes CSS/ISR, décimos.
-- **[docs/compliance/](./docs/compliance/)** — regulación Panamá + política de eliminación de datos.
-- **[docs/multi-tenant/](./docs/multi-tenant/)** — implementación multi-tenant.
-- **[docs/roles-permisos/](./docs/roles-permisos/)** — sistema de roles custom.
-- **[docs/api-platform/](./docs/api-platform/)** — quickstart + roadmap API B2B.
-- **[docs/integrations/](./docs/integrations/)** — Stripe, Brevo, SMTP.
-- **[docs/deploy/](./docs/deploy/)** — CapRover, dominio, build fixes.
-- **[docs/security/](./docs/security/)** — auth, hardening.
-- **[docs/qa/](./docs/qa/)** — pruebas, OWASP ZAP, bugs.
-- **[docs/runbooks/](./docs/runbooks/)** — incidentes (ej. payday down).
-- **[docs/changelog/](./docs/changelog/)** — historial de cambios.
+- **[docs/README.md](./docs/README.md)** — Navigable index with "Recently Updated" section
+- **[docs/OVERVIEW.md](./docs/OVERVIEW.md)** — Complete project datasheet
+- **[docs/onboarding/](./docs/onboarding/)** — Quick start, environment setup
+- **[docs/architecture/](./docs/architecture/)** — Design, frontend conventions, refactor plan
+- **[docs/payroll/](./docs/payroll/)** — Calculation engine, CSS/ISR fixes, 13th month
+- **[docs/compliance/](./docs/compliance/)** — Panama regulations + data deletion policy
+- **[docs/multi-tenant/](./docs/multi-tenant/)** — Multi-tenancy implementation
+- **[docs/roles-permisos/](./docs/roles-permisos/)** — Custom role system
+- **[docs/api-platform/](./docs/api-platform/)** — B2B API quickstart + roadmap
+- **[docs/integrations/](./docs/integrations/)** — Stripe, Brevo, SMTP
+- **[docs/deploy/](./docs/deploy/)** — CapRover, domain configuration, build troubleshooting
+- **[docs/security/](./docs/security/)** — Auth implementation, hardening
+- **[docs/qa/](./docs/qa/)** — Testing, OWASP ZAP, reported bugs
+- **[docs/runbooks/](./docs/runbooks/)** — Incident procedures
+- **[docs/changelog/](./docs/changelog/)** — Change history
 
 ---
 
 ## 🗺️ Roadmap
 
-Hecho ✅ · En progreso 🚧 · Próximo ⏭️
+Completed ✅ · In Progress 🚧 · Upcoming ⏭️
 
 - [x] Clean Architecture (.NET 9 + React 19)
 - [x] Multi-tenant (global query filters + JWT claims)
-- [x] Sistema de roles custom + 29 permisos granulares
-- [x] Motor de cálculo Panamá (CSS, SE, ISR, décimo, liquidaciones, horas extra)
-- [x] Reportes PDF (QuestPDF) y Excel (ClosedXML)
-- [x] Billing Stripe (Free / Starter / Professional / Enterprise) + webhooks
-- [x] Invitaciones por email (Brevo)
-- [x] API Platform B2B (API keys, rate limit, idempotency, quota alerts)
-- [x] Deploy automatizado CapRover + DigitalOcean
-- [x] Health checks + auditoría
-- [ ] 🚧 Cobertura completa de tests unitarios y de integración
-- [ ] 🚧 Portal de auto-servicio para empleados (pay stubs, solicitudes)
-- [ ] ⏭️ Integración bancaria (ACH) para pagos de nómina
-- [ ] ⏭️ App móvil (MAUI)
-- [ ] ⏭️ Dashboards ejecutivos avanzados con IA (anomaly detection)
+- [x] Custom role system + 29 granular permissions
+- [x] Panama payroll engine (CSS, ISR, 13th month, settlements, overtime)
+- [x] PDF (QuestPDF) and Excel (ClosedXML) reports
+- [x] Stripe billing (Free / Starter / Professional / Enterprise) + webhooks
+- [x] Email invitations (Brevo)
+- [x] B2B API Platform (API keys, rate limit, idempotency, quota alerts)
+- [x] Automated CapRover + DigitalOcean deployment
+- [x] Health checks + audit trails
+- [ ] 🚧 Comprehensive unit and integration test coverage
+- [ ] 🚧 Employee self-service portal (pay stubs, requests)
+- [ ] ⏭️ Banking integration (ACH) for payroll disbursement
+- [ ] ⏭️ Mobile app (.NET MAUI)
+- [ ] ⏭️ Advanced executive dashboards with AI (anomaly detection)
 
 ---
 
-## 🏢 Sobre Vorluno
+## 🏢 About Pagly
 
-**[Vorluno Software](https://vorluno.dev)** — *Where code meets craft.*
-Panama City, Panama · UTC-5 · [contacto@vorluno.dev](mailto:contacto@vorluno.dev)
+**Pagly** — *Enterprise Payroll, Simplified.* — is built on proven technology by [Vorluno Software](https://vorluno.dev).
 
-Productos hermanos: **CLAU** (KYC), **Core360** (ERP), **Pagly** (este repo).
+Panama City, Panama · UTC-5 · [hello@pagly.app](mailto:hello@pagly.app)
+
+Related products: **CLAU** (KYC), **Core360** (ERP).
 
 ---
 
-## 📄 Licencia
+## 📄 License
 
-Copyright © Vorluno 2025. Todos los derechos reservados. Proprietary — no redistribution.
+Copyright © Pagly 2025. All rights reserved. Proprietary — no redistribution.
 
 ---
 
 <div align="center">
 
-**[⬆ Volver arriba](#-pagly--vorluno-planilla)**
+**[⬆ Back to top](#-pagly--enterprise-payroll-platform)**
 
-Hecho con 💜 por [Vorluno](https://vorluno.dev) en Panamá 🇵🇦
+Built with 💜 by [Vorluno Software](https://vorluno.dev) in Panama 🇵🇦
 
 </div>
