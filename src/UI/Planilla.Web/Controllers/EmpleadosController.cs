@@ -147,7 +147,8 @@ namespace Vorluno.Planilla.Web.Controllers
                     e.Empleado.AverageSalaryLast10Years,
                     e.Empleado.Dependents,
                     e.Empleado.CssRiskPercentage,
-                    (int)e.Empleado.PayPeriodType
+                    (int)e.Empleado.PayPeriodType,
+                    e.Empleado.TipoContrato
                 );
             }).ToList();
 
@@ -234,7 +235,8 @@ namespace Vorluno.Planilla.Web.Controllers
                 result.Empleado.AverageSalaryLast10Years,
                 result.Empleado.Dependents,
                 result.Empleado.CssRiskPercentage,
-                (int)result.Empleado.PayPeriodType
+                (int)result.Empleado.PayPeriodType,
+                result.Empleado.TipoContrato
             );
 
             return Ok(empleadoDto);
@@ -265,7 +267,9 @@ namespace Vorluno.Planilla.Web.Controllers
             }
 
             var empleado = _mapper.Map<Empleado>(empleadoDto);
-            empleado.FechaContratacion = DateTime.UtcNow; // Lógica de negocio simple
+            // Respeta la fecha de contratación capturada (clave para antigüedad e historial
+            // salarial de B5); si no se envió, usa hoy como fallback.
+            empleado.FechaContratacion = empleadoDto.FechaContratacion ?? DateTime.UtcNow;
             empleado.TenantId = tenantId; // ✅ SEGURIDAD: TenantId del token JWT
 
             // ✅ AUTO-VINCULACIÓN: Si tiene email, crear/vincular usuario
@@ -280,6 +284,16 @@ namespace Vorluno.Planilla.Web.Controllers
                     return BadRequest(new { message = $"Error vinculando usuario: {ex.Message}" });
                 }
             }
+
+            // B5: registrar el salario inicial en el historial (base de promedios de liquidación)
+            empleado.HistorialSalarial.Add(new HistorialSalarial
+            {
+                SalarioMensual = empleado.SalarioBase,
+                FechaVigencia = empleado.FechaContratacion,
+                Motivo = "Contratación",
+                CreatedAt = DateTime.UtcNow,
+                TenantId = tenantId
+            });
 
             try
             {
@@ -354,7 +368,8 @@ namespace Vorluno.Planilla.Web.Controllers
                 empleado.AverageSalaryLast10Years,
                 empleado.Dependents,
                 empleado.CssRiskPercentage,
-                (int)empleado.PayPeriodType
+                (int)empleado.PayPeriodType,
+                empleado.TipoContrato
             );
 
             // ✅ AUDIT LOG: Registrar creación de empleado
@@ -415,11 +430,27 @@ namespace Vorluno.Planilla.Web.Controllers
             // Si tiene usuario vinculado, no permitir cambiar el email del empleado (es el del usuario)
             var emailOriginal = empleado.Email;
 
+            var salarioOriginal = empleado.SalarioBase;
+
             // Mantiene NumeroIdentificacion y FechaContratacion originales - solo actualiza campos permitidos
             _mapper.Map(empleadoDto, empleado);
 
             if (!string.IsNullOrEmpty(empleado.UserId))
                 empleado.Email = emailOriginal;
+
+            // B5: si cambió el salario, registrar el nuevo valor en el historial
+            if (empleado.SalarioBase != salarioOriginal)
+            {
+                _context.HistorialSalarial.Add(new HistorialSalarial
+                {
+                    EmpleadoId = empleado.Id,
+                    SalarioMensual = empleado.SalarioBase,
+                    FechaVigencia = DateTime.UtcNow,
+                    Motivo = "Ajuste salarial",
+                    CreatedAt = DateTime.UtcNow,
+                    TenantId = tenantId
+                });
+            }
 
             _unitOfWork.Empleados.Update(empleado);
             await _unitOfWork.CompleteAsync();
@@ -885,6 +916,32 @@ namespace Vorluno.Planilla.Web.Controllers
                 MontoDecimoAcumulado: saldo.MontoDecimoAcumulado,
                 Notas: saldo.Notas
             ));
+        }
+
+        /// <summary>
+        /// Obtiene el historial salarial de un empleado (cambios de salario en el tiempo),
+        /// base para los promedios de prima (Art. 226) e indemnización (Art. 149).
+        /// GET /api/empleados/{id}/historial-salarial
+        /// </summary>
+        [HttpGet("{id}/historial-salarial")]
+        [RequirePermission(SystemPermission.EmployeesRead)]
+        public async Task<ActionResult<IEnumerable<HistorialSalarialDto>>> GetHistorialSalarial(int id)
+        {
+            var tenantId = _tenantContext.TenantId;
+
+            var empleado = await _context.Empleados
+                .FirstOrDefaultAsync(e => e.Id == id && e.TenantId == tenantId && !e.IsDeleted);
+            if (empleado == null)
+                return NotFound(new { message = $"Empleado {id} no encontrado" });
+
+            var historial = await _context.HistorialSalarial
+                .Where(h => h.EmpleadoId == id && h.TenantId == tenantId)
+                .OrderByDescending(h => h.FechaVigencia)
+                .ThenByDescending(h => h.Id)
+                .Select(h => new HistorialSalarialDto(h.Id, h.SalarioMensual, h.FechaVigencia, h.Motivo))
+                .ToListAsync();
+
+            return Ok(historial);
         }
 
         /// <summary>

@@ -35,7 +35,8 @@ namespace Vorluno.Planilla.Application.DTOs
         int Dependents = 0,
         decimal CssRiskPercentage = 0.56m,
         // === Pay Period numeric value para edición ===
-        int PayPeriodTypeValue = 2
+        int PayPeriodTypeValue = 2,
+        TipoContratoDuracion TipoContrato = TipoContratoDuracion.Indefinido
     );
 
     /// <summary>
@@ -81,7 +82,11 @@ namespace Vorluno.Planilla.Application.DTOs
         int Dependents = 0,
 
         [Range(0, 100)]
-        decimal CssRiskPercentage = 0.56m
+        decimal CssRiskPercentage = 0.56m,
+        TipoContratoDuracion TipoContrato = TipoContratoDuracion.Indefinido,
+
+        // === Fecha de Contratación (capturada en el alta) ===
+        DateTime? FechaContratacion = null
     );
 
     /// <summary>
@@ -128,7 +133,8 @@ namespace Vorluno.Planilla.Application.DTOs
         decimal CssRiskPercentage = 0.56m,
 
         // === Fecha de Contratación (editable) ===
-        DateTime? FechaContratacion = null
+        DateTime? FechaContratacion = null,
+        TipoContratoDuracion TipoContrato = TipoContratoDuracion.Indefinido
     );
 
     /// <summary>
@@ -137,5 +143,16 @@ namespace Vorluno.Planilla.Application.DTOs
     public record VincularUsuarioDto(
         [Required(ErrorMessage = "El ID del usuario es requerido")]
         string UserId
+    );
+
+    /// <summary>
+    /// DTO para visualizar un registro del historial salarial de un empleado
+    /// (base de los promedios de prima e indemnización en la liquidación).
+    /// </summary>
+    public record HistorialSalarialDto(
+        int Id,
+        decimal SalarioMensual,
+        DateTime FechaVigencia,
+        string? Motivo
     );
 }

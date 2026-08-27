@@ -69,23 +69,23 @@ public class LiquidacionCalculationService
         // ====================================================================
         // Núcleo legal: calculadoras puras (Código de Trabajo Panamá).
         //
-        // Bases salariales (B5): la ley pide promedio de 5 años para la prima (Art. 226)
-        // y promedio 6m/30d para la indemnización (Art. 149). Mientras no exista historial
-        // salarial estructurado en el dominio, las tres bases usan el salario mensual actual.
+        // Bases salariales (B5): la prima usa el promedio de 5 años (Art. 226) y la
+        // indemnización el promedio 6m/30d (Art. 149), calculados desde el historial
+        // salarial. Si el empleado no tiene historial, cae al salario actual (fallback)
         // Tipo de contrato (B4): asume Indefinido (prima Art. 224) hasta que el dominio
         // exponga el tipo — DEFINIDO/POR_OBRA usaría cesantía (Decreto 60/1995).
         // ====================================================================
         var calc = LiquidacionCalculator.Calcular(new LiquidacionCalcInput
         {
-            MonthlySalaryForPrima = salarioMensual,
-            MonthlySalaryForIndemnization = salarioMensual,
+            MonthlySalaryForPrima = SalaryHistoryAverager.AverageForPrima(empleado.HistorialSalarial, request.FechaTerminacion, salarioMensual),
+            MonthlySalaryForIndemnization = SalaryHistoryAverager.AverageForIndemnization(empleado.HistorialSalarial, request.FechaTerminacion, salarioMensual),
             MonthlySalaryForDailyRate = salarioMensual,
             YearsWorked = anosServicio,
             Causa = request.TipoTerminacion.ToCausaTerminacion(),
             UnpaidVacationDays = diasVacVencidas,
             // request.IncluyePreaviso indica que el preaviso fue otorgado (no se compensa).
             PreavisoOtorgado = request.IncluyePreaviso,
-            ContractDurationType = TipoContratoDuracion.Indefinido
+            ContractDurationType = empleado.TipoContrato
         });
 
         // Salario pendiente (días trabajados no pagados) — propio de Pagly, fuera de las calculadoras.

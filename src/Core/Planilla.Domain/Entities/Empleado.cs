@@ -40,6 +40,12 @@ public class Empleado : ITenantEntity
 
     public DateTime FechaContratacion { get; set; }
 
+    /// <summary>
+    /// Tipo de duración del contrato. Indefinido (default) → prima de antigüedad (Art.224);
+    /// Definido/PorObra → cesantía (Decreto 60/1995).
+    /// </summary>
+    public TipoContratoDuracion TipoContrato { get; set; } = TipoContratoDuracion.Indefinido;
+
     public bool EstaActivo { get; set; } = true;
 
     // ====================================================================
@@ -178,6 +184,10 @@ public class Empleado : ITenantEntity
     // Propiedad de navegaci�n: un empleado puede tener muchos recibos de sueldo.
     // La clase ReciboDeSueldo ya est� implementada y representa cada uno de ellos.
     public virtual ICollection<ReciboDeSueldo> RecibosDeSueldo { get; set; } = new List<ReciboDeSueldo>();
+
+    // Historial de cambios de salario (B5): base para promedios de prima/indemnización.
+    public virtual ICollection<HistorialSalarial> HistorialSalarial { get; set; } = new
+    List<HistorialSalarial>();
 
     // Navigation properties para Departamento y Posicion
     public virtual Departamento? Departamento { get; set; }
