@@ -49,8 +49,8 @@ export default function DecimoPage() {
   const load = async () => {
     try {
       setIsLoading(true);
-      const res = await api.get(`/api/decimo?ano=${anoFiltro}`);
-      const data = res?.data;
+      // api.get devuelve el body ya deserializado; no envuelve en { data }.
+      const data = await api.get(`/api/decimo?ano=${anoFiltro}`);
       setPlanillas(Array.isArray(data) ? data : []);
     } catch (e) {
       toast.error(e.response?.data?.message || 'Error al cargar planillas de décimo');
@@ -90,8 +90,8 @@ export default function DecimoPage() {
     try {
       setViewLoading(true);
       setExpandedRows(new Set());
-      const res = await api.get(`/api/decimo/${planilla.id}`);
-      setViewPlanilla(res.data);
+      const detalle = await api.get(`/api/decimo/${planilla.id}`);
+      setViewPlanilla(detalle);
     } catch (e) {
       toast.error('Error al cargar detalle');
     } finally {
@@ -104,10 +104,10 @@ export default function DecimoPage() {
     try {
       setCalculando(true);
       const res = await api.post(`/api/decimo/${planillaId}/calcular`);
-      toast.success(res.data.message || 'Décimo calculado');
+      toast.success(res?.message || 'Décimo calculado');
       // Refrescar el detalle abierto
       const updated = await api.get(`/api/decimo/${planillaId}`);
-      setViewPlanilla(updated.data);
+      setViewPlanilla(updated);
       load();
     } catch (e) {
       toast.error(e.response?.data?.message || 'Error al calcular');
@@ -120,13 +120,10 @@ export default function DecimoPage() {
   const handleDescargar = async (planillaDecimoId, formato) => {
     try {
       const ext = formato === 'pdf' ? 'pdf' : 'excel';
-      const res = await api.get(`/api/reportes/desglose-decimo/${planillaDecimoId}/${ext}`, { responseType: 'blob' });
-      const blob = new Blob([res.data]);
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `DesgloseDecimo_${planillaDecimoId}.${formato === 'pdf' ? 'pdf' : 'xlsx'}`;
-      link.click();
-      URL.revokeObjectURL(link.href);
+      const nombre = `DesgloseDecimo_${planillaDecimoId}.${formato === 'pdf' ? 'pdf' : 'xlsx'}`;
+      // api.get no acepta responseType: descarta el segundo argumento y devuelve
+      // el body parseado. api.download es el helper que maneja el blob.
+      await api.download(`/api/reportes/desglose-decimo/${planillaDecimoId}/${ext}`, nombre);
     } catch (e) {
       toast.error(e?.response?.data?.message || 'Error al descargar el reporte');
     }
@@ -139,10 +136,10 @@ export default function DecimoPage() {
       await api.patch(`/api/decimo/${planillaId}/pagar`);
       toast.success('Planilla marcada como pagada');
       const updated = await api.get(`/api/decimo/${planillaId}`);
-      setViewPlanilla(updated.data);
+      setViewPlanilla(updated);
       load();
     } catch (e) {
-      toast.error(e.response?.data?.message || 'Error al marcar como pagada');
+      toast.error(e?.message || 'Error al marcar como pagada');
     }
   };
 
