@@ -5,6 +5,7 @@ import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmModal from '../components/ConfirmModal';
 import { formatCurrency } from '../utils/currency';
+import { formatDate, toDateInputValue, todayInputValue } from '../utils/date';
 
 const OvertimeByTypeBarChart = lazy(() => import('../components/charts/OvertimeByTypeBarChart'));
 const OvertimeCostDistributionPieChart = lazy(() => import('../components/charts/OvertimeCostDistributionPieChart'));
@@ -43,7 +44,7 @@ const HorasExtraPage = () => {
     // Form data
     const [formData, setFormData] = useState({
         empleadoId: '',
-        fecha: new Date().toISOString().split('T')[0],
+        fecha: todayInputValue(),
         tipoHoraExtra: '1',
         horaInicio: '09:00',
         horaFin: '10:00',
@@ -381,7 +382,7 @@ const HorasExtraPage = () => {
     const handleEdit = (horaExtra) => {
         setFormData({
             empleadoId: horaExtra.empleadoId.toString(),
-            fecha: new Date(horaExtra.fecha).toISOString().split('T')[0],
+            fecha: toDateInputValue(horaExtra.fecha),
             tipoHoraExtra: horaExtra.tipoHoraExtra.toString(),
             horaInicio: formatTime(horaExtra.horaInicio),
             horaFin: formatTime(horaExtra.horaFin),
@@ -396,7 +397,7 @@ const HorasExtraPage = () => {
         setEditingId(null);
         setFormData({
             empleadoId: '',
-            fecha: new Date().toISOString().split('T')[0],
+            fecha: todayInputValue(),
             tipoHoraExtra: '1',
             horaInicio: '09:00',
             horaFin: '10:00',
@@ -614,11 +615,7 @@ const HorasExtraPage = () => {
                                 <tr key={he.id} className="hover:bg-navy-800 transition-colors">
                                     <td className="py-4 px-6 text-sm text-gray-100">{he.empleadoNombre}</td>
                                     <td className="py-4 px-6 text-sm text-gray-500">
-                                        {new Date(he.fecha).toLocaleDateString('es-PA', {
-                                            day: '2-digit',
-                                            month: 'short',
-                                            year: 'numeric'
-                                        })}
+                                        {formatDate(he.fecha)}
                                     </td>
                                     <td className="py-4 px-6">
                                         <div className="flex flex-col gap-1">

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { formatDate, formatDateShort, formatDayMonth, todayInputValue } from '../utils/date';
 
 const VacacionesPage = () => {
     // Auth context for permissions
@@ -22,8 +23,8 @@ const VacacionesPage = () => {
     // Form data
     const [formData, setFormData] = useState({
         empleadoId: '',
-        fechaInicio: new Date().toISOString().split('T')[0],
-        fechaFin: new Date().toISOString().split('T')[0],
+        fechaInicio: todayInputValue(),
+        fechaFin: todayInputValue(),
         observaciones: ''
     });
 
@@ -187,8 +188,8 @@ const VacacionesPage = () => {
         setShowModal(false);
         setFormData({
             empleadoId: '',
-            fechaInicio: new Date().toISOString().split('T')[0],
-            fechaFin: new Date().toISOString().split('T')[0],
+            fechaInicio: todayInputValue(),
+            fechaFin: todayInputValue(),
             observaciones: ''
         });
         setCalculoVacacional(null);
@@ -358,11 +359,11 @@ const VacacionesPage = () => {
                                         <tr key={vac.id} className="hover:bg-navy-800 transition-colors">
                                             <td className="py-4 px-4 text-sm text-gray-100">{vac.empleadoNombre}</td>
                                             <td className="py-4 px-4 text-sm text-gray-500">
-                                                {new Date(vac.fechaInicio).toLocaleDateString('es-PA', { day: '2-digit', month: 'short' })} - {new Date(vac.fechaFin).toLocaleDateString('es-PA', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                {formatDayMonth(vac.fechaInicio)} - {formatDate(vac.fechaFin)}
                                             </td>
                                             <td className="py-4 px-4 text-sm font-medium text-gray-100">{vac.diasVacaciones}</td>
                                             <td className="py-4 px-4 text-sm text-gray-500">
-                                                {new Date(vac.fechaSolicitud).toLocaleDateString('es-PA', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                                {formatDate(vac.fechaSolicitud)}
                                             </td>
                                             <td className="py-4 px-4">
                                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getEstadoColor(vac.estado)}`}>
@@ -447,7 +448,7 @@ const VacacionesPage = () => {
                                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                                         </svg>
-                                                        {new Date(vac.fechaInicio).toLocaleDateString('es-PA')} - {new Date(vac.fechaFin).toLocaleDateString('es-PA')}
+                                                        {formatDateShort(vac.fechaInicio)} - {formatDateShort(vac.fechaFin)}
                                                     </div>
                                                     <div className="flex items-center gap-1">
                                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -656,7 +657,7 @@ const VacacionesPage = () => {
                                                     </div>
                                                 </div>
                                                 <p className="text-xs text-gray-500">
-                                                    Período ref: {calculoVacacional.periodoDesde ? new Date(calculoVacacional.periodoDesde).toLocaleDateString('es-PA') : '—'} — {calculoVacacional.periodoHasta ? new Date(calculoVacacional.periodoHasta).toLocaleDateString('es-PA') : '—'} ({calculoVacacional.diasCalendarioCubiertos} días calendario)
+                                                    Período ref: {calculoVacacional.periodoDesde ? formatDateShort(calculoVacacional.periodoDesde) : '—'} — {calculoVacacional.periodoHasta ? formatDateShort(calculoVacacional.periodoHasta) : '—'} ({calculoVacacional.diasCalendarioCubiertos} días calendario)
                                                 </p>
                                             </div>
                                         ) : (

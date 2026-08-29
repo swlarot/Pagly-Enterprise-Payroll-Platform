@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../utils/currency';
+import { formatDateShort, toDateInputValue, todayInputValue } from '../utils/date';
 
 const PrestamosPage = () => {
     // Auth context - Solo Manager+ puede crear/aprobar préstamos
@@ -29,7 +30,7 @@ const PrestamosPage = () => {
         cuotaMensual: '',
         numeroCuotas: '',
         tasaInteres: '0',
-        fechaInicio: new Date().toISOString().split('T')[0],
+        fechaInicio: todayInputValue(),
         referencia: '',
         observaciones: '',
         frecuenciaCuota: '3'
@@ -162,7 +163,7 @@ const PrestamosPage = () => {
             cuotaMensual: prestamo.cuotaMensual.toString(),
             numeroCuotas: prestamo.numeroCuotas.toString(),
             tasaInteres: prestamo.tasaInteres.toString(),
-            fechaInicio: new Date(prestamo.fechaInicio).toISOString().split('T')[0],
+            fechaInicio: toDateInputValue(prestamo.fechaInicio),
             referencia: prestamo.referencia || '',
             observaciones: prestamo.observaciones || '',
             frecuenciaCuota: (prestamo.frecuenciaCuota ?? 3).toString()
@@ -215,7 +216,7 @@ const PrestamosPage = () => {
             cuotaMensual: '',
             numeroCuotas: '',
             tasaInteres: '0',
-            fechaInicio: new Date().toISOString().split('T')[0],
+            fechaInicio: todayInputValue(),
             referencia: '',
             observaciones: '',
             frecuenciaCuota: '3'
@@ -742,7 +743,7 @@ const PrestamosPage = () => {
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-400">Fecha de Inicio</p>
-                                    <p className="font-medium text-gray-100">{new Date(selectedPrestamo.fechaInicio).toLocaleDateString('es-PA')}</p>
+                                    <p className="font-medium text-gray-100">{formatDateShort(selectedPrestamo.fechaInicio)}</p>
                                 </div>
                                 {selectedPrestamo.referencia && (
                                     <div>
@@ -782,7 +783,7 @@ const PrestamosPage = () => {
                                             <tbody className="divide-y divide-navy-700">
                                                 {selectedPrestamo.historialPagos.map((pago, idx) => (
                                                     <tr key={idx}>
-                                                        <td className="py-2 px-3 text-gray-300">{new Date(pago.fecha).toLocaleDateString('es-PA')}</td>
+                                                        <td className="py-2 px-3 text-gray-300">{formatDateShort(pago.fecha)}</td>
                                                         <td className="py-2 px-3 text-gray-300">{pago.numeroCuota}</td>
                                                         <td className="py-2 px-3 font-medium font-mono text-gray-100">{formatCurrency(pago.monto)}</td>
                                                         <td className="py-2 px-3 font-mono text-gray-300">{formatCurrency(pago.saldoAnterior)}</td>

@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../utils/currency';
+import { formatDate, todayInputValue } from '../utils/date';
 
 const AnticiposPage = () => {
     // Auth context - Solo Manager+ puede aprobar anticipos
@@ -406,19 +407,11 @@ const AnticiposPage = () => {
                                         {formatCurrency(anticipo.monto)}
                                     </td>
                                     <td className="py-4 px-6 text-sm text-gray-400">
-                                        {new Date(anticipo.fechaSolicitud).toLocaleDateString('es-PA', {
-                                            day: '2-digit',
-                                            month: 'short',
-                                            year: 'numeric'
-                                        })}
+                                        {formatDate(anticipo.fechaSolicitud)}
                                     </td>
                                     <td className="py-4 px-6 text-sm text-gray-400">
                                         {anticipo.fechaDescuento
-                                            ? new Date(anticipo.fechaDescuento).toLocaleDateString('es-PA', {
-                                                day: '2-digit',
-                                                month: 'short',
-                                                year: 'numeric'
-                                            })
+                                            ? formatDate(anticipo.fechaDescuento)
                                             : '-'
                                         }
                                     </td>
@@ -564,7 +557,7 @@ const AnticiposPage = () => {
                                         required
                                         value={formData.fechaDescuento}
                                         onChange={(e) => setFormData({ ...formData, fechaDescuento: e.target.value })}
-                                        min={new Date().toISOString().split('T')[0]}
+                                        min={todayInputValue()}
                                         className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     />
                                     <p className="text-xs text-gray-500 mt-1">Fecha en que se descontará de la planilla</p>

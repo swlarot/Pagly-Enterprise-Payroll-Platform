@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../utils/currency';
+import { formatDate, formatDayMonth, toDateInputValue, todayInputValue } from '../utils/date';
 
 const AusenciasPage = () => {
     // Auth context for permissions
@@ -27,8 +28,8 @@ const AusenciasPage = () => {
     const [formData, setFormData] = useState({
         empleadoId: '',
         tipoAusencia: '1',
-        fechaInicio: new Date().toISOString().split('T')[0],
-        fechaFin: new Date().toISOString().split('T')[0],
+        fechaInicio: todayInputValue(),
+        fechaFin: todayInputValue(),
         motivo: '',
         tieneJustificacion: false,
         documentoReferencia: ''
@@ -115,8 +116,8 @@ const AusenciasPage = () => {
         setFormData({
             empleadoId: ausencia.empleadoId.toString(),
             tipoAusencia: ausencia.tipoAusencia.toString(),
-            fechaInicio: new Date(ausencia.fechaInicio).toISOString().split('T')[0],
-            fechaFin: new Date(ausencia.fechaFin).toISOString().split('T')[0],
+            fechaInicio: toDateInputValue(ausencia.fechaInicio),
+            fechaFin: toDateInputValue(ausencia.fechaFin),
             motivo: ausencia.motivo || '',
             tieneJustificacion: ausencia.tieneJustificacion,
             documentoReferencia: ausencia.documentoReferencia || ''
@@ -143,8 +144,8 @@ const AusenciasPage = () => {
         setFormData({
             empleadoId: '',
             tipoAusencia: '1',
-            fechaInicio: new Date().toISOString().split('T')[0],
-            fechaFin: new Date().toISOString().split('T')[0],
+            fechaInicio: todayInputValue(),
+            fechaFin: todayInputValue(),
             motivo: '',
             tieneJustificacion: false,
             documentoReferencia: ''
@@ -305,7 +306,7 @@ const AusenciasPage = () => {
                                         </span>
                                     </td>
                                     <td className="py-4 px-6 text-sm text-gray-500">
-                                        {new Date(aus.fechaInicio).toLocaleDateString('es-PA', { day: '2-digit', month: 'short' })} - {new Date(aus.fechaFin).toLocaleDateString('es-PA', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                        {formatDayMonth(aus.fechaInicio)} - {formatDate(aus.fechaFin)}
                                     </td>
                                     <td className="py-4 px-6 text-sm font-medium text-gray-100">
                                         {aus.diasAusencia}

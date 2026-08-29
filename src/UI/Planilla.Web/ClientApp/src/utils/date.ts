@@ -62,6 +62,17 @@ export function formatDateShort(dateStr: string | undefined | null): string {
 }
 
 /**
+ * Formatea una fecha de calendario como "01 ene", sin año.
+ * Para extremos de un rango donde el año se muestra una sola vez.
+ */
+export function formatDayMonth(dateStr: string | undefined | null): string {
+  if (!dateStr) return '-';
+  const date = parseCalendarDate(dateStr);
+  if (!date) return '-';
+  return date.toLocaleDateString('es-PA', { day: '2-digit', month: 'short' });
+}
+
+/**
  * Convierte una fecha del backend al valor que espera un `<input type="date">`
  * (YYYY-MM-DD), sin desplazarla por zona horaria.
  *

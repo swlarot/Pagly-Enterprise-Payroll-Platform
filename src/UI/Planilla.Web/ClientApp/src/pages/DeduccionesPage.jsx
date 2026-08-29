@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import AcreedorCombobox from '../components/AcreedorCombobox';
 import { formatCurrency } from '../utils/currency';
 import CollapsibleSection from '../components/CollapsibleSection';
+import { formatDateShort, toDateInputValue, todayInputValue } from '../utils/date';
 
 // Constantes de tipos de deduccion (valores numericos del backend)
 const TIPO_PENSION_ALIMENTICIA = 3;
@@ -27,7 +28,7 @@ const INITIAL_FORM = {
     esPorcentaje: false,
     monto: '',
     porcentaje: '',
-    fechaInicio: new Date().toISOString().split('T')[0],
+    fechaInicio: todayInputValue(),
     fechaFin: '',
     prioridad: '10',
     referencia: '',
@@ -325,10 +326,10 @@ const DeduccionesPage = () => {
             monto: deduccion.monto?.toString() || '',
             porcentaje: deduccion.porcentaje?.toString() || '',
             fechaInicio: deduccion.fechaInicio
-                ? new Date(deduccion.fechaInicio).toISOString().split('T')[0]
-                : new Date().toISOString().split('T')[0],
+                ? toDateInputValue(deduccion.fechaInicio)
+                : todayInputValue(),
             fechaFin: deduccion.fechaFin
-                ? new Date(deduccion.fechaFin).toISOString().split('T')[0]
+                ? toDateInputValue(deduccion.fechaFin)
                 : '',
             prioridad: deduccion.prioridad?.toString() || '10',
             referencia: deduccion.referencia || '',
@@ -345,7 +346,7 @@ const DeduccionesPage = () => {
             numeroExpediente: deduccion.numeroExpediente || '',
             juzgado: deduccion.juzgado || '',
             fechaOrdenJudicial: deduccion.fechaOrdenJudicial
-                ? new Date(deduccion.fechaOrdenJudicial).toISOString().split('T')[0]
+                ? toDateInputValue(deduccion.fechaOrdenJudicial)
                 : '',
             nombreJuez: deduccion.nombreJuez || '',
             estadoOrdenJudicial: deduccion.estadoOrdenJudicial?.toString() || '1',
@@ -353,7 +354,7 @@ const DeduccionesPage = () => {
             // Autorizacion del trabajador
             tieneAutorizacionEscrita: deduccion.tieneAutorizacionEscrita || false,
             fechaAutorizacion: deduccion.fechaAutorizacion
-                ? new Date(deduccion.fechaAutorizacion).toISOString().split('T')[0]
+                ? toDateInputValue(deduccion.fechaAutorizacion)
                 : '',
             documentoAutorizacionRef: deduccion.documentoAutorizacionRef || '',
 
@@ -620,10 +621,10 @@ const DeduccionesPage = () => {
                                             )}
                                         </td>
                                         <td className="py-4 px-6 text-sm text-gray-400">
-                                            {new Date(deduccion.fechaInicio).toLocaleDateString('es-PA')}
+                                            {formatDateShort(deduccion.fechaInicio)}
                                             {' - '}
                                             {deduccion.fechaFin
-                                                ? new Date(deduccion.fechaFin).toLocaleDateString('es-PA')
+                                                ? formatDateShort(deduccion.fechaFin)
                                                 : 'Indefinida'
                                             }
                                         </td>
