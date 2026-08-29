@@ -131,7 +131,12 @@ public class LiquidacionCalculationService
             RecargoArt219 = calc.RecargoArt219Amount,
             Preaviso = calc.PreavisoCompensacionAmount,
             VacacionesProporcionales = RoundingPolicy.Round(baseVacaciones),
-            DiasVacacionesProporcionales = diasVacVencidas,
+            // Antes se mostraban solo los dias vencidos que el usuario escribia a mano,
+            // mientras el monto sumaba vencidas + proporcionales. Con 7 meses de servicio
+            // la UI decia "0.00 dias" junto a un pago de B/. 447.59.
+            DiasVacacionesProporcionales = diasVacVencidas > 0
+                ? diasVacVencidas
+                : calc.VacacionesProporcionalDias,
             DecimoTercerMesProporcional = calc.DecimoProporcionalAmount,
             Cesantia = calc.CesantiaAmount,
             SalarioPendiente = montoPend,

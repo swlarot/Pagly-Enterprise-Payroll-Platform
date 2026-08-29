@@ -68,6 +68,13 @@ public record LiquidacionCalcResult
     public decimal DecimosProrrateadosAmount { get; init; }
     public decimal OtrasIndemnizaciones { get; init; }
     public decimal VacacionesProporcionalAmount { get; init; }
+
+    /// <summary>
+    /// Dias de vacacion que representa <see cref="VacacionesProporcionalAmount"/>,
+    /// a razon de 1 dia por cada 11 trabajados (Art. 54.1). Se expone junto al monto
+    /// para que la UI no tenga que reconstruirlo y ambos no puedan divergir.
+    /// </summary>
+    public decimal VacacionesProporcionalDias { get; init; }
     public decimal DecimoProporcionalAmount { get; init; }
     public decimal CesantiaAmount { get; init; }
     public decimal PreavisoDiasRequeridos { get; init; }
@@ -183,6 +190,21 @@ public static class LiquidacionCalculator
     }
 
     /// <summary>
+    /// Dias de vacacion equivalentes al monto proporcional (Art. 54.1: 1 dia por cada 11
+    /// trabajados). Refleja exactamente las mismas ramas que CalcularVacacionProporcional,
+    /// para que el monto mostrado y los dias mostrados nunca se contradigan.
+    /// </summary>
+    public static decimal CalcularVacacionProporcionalDias(
+        decimal monthsOwed, decimal daysWorked, decimal yearsWorked, bool isDomestic)
+    {
+        if (isDomestic) return 0;
+        if (monthsOwed > 0) return RoundingPolicy.Round(monthsOwed * 30m);
+        if (daysWorked > 0 && yearsWorked < 1)
+            return RoundingPolicy.Round(daysWorked / DiasVacacionUnit);
+        return 0;
+    }
+
+    /// <summary>
     /// XIII Mes proporcional al cierre (Art. 142 + Ley 51/2005 Art. 96.4-96.5):
     /// (salario / 24) + (salario × mesesVencidos / 11). Fórmula MITRADEL validada.
     /// </summary>
@@ -270,6 +292,8 @@ public static class LiquidacionCalculator
         var daysWorked = input.YearsWorked * 365.25m;
         var vacacionProp = CalcularVacacionProporcional(
             input.MonthlySalaryForDailyRate, monthsOwed, daysWorked, input.YearsWorked, input.IsDomesticWorker);
+        var vacacionPropDias = CalcularVacacionProporcionalDias(
+            monthsOwed, daysWorked, input.YearsWorked, input.IsDomesticWorker);
         var decimoProp = CalcularDecimoProporcional(input.MonthlySalaryForDailyRate, monthsOwed);
 
         // 5d. Cesantía (Decreto 60/1995) — solo DEFINIDO/POR_OBRA.
@@ -299,6 +323,7 @@ public static class LiquidacionCalculator
             DecimosProrrateadosAmount = decimosProrrateados,
             OtrasIndemnizaciones = otras,
             VacacionesProporcionalAmount = vacacionProp,
+            VacacionesProporcionalDias = vacacionPropDias,
             DecimoProporcionalAmount = decimoProp,
             CesantiaAmount = cesantia,
             PreavisoDiasRequeridos = preaviso.DiasRequeridos,

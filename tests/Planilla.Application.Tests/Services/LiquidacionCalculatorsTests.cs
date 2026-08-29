@@ -242,4 +242,48 @@ public class LiquidacionCalculatorsTests
         r.IndemnizacionDespidoAmount.Should().BeApproximately(36000m, 0.10m);
         r.RecargoArt219Amount.Should().BeApproximately(9000m, 0.10m);
     }
+    // ── Dias de vacacion proporcional (Art. 54.1) ──────────────────────
+    // Regresion: la liquidacion mostraba "0.00 dias" junto a un pago de
+    // B/. 447.59 porque los dias solo contaban las vacaciones VENCIDAS
+    // mientras el monto sumaba vencidas + proporcionales.
+
+    [Fact]
+    public void VacacionProporcionalDias__SieteMesesSinVencidas__NoEsCero()
+    {
+        // 7 meses de servicio: sin vacaciones vencidas, pero si proporcionales.
+        var yearsWorked = 7m / 12m;
+        var daysWorked = yearsWorked * 365.25m;
+
+        var dias = LiquidacionCalculator.CalcularVacacionProporcionalDias(
+            monthsOwed: 0m, daysWorked: daysWorked, yearsWorked: yearsWorked, isDomestic: false);
+
+        // Art. 54.1: un dia por cada once trabajados.
+        dias.Should().BeApproximately(daysWorked / 11m, 0.01m);
+        dias.Should().BeGreaterThan(0m);
+    }
+
+    [Fact]
+    public void VacacionProporcionalDias__AcompanaAlMonto__NingunoEsCeroSinElOtro()
+    {
+        var yearsWorked = 7m / 12m;
+        var daysWorked = yearsWorked * 365.25m;
+
+        var monto = LiquidacionCalculator.CalcularVacacionProporcional(
+            monthlySalary: 700m, monthsOwed: 0m, daysWorked: daysWorked,
+            yearsWorked: yearsWorked, isDomestic: false);
+        var dias = LiquidacionCalculator.CalcularVacacionProporcionalDias(
+            monthsOwed: 0m, daysWorked: daysWorked, yearsWorked: yearsWorked, isDomestic: false);
+
+        // Si se paga un monto, tiene que haber dias que lo expliquen, y viceversa.
+        (monto > 0).Should().Be(dias > 0);
+    }
+
+    [Fact]
+    public void VacacionProporcionalDias__TrabajadorDomestico__EsCero()
+    {
+        LiquidacionCalculator.CalcularVacacionProporcionalDias(
+            monthsOwed: 0m, daysWorked: 200m, yearsWorked: 0.5m, isDomestic: true)
+            .Should().Be(0m);
+    }
+
 }
