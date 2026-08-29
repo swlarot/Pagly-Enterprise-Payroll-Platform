@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Loader2, Plus, Calculator, CheckCircle, ChevronDown, ChevronRight, Calendar, DollarSign, Users, FileDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
+import { formatDate } from '../utils/date';
 
 // ============================================================
 // Utilidades de formato
@@ -11,11 +12,8 @@ const fmt = (n) => {
   return isNaN(v) ? 'B/. 0.00' : `B/. ${v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
 };
 
-const fmtDate = (d) => {
-  if (!d) return '—';
-  const date = new Date(d);
-  return date.toLocaleDateString('es-PA', { day: '2-digit', month: 'short', year: 'numeric' });
-};
+// Usa el helper central: new Date(iso) desplaza el dia en Panama (UTC-5).
+const fmtDate = (d) => (d ? formatDate(d) : '—');
 
 const MESES = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 

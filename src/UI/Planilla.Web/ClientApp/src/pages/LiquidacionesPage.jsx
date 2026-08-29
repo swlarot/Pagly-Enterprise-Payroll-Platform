@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../utils/currency';
+import { formatDateShort } from '../utils/date';
 
 const TIPOS_TERMINACION = [
     { value: 0, label: 'Despido Injustificado' },
@@ -176,11 +177,9 @@ const LiquidacionesPage = () => {
         return colors[tipo] || 'bg-gray-500/15 text-gray-400';
     };
 
-    const formatDate = (dateStr) => {
-        if (!dateStr) return '-';
-        const d = new Date(dateStr);
-        return d.toLocaleDateString('es-PA', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    };
+    // Usa el helper central: new Date(iso) desplaza el dia en Panama (UTC-5),
+    // y estas fechas deciden antiguedad, prima e indemnizacion.
+    const formatDate = (dateStr) => formatDateShort(dateStr);
 
     const formatYears = (anos) => {
         if (!anos) return '0';
