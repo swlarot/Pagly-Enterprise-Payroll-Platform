@@ -78,3 +78,10 @@ src/UI/Planilla.Desktop/src-tauri/gen/
 # Configuración local con credenciales (no subir a GitHub)
 **/appsettings.Development.json
 **/appsettings.Local.json
+
+# Tooling de IA / indexado local (no versionar)
+.agora/
+.remember/
+.claude/agents/
+.claude/hooks/
+**/__pycache__/

@@ -199,27 +199,4 @@ Stripe__PublishableKey / Stripe__SecretKey / Stripe__WebhookSecret
 
 El registro de usuarios nuevos lo hace un admin del sistema desde `/system-admin/tenants/create`. El flujo de usuario solo tiene `/login` y `/accept-invite`.
 
----
-
-## Flujo obligatorio — Linear Tickets (CRÍTICO)
-
-**Antes de tocar cualquier archivo**, sin excepción de tamaño:
-
-1. **Crear ticket en Linear** (equipo `DEV`) con:
-   - Título descriptivo (sin prefijo `DEV-#`)
-   - **Descripción: OBLIGATORIO usar la plantilla correspondiente al tipo** (ver MEMORY.md). Nunca crear ticket sin plantilla.
-     - `Bug` → plantilla Bug Report
-     - `Feature` → plantilla Feature Request
-     - `Refactor` / `Performance` / tech task → plantilla Tech Task
-   - Labels apropiados (`Bug` / `Feature` / `Refactor` / etc., `WEBAPP` / `API` / etc.)
-   - Estado: `Todo`
-
-2. **Mover a `In Progress`** al empezar a trabajar.
-
-3. **Implementar** el cambio.
-
-4. **Mover a `Done`** al terminar.
-
-Esto aplica a: bugs de una línea, cambios de texto, refactors grandes, nuevas features — **todo**.
-
 @~/.claude/CLAUDE.md

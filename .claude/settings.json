@@ -24,28 +24,5 @@
       "Bash(grep:*)",
       "Bash(findstr:*)"
     ]
-  },
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python ${CLAUDE_PROJECT_DIR}/.claude/hooks/route_prompt.py"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python ${CLAUDE_PROJECT_DIR}/.claude/hooks/stop_guard.py",
-            "timeout": 120
-          }
-        ]
-      }
-    ]
   }
 }
