@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
+import { formatDate, toDateInputValue } from '../utils/date';
 import { api } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { LinkUserModal } from '../components/empleados/LinkUserModal';
@@ -220,7 +221,7 @@ const EmpleadosPage = () => {
             email: empleado.usuarioVinculadoEmail ?? empleado.email ?? '',
             salarioBase: empleado.salarioBase.toString(),
             fechaContratacion: empleado.fechaContratacion
-                ? new Date(empleado.fechaContratacion).toISOString().split('T')[0]
+                ? toDateInputValue(empleado.fechaContratacion)
                 : '',
             departamentoId: empleado.departamentoId ? empleado.departamentoId.toString() : '',
             posicionId: empleado.posicionId ? empleado.posicionId.toString() : '',
@@ -578,11 +579,7 @@ const EmpleadosPage = () => {
                                         })()}
                                     </td>
                                     <td className="py-3 px-4 text-sm text-gray-500">
-                                        {new Date(empleado.fechaContratacion).toLocaleDateString('es-PA', {
-                                            day: '2-digit',
-                                            month: 'short',
-                                            year: 'numeric'
-                                        })}
+                                        {formatDate(empleado.fechaContratacion)}
                                     </td>
                                     <td className="py-3 px-4 text-sm text-gray-300">
                                         {empleado.departamentoNombre || <span className="text-gray-500">-</span>}
@@ -920,7 +917,7 @@ const EmpleadosPage = () => {
                                                                 <span className="text-gray-100 font-medium">{formatBalboas(h.salarioMensual)}</span>
                                                                 {h.motivo && <span className="text-gray-500 ml-2">— {h.motivo}</span>}
                                                             </div>
-                                                            <span className="text-gray-400">{new Date(h.fechaVigencia).toLocaleDateString('es-PA')}</span>
+                                                            <span className="text-gray-400">{formatDate(h.fechaVigencia)}</span>
                                                         </li>
                                                     ))}
                                                 </ul>
@@ -1067,7 +1064,7 @@ const EmpleadosPage = () => {
                                                     placeholder="0"
                                                 />
                                                 <p className="text-xs text-gray-500 mt-1">
-                                                    Afecta tope de cotización CSS (25 años: tope intermedio, 30 años: tope máximo)
+                                                    Años cotizados ante la CSS. Referencial: no afecta el cálculo de la cuota, que se aplica sobre el salario completo (Ley 51/2005, Art. 96).
                                                 </p>
                                             </div>
 
@@ -1089,7 +1086,7 @@ const EmpleadosPage = () => {
                                                     />
                                                 </div>
                                                 <p className="text-xs text-gray-500 mt-1">
-                                                    Usado para determinar el tope alto de cotización CSS
+                                                    Referencial para topes de pensión (Art. 193). No afecta el cálculo de la cuota mensual.
                                                 </p>
                                             </div>
 
@@ -1109,7 +1106,7 @@ const EmpleadosPage = () => {
                                                     placeholder="0"
                                                 />
                                                 <p className="text-xs text-gray-500 mt-1">
-                                                    Máximo 3 dependientes para deducción ISR (B/. 100 c/u al año)
+                                                    Deducción ISR de B/. 800 al año por cada dependiente (sin límite legal)
                                                 </p>
                                             </div>
 

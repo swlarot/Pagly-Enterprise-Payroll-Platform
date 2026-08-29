@@ -266,7 +266,7 @@ const ConfiguracionPage = () => {
                                                             {Number(taxConfig.cssEmployerBaseRate).toFixed(2)}%
                                                         </span>
                                                     </td>
-                                                    <td className="py-3 px-4 text-sm text-gray-500">Topes: B/.{Number(taxConfig.cssMaxContributionBaseStandard).toFixed(0)} / B/.{Number(taxConfig.cssMaxContributionBaseIntermediate).toFixed(0)} / B/.{Number(taxConfig.cssMaxContributionBaseHigh).toFixed(0)}</td>
+                                                    <td className="py-3 px-4 text-sm text-gray-500">Sobre el salario completo, sin tope (Art. 96)</td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -340,7 +340,7 @@ const ConfiguracionPage = () => {
                                     <div className="mt-6 p-4 bg-navy-950 rounded-lg border border-navy-700">
                                         <h4 className="text-sm font-semibold text-gray-100 mb-2">Notas:</h4>
                                         <ul className="text-sm text-gray-400 space-y-1 list-disc list-inside">
-                                            <li>Topes CSS según años cotizados y salario promedio (configuración actual en uso)</li>
+                                            <li>La cuota de CSS se calcula sobre el salario completo. No existe tope de cotización (Ley 51/2005, Art. 96). Los montos de B/.1,500 / B/.2,000 / B/.2,500 son topes de <strong>pensión</strong> (Art. 193), no de cotización.</li>
                                             <li>Deducción ISR por dependiente: B/.{Number(taxConfig.dependentDeductionAmount).toFixed(0)} (máx. {taxConfig.maxDependents} dependientes)</li>
                                         </ul>
                                     </div>
