@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Identity.EntityFrameworkCore; // <--- USANDO A�ADIDO
+﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore; // <--- USANDO A�ADIDO
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -44,6 +44,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
 
     // Phase A: Configuraci�n de planilla (tasas CSS, SE, ISR)
     public DbSet<PayrollTaxConfiguration> PayrollTaxConfigurations { get; set; }
+    public DbSet<OvertimeFactorConfiguration> OvertimeFactorConfigurations { get; set; }
     public DbSet<TaxBracket> TaxBrackets { get; set; }
 
     // Phase D: Workflow de planilla
@@ -167,6 +168,22 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
         });
 
         // Phase A: Configuraci�n de PayrollTaxConfiguration
+        modelBuilder.Entity<OvertimeFactorConfiguration>(entity =>
+        {
+            // Un solo factor por tipo de hora extra dentro de cada tenant
+            entity.HasIndex(o => new { o.TenantId, o.Tipo })
+                .IsUnique()
+                .HasDatabaseName("IX_OvertimeFactorConfiguration_TenantId_Tipo");
+
+            entity.Property(o => o.Factor).HasPrecision(6, 4);
+            entity.Property(o => o.FactorExceso).HasPrecision(6, 4);
+
+            entity.HasOne(o => o.Tenant)
+                .WithMany()
+                .HasForeignKey(o => o.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<PayrollTaxConfiguration>(entity =>
         {
             // �ndice compuesto para b�squedas por tenant y fecha efectiva

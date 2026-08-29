@@ -22,7 +22,7 @@ public class CssCalculationServiceTests
     private readonly DateTime _calculationDate = new(2025, 1, 15);
 
     [Fact]
-    public async Task CalculateEmployeeCss__TopeEstandar__ReturnsCorrectAmount()
+    public async Task CalculateEmployeeCss__SalarioSobre1500__CotizaSobreElSueldoCompleto()
     {
         // Arrange
         var mockProvider = new MockPayrollConfigProvider();
@@ -45,15 +45,15 @@ public class CssCalculationServiceTests
         );
 
         // Assert
-        result.ContributionBase.Should().Be(1500m);
-        result.MaxContributionBase.Should().Be(1500m);
+        // Ley 51/2005 Art. 96.1: 9.75 % de SUS SUELDOS, sin tope de cotizacion.
+        result.ContributionBase.Should().Be(1800m);
         result.TipoTope.Should().Be("Estándar");
         result.Rate.Should().Be(9.75m);
-        result.Amount.Should().Be(146.25m); // 1500 * 9.75% = 146.25
+        result.Amount.Should().Be(175.50m); // 1800 * 9.75% = 175.50
     }
 
     [Fact]
-    public async Task CalculateEmployeeCss__TopeIntermedio__ReturnsCorrectAmount()
+    public async Task CalculateEmployeeCss__SalarioSobre2000__CotizaSobreElSueldoCompleto()
     {
         // Arrange
         var mockProvider = new MockPayrollConfigProvider();
@@ -76,15 +76,14 @@ public class CssCalculationServiceTests
         );
 
         // Assert
-        result.ContributionBase.Should().Be(2000m);
-        result.MaxContributionBase.Should().Be(2000m);
+        result.ContributionBase.Should().Be(2500m);
         result.TipoTope.Should().Be("Intermedio");
         result.Rate.Should().Be(9.75m);
-        result.Amount.Should().Be(195.00m); // 2000 * 9.75% = 195.00
+        result.Amount.Should().Be(243.75m); // 2500 * 9.75% = 243.75
     }
 
     [Fact]
-    public async Task CalculateEmployeeCss__TopeAlto__ReturnsCorrectAmount()
+    public async Task CalculateEmployeeCss__SalarioSobre2500__CotizaSobreElSueldoCompleto()
     {
         // Arrange
         var mockProvider = new MockPayrollConfigProvider();
@@ -107,11 +106,10 @@ public class CssCalculationServiceTests
         );
 
         // Assert
-        result.ContributionBase.Should().Be(2500m);
-        result.MaxContributionBase.Should().Be(2500m);
+        result.ContributionBase.Should().Be(3000m);
         result.TipoTope.Should().Be("Alto");
         result.Rate.Should().Be(9.75m);
-        result.Amount.Should().Be(243.75m); // 2500 * 9.75% = 243.75
+        result.Amount.Should().Be(292.50m); // 3000 * 9.75% = 292.50
     }
 
     [Fact]
@@ -144,9 +142,9 @@ public class CssCalculationServiceTests
     }
 
     [Fact]
-    public async Task CalculateEmployerCss__SalarioSobreTope__AplicaTopeAlContributionBase()
+    public async Task CalculateEmployerCss__SalarioSobre1500__CotizaSobreElSueldoCompleto()
     {
-        // grossPay = 2000 > tope estándar (1500) → contribución debe basarse en 1500
+        // Ley 51/2005 Art. 96.2.a: 13.25 % de LOS SUELDOS QUE PAGUEN, sin tope.
         var mockProvider = new MockPayrollConfigProvider();
         var service = new CssCalculationServicePortable(mockProvider);
 
@@ -160,24 +158,23 @@ public class CssCalculationServiceTests
             calculationDate: _calculationDate
         );
 
-        result.ContributionBase.Should().Be(1500m);  // capped
+        result.ContributionBase.Should().Be(2000m);
         result.Rate.Should().Be(13.25m);
-        result.Amount.Should().Be(198.75m); // 1500 * 13.25% = 198.75 (no 2000 * 13.25% = 265)
+        result.Amount.Should().Be(265.00m); // 2000 * 13.25% = 265.00
     }
 
     // ====================================================================
-    // CSS por frecuencia de pago no-mensual (DEV-75)
-    // Verifica que periodCap se prorratee y se aplique al contributionBase
+    // CSS por frecuencia de pago no-mensual
+    // La cuota se calcula sobre el bruto del periodo, sin prorratear ningun tope.
     // ====================================================================
 
     [Theory]
-    [InlineData("Quincenal", 900.00, 750.00,  73.13)]  // cap=1500/2=750;  750*9.75%=73.125→73.13
-    [InlineData("Bisemanal", 800.00, 692.31,  67.50)]  // cap=1500*12/26=692.31; 692.31*9.75%=67.500225→67.50
-    [InlineData("Semanal",   400.00, 346.15,  33.75)]  // cap=1500*12/52=346.15; *9.75%=33.75
-    public async Task CalculateEmployeeCss__FrecuenciaNivel_ProrrateoTope_ReturnsCorrectAmount(
-        string payFrequency, decimal grossPay, decimal expectedCap, decimal expectedAmount)
+    [InlineData("Quincenal", 900.00,  87.75)]  // 900 * 9.75% = 87.75
+    [InlineData("Bisemanal", 800.00,  78.00)]  // 800 * 9.75% = 78.00
+    [InlineData("Semanal",   400.00,  39.00)]  // 400 * 9.75% = 39.00
+    public async Task CalculateEmployeeCss__CualquierFrecuencia__CotizaSobreElBrutoDelPeriodo(
+        string payFrequency, decimal grossPay, decimal expectedAmount)
     {
-        // En todas las frecuencias: grossPay > periodCap → contributionBase = periodCap
         var mockProvider = new MockPayrollConfigProvider();
         var service = new CssCalculationServicePortable(mockProvider);
 
@@ -191,8 +188,7 @@ public class CssCalculationServiceTests
             calculationDate: _calculationDate
         );
 
-        result.ContributionBase.Should().Be(expectedCap);
-        result.MaxContributionBase.Should().Be(expectedCap);
+        result.ContributionBase.Should().Be(grossPay);
         result.TipoTope.Should().Be("Estándar");
         result.Rate.Should().Be(9.75m);
         result.Amount.Should().Be(expectedAmount);

@@ -45,6 +45,62 @@ public static class OvertimeClassifier
     }
 
     /// <summary>
+    /// Recargo adicional legal por exceder los límites de jornada extraordinaria
+    /// (más de 3h/día o 9h/semana). Código de Trabajo Art. 36.4.
+    /// </summary>
+    public const decimal FactorExcesoLegal = 1.75m;
+
+    /// <summary>Todos los tipos de hora extra del catálogo, en orden de presentación.</summary>
+    public static readonly IReadOnlyList<TipoHoraExtra> TodosLosTipos = new[]
+    {
+        TipoHoraExtra.Diurna,
+        TipoHoraExtra.Nocturna,
+        TipoHoraExtra.MixtaDiurnaNocturna,
+        TipoHoraExtra.MixtaNocturnaDiurna,
+        TipoHoraExtra.DomingoFeriado,
+        TipoHoraExtra.DominicalHEDiurna,
+        TipoHoraExtra.NocturnaDomingoFeriado,
+        TipoHoraExtra.FeriadoOrdinario,
+        TipoHoraExtra.FiestaNacionalDiurna,
+        TipoHoraExtra.FiestaNacionalNocturna,
+        TipoHoraExtra.DiaSustituto
+    };
+
+    /// <summary>Nombre legible de cada tipo, para la UI de Configuración.</summary>
+    public static string Nombre(TipoHoraExtra tipo) => tipo switch
+    {
+        TipoHoraExtra.Diurna => "Hora extra diurna",
+        TipoHoraExtra.Nocturna => "Hora extra nocturna",
+        TipoHoraExtra.MixtaDiurnaNocturna => "Mixta (inicia diurna)",
+        TipoHoraExtra.MixtaNocturnaDiurna => "Mixta (inicia nocturna)",
+        TipoHoraExtra.DomingoFeriado => "Domingo — jornada ordinaria",
+        TipoHoraExtra.DominicalHEDiurna => "Domingo — hora extra diurna",
+        TipoHoraExtra.NocturnaDomingoFeriado => "Domingo — hora extra nocturna",
+        TipoHoraExtra.FeriadoOrdinario => "Feriado — jornada ordinaria",
+        TipoHoraExtra.FiestaNacionalDiurna => "Feriado — hora extra diurna",
+        TipoHoraExtra.FiestaNacionalNocturna => "Feriado — hora extra nocturna",
+        TipoHoraExtra.DiaSustituto => "Día sustituto tras feriado",
+        _ => tipo.ToString()
+    };
+
+    /// <summary>Artículo del Código de Trabajo que respalda el factor legal.</summary>
+    public static string BaseLegal(TipoHoraExtra tipo) => tipo switch
+    {
+        TipoHoraExtra.Diurna => "Art. 33.1",
+        TipoHoraExtra.Nocturna => "Art. 33.2",
+        TipoHoraExtra.MixtaDiurnaNocturna => "Art. 33.2",
+        TipoHoraExtra.MixtaNocturnaDiurna => "Art. 33.3",
+        TipoHoraExtra.DomingoFeriado => "Art. 48",
+        TipoHoraExtra.DominicalHEDiurna => "Arts. 48 + 50",
+        TipoHoraExtra.NocturnaDomingoFeriado => "Arts. 48 + 50",
+        TipoHoraExtra.FeriadoOrdinario => "Art. 49",
+        TipoHoraExtra.FiestaNacionalDiurna => "Arts. 49 + 50",
+        TipoHoraExtra.FiestaNacionalNocturna => "Arts. 49 + 50",
+        TipoHoraExtra.DiaSustituto => "Art. 49 inciso 2",
+        _ => "—"
+    };
+
+    /// <summary>
     /// ¿La jornada se considera nocturna? Es nocturna si toda cae en período nocturno
     /// o si comprende más de 3 horas dentro de él (Art. 30).
     /// </summary>

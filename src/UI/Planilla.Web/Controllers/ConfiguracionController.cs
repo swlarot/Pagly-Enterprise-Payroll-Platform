@@ -22,14 +22,17 @@ public class ConfiguracionController : ControllerBase
     private readonly IPayrollConfigProvider _configProvider;
     private readonly ITenantContext _tenantContext;
     private readonly ApplicationDbContext _context;
+    private readonly IOvertimeFactorConfigService _overtimeFactors;
     private readonly ILogger<ConfiguracionController> _logger;
 
     public ConfiguracionController(
         IPayrollConfigProvider configProvider,
         ITenantContext tenantContext,
         ApplicationDbContext context,
+        IOvertimeFactorConfigService overtimeFactors,
         ILogger<ConfiguracionController> logger)
     {
+        _overtimeFactors = overtimeFactors ?? throw new ArgumentNullException(nameof(overtimeFactors));
         _configProvider = configProvider ?? throw new ArgumentNullException(nameof(configProvider));
         _tenantContext = tenantContext ?? throw new ArgumentNullException(nameof(tenantContext));
         _context = context ?? throw new ArgumentNullException(nameof(context));
@@ -142,6 +145,68 @@ public class ConfiguracionController : ControllerBase
             salarioMinimoLegal = config.SalarioMinimoLegal,
             actividadEconomica = config.ActividadEconomica
         });
+    }
+
+    /// <summary>
+    /// Factores de horas extra vigentes para el tenant, con su referencia legal.
+    /// GET /api/configuracion/overtime-factors
+    /// </summary>
+    [HttpGet("overtime-factors")]
+    [RequirePermission(SystemPermission.SettingsTaxes)]
+    public async Task<ActionResult<OvertimeFactorConfigDto>> GetOvertimeFactors(CancellationToken ct)
+    {
+        var config = await _overtimeFactors.GetConfigAsync(ct);
+        return Ok(config);
+    }
+
+    /// <summary>
+    /// Actualiza los factores de horas extra del tenant.
+    /// Un factor null (o igual al legal) elimina el override y vuelve al valor de ley.
+    /// PUT /api/configuracion/overtime-factors
+    /// </summary>
+    [HttpPut("overtime-factors")]
+    [RequirePermission(SystemPermission.SettingsTaxes)]
+    public async Task<ActionResult> UpdateOvertimeFactors(
+        [FromBody] UpdateOvertimeFactorsRequest request, CancellationToken ct)
+    {
+        if (request is null)
+            return BadRequest(new { message = "Solicitud vacia" });
+
+        // Un factor de 0 o negativo produciria planillas sin pago; eso si se rechaza.
+        foreach (var item in request.Factores ?? Array.Empty<UpdateOvertimeFactorItem>())
+        {
+            if (item.Factor is not null && item.Factor <= 0)
+                return BadRequest(new { message = $"El factor de '{item.Tipo}' debe ser mayor a cero" });
+        }
+
+        if (request.FactorExceso is not null && request.FactorExceso <= 0)
+            return BadRequest(new { message = "El recargo por exceso debe ser mayor a cero" });
+
+        var userId = User.FindFirst("sub")?.Value ?? User.Identity?.Name;
+        await _overtimeFactors.UpdateConfigAsync(request, userId, ct);
+
+        _logger.LogInformation(
+            "Factores de horas extra actualizados para tenant {TenantId} por {UserId}",
+            _tenantContext.TenantId, userId);
+
+        return Ok(new { message = "Factores de horas extra actualizados exitosamente" });
+    }
+
+    /// <summary>
+    /// Elimina los factores personalizados y vuelve a los valores del Codigo de Trabajo.
+    /// POST /api/configuracion/overtime-factors/reset
+    /// </summary>
+    [HttpPost("overtime-factors/reset")]
+    [RequirePermission(SystemPermission.SettingsTaxes)]
+    public async Task<ActionResult> ResetOvertimeFactors(CancellationToken ct)
+    {
+        await _overtimeFactors.ResetToLegalAsync(ct);
+
+        _logger.LogInformation(
+            "Factores de horas extra restaurados a valores legales para tenant {TenantId}",
+            _tenantContext.TenantId);
+
+        return Ok(new { message = "Factores restaurados a los valores del Codigo de Trabajo" });
     }
 }
 

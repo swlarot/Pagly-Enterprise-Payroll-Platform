@@ -25,11 +25,16 @@ public class OvertimeFactorService : IOvertimeFactorService
 {
     private readonly ApplicationDbContext _context;
     private readonly PanamaHolidayService _holidayService;
+    private readonly IOvertimeFactorConfigService _factorConfig;
 
-    public OvertimeFactorService(ApplicationDbContext context, PanamaHolidayService holidayService)
+    public OvertimeFactorService(
+        ApplicationDbContext context,
+        PanamaHolidayService holidayService,
+        IOvertimeFactorConfigService factorConfig)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _holidayService = holidayService ?? throw new ArgumentNullException(nameof(holidayService));
+        _factorConfig = factorConfig ?? throw new ArgumentNullException(nameof(factorConfig));
     }
 
     /// <summary>
@@ -53,14 +58,32 @@ public class OvertimeFactorService : IOvertimeFactorService
         return OvertimeClassifier.ClasificarJornadaRegular(horaInicio, horaFin);
     }
 
-    /// <summary>Factor multiplicador base según el tipo de hora extra.</summary>
+    /// <summary>Factor legal del tipo, sin overrides del tenant.</summary>
     public decimal CalculateBaseFactor(TipoHoraExtra tipo) => OvertimeClassifier.FactorBase(tipo);
 
-    /// <summary>Factor multiplicador completo, incluyendo recargo por exceso (Art. 36.4).</summary>
+    /// <summary>Factor legal completo, sin overrides del tenant.</summary>
     public decimal CalculateFactor(TipoHoraExtra tipo, bool esExceso)
     {
         decimal factorBase = OvertimeClassifier.FactorBase(tipo);
-        return esExceso ? factorBase * 1.75m : factorBase;
+        return esExceso ? factorBase * OvertimeClassifier.FactorExcesoLegal : factorBase;
+    }
+
+    /// <summary>Factor base vigente para el tenant (override configurado o valor legal).</summary>
+    public Task<decimal> CalculateBaseFactorAsync(TipoHoraExtra tipo, CancellationToken ct = default)
+        => _factorConfig.GetFactorAsync(tipo, ct);
+
+    /// <summary>Recargo por exceso vigente para el tenant (Art. 36.4, legal 1.75).</summary>
+    public Task<decimal> GetFactorExcesoAsync(CancellationToken ct = default)
+        => _factorConfig.GetFactorExcesoAsync(ct);
+
+    /// <summary>Factor completo vigente para el tenant, con recargo por exceso si aplica.</summary>
+    public async Task<decimal> CalculateFactorAsync(TipoHoraExtra tipo, bool esExceso, CancellationToken ct = default)
+    {
+        var factorBase = await _factorConfig.GetFactorAsync(tipo, ct);
+        if (!esExceso) return factorBase;
+
+        var factorExceso = await _factorConfig.GetFactorExcesoAsync(ct);
+        return factorBase * factorExceso;
     }
 
     /// <summary>

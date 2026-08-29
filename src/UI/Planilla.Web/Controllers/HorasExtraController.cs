@@ -130,16 +130,18 @@ public class HorasExtraController : ControllerBase
     /// Obtiene tipos de hora extra con factores
     /// </summary>
     [HttpGet("tipos")]
-    public IActionResult GetTipos()
+    public async Task<IActionResult> GetTipos()
     {
-        var tipos = Enum.GetValues<TipoHoraExtra>()
-            .Select(t => new
+        var tipos = new List<object>();
+        foreach (var t in Enum.GetValues<TipoHoraExtra>())
+        {
+            tipos.Add(new
             {
                 Valor = (int)t,
                 Nombre = ObtenerNombreTipo(t),
-                Factor = _overtimeFactorService.CalculateBaseFactor(t)
-            })
-            .ToArray();
+                Factor = await _overtimeFactorService.CalculateBaseFactorAsync(t)
+            });
+        }
 
         return Ok(tipos);
     }
@@ -171,9 +173,9 @@ public class HorasExtraController : ControllerBase
             request.EmpleadoId, request.Fecha, cantidadHoras);
 
         // Calcular factores
-        var factorBase = _overtimeFactorService.CalculateBaseFactor(tipo);
-        var factorTotal = _overtimeFactorService.CalculateFactor(tipo, esExceso);
-        decimal? factorExceso = esExceso ? 1.75m : null;
+        var factorBase = await _overtimeFactorService.CalculateBaseFactorAsync(tipo);
+        var factorTotal = await _overtimeFactorService.CalculateFactorAsync(tipo, esExceso);
+        decimal? factorExceso = esExceso ? await _overtimeFactorService.GetFactorExcesoAsync() : null;
 
         // Calcular monto
         var montoCalculado = CalcularMonto(empleado, cantidadHoras, factorBase, factorExceso);
@@ -241,9 +243,9 @@ public class HorasExtraController : ControllerBase
                 request.EmpleadoId, request.Fecha, cantidadHoras);
 
             // Calcular factores
-            var factorBase = _overtimeFactorService.CalculateBaseFactor(tipo);
-            var factorTotal = _overtimeFactorService.CalculateFactor(tipo, esExceso);
-            decimal? factorExceso = esExceso ? 1.75m : null;
+            var factorBase = await _overtimeFactorService.CalculateBaseFactorAsync(tipo);
+            var factorTotal = await _overtimeFactorService.CalculateFactorAsync(tipo, esExceso);
+            decimal? factorExceso = esExceso ? await _overtimeFactorService.GetFactorExcesoAsync() : null;
 
             // Calcular monto
             var montoCalculado = CalcularMonto(empleado, cantidadHoras, factorBase, factorExceso);
@@ -328,9 +330,9 @@ public class HorasExtraController : ControllerBase
         bool esExceso = (horasExistentesDelDia + cantidadHoras) > 3m || (horasExistentesDeLaSemana + cantidadHoras) > 9m;
 
         // Calcular factores
-        var factorBase = _overtimeFactorService.CalculateBaseFactor(tipo);
-        var factorTotal = _overtimeFactorService.CalculateFactor(tipo, esExceso);
-        decimal? factorExceso = esExceso ? 1.75m : null;
+        var factorBase = await _overtimeFactorService.CalculateBaseFactorAsync(tipo);
+        var factorTotal = await _overtimeFactorService.CalculateFactorAsync(tipo, esExceso);
+        decimal? factorExceso = esExceso ? await _overtimeFactorService.GetFactorExcesoAsync() : null;
 
         // Calcular monto
         var montoCalculado = CalcularMonto(empleado, cantidadHoras, factorBase, factorExceso);
@@ -378,7 +380,7 @@ public class HorasExtraController : ControllerBase
 
         // Recalcular monto al aprobar (por si cambió el salario del empleado)
         // Usar factor base y factor exceso por separado para cálculo correcto
-        var factorBase = _overtimeFactorService.CalculateBaseFactor(horaExtra.TipoHoraExtra);
+        var factorBase = await _overtimeFactorService.CalculateBaseFactorAsync(horaExtra.TipoHoraExtra);
         var montoCalculado = CalcularMonto(empleado, horaExtra.CantidadHoras, factorBase, horaExtra.FactorExceso);
 
         horaExtra.EstaAprobada = true;
@@ -782,7 +784,7 @@ public class HorasExtraController : ControllerBase
     /// </summary>
     [HttpGet("sugerir-tipo")]
     [Authorize]
-    public ActionResult SugerirTipo(
+    public async Task<ActionResult> SugerirTipo(
         [FromQuery] DateTime fecha,
         [FromQuery] string horaInicio,
         [FromQuery] string horaFin)
@@ -807,7 +809,7 @@ public class HorasExtraController : ControllerBase
             esFestivo,
             nombreFestivo,
             esDomingo,
-            factor = overtimeFactorService.CalculateBaseFactor(tipoSugerido)
+            factor = await overtimeFactorService.CalculateBaseFactorAsync(tipoSugerido)
         });
     }
 }

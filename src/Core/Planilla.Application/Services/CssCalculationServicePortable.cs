@@ -115,7 +115,12 @@ public class CssCalculationServicePortable
         var periodsPerYear = PayrollConstants.GetPeriodsPerYear(payFrequency);
         var periodCap = RoundingPolicy.Round(cap * 12m / periodsPerYear, 2);
 
-        var contributionBase = Math.Min(grossPay, periodCap); // Tope de salario cotizable según Ley 462 Art. 178
+        // NO existe tope de salario cotizable. Ley 51 de 2005 Art. 96.1 (Texto Unico con
+        // reformas de la Ley 462 de 2025, Gaceta Oficial 30284-B): la cuota del empleado es
+        // "el equivalente a 9.75 % de sus sueldos", sin techo alguno.
+        // Los montos B/.1,500 / 2,000 / 2,500 son el MONTO MAXIMO DE LA PENSION (Art. 193),
+        // no una base maxima de cotizacion. periodCap se conserva solo como dato informativo.
+        var contributionBase = grossPay;
         var rate = config.CssEmployeeRate;
         var amount = RoundingPolicy.CalculatePercentage(contributionBase, rate);
 
@@ -173,7 +178,12 @@ public class CssCalculationServicePortable
         var periodsPerYear = PayrollConstants.GetPeriodsPerYear(payFrequency);
         var periodCap = RoundingPolicy.Round(cap * 12m / periodsPerYear, 2);
 
-        var contributionBase = Math.Min(grossPay, periodCap); // Tope de salario cotizable según Ley 462 Art. 178
+        // NO existe tope de salario cotizable. Ley 51 de 2005 Art. 96.1 (Texto Unico con
+        // reformas de la Ley 462 de 2025, Gaceta Oficial 30284-B): la cuota del empleado es
+        // "el equivalente a 9.75 % de sus sueldos", sin techo alguno.
+        // Los montos B/.1,500 / 2,000 / 2,500 son el MONTO MAXIMO DE LA PENSION (Art. 193),
+        // no una base maxima de cotizacion. periodCap se conserva solo como dato informativo.
+        var contributionBase = grossPay;
         var rate = config.CssEmployerBaseRate;
         var amount = RoundingPolicy.CalculatePercentage(contributionBase, rate);
 

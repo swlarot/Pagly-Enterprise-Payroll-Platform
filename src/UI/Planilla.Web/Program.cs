@@ -195,6 +195,7 @@ builder.Services.AddScoped<ICustomTenantRoleService, CustomTenantRoleService>();
 builder.Services.AddScoped<IEmployeeDeletionValidationService, EmployeeDeletionValidationService>();
 builder.Services.AddScoped<Vorluno.Planilla.Application.Interfaces.IAsistenciaCalculationService, Vorluno.Planilla.Infrastructure.Services.AsistenciaCalculationService>();
 builder.Services.AddScoped<Vorluno.Planilla.Infrastructure.Services.PanamaHolidayService>();
+builder.Services.AddScoped<Vorluno.Planilla.Application.Interfaces.IOvertimeFactorConfigService, Vorluno.Planilla.Infrastructure.Services.OvertimeFactorConfigService>();
 builder.Services.AddScoped<Vorluno.Planilla.Application.Interfaces.IOvertimeFactorService, Vorluno.Planilla.Infrastructure.Services.OvertimeFactorService>();
 builder.Services.AddScoped<Vorluno.Planilla.Application.Interfaces.IDecimoCalculationService, Vorluno.Planilla.Infrastructure.Services.DecimoCalculationService>();
 

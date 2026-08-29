@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { UsageDashboard } from '../components/UsageDashboard';
 import { TenantRole } from '../types/api';
 import { api } from '../services/api';
-import { Save, Building2, Loader2 } from 'lucide-react';
+import { Save, Building2, Loader2, Clock, RotateCcw } from 'lucide-react';
 
 const ConfiguracionPage = () => {
     const { hasRole } = useAuth();
@@ -13,6 +13,13 @@ const ConfiguracionPage = () => {
     const [taxConfig, setTaxConfig] = useState(null);
     const [taxConfigLoading, setTaxConfigLoading] = useState(false);
     const [ensureTaxConfigLoading, setEnsureTaxConfigLoading] = useState(false);
+
+    // Horas Extra state
+    const [overtimeConfig, setOvertimeConfig] = useState(null);
+    const [overtimeDraft, setOvertimeDraft] = useState({});
+    const [overtimeExcesoDraft, setOvertimeExcesoDraft] = useState('');
+    const [overtimeLoading, setOvertimeLoading] = useState(false);
+    const [overtimeSaving, setOvertimeSaving] = useState(false);
 
     // Salario Mínimo state
     const [salarioMinimo, setSalarioMinimo] = useState('');
@@ -71,9 +78,73 @@ const ConfiguracionPage = () => {
         }
     };
 
+    const fetchOvertimeFactors = async () => {
+        setOvertimeLoading(true);
+        try {
+            const data = await api.get('/api/configuracion/overtime-factors');
+            setOvertimeConfig(data);
+            const draft = {};
+            (data.factores || []).forEach(f => { draft[f.tipo] = f.factorVigente?.toString() ?? ''; });
+            setOvertimeDraft(draft);
+            setOvertimeExcesoDraft(data.factorExcesoVigente?.toString() ?? '');
+        } catch (err) {
+            toast.error(err.message || 'Error al cargar los factores de horas extra');
+        } finally {
+            setOvertimeLoading(false);
+        }
+    };
+
+    const handleSaveOvertimeFactors = async (e) => {
+        e.preventDefault();
+        const factores = (overtimeConfig?.factores || []).map(f => {
+            const raw = overtimeDraft[f.tipo];
+            const valor = parseFloat(raw);
+            return { tipo: f.tipo, factor: isNaN(valor) ? null : valor };
+        });
+
+        if (factores.some(f => f.factor !== null && f.factor <= 0)) {
+            toast.error('Los factores deben ser mayores a cero');
+            return;
+        }
+
+        const exceso = parseFloat(overtimeExcesoDraft);
+        if (!isNaN(exceso) && exceso <= 0) {
+            toast.error('El recargo por exceso debe ser mayor a cero');
+            return;
+        }
+
+        try {
+            setOvertimeSaving(true);
+            await api.put('/api/configuracion/overtime-factors', {
+                factores,
+                factorExceso: isNaN(exceso) ? null : exceso,
+            });
+            toast.success('Factores de horas extra actualizados');
+            await fetchOvertimeFactors();
+        } catch (err) {
+            toast.error(err.message || 'Error al guardar');
+        } finally {
+            setOvertimeSaving(false);
+        }
+    };
+
+    const handleResetOvertimeFactors = async () => {
+        try {
+            setOvertimeSaving(true);
+            await api.post('/api/configuracion/overtime-factors/reset');
+            toast.success('Factores restaurados a los valores del Código de Trabajo');
+            await fetchOvertimeFactors();
+        } catch (err) {
+            toast.error(err.message || 'Error al restaurar');
+        } finally {
+            setOvertimeSaving(false);
+        }
+    };
+
     useEffect(() => {
         if (activeTab === 'tasas') fetchTaxConfig();
         if (activeTab === 'salario-minimo') fetchSalarioMinimo();
+        if (activeTab === 'horas-extra') fetchOvertimeFactors();
     }, [activeTab]);
 
     const handleEnsureTaxConfig = async () => {
@@ -95,6 +166,7 @@ const ConfiguracionPage = () => {
         { id: 'tasas', label: 'Tasas CSS/SE', icon: 'M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z', visible: true },
         { id: 'isr', label: 'Tabla ISR', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', visible: true },
         { id: 'salario-minimo', label: 'Salario Mínimo', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', visible: true },
+        { id: 'horas-extra', label: 'Horas Extra', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', visible: true },
         { id: 'audit', label: 'Audit Log', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', visible: hasRole ? hasRole(TenantRole.Owner) : false },
         { id: 'plan', label: 'Uso del Plan', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', visible: true },
         { id: 'soporte', label: 'Soporte', icon: 'M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z', visible: true }
@@ -356,6 +428,121 @@ const ConfiguracionPage = () => {
                     )}
 
                     {/* Tab: Salario Mínimo */}
+                    {activeTab === 'horas-extra' && (
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-100 mb-2">Factores de Horas Extra</h3>
+                            <p className="text-sm text-gray-400 mb-6">
+                                Multiplicadores que se aplican sobre la tarifa horaria ordinaria. Cada factor incluye
+                                el 100% del salario más el recargo. Se muestra el valor del Código de Trabajo como referencia.
+                            </p>
+
+                            {overtimeLoading ? (
+                                <div className="flex items-center justify-center py-12">
+                                    <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
+                                </div>
+                            ) : !overtimeConfig ? (
+                                <p className="text-sm text-gray-400">No se pudo cargar la configuración.</p>
+                            ) : (
+                                <form onSubmit={handleSaveOvertimeFactors} className="space-y-5">
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className="border-b border-navy-700 text-left text-gray-400">
+                                                    <th className="py-2 pr-4 font-medium">Tipo</th>
+                                                    <th className="py-2 pr-4 font-medium">Base legal</th>
+                                                    <th className="py-2 pr-4 font-medium text-right">Legal</th>
+                                                    <th className="py-2 pr-4 font-medium text-right">Factor aplicado</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {overtimeConfig.factores.map(f => (
+                                                    <tr key={f.tipo} className="border-b border-navy-800">
+                                                        <td className="py-2 pr-4 text-gray-200">
+                                                            {f.nombre}
+                                                            {f.esPersonalizado && (
+                                                                <span className="ml-2 px-1.5 py-0.5 text-[10px] rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                                                    personalizado
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                        <td className="py-2 pr-4 text-gray-500 whitespace-nowrap">{f.baseLegal}</td>
+                                                        <td className="py-2 pr-4 text-right text-gray-500 tabular-nums">{f.factorLegal.toFixed(3)}</td>
+                                                        <td className="py-2 pr-4 text-right">
+                                                            <input
+                                                                type="number"
+                                                                step="0.001"
+                                                                min="0.001"
+                                                                aria-label={'Factor de ' + f.nombre}
+                                                                value={overtimeDraft[f.tipo] ?? ''}
+                                                                onChange={(e) => setOvertimeDraft(prev => ({ ...prev, [f.tipo]: e.target.value }))}
+                                                                className="w-28 px-3 py-1.5 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm text-right tabular-nums"
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                <tr>
+                                                    <td className="py-3 pr-4 text-gray-200">
+                                                        Recargo por exceso de jornada
+                                                        {overtimeConfig.factorExcesoEsPersonalizado && (
+                                                            <span className="ml-2 px-1.5 py-0.5 text-[10px] rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                                                                personalizado
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-3 pr-4 text-gray-500 whitespace-nowrap">Art. 36.4</td>
+                                                    <td className="py-3 pr-4 text-right text-gray-500 tabular-nums">
+                                                        {overtimeConfig.factorExcesoLegal.toFixed(3)}
+                                                    </td>
+                                                    <td className="py-3 pr-4 text-right">
+                                                        <input
+                                                            type="number"
+                                                            step="0.001"
+                                                            min="0.001"
+                                                            aria-label="Recargo por exceso de jornada"
+                                                            value={overtimeExcesoDraft}
+                                                            onChange={(e) => setOvertimeExcesoDraft(e.target.value)}
+                                                            className="w-28 px-3 py-1.5 bg-navy-800 border border-navy-600 text-gray-100 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm text-right tabular-nums"
+                                                        />
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                                        <h4 className="text-sm font-semibold text-amber-300 mb-2">Importante</h4>
+                                        <ul className="text-xs text-amber-400/80 list-disc list-inside space-y-1">
+                                            <li>Los factores del Código de Trabajo son <strong>mínimos</strong>: puede pagar por encima, no por debajo.</li>
+                                            <li>Si define un factor menor al legal, la planilla resultante incumple la ley. El sistema lo permite, pero queda registrado en auditoría.</li>
+                                            <li>Dejar un factor en su valor legal equivale a no personalizarlo.</li>
+                                            <li>Los cambios aplican a las horas extra que se registren de aquí en adelante; no recalculan planillas ya procesadas.</li>
+                                        </ul>
+                                    </div>
+
+                                    <div className="flex justify-between items-center gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={handleResetOvertimeFactors}
+                                            disabled={overtimeSaving}
+                                            className="inline-flex items-center gap-2 px-4 py-2.5 border border-navy-600 text-gray-300 rounded-lg hover:bg-navy-800 text-sm disabled:opacity-50"
+                                        >
+                                            <RotateCcw className="w-4 h-4" />
+                                            Restaurar valores legales
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={overtimeSaving}
+                                            className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 text-sm disabled:opacity-50"
+                                        >
+                                            {overtimeSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                                            Guardar factores
+                                        </button>
+                                    </div>
+                                </form>
+                            )}
+                        </div>
+                    )}
+
                     {activeTab === 'salario-minimo' && (
                         <div>
                             <h3 className="text-lg font-semibold text-gray-100 mb-2">Salario Mínimo Legal</h3>
