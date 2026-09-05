@@ -45,6 +45,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     // Phase A: Configuraci�n de planilla (tasas CSS, SE, ISR)
     public DbSet<PayrollTaxConfiguration> PayrollTaxConfigurations { get; set; }
     public DbSet<OvertimeFactorConfiguration> OvertimeFactorConfigurations { get; set; }
+    public DbSet<AcumuladoFiscalEmpleado> AcumuladosFiscalesEmpleados { get; set; }
     public DbSet<TaxBracket> TaxBrackets { get; set; }
 
     // Phase D: Workflow de planilla
@@ -168,6 +169,24 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
         });
 
         // Phase A: Configuraci�n de PayrollTaxConfiguration
+        modelBuilder.Entity<AcumuladoFiscalEmpleado>(entity =>
+        {
+            // Un solo acumulado por empleado y año fiscal.
+            entity.HasIndex(a => new { a.TenantId, a.EmpleadoId, a.Anio })
+                .IsUnique()
+                .HasDatabaseName("IX_AcumuladoFiscalEmpleado_Tenant_Empleado_Anio");
+
+            entity.HasOne(a => a.Empleado)
+                .WithMany()
+                .HasForeignKey(a => a.EmpleadoId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(a => a.Tenant)
+                .WithMany()
+                .HasForeignKey(a => a.TenantId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<OvertimeFactorConfiguration>(entity =>
         {
             // Un solo factor por tipo de hora extra dentro de cada tenant
