@@ -61,6 +61,31 @@ public static class PayrollConstants
     public static decimal GetEquivalentPeriodsPerYear(PayPeriodType periodType)
         => GetPeriodsPerYear(periodType) * MonthsIncludingDecimo / 12m;
 
+    /// <summary>
+    /// Periodos que un empleado alcanzara a trabajar dentro del año fiscal, contados desde su
+    /// fecha de ingreso. Devuelve null cuando entro antes del año en curso — en ese caso se
+    /// proyecta el año completo y no hay nada que prorratear.
+    ///
+    /// Sirve para no anualizar el salario de quien ingresa a mitad de año como si lo hubiera
+    /// cobrado desde enero, que lo empujaria a un tramo de ISR que no le corresponde.
+    /// </summary>
+    public static decimal? GetRemainingPeriodsInYear(
+        DateTime hireDate, DateTime calculationDate, string payFrequency)
+    {
+        if (hireDate.Year != calculationDate.Year) return null;   // entro en un año anterior
+
+        var periodsPerYear = GetPeriodsPerYear(payFrequency);
+        if (periodsPerYear <= 0) return null;
+
+        // Fraccion del año que queda desde el ingreso, contada en dias.
+        var finDeAño = new DateTime(hireDate.Year, 12, 31);
+        var diasDelAño = DateTime.IsLeapYear(hireDate.Year) ? 366m : 365m;
+        var diasRestantes = (decimal)(finDeAño - hireDate.Date).TotalDays + 1m;
+
+        var periodos = periodsPerYear * (diasRestantes / diasDelAño);
+        return periodos > 0 ? periodos : null;
+    }
+
     // ====================================================================
     // Tasas CSS / Seguro Educativo — Ley 462
     // ====================================================================

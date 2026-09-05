@@ -522,5 +522,51 @@ public class IncomeTaxCalculationServiceTests
         // (3,000 x 6) + 12,000 = 30,000 + decimo 2,500 = 32,500
         result.TaxableIncome.Should().Be(32500m);
     }
+    // ── Periodos restantes segun fecha de ingreso ──────────────────────
+
+    [Fact]
+    public void PeriodosRestantes__IngresoEnAñoAnterior__NoProrratea()
+    {
+        // Quien ya estaba en la empresa proyecta el año completo: no hay nada que prorratear.
+        PayrollConstants.GetRemainingPeriodsInYear(
+            new DateTime(2025, 3, 1), new DateTime(2026, 6, 15), "Quincenal")
+            .Should().BeNull();
+    }
+
+    [Fact]
+    public void PeriodosRestantes__IngresoEnEnero__EsPracticamenteElAñoCompleto()
+    {
+        var r = PayrollConstants.GetRemainingPeriodsInYear(
+            new DateTime(2026, 1, 1), new DateTime(2026, 6, 15), "Quincenal");
+        r.Should().NotBeNull();
+        r!.Value.Should().BeApproximately(24m, 0.1m);
+    }
+
+    [Fact]
+    public void PeriodosRestantes__IngresoAMitadDeAño__EsAproximadamenteLaMitad()
+    {
+        // Del 1 de julio al 31 de diciembre son 184 dias de 365.
+        var r = PayrollConstants.GetRemainingPeriodsInYear(
+            new DateTime(2026, 7, 1), new DateTime(2026, 7, 15), "Quincenal");
+        r.Should().NotBeNull();
+        r!.Value.Should().BeApproximately(24m * 184m / 365m, 0.1m);   // ~12.1
+    }
+
+    [Fact]
+    public async Task IngresoAMitadDeAño__RetieneMenosQueSiSeAnualizaraCompleto()
+    {
+        var service = new IncomeTaxCalculationServicePortable(new MockPayrollConfigProvider());
+        var rem = PayrollConstants.GetRemainingPeriodsInYear(
+            new DateTime(2026, 7, 1), new DateTime(2026, 7, 15), "Mensual");
+
+        var conProrrateo = await service.CalculateIncomeTaxAsync(
+            DefaultCompanyId, 3000m, "Mensual", 0, true, true, _calculationDate,
+            remainingPeriodsInYear: rem, earnedSoFarThisYear: 0m);
+        var sinProrrateo = await service.CalculateIncomeTaxAsync(
+            DefaultCompanyId, 3000m, "Mensual", 0, true, true, _calculationDate);
+
+        conProrrateo.TaxAmount.Should().BeLessThan(sinProrrateo.TaxAmount);
+    }
+
 
 }
