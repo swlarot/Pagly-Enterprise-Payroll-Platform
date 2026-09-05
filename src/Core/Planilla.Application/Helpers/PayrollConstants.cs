@@ -1,4 +1,4 @@
-// ====================================================================
+﻿// ====================================================================
 // Planilla - PayrollConstants
 // Source: Core360 Stage 4
 // Portado: 2025-12-26
@@ -35,6 +35,56 @@ public static class PayrollConstants
     /// La DGI permite distribuir el ISR del décimo uniformemente en todos los períodos.
     /// </summary>
     public const int MonthsIncludingDecimo = 13;
+
+    /// <summary>
+    /// Periodos EQUIVALENTES de un año para repartir la retencion de ISR.
+    ///
+    /// El decimo tercer mes tambien tributa, asi que tiene que entrar en el reparto.
+    /// Como equivale a un mes de salario, en periodos equivalentes son P/12; el total
+    /// es entonces P + P/12 = P x 13/12.
+    ///
+    ///   Semanal   52 -> 56.33     Quincenal 24 -> 26.00
+    ///   Bisemanal 26 -> 28.17     Mensual   12 -> 13.00
+    ///
+    /// El caso mensual da 13, que es el "x13 meses" que ya se usaba: es el mismo
+    /// principio expresado en otras unidades. El quincenal da 26, que es el divisor
+    /// que emplea el contador en su libro de retencion.
+    ///
+    /// Reparte asi: la planilla regular retiene P/(P x 13/12) del impuesto anual y el
+    /// modulo de decimo el resto (isrAnual/13 = 1/13 del anual, o 2/26 en quincenal),
+    /// de modo que entre ambos suman exactamente el 100%.
+    /// </summary>
+    public static decimal GetEquivalentPeriodsPerYear(string payFrequency)
+        => GetPeriodsPerYear(payFrequency) * MonthsIncludingDecimo / 12m;
+
+    /// <inheritdoc cref="GetEquivalentPeriodsPerYear(string)"/>
+    public static decimal GetEquivalentPeriodsPerYear(PayPeriodType periodType)
+        => GetPeriodsPerYear(periodType) * MonthsIncludingDecimo / 12m;
+
+    /// <summary>
+    /// Periodos que un empleado alcanzara a trabajar dentro del año fiscal, contados desde su
+    /// fecha de ingreso. Devuelve null cuando entro antes del año en curso — en ese caso se
+    /// proyecta el año completo y no hay nada que prorratear.
+    ///
+    /// Sirve para no anualizar el salario de quien ingresa a mitad de año como si lo hubiera
+    /// cobrado desde enero, que lo empujaria a un tramo de ISR que no le corresponde.
+    /// </summary>
+    public static decimal? GetRemainingPeriodsInYear(
+        DateTime hireDate, DateTime calculationDate, string payFrequency)
+    {
+        if (hireDate.Year != calculationDate.Year) return null;   // entro en un año anterior
+
+        var periodsPerYear = GetPeriodsPerYear(payFrequency);
+        if (periodsPerYear <= 0) return null;
+
+        // Fraccion del año que queda desde el ingreso, contada en dias.
+        var finDeAño = new DateTime(hireDate.Year, 12, 31);
+        var diasDelAño = DateTime.IsLeapYear(hireDate.Year) ? 366m : 365m;
+        var diasRestantes = (decimal)(finDeAño - hireDate.Date).TotalDays + 1m;
+
+        var periodos = periodsPerYear * (diasRestantes / diasDelAño);
+        return periodos > 0 ? periodos : null;
+    }
 
     // ====================================================================
     // Tasas CSS / Seguro Educativo — Ley 462

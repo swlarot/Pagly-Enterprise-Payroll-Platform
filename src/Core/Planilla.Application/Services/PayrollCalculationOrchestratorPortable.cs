@@ -45,6 +45,15 @@ public class PayrollCalculationOrchestratorPortable
     /// <param name="isSubjectToEducationalInsurance">Indica si el empleado está sujeto a Seguro Educativo</param>
     /// <param name="isSubjectToIncomeTax">Indica si el empleado está sujeto a ISR</param>
     /// <param name="calculationDate">Fecha de cálculo (para determinar configuración vigente)</param>
+    /// <param name="variablePay">
+    /// Parte variable del bruto (horas extra, recargos, comisiones). No se proyecta al año:
+    /// se grava por impuesto marginal en el período en que se paga.
+    /// </param>
+    /// <param name="remainingPeriodsInYear">
+    /// Períodos que el empleado trabajará en lo que resta del año fiscal. Para quien ingresa
+    /// a mitad de año, evita anualizar su salario como si lo hubiera cobrado desde enero.
+    /// </param>
+    /// <param name="earnedSoFarThisYear">Lo realmente devengado en el año antes de este período.</param>
     /// <returns>Resultado completo del cálculo de planilla</returns>
     public async Task<PayrollCalculationResult> CalculateEmployeePayrollAsync(
         int companyId,
@@ -57,7 +66,10 @@ public class PayrollCalculationOrchestratorPortable
         bool isSubjectToCss,
         bool isSubjectToEducationalInsurance,
         bool isSubjectToIncomeTax,
-        DateTime calculationDate)
+        DateTime calculationDate,
+        decimal? variablePay = null,
+        decimal? remainingPeriodsInYear = null,
+        decimal earnedSoFarThisYear = 0m)
     {
         // ====================================================================
         // 1. Calcular CSS completo (empleado + empleador + riesgo profesional)
@@ -102,7 +114,10 @@ public class PayrollCalculationOrchestratorPortable
             dependents,
             isSubjectToIncomeTax,
             isSubjectToEducationalInsurance,
-            calculationDate
+            calculationDate,
+            variablePay,
+            remainingPeriodsInYear,
+            earnedSoFarThisYear
         );
 
         decimal incomeTax = isrResult.TaxAmount;

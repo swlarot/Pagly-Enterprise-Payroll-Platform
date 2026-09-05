@@ -10,6 +10,7 @@
 // ====================================================================
 
 using FluentAssertions;
+using Vorluno.Planilla.Application.Helpers;
 using Vorluno.Planilla.Application.Services;
 using Vorluno.Planilla.Application.Tests.Helpers;
 
@@ -76,8 +77,10 @@ public class IncomeTaxCalculationServiceTests
         result.SeDeduction.Should().Be(487.50m);           // 39,000 * 1.25%
         result.NetTaxableIncome.Should().Be(38512.50m);    // 39,000 - 487.50
         // ISR: (38,512.50 - 11,000) * 15% = 4,126.875 ≈ 4,126.88 anual
-        // Por mes: 4,126.88 / 12 = 343.91
-        result.TaxAmount.Should().Be(343.91m);
+        // Se reparte entre periodos EQUIVALENTES: mensual = 12 x 13/12 = 13.
+        // El decimo tercio lo retiene el modulo de decimo, que divide entre 13.
+        // Por mes: 4,126.88 / 13 = 317.45
+        result.TaxAmount.Should().Be(317.45m);
     }
 
     [Fact]
@@ -102,12 +105,12 @@ public class IncomeTaxCalculationServiceTests
         result.SeDeduction.Should().Be(975.00m);           // 78,000 * 1.25%
         result.NetTaxableIncome.Should().Be(77025m);       // 78,000 - 975
         // ISR: 5,850 (fixed tramo 3) + (77,025 - 50,000) * 25% = 5,850 + 6,756.25 = 12,606.25 anual
-        // Por mes: 12,606.25 / 12 = 1,050.52
-        result.TaxAmount.Should().Be(1050.52m);
+        // Por mes: 12,606.25 / 13 = 969.71
+        result.TaxAmount.Should().Be(969.71m);
     }
 
     [Fact]
-    public async Task CalculateIncomeTax__ConDependientes__AplicaDeduccion()
+    public async Task CalculateIncomeTax__ConDependientes__NoAplicaDeduccionEnPlanilla()
     {
         // Arrange
         var mockProvider = new MockPayrollConfigProvider();
@@ -115,7 +118,7 @@ public class IncomeTaxCalculationServiceTests
 
         var grossPay = 3000m; // 3000 * 13 = 39,000 anual
         var payFrequency = "Mensual";
-        var dependents = 2; // 2 dependientes = B/. 1,600 deducción
+        var dependents = 2; // declarados, pero la deduccion NO se aplica en planilla
         var isSubject = true;
         var subjectToSe = true;
 
@@ -124,17 +127,19 @@ public class IncomeTaxCalculationServiceTests
             DefaultCompanyId, grossPay, payFrequency, dependents, isSubject, subjectToSe, _calculationDate);
 
         // Assert
+        // La deduccion basica de B/. 800 es por PAREJA en declaracion conjunta
+        // (Art. 709 num. 2, mod. Art. 25 Ley 8/2010) y se ajusta en la declaracion
+        // anual, no en la retencion de planilla. El resultado es identico al de
+        // un empleado sin dependientes declarados.
         result.TaxableIncome.Should().Be(39000m);
-        result.DependentDeduction.Should().Be(1600m);      // 800 * 2
-        result.SeDeduction.Should().Be(487.50m);           // 39,000 * 1.25%
-        result.NetTaxableIncome.Should().Be(36912.50m);    // 39,000 - 1,600 - 487.50
-        // ISR: (36,912.50 - 11,000) * 15% = 3,886.875 ≈ 3,886.88 anual
-        // Por mes: 3,886.88 / 12 = 323.91
-        result.TaxAmount.Should().Be(323.91m);
+        result.DependentDeduction.Should().Be(0m);
+        result.SeDeduction.Should().Be(487.50m);
+        result.NetTaxableIncome.Should().Be(38512.50m);
+        result.TaxAmount.Should().Be(317.45m);
     }
 
     [Fact]
-    public async Task CalculateIncomeTax__MasDe3Dependientes__LimitaA3()
+    public async Task CalculateIncomeTax__CualquierNumeroDeDependientes__NoCambiaLaRetencion()
     {
         // Arrange
         var mockProvider = new MockPayrollConfigProvider();
@@ -142,7 +147,7 @@ public class IncomeTaxCalculationServiceTests
 
         var grossPay = 3000m;
         var payFrequency = "Mensual";
-        var dependents = 5; // Intenta 5, pero el mock limita a 3
+        var dependents = 5; // el numero declarado ya no influye en la retencion
         var isSubject = true;
         var subjectToSe = true;
 
@@ -150,8 +155,8 @@ public class IncomeTaxCalculationServiceTests
         var result = await service.CalculateIncomeTaxAsync(
             DefaultCompanyId, grossPay, payFrequency, dependents, isSubject, subjectToSe, _calculationDate);
 
-        // Assert
-        result.DependentDeduction.Should().Be(2400m); // 800 * 3 (máximo del mock)
+        // Assert — la deduccion no se aplica en planilla, sin importar cuantos se declaren
+        result.DependentDeduction.Should().Be(0m);
     }
 
     [Fact]
@@ -266,8 +271,8 @@ public class IncomeTaxCalculationServiceTests
         // Assert — sin SE deducible, la base es el bruto íntegro
         result.SeDeduction.Should().Be(0m);
         result.NetTaxableIncome.Should().Be(39000m);
-        // ISR: (39,000 - 11,000) * 15% = 4,200 anual → / 12 = 350.00
-        result.TaxAmount.Should().Be(350.00m);
+        // ISR: (39,000 - 11,000) * 15% = 4,200 anual → / 13 periodos equivalentes = 323.08
+        result.TaxAmount.Should().Be(323.08m);
     }
 
     [Fact]
@@ -355,8 +360,8 @@ public class IncomeTaxCalculationServiceTests
         // Assert
         result.TaxableIncome.Should().Be(49999.95m); // 3846.15 * 13
         // SE = 49,999.95 * 1.25% = 624.999375 → base 49,374.95
-        // ISR: (49,374.95 - 11,000) * 15% = 5,756.24 anual → / 12 = 479.69
-        result.TaxAmount.Should().BeApproximately(479.69m, 0.05m);
+        // ISR: (49,374.95 - 11,000) * 15% = 5,756.24 anual → / 13 = 442.79
+        result.TaxAmount.Should().BeApproximately(442.79m, 0.05m);
     }
 
     [Fact]
@@ -403,8 +408,8 @@ public class IncomeTaxCalculationServiceTests
         result.SeDeduction.Should().Be(1625.00m);          // 130,000 * 1.25%
         result.NetTaxableIncome.Should().Be(128375m);      // 130,000 - 1,625
         // ISR: 5,850 + (128,375 - 50,000) * 25% = 5,850 + 19,593.75 = 25,443.75 anual
-        // Por mes: 25,443.75 / 12 = 2,120.31
-        result.TaxAmount.Should().Be(2120.31m);
+        // Por mes: 25,443.75 / 13 = 1,957.21
+        result.TaxAmount.Should().Be(1957.21m);
     }
 
     [Fact]
@@ -429,4 +434,139 @@ public class IncomeTaxCalculationServiceTests
         // Tasa efectiva: (12,606.25 / 78,000) * 100 ≈ 16.16%
         result.EffectiveTaxRate.Should().BeApproximately(16.16m, 0.05m);
     }
+    // ════════════════════════════════════════════════════════════════
+    // Periodos equivalentes, impuesto marginal y prorrateo por ingreso
+    // ════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [InlineData("Mensual", 13)]
+    [InlineData("Quincenal", 26)]
+    [InlineData("Bisemanal", 28.1666666666666666666666667)]
+    [InlineData("Semanal", 56.3333333333333333333333333)]
+    public void PeriodosEquivalentes__PorFrecuencia__EsPPor13Doceavos(string frecuencia, decimal esperado)
+    {
+        // El decimo tambien tributa: equivale a P/12 periodos, asi que el total es P x 13/12.
+        PayrollConstants.GetEquivalentPeriodsPerYear(frecuencia)
+            .Should().BeApproximately(esperado, 0.0001m);
+    }
+
+    [Fact]
+    public void PeriodosEquivalentes__Quincenal__CoincideConElLibroDelContador()
+    {
+        // El contador divide entre 26 en su hoja quincenal: 24 quincenas + 2 del decimo.
+        PayrollConstants.GetEquivalentPeriodsPerYear("Quincenal").Should().Be(26m);
+    }
+
+    [Fact]
+    public async Task IngresoVariable__NoSeProyectaAlAño__SeGravaEnSuPeriodo()
+    {
+        var service = new IncomeTaxCalculationServicePortable(new MockPayrollConfigProvider());
+
+        // 3,000 fijos + 1,000 de comisiones en ESTE periodo.
+        var result = await service.CalculateIncomeTaxAsync(
+            DefaultCompanyId, grossPay: 4000m, payFrequency: "Mensual", dependents: 0,
+            isSubjectToIncomeTax: true, isSubjectToEducationalInsurance: true,
+            calculationDate: _calculationDate, variablePay: 1000m);
+
+        // La proyeccion usa SOLO el fijo: 3,000 x 13 = 39,000 (no 4,000 x 13 = 52,000).
+        result.TaxableIncome.Should().Be(39000m);
+
+        // Retencion = parte del impuesto anual del fijo + impuesto marginal del variable:
+        //   317.45 (4,126.88 / 13)  +  148.12 (subida del anual al sumar los 1,000)
+        result.TaxAmount.Should().BeApproximately(465.58m, 0.02m);
+    }
+
+    [Fact]
+    public async Task IngresoVariable__ElPicoNoSeArrastra__ElPeriodoSiguienteVuelveAlaBase()
+    {
+        var service = new IncomeTaxCalculationServicePortable(new MockPayrollConfigProvider());
+
+        var conComision = await service.CalculateIncomeTaxAsync(
+            DefaultCompanyId, 4000m, "Mensual", 0, true, true, _calculationDate, variablePay: 1000m);
+        var mesSiguiente = await service.CalculateIncomeTaxAsync(
+            DefaultCompanyId, 3000m, "Mensual", 0, true, true, _calculationDate);
+
+        conComision.TaxAmount.Should().BeGreaterThan(mesSiguiente.TaxAmount);
+        mesSiguiente.TaxAmount.Should().Be(317.45m);   // vuelve exactamente a la base
+    }
+
+    [Fact]
+    public async Task IngresoAMitadDeAño__NoAnualizaComoAñoCompleto()
+    {
+        var service = new IncomeTaxCalculationServicePortable(new MockPayrollConfigProvider());
+
+        // Entra en julio: solo le quedan 6 periodos mensuales y no ha devengado nada antes.
+        var parcial = await service.CalculateIncomeTaxAsync(
+            DefaultCompanyId, 3000m, "Mensual", 0, true, true, _calculationDate,
+            remainingPeriodsInYear: 6m, earnedSoFarThisYear: 0m);
+        var añoCompleto = await service.CalculateIncomeTaxAsync(
+            DefaultCompanyId, 3000m, "Mensual", 0, true, true, _calculationDate);
+
+        // 3,000 x 6 = 18,000 + decimo proporcional 1,500 = 19,500, no 39,000.
+        parcial.TaxableIncome.Should().Be(19500m);
+        añoCompleto.TaxableIncome.Should().Be(39000m);
+
+        // Y por tanto se le retiene bastante menos, en vez de empujarlo a un tramo que no le toca.
+        parcial.TaxAmount.Should().BeLessThan(añoCompleto.TaxAmount);
+    }
+
+    [Fact]
+    public async Task IngresoAMitadDeAño__SumaLoYaDevengado()
+    {
+        var service = new IncomeTaxCalculationServicePortable(new MockPayrollConfigProvider());
+
+        var result = await service.CalculateIncomeTaxAsync(
+            DefaultCompanyId, 3000m, "Mensual", 0, true, true, _calculationDate,
+            remainingPeriodsInYear: 6m, earnedSoFarThisYear: 12000m);
+
+        // (3,000 x 6) + 12,000 = 30,000 + decimo 2,500 = 32,500
+        result.TaxableIncome.Should().Be(32500m);
+    }
+    // ── Periodos restantes segun fecha de ingreso ──────────────────────
+
+    [Fact]
+    public void PeriodosRestantes__IngresoEnAñoAnterior__NoProrratea()
+    {
+        // Quien ya estaba en la empresa proyecta el año completo: no hay nada que prorratear.
+        PayrollConstants.GetRemainingPeriodsInYear(
+            new DateTime(2025, 3, 1), new DateTime(2026, 6, 15), "Quincenal")
+            .Should().BeNull();
+    }
+
+    [Fact]
+    public void PeriodosRestantes__IngresoEnEnero__EsPracticamenteElAñoCompleto()
+    {
+        var r = PayrollConstants.GetRemainingPeriodsInYear(
+            new DateTime(2026, 1, 1), new DateTime(2026, 6, 15), "Quincenal");
+        r.Should().NotBeNull();
+        r!.Value.Should().BeApproximately(24m, 0.1m);
+    }
+
+    [Fact]
+    public void PeriodosRestantes__IngresoAMitadDeAño__EsAproximadamenteLaMitad()
+    {
+        // Del 1 de julio al 31 de diciembre son 184 dias de 365.
+        var r = PayrollConstants.GetRemainingPeriodsInYear(
+            new DateTime(2026, 7, 1), new DateTime(2026, 7, 15), "Quincenal");
+        r.Should().NotBeNull();
+        r!.Value.Should().BeApproximately(24m * 184m / 365m, 0.1m);   // ~12.1
+    }
+
+    [Fact]
+    public async Task IngresoAMitadDeAño__RetieneMenosQueSiSeAnualizaraCompleto()
+    {
+        var service = new IncomeTaxCalculationServicePortable(new MockPayrollConfigProvider());
+        var rem = PayrollConstants.GetRemainingPeriodsInYear(
+            new DateTime(2026, 7, 1), new DateTime(2026, 7, 15), "Mensual");
+
+        var conProrrateo = await service.CalculateIncomeTaxAsync(
+            DefaultCompanyId, 3000m, "Mensual", 0, true, true, _calculationDate,
+            remainingPeriodsInYear: rem, earnedSoFarThisYear: 0m);
+        var sinProrrateo = await service.CalculateIncomeTaxAsync(
+            DefaultCompanyId, 3000m, "Mensual", 0, true, true, _calculationDate);
+
+        conProrrateo.TaxAmount.Should().BeLessThan(sinProrrateo.TaxAmount);
+    }
+
+
 }
