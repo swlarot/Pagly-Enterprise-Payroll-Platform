@@ -1,4 +1,4 @@
-// ====================================================================
+﻿// ====================================================================
 // Planilla - PayrollConstants
 // Source: Core360 Stage 4
 // Portado: 2025-12-26
@@ -35,6 +35,31 @@ public static class PayrollConstants
     /// La DGI permite distribuir el ISR del décimo uniformemente en todos los períodos.
     /// </summary>
     public const int MonthsIncludingDecimo = 13;
+
+    /// <summary>
+    /// Periodos EQUIVALENTES de un año para repartir la retencion de ISR.
+    ///
+    /// El decimo tercer mes tambien tributa, asi que tiene que entrar en el reparto.
+    /// Como equivale a un mes de salario, en periodos equivalentes son P/12; el total
+    /// es entonces P + P/12 = P x 13/12.
+    ///
+    ///   Semanal   52 -> 56.33     Quincenal 24 -> 26.00
+    ///   Bisemanal 26 -> 28.17     Mensual   12 -> 13.00
+    ///
+    /// El caso mensual da 13, que es el "x13 meses" que ya se usaba: es el mismo
+    /// principio expresado en otras unidades. El quincenal da 26, que es el divisor
+    /// que emplea el contador en su libro de retencion.
+    ///
+    /// Reparte asi: la planilla regular retiene P/(P x 13/12) del impuesto anual y el
+    /// modulo de decimo el resto (isrAnual/13 = 1/13 del anual, o 2/26 en quincenal),
+    /// de modo que entre ambos suman exactamente el 100%.
+    /// </summary>
+    public static decimal GetEquivalentPeriodsPerYear(string payFrequency)
+        => GetPeriodsPerYear(payFrequency) * MonthsIncludingDecimo / 12m;
+
+    /// <inheritdoc cref="GetEquivalentPeriodsPerYear(string)"/>
+    public static decimal GetEquivalentPeriodsPerYear(PayPeriodType periodType)
+        => GetPeriodsPerYear(periodType) * MonthsIncludingDecimo / 12m;
 
     // ====================================================================
     // Tasas CSS / Seguro Educativo — Ley 462

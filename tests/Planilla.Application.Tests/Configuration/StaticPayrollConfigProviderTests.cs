@@ -246,12 +246,14 @@ public class StaticPayrollConfigProviderTests
         // annual = 2,000 * 13 = 26,000; SE = 26,000 * 1.25% = 325 → base 25,675
         // Bracket 2: MinIncome = 11,000.01, Rate = 15%, FixedAmount = 0
         // Excedente = 25,675 - 11,000.01 = 14,674.99
-        // AnnualTax = 14,674.99 * 0.15 ≈ 2,201.25 → PeriodTax = 2,201.25 / 12 ≈ 183.44
+        // AnnualTax = 14,674.99 * 0.15 ≈ 2,201.25
+        // PeriodTax = 2,201.25 / 13 periodos equivalentes ≈ 169.33
+        // (mensual: 12 x 13/12 = 13; el tercio del decimo lo retiene el modulo de decimo)
         result.TaxableIncome.Should().Be(26000m);
         result.DependentDeduction.Should().Be(0m);
         result.SeDeduction.Should().Be(325m);
         result.NetTaxableIncome.Should().Be(25675m);
-        result.TaxAmount.Should().BeApproximately(183.44m, 0.02m);
+        result.TaxAmount.Should().BeApproximately(169.33m, 0.02m);
     }
 
     [Fact]
