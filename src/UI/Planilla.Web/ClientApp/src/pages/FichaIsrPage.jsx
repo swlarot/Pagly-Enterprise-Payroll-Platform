@@ -1,31 +1,36 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Loader2, FileSpreadsheet, Save, Info } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Loader2, FileSpreadsheet, Download, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
-import { formatDate } from '../utils/date';
 
 // ============================================================
 // Ficha anual de ISR
 //
-// Reproduce el libro que el contador lleva a mano: una fila por corrida,
-// con la proyección del año y el impuesto que se fue reteniendo. Cada
-// columna existe para poder decirle a un empleado por qué le descontaron
-// lo que le descontaron en una quincena concreta.
+// Es la hoja que el contador lleva en Excel, reproducida tal cual: la misma
+// cabecera, las mismas 15 columnas con sus nombres, 24 filas fijas agrupadas
+// por mes, los meses con décimo resaltados y la fila de totales al pie.
+// Nada que no esté en su hoja.
 // ============================================================
 
 const fmt = (n) => {
   const v = typeof n === 'number' ? n : parseFloat(n ?? 0);
-  return isNaN(v) ? '0.00' : v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return isNaN(v) ? '0.00' : v.toLocaleString('es-PA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
-
-const fmtDate = (d) => (d ? formatDate(d) : '—');
+const fmtPeriodos = (n) => Number(n ?? 0).toFixed(3);
 
 const ANIO_ACTUAL = new Date().getFullYear();
 const ANIOS = [ANIO_ACTUAL - 2, ANIO_ACTUAL - 1, ANIO_ACTUAL, ANIO_ACTUAL + 1];
 
+const COLUMNAS = [
+  'MESES', 'QUINCENAS', 'PERIODOS', 'SALARIOS', 'VACACIONES', 'EXTRAS', 'COMISION', 'XIII MEX',
+  'ACUMULADO', 'INGRESO GRAVABLE', 'RENTA ANUAL', 'RENTA POR PERIODO',
+  'IMPUESTO CAUSADO', 'IMPUESTO A PAGAR', 'RENTA ACUMULADA',
+];
+
 const SALDOS_VACIOS = {
   ingresoGravableInicial: '',
   decimoInicial: '',
+  partidasDecimoInicial: '0',
   isrRetenidoInicial: '',
   gastoRepresentacionInicial: '',
   isrGastoRepresentacionInicial: '',
@@ -39,6 +44,7 @@ export default function FichaIsrPage() {
   const [ficha, setFicha] = useState(null);
   const [isLoadingEmpleados, setIsLoadingEmpleados] = useState(true);
   const [isLoadingFicha, setIsLoadingFicha] = useState(false);
+  const [descargando, setDescargando] = useState(false);
 
   const [showSaldos, setShowSaldos] = useState(false);
   const [saldos, setSaldos] = useState(SALDOS_VACIOS);
@@ -68,13 +74,24 @@ export default function FichaIsrPage() {
   const loadFicha = async () => {
     try {
       setIsLoadingFicha(true);
-      const data = await api.get(`/api/acumulados-fiscales/${empleadoId}/ficha/${anio}`);
-      setFicha(data);
+      setFicha(await api.get(`/api/acumulados-fiscales/${empleadoId}/ficha/${anio}`));
     } catch (error) {
       setFicha(null);
       toast.error(error.message || 'No se pudo cargar la ficha');
     } finally {
       setIsLoadingFicha(false);
+    }
+  };
+
+  const descargarExcel = async () => {
+    try {
+      setDescargando(true);
+      const nombre = `CALCULO RENTA ${ficha?.empleado ?? ''} ${anio}.xlsx`;
+      await api.download(`/api/acumulados-fiscales/${empleadoId}/ficha/${anio}/excel`, nombre);
+    } catch (error) {
+      toast.error(error.message || 'No se pudo descargar el Excel');
+    } finally {
+      setDescargando(false);
     }
   };
 
@@ -84,6 +101,7 @@ export default function FichaIsrPage() {
       setSaldos({
         ingresoGravableInicial: String(data?.ingresoGravableInicial ?? 0),
         decimoInicial: String(data?.decimoInicial ?? 0),
+        partidasDecimoInicial: String(data?.partidasDecimoInicial ?? 0),
         isrRetenidoInicial: String(data?.isrRetenidoInicial ?? 0),
         gastoRepresentacionInicial: String(data?.gastoRepresentacionInicial ?? 0),
         isrGastoRepresentacionInicial: String(data?.isrGastoRepresentacionInicial ?? 0),
@@ -98,22 +116,19 @@ export default function FichaIsrPage() {
     const valores = {
       ingresoGravableInicial: parseFloat(saldos.ingresoGravableInicial) || 0,
       decimoInicial: parseFloat(saldos.decimoInicial) || 0,
+      partidasDecimoInicial: parseInt(saldos.partidasDecimoInicial) || 0,
       isrRetenidoInicial: parseFloat(saldos.isrRetenidoInicial) || 0,
       gastoRepresentacionInicial: parseFloat(saldos.gastoRepresentacionInicial) || 0,
       isrGastoRepresentacionInicial: parseFloat(saldos.isrGastoRepresentacionInicial) || 0,
     };
-
     if (Object.values(valores).some(v => v < 0)) {
       toast.error('Los saldos iniciales no pueden ser negativos');
       return;
     }
-
     try {
       setSavingSaldos(true);
       await api.put(`/api/acumulados-fiscales/${empleadoId}/saldos/${anio}`, {
-        empleadoId: Number(empleadoId),
-        anio,
-        ...valores,
+        empleadoId: Number(empleadoId), anio, ...valores,
       });
       toast.success('Saldos iniciales guardados');
       setShowSaldos(false);
@@ -125,66 +140,89 @@ export default function FichaIsrPage() {
     }
   };
 
-  // El año recién empezado todavía no tiene un impuesto real contra el que
-  // comparar: la diferencia solo dice algo con las corridas del año completas.
-  const anioCompleto = useMemo(() => {
-    if (!ficha) return false;
-    const regulares = ficha.filas.filter(f => !f.esDecimo).length;
-    return regulares >= Math.floor(ficha.periodosEquivalentes * 12 / 13);
-  }, [ficha]);
-
   if (isLoadingEmpleados) return (
     <div className="flex items-center justify-center h-64">
       <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
     </div>
   );
 
+  // Agrupa las filas por mes para que la celda MESES abarque sus quincenas, como en la hoja.
+  const filas = ficha?.filas ?? [];
+  const rowSpanDeMes = {};
+  let mesActual = null;
+  filas.forEach((f, i) => {
+    if (f.mes) { mesActual = i; rowSpanDeMes[i] = 1; }
+    else if (mesActual !== null) rowSpanDeMes[mesActual] += 1;
+  });
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-5">
+      {/* Título y acciones */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-bold text-white">Ficha Anual de ISR</h1>
-          <p className="text-gray-400 mt-1">
-            Método acumulativo — cada corrida cobra la diferencia entre el impuesto debido y el ya retenido
-          </p>
+          <h1 className="text-3xl font-bold text-white">Cálculo de Renta</h1>
+          <p className="text-gray-400 mt-1">Ficha anual de impuesto sobre la renta por empleado</p>
         </div>
         {empleadoId && (
-          <button
-            onClick={abrirSaldos}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
-          >
-            <FileSpreadsheet className="w-4 h-4" /> Saldos iniciales
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={abrirSaldos}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+            >
+              <FileSpreadsheet className="w-4 h-4" /> Saldos iniciales
+            </button>
+            <button
+              onClick={descargarExcel}
+              disabled={descargando || !ficha}
+              className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white rounded-lg font-medium transition-colors"
+            >
+              {descargando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              Exportar a Excel
+            </button>
+          </div>
         )}
       </div>
 
-      {/* Filtros */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-2">
-          <label htmlFor="ficha-empleado" className="text-sm text-gray-400">Empleado:</label>
+      {/* Cabecera de la hoja */}
+      <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 grid gap-4 md:grid-cols-4">
+        <div>
+          <label htmlFor="ficha-empleado" className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Empleado</label>
           <select
             id="ficha-empleado"
             value={empleadoId}
             onChange={e => setEmpleadoId(e.target.value)}
-            className="bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-1.5 text-sm min-w-64"
+            className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-1.5 text-sm"
           >
             {empleados.length === 0 && <option value="">No hay empleados</option>}
-            {empleados.map(e => (
-              <option key={e.id} value={e.id}>{e.nombre} {e.apellido}</option>
-            ))}
+            {empleados.map(e => <option key={e.id} value={e.id}>{e.nombre} {e.apellido}</option>)}
           </select>
         </div>
-        <div className="flex items-center gap-2">
-          <label htmlFor="ficha-anio" className="text-sm text-gray-400">Año:</label>
-          <select
-            id="ficha-anio"
-            value={anio}
-            onChange={e => setAnio(Number(e.target.value))}
-            className="bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-1.5 text-sm"
-          >
-            {ANIOS.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Salario Base</p>
+          <p className="text-lg font-mono text-white py-1">{ficha ? fmt(ficha.salarioBase) : '—'}</p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Conyuge es dependiente</p>
+          <p className="text-lg text-white py-1">{ficha ? ficha.conyugeDependiente : '—'}</p>
+        </div>
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Periodos de Pagos</p>
+            <p className="text-lg font-mono text-white py-1">
+              {ficha ? `${Number(ficha.periodosDePago).toFixed(0)} ${ficha.nombrePeriodo}` : '—'}
+            </p>
+          </div>
+          <div>
+            <label htmlFor="ficha-anio" className="block text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Año</label>
+            <select
+              id="ficha-anio"
+              value={anio}
+              onChange={e => setAnio(Number(e.target.value))}
+              className="bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-1.5 text-sm"
+            >
+              {ANIOS.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -194,126 +232,83 @@ export default function FichaIsrPage() {
         </div>
       )}
 
+      {/* La hoja */}
       {!isLoadingFicha && ficha && (
-        <>
-          {/* Resumen */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Tarjeta titulo="Ingreso gravable del año" valor={fmt(ficha.totalGravable)} />
-            <Tarjeta titulo="Décimo del año" valor={fmt(ficha.totalDecimo)} />
-            <Tarjeta titulo="ISR retenido" valor={fmt(ficha.totalIsrRetenido)} acento="text-blue-400" />
-            <Tarjeta
-              titulo={anioCompleto ? 'ISR del año / diferencia' : 'ISR del año (parcial)'}
-              valor={fmt(ficha.isrDelAnioSegunIngresoReal)}
-              nota={anioCompleto
-                ? (ficha.diferenciaRetenido >= 0
-                    ? `Retenido de más: ${fmt(ficha.diferenciaRetenido)}`
-                    : `Falta retener: ${fmt(Math.abs(ficha.diferenciaRetenido))}`)
-                : 'El año todavía no está completo'}
-              acento={anioCompleto && Math.abs(ficha.diferenciaRetenido) > 0.01
-                ? 'text-amber-400'
-                : 'text-emerald-400'}
-            />
-          </div>
-
-          {ficha.totalGastoRepresentacion > 0 && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Tarjeta
-                titulo="Gastos de representación del año"
-                valor={fmt(ficha.totalGastoRepresentacion)}
-              />
-              <Tarjeta
-                titulo="ISR sobre gastos de representación"
-                valor={fmt(ficha.totalIsrGastoRepresentacion)}
-                nota="Tarifa propia: 10% hasta B/. 25,000 y 15% sobre el excedente"
-                acento="text-purple-400"
-              />
-            </div>
-          )}
-
-          <div className="text-sm text-gray-400 flex items-start gap-2">
-            <Info className="w-4 h-4 mt-0.5 shrink-0" />
-            <p>
-              Frecuencia <span className="text-gray-200">{ficha.frecuencia}</span> —
-              el año se reparte en <span className="text-gray-200">{fmt(ficha.periodosEquivalentes)}</span> períodos
-              equivalentes, porque el décimo tercer mes también tributa y entra en el reparto.
-            </p>
-          </div>
-
-          {/* Libro por corrida */}
-          <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
-            <table className="w-full text-sm min-w-[1250px]">
-              <thead>
-                <tr className="bg-slate-700/50 text-gray-400 text-left">
-                  <th className="px-3 py-3 font-medium">#</th>
-                  <th className="px-3 py-3 font-medium">Corrida</th>
-                  <th className="px-3 py-3 font-medium">Pago</th>
-                  <th className="px-3 py-3 font-medium text-right">Bruto</th>
-                  <th className="px-3 py-3 font-medium text-right">Seg. Social</th>
-                  <th className="px-3 py-3 font-medium text-right">Gravable</th>
-                  <th className="px-3 py-3 font-medium text-right">G. repr.</th>
-                  <th className="px-3 py-3 font-medium text-right">Acumulado</th>
-                  <th className="px-3 py-3 font-medium text-right">Períodos</th>
-                  <th className="px-3 py-3 font-medium text-right">Proyectado</th>
-                  <th className="px-3 py-3 font-medium text-right">ISR anual</th>
-                  <th className="px-3 py-3 font-medium text-right">Debido</th>
-                  <th className="px-3 py-3 font-medium text-right">ISR g. repr.</th>
-                  <th className="px-3 py-3 font-medium text-right">Descontado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700">
-                {ficha.filas.length === 0 && (
-                  <tr>
-                    <td colSpan={14} className="px-4 py-10 text-center text-gray-400">
-                      Este empleado no tiene corridas en {anio}
-                    </td>
-                  </tr>
-                )}
-                {ficha.filas.map((f, i) => (
-                  <tr
-                    key={`${f.concepto}-${i}`}
-                    className={`text-gray-200 hover:bg-slate-700/30 transition-colors ${
-                      f.esDecimo ? 'bg-slate-700/20' : ''
+        <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-x-auto">
+          <table className="w-full text-[13px] min-w-[1400px] border-collapse">
+            <thead>
+              <tr className="bg-emerald-900/40 text-emerald-100">
+                {COLUMNAS.map(c => (
+                  <th
+                    key={c}
+                    className={`px-2 py-2.5 font-bold text-[11px] tracking-wide border border-slate-700 ${
+                      c === 'MESES' ? 'text-left w-24' : 'text-center'
                     }`}
                   >
-                    <td className="px-3 py-2 text-gray-400">{f.periodo}</td>
-                    <td className="px-3 py-2">
-                      {f.concepto}
-                      {f.esDecimo && (
-                        <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-purple-900 text-purple-200">
-                          décimo
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-gray-400">{fmtDate(f.fechaPago)}</td>
-                    <td className="px-3 py-2 text-right font-mono">{fmt(f.bruto)}</td>
-                    <td className="px-3 py-2 text-right font-mono text-gray-400">{fmt(f.seguroSocial)}</td>
-                    <td className="px-3 py-2 text-right font-mono">{fmt(f.gravable)}</td>
-                    <td className="px-3 py-2 text-right font-mono text-gray-400">
-                      {f.gastoRepresentacion > 0 ? fmt(f.gastoRepresentacion) : '—'}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono text-gray-400">{fmt(f.gravableAcumulado)}</td>
-                    <td className="px-3 py-2 text-right font-mono text-gray-400">
-                      {Number(f.periodoEquivalente).toFixed(3)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono text-gray-400">{fmt(f.ingresoAnualProyectado)}</td>
-                    <td className="px-3 py-2 text-right font-mono text-gray-400">{fmt(f.isrAnualProyectado)}</td>
-                    <td className="px-3 py-2 text-right font-mono text-gray-400">{fmt(f.isrDebidoAcumulado)}</td>
-                    <td className="px-3 py-2 text-right font-mono text-purple-400">
-                      {f.isrGastoRepresentacion > 0 ? fmt(f.isrGastoRepresentacion) : '—'}
-                    </td>
-                    <td className="px-3 py-2 text-right font-mono text-blue-400">{fmt(f.isrRetenido)}</td>
-                  </tr>
+                    {c}
+                  </th>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        </>
+              </tr>
+            </thead>
+            <tbody>
+              {filas.map((f, i) => {
+                const claseFila = f.esMesDecimo
+                  ? 'bg-amber-400/15 text-amber-50'
+                  : f.tieneDatos ? 'text-gray-100' : 'text-gray-500';
+                const num = (v, bold = false) => (
+                  <td className={`px-2 py-1.5 text-right font-mono border border-slate-700/70 ${bold ? 'font-semibold' : ''}`}>
+                    {fmt(v)}
+                  </td>
+                );
+                return (
+                  <tr key={f.quincena} className={`${claseFila} hover:bg-slate-700/30`}>
+                    {f.mes && (
+                      <td
+                        rowSpan={rowSpanDeMes[i]}
+                        className={`px-2 py-1.5 font-semibold align-middle border border-slate-700 ${
+                          f.esMesDecimo ? 'bg-amber-400/25 text-amber-100' : 'text-gray-200'
+                        }`}
+                      >
+                        {f.mes}
+                      </td>
+                    )}
+                    <td className="px-2 py-1.5 text-right font-mono border border-slate-700/70">{f.quincena}</td>
+                    <td className="px-2 py-1.5 text-right font-mono border border-slate-700/70">{fmtPeriodos(f.periodos)}</td>
+                    {num(f.salarios)}
+                    {num(f.vacaciones)}
+                    {num(f.extras)}
+                    {num(f.comision)}
+                    {num(f.xiiiMes)}
+                    {num(f.acumulado, true)}
+                    {num(f.ingresoGravable, true)}
+                    {num(f.rentaAnual)}
+                    {num(f.rentaPorPeriodo)}
+                    {num(f.impuestoCausado)}
+                    {num(f.impuestoAPagar)}
+                    {num(f.rentaAcumulada, true)}
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="bg-slate-900/60 text-white font-semibold">
+                <td className="px-2 py-2 border border-slate-700" colSpan={3}>TOTALES</td>
+                <td className="px-2 py-2 text-right font-mono border border-slate-700">{fmt(ficha.totalSalarios)}</td>
+                <td className="px-2 py-2 text-right font-mono border border-slate-700">{fmt(ficha.totalVacaciones)}</td>
+                <td className="px-2 py-2 text-right font-mono border border-slate-700">{fmt(ficha.totalExtras)}</td>
+                <td className="px-2 py-2 text-right font-mono border border-slate-700">{fmt(ficha.totalComision)}</td>
+                <td className="px-2 py-2 text-right font-mono border border-slate-700">{fmt(ficha.totalXiiiMes)}</td>
+                <td className="px-2 py-2 border border-slate-700" colSpan={7}></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       )}
 
       {/* Modal de saldos iniciales */}
       {showSaldos && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-lg p-6 space-y-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-xl w-full max-w-lg p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div>
               <h2 className="text-xl font-bold text-white">Saldos iniciales {anio}</h2>
               <p className="text-sm text-gray-400 mt-1">
@@ -322,54 +317,50 @@ export default function FichaIsrPage() {
               </p>
             </div>
 
-            <CampoSaldo
-              id="saldo-gravable"
-              label="Ingreso gravable acumulado"
-              ayuda="Bruto menos Seguro Social, sumado de enero a la migración"
+            <CampoSaldo id="saldo-gravable" label="Ingreso bruto acumulado"
+              ayuda="Salarios, vacaciones, extras y comisiones sumados de enero a la migración"
               value={saldos.ingresoGravableInicial}
-              onChange={v => setSaldos(s => ({ ...s, ingresoGravableInicial: v }))}
-            />
-            <CampoSaldo
-              id="saldo-decimo"
-              label="Décimo pagado en el año"
+              onChange={v => setSaldos(s => ({ ...s, ingresoGravableInicial: v }))} />
+            <CampoSaldo id="saldo-decimo" label="Décimo pagado en el año"
               ayuda="Partidas de décimo ya pagadas antes de migrar"
               value={saldos.decimoInicial}
-              onChange={v => setSaldos(s => ({ ...s, decimoInicial: v }))}
-            />
-            <CampoSaldo
-              id="saldo-isr"
-              label="ISR ya retenido"
-              ayuda="Se descuenta del impuesto debido para no cobrarlo dos veces"
+              onChange={v => setSaldos(s => ({ ...s, decimoInicial: v }))} />
+            <div>
+              <label htmlFor="saldo-partidas" className="block text-sm text-gray-300 mb-1">Cuántas partidas de décimo ya se pagaron</label>
+              <select
+                id="saldo-partidas"
+                value={saldos.partidasDecimoInicial}
+                onChange={e => setSaldos(s => ({ ...s, partidasDecimoInicial: e.target.value }))}
+                className="w-full bg-slate-700 border border-slate-600 text-white rounded-lg px-3 py-2"
+              >
+                <option value="0">Ninguna</option>
+                <option value="1">1 (abril)</option>
+                <option value="2">2 (abril y agosto)</option>
+                <option value="3">3 (abril, agosto y diciembre)</option>
+              </select>
+              <p className="text-xs text-gray-400 mt-1">La columna PERIODOS avanza 0.667 por cada partida pagada</p>
+            </div>
+            <CampoSaldo id="saldo-isr" label="ISR ya retenido"
+              ayuda="Se descuenta del impuesto causado para no cobrarlo dos veces"
               value={saldos.isrRetenidoInicial}
-              onChange={v => setSaldos(s => ({ ...s, isrRetenidoInicial: v }))}
-            />
-
-            <CampoSaldo
-              id="saldo-gasto-representacion"
-              label="Gastos de representación pagados"
+              onChange={v => setSaldos(s => ({ ...s, isrRetenidoInicial: v }))} />
+            <CampoSaldo id="saldo-gasto-representacion" label="Gastos de representación pagados"
               ayuda="Solo si el empleado recibe gastos de representación"
               value={saldos.gastoRepresentacionInicial}
-              onChange={v => setSaldos(s => ({ ...s, gastoRepresentacionInicial: v }))}
-            />
-            <CampoSaldo
-              id="saldo-isr-gasto-representacion"
-              label="ISR retenido sobre esos gastos"
+              onChange={v => setSaldos(s => ({ ...s, gastoRepresentacionInicial: v }))} />
+            <CampoSaldo id="saldo-isr-gasto-representacion" label="ISR retenido sobre esos gastos"
               ayuda="Su tarifa es por tramos: sin este dato el 10% se cobraría dos veces"
               value={saldos.isrGastoRepresentacionInicial}
-              onChange={v => setSaldos(s => ({ ...s, isrGastoRepresentacionInicial: v }))}
-            />
+              onChange={v => setSaldos(s => ({ ...s, isrGastoRepresentacionInicial: v }))} />
 
             <div className="flex justify-end gap-3 pt-2">
-              <button
-                onClick={() => setShowSaldos(false)}
-                className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
-              >
+              <button onClick={() => setShowSaldos(false)} className="px-4 py-2 text-gray-300 hover:text-white transition-colors">
                 Cancelar
               </button>
               <button
                 onClick={guardarSaldos}
                 disabled={savingSaldos}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg font-medium transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white rounded-lg font-medium transition-colors"
               >
                 {savingSaldos ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Guardar
@@ -378,16 +369,6 @@ export default function FichaIsrPage() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function Tarjeta({ titulo, valor, nota, acento = 'text-white' }) {
-  return (
-    <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
-      <p className="text-sm text-gray-400">{titulo}</p>
-      <p className={`text-2xl font-bold font-mono mt-1 ${acento}`}>B/. {valor}</p>
-      {nota && <p className="text-xs text-gray-400 mt-1">{nota}</p>}
     </div>
   );
 }

@@ -43,6 +43,13 @@ public class AcumuladoFiscalEmpleado : ITenantEntity
     public decimal DecimoInicial { get; set; }
 
     /// <summary>
+    /// Cuántas partidas de décimo ya se habían pagado al migrar (0 a 3). El contador
+    /// de períodos del libro avanza una fracción fija por partida, así que el monto
+    /// solo no basta.
+    /// </summary>
+    public int PartidasDecimoInicial { get; set; }
+
+    /// <summary>
     /// ISR ya retenido al empleado antes de entrar a este sistema.
     /// Se resta del impuesto debido acumulado para no cobrarle dos veces.
     /// </summary>

@@ -43,8 +43,14 @@ public sealed class AcumuladoIsr
     public decimal IsrGastoRepresentacionInicial { get; init; }
     public decimal IsrGastoRepresentacionProcesado { get; init; }
 
+    // Partidas de décimo ya pagadas en el año. El contador de períodos avanza una
+    // fracción fija por partida, no por monto, así que hace falta saber cuántas van.
+    public int PartidasDecimoInicial { get; init; }
+    public int PartidasDecimoProcesadas { get; init; }
+
     public decimal IngresoGravableTotal => IngresoGravableInicial + IngresoGravableProcesado;
     public decimal DecimoTotal => DecimoInicial + DecimoProcesado;
+    public int PartidasDecimoTotal => PartidasDecimoInicial + PartidasDecimoProcesadas;
     public decimal GastoRepresentacionTotal => GastoRepresentacionInicial + GastoRepresentacionProcesado;
 
     public decimal IsrGastoRepresentacionTotal =>
@@ -81,6 +87,9 @@ public sealed class ResultadoIsr
     public decimal IngresoGravableAcumulado { get; init; }
     public decimal DecimoPeriodo { get; init; }
     public decimal DecimoAcumulado { get; init; }
+    /// <summary>Columna PERIODOS del libro del contador.</summary>
+    public decimal PeriodoEquivalente { get; init; }
+
     public decimal IngresoAnualProyectado { get; init; }
     public decimal RentaNetaGravableProyectada { get; init; }
     public decimal IsrAnualProyectado { get; init; }
@@ -176,6 +185,26 @@ public static class MotorIsrPanama
     public static decimal ObtenerPeriodosEquivalentesAnuales(PayPeriodType frecuencia)
         => ObtenerPeriodosAnuales(frecuencia) * 13m / 12m;
 
+    /// <summary>
+    /// Columna PERIODOS del libro del contador: el número de corrida más una fracción
+    /// FIJA por cada partida de décimo ya pagada. Cada partida vale un tercio de mes,
+    /// o sea P/36 períodos: en una quincenal, 2/3.
+    ///
+    ///   q7 con 1 partida  -> 7.667     q15 con 2 -> 16.333
+    ///   q23 con 3 partidas -> 25.000    q24 con 3 -> 26.000
+    ///
+    /// Es una constante, no depende del monto del décimo ni del salario. Antes se
+    /// ponderaba por monto y con salario fijo daba lo mismo, pero con salario variable
+    /// se separaba del libro (7.685 donde el contador pone 7.667).
+    ///
+    /// Se redondea a TRES decimales porque así lo escribe el contador en su hoja
+    /// (7.667, no 7.6667) y con la fracción exacta la celda IMPUESTO CAUSADO se
+    /// separa ocho centavos de la suya.
+    /// </summary>
+    public static decimal CalcularPeriodoEquivalente(PayPeriodType frecuencia, int numeroPeriodo, int partidasDecimo)
+        => Math.Round(numeroPeriodo + partidasDecimo * (ObtenerPeriodosAnuales(frecuencia) / 36m), 3,
+            MidpointRounding.AwayFromZero);
+
     /// <summary>Períodos del calendario según la frecuencia del EMPLEADO (52 / 26 / 24 / 12).</summary>
     public static int ObtenerPeriodosAnuales(PayPeriodType frecuencia) => frecuencia switch
     {
@@ -208,18 +237,15 @@ public static class MotorIsrPanama
         var ingresoGravableAcumulado = corrida.AcumuladoAnterior.IngresoGravableTotal + ingresoGravablePeriodo;
         var decimoAcumulado = corrida.AcumuladoAnterior.DecimoTotal + decimoPeriodo;
 
-        // Período EQUIVALENTE corrido: los períodos de calendario más lo que aporta el décimo
-        // ya pagado, expresado en períodos de salario. Reproduce la columna PERIODOS del libro
-        // del contador — 7.667, 16.333, 25.000, 26.000 en una quincenal con partidas en las
-        // quincenas 7, 15 y 23.
-        var promedioSimple = ingresoGravableAcumulado / corrida.NumeroPeriodoEmpleado;
-        var periodoEquivalente = promedioSimple > 0
-            ? corrida.NumeroPeriodoEmpleado + decimoAcumulado / promedioSimple
-            : corrida.NumeroPeriodoEmpleado;
+        // Una corrida que trae décimo cuenta como una partida más.
+        var partidasDecimo = corrida.AcumuladoAnterior.PartidasDecimoTotal + (decimoPeriodo > 0m ? 1 : 0);
+        var periodoEquivalente = CalcularPeriodoEquivalente(
+            corrida.Frecuencia, corrida.NumeroPeriodoEmpleado, partidasDecimo);
 
-        // Proyección desde lo REALMENTE acumulado, no desde el bruto de este período: un
-        // período con horas extra se diluye en el promedio y el año converge solo. Todo lo
-        // gravable se proyecta, incluidos los ingresos variables.
+        // Proyección del ACUMULADO bruto, sin restar nada —criterio del contador— y
+        // desde lo realmente acumulado, no desde el bruto de este período: un período con
+        // horas extra se diluye en el promedio y el año converge solo. Es la columna
+        // INGRESO GRAVABLE del libro: ACUMULADO / PERIODOS x 26.
         var totalAcumulado = ingresoGravableAcumulado + decimoAcumulado;
         var ingresoAnualProyectado = totalAcumulado / periodoEquivalente * periodosEquivalentes;
         var rentaNeta = Math.Max(0m, ingresoAnualProyectado - corrida.DeduccionesFiscalesAnuales);
@@ -262,6 +288,7 @@ public static class MotorIsrPanama
             IngresoGravableAcumulado = Redondear(ingresoGravableAcumulado),
             DecimoPeriodo = Redondear(decimoPeriodo),
             DecimoAcumulado = Redondear(decimoAcumulado),
+            PeriodoEquivalente = Math.Round(periodoEquivalente, 3, MidpointRounding.AwayFromZero),
             IngresoAnualProyectado = Redondear(ingresoAnualProyectado),
             RentaNetaGravableProyectada = Redondear(rentaNeta),
             IsrAnualProyectado = Redondear(isrAnual),

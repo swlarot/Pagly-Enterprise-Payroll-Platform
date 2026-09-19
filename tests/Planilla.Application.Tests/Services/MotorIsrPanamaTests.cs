@@ -49,6 +49,7 @@ public class MotorIsrPanamaTests
             {
                 IngresoGravableProcesado = r.IngresoGravableAcumulado,
                 DecimoProcesado = r.DecimoAcumulado,
+                PartidasDecimoProcesadas = acum.PartidasDecimoTotal + (decimoPartida > 0m ? 1 : 0),
                 IsrRegularProcesado = r.IsrRetenidoTotalNuevo
             };
         }
@@ -216,6 +217,7 @@ public class MotorIsrPanamaTests
             {
                 IngresoGravableProcesado = r.IngresoGravableAcumulado,
                 DecimoProcesado = r.DecimoAcumulado,
+                PartidasDecimoProcesadas = acum.PartidasDecimoTotal + (decimoPartida > 0m ? 1 : 0),
                 IsrRegularProcesado = r.IsrRetenidoTotalNuevo
             };
         }
@@ -309,10 +311,125 @@ public class MotorIsrPanamaTests
         var acum = new AcumuladoIsr { IngresoGravableProcesado = 3_000m };   // 6 quincenas
         var r = MotorIsrPanama.Calcular(Corrida(PayPeriodType.Quincenal, 7, 500m, decimo: 333.33m, acumulado: acum));
 
-        // 3,500 de salario + 333.33 de decimo, proyectado sobre 7.667 periodos equivalentes.
+        r.PeriodoEquivalente.Should().Be(7.667m);
         r.IngresoGravableAcumulado.Should().Be(3_500m);
         r.DecimoAcumulado.Should().Be(333.33m);
         r.IngresoAnualProyectado.Should().BeApproximately(13_000m, 1m);
+    }
+
+    [Theory]
+    [InlineData(PayPeriodType.Quincenal, 7, 1, 7.667)]
+    [InlineData(PayPeriodType.Quincenal, 15, 2, 16.333)]
+    [InlineData(PayPeriodType.Quincenal, 23, 3, 25.000)]
+    [InlineData(PayPeriodType.Quincenal, 24, 3, 26.000)]
+    [InlineData(PayPeriodType.Mensual, 12, 3, 13.000)]
+    public void PeriodoEquivalente__EsUnaConstantePorPartidaNoDependeDelMonto(
+        PayPeriodType frecuencia, int periodo, int partidas, decimal esperado)
+    {
+        // Columna PERIODOS del libro del contador: constantes 7.667 / 16.333 / 25 / 26.
+        // Antes se ponderaba por monto y con salario variable daba 7.685 donde el
+        // contador escribe 7.667.
+        Math.Round(MotorIsrPanama.CalcularPeriodoEquivalente(frecuencia, periodo, partidas), 3)
+            .Should().Be(esperado);
+    }
+
+    // ====================================================================
+    // Reproducción de las hojas del contador, celda por celda
+    //
+    // Libro1.xlsx (Orlando_Barroso) y CALCULO RENTA.xlsx (CRIS, Marianela_Barroso).
+    // Las fórmulas: ACUMULADO = suma bruta; INGRESO GRAVABLE = ACUMULADO/PERIODOS*26;
+    // RENTA ANUAL = Art. 700; IMPUESTO CAUSADO = RENTA ANUAL/26*PERIODOS.
+    // La base es el BRUTO: no se resta el Seguro Social en ninguna celda.
+    // ====================================================================
+
+    [Fact]
+    public void Libro1_OrlandoBarroso__IngresoGravableYRentaAlCentavo()
+    {
+        // Fila 1: 356.72 / 1 x 26 = 9,274.72. Con el Seguro Social restado daba 8,370.44.
+        var acum = new AcumuladoIsr();
+        var q1 = MotorIsrPanama.Calcular(Corrida(PayPeriodType.Quincenal, 1, 356.72m, acumulado: acum));
+        q1.IngresoAnualProyectado.Should().Be(9_274.72m);
+        q1.IsrAnualProyectado.Should().Be(0m);
+
+        acum = new AcumuladoIsr { IngresoGravableProcesado = 356.72m };
+        var q2 = MotorIsrPanama.Calcular(Corrida(PayPeriodType.Quincenal, 2, 445.90m, acumulado: acum));
+        q2.IngresoAnualProyectado.Should().Be(10_434.06m);
+
+        acum = new AcumuladoIsr { IngresoGravableProcesado = 802.62m };
+        var q3 = MotorIsrPanama.Calcular(Corrida(PayPeriodType.Quincenal, 3, 466.48m, acumulado: acum));
+        q3.IngresoAnualProyectado.Should().Be(10_998.87m);
+
+        acum = new AcumuladoIsr { IngresoGravableProcesado = 1_269.10m };
+        var q4 = MotorIsrPanama.Calcular(Corrida(PayPeriodType.Quincenal, 4, 466.48m, acumulado: acum));
+        q4.IngresoAnualProyectado.Should().Be(11_281.27m);
+        q4.IsrAnualProyectado.Should().Be(42.19m, "RENTA ANUAL");
+        q4.IsrDebidoAcumulado.Should().Be(6.49m, "IMPUESTO CAUSADO = 42.19 / 26 x 4");
+    }
+
+    [Fact]
+    public void CalculoRenta_Cris__ExtrasYTresDecimosAlCentavo()
+    {
+        // Salario 1,000 por quincena con extras variables y décimo en q7, q15 y q23.
+        var extras = new Dictionary<int, decimal>
+        {
+            [1] = 3_711.21m, [3] = 2_717.30m, [5] = 3_939.97m, [7] = 3_095.62m, [9] = 4_835.96m,
+            [11] = 3_771.71m, [13] = 3_721.53m, [15] = 3_603.20m, [17] = 3_185.45m, [19] = 1_612.46m,
+            [21] = 1_952.76m, [23] = 1_694.51m
+        };
+        var decimos = new Dictionary<int, decimal> { [7] = 1_530.62m, [15] = 2_442.82m, [23] = 1_370.43m };
+
+        var causadoPorQuincena = new Dictionary<int, decimal>();
+        var acum = new AcumuladoIsr();
+        for (var n = 1; n <= 24; n++)
+        {
+            var bruto = 1_000m + extras.GetValueOrDefault(n);
+            var dec = decimos.GetValueOrDefault(n);
+            var r = MotorIsrPanama.Calcular(Corrida(PayPeriodType.Quincenal, n, bruto, dec, acum));
+            causadoPorQuincena[n] = r.IsrDebidoAcumulado;
+
+            if (n == 7) r.PeriodoEquivalente.Should().Be(7.667m);
+            if (n == 15) r.PeriodoEquivalente.Should().Be(16.333m);
+            if (n == 23) r.PeriodoEquivalente.Should().Be(25.000m);
+            if (n == 24) r.PeriodoEquivalente.Should().Be(26.000m);
+
+            acum = new AcumuladoIsr
+            {
+                IngresoGravableProcesado = r.IngresoGravableAcumulado,
+                DecimoProcesado = r.DecimoAcumulado,
+                PartidasDecimoProcesadas = acum.PartidasDecimoTotal + (dec > 0m ? 1 : 0),
+                IsrRegularProcesado = r.IsrRetenidoTotalNuevo
+            };
+        }
+
+        // Celdas de IMPUESTO CAUSADO de la hoja CRIS. El Excel calcula con la fracción
+        // exacta 7.667 escrita a mano y sin redondeo intermedio; un centavo de tolerancia.
+        causadoPorQuincena[1].Should().BeApproximately(922.03m, 0.01m);
+        causadoPorQuincena[7].Should().BeApproximately(3_537.70m, 0.01m);
+        causadoPorQuincena[15].Should().BeApproximately(7_915.01m, 0.02m);
+        causadoPorQuincena[24].Should().BeApproximately(10_146.39m, 0.01m);
+    }
+
+    [Fact]
+    public void CalculoRenta_MarianelaBarroso__SalarioFijoCierraEn6350()
+    {
+        // 2,000 por quincena, décimo 1,333.33 x 3: 52,000 al año -> RENTA ANUAL 6,350.
+        var acum = new AcumuladoIsr();
+        decimal causadoFinal = 0m;
+        for (var n = 1; n <= 24; n++)
+        {
+            var dec = new[] { 7, 15, 23 }.Contains(n) ? 1_333.33m : 0m;
+            var r = MotorIsrPanama.Calcular(Corrida(PayPeriodType.Quincenal, n, 2_000m, dec, acum));
+            r.IsrAnualProyectado.Should().BeApproximately(6_350m, 0.60m, "RENTA ANUAL fila {0}", n);
+            causadoFinal = r.IsrDebidoAcumulado;
+            acum = new AcumuladoIsr
+            {
+                IngresoGravableProcesado = r.IngresoGravableAcumulado,
+                DecimoProcesado = r.DecimoAcumulado,
+                PartidasDecimoProcesadas = acum.PartidasDecimoTotal + (dec > 0m ? 1 : 0),
+                IsrRegularProcesado = r.IsrRetenidoTotalNuevo
+            };
+        }
+        causadoFinal.Should().Be(6_350.00m, "IMPUESTO CAUSADO de la quincena 24");
     }
 
 

@@ -1,97 +1,90 @@
 // ====================================================================
 // Planilla - Ficha anual de ISR
-// Reproduce el libro que lleva el contador a mano: una fila por corrida,
-// con la proyección del año y el impuesto que se fue reteniendo.
+//
+// Es la hoja que el contador lleva en Excel, reproducida columna por columna
+// y con sus mismos nombres: una hoja por empleado, 24 filas fijas (una por
+// quincena) agrupadas por mes, y una fila de totales. Las columnas de cálculo
+// siguen sus fórmulas literales:
+//
+//   ACUMULADO          = SUM(SALARIOS..XIII MEX) + ACUMULADO anterior
+//   INGRESO GRAVABLE   = ACUMULADO / PERIODOS x 26
+//   RENTA ANUAL        = tarifa Art. 700 sobre INGRESO GRAVABLE
+//   RENTA POR PERIODO  = RENTA ANUAL / 26
+//   IMPUESTO CAUSADO   = RENTA POR PERIODO x PERIODOS
+//   IMPUESTO A PAGAR   = IMPUESTO CAUSADO
+//   RENTA ACUMULADA    = IMPUESTO A PAGAR
+//
+// La base es el BRUTO: en la hoja no se resta el Seguro Social en ninguna celda.
 // ====================================================================
 
 namespace Vorluno.Planilla.Application.DTOs;
 
-/// <summary>Una corrida dentro de la ficha anual de ISR de un empleado.</summary>
+/// <summary>Una fila de la hoja: una quincena (o el período que toque según la frecuencia).</summary>
 public class FilaFichaIsrDto
 {
-    /// <summary>Número de corrida del empleado en el año.</summary>
-    public int Periodo { get; set; }
+    /// <summary>Columna MESES. Solo va en la primera fila de cada mes, como en la hoja.</summary>
+    public string Mes { get; set; } = string.Empty;
 
-    public DateTime FechaPago { get; set; }
+    /// <summary>Columna QUINCENAS: 1…24.</summary>
+    public int Quincena { get; set; }
 
-    /// <summary>Descripción de la corrida: "Quincena 3" o "Décimo (abril)".</summary>
-    public string Concepto { get; set; } = string.Empty;
+    /// <summary>Columna PERIODOS: la quincena más 0.667 por cada partida de décimo pagada.</summary>
+    public decimal Periodos { get; set; }
 
-    /// <summary>true si la fila es una partida de décimo y no una planilla regular.</summary>
-    public bool EsDecimo { get; set; }
+    public decimal Salarios { get; set; }
+    public decimal Vacaciones { get; set; }
+    public decimal Extras { get; set; }
+    public decimal Comision { get; set; }
 
-    public decimal Bruto { get; set; }
-    public decimal SeguroSocial { get; set; }
+    /// <summary>Columna XIII MEX: la partida de décimo, en la fila de la quincena en que se paga.</summary>
+    public decimal XiiiMes { get; set; }
 
-    /// <summary>Bruto menos Seguro Social: la base sobre la que se proyecta.</summary>
-    public decimal Gravable { get; set; }
+    public decimal Acumulado { get; set; }
+    public decimal IngresoGravable { get; set; }
+    public decimal RentaAnual { get; set; }
+    public decimal RentaPorPeriodo { get; set; }
+    public decimal ImpuestoCausado { get; set; }
+    public decimal ImpuestoAPagar { get; set; }
+    public decimal RentaAcumulada { get; set; }
 
-    public decimal GravableAcumulado { get; set; }
-    public decimal DecimoAcumulado { get; set; }
+    /// <summary>true en los meses con partida de décimo; la hoja los resalta.</summary>
+    public bool EsMesDecimo { get; set; }
 
-    /// <summary>Períodos corridos incluyendo lo que aporta el décimo ya pagado.</summary>
-    public decimal PeriodoEquivalente { get; set; }
-
-    public decimal IngresoAnualProyectado { get; set; }
-    public decimal IsrAnualProyectado { get; set; }
-
-    /// <summary>Impuesto que debería llevar retenido a esta fecha.</summary>
-    public decimal IsrDebidoAcumulado { get; set; }
-
-    /// <summary>Lo que el motor calcula descontar en esta corrida.</summary>
-    public decimal IsrCalculado { get; set; }
-
-    /// <summary>Gasto de representación pagado en la corrida, si lo hubo.</summary>
-    public decimal GastoRepresentacion { get; set; }
-
-    /// <summary>Retención sobre el gasto de representación, con su tarifa propia.</summary>
-    public decimal IsrGastoRepresentacion { get; set; }
-
-    /// <summary>Lo que de verdad se le descontó y quedó guardado en la planilla.</summary>
-    public decimal IsrRetenido { get; set; }
-
-    public decimal IsrRetenidoAcumulado { get; set; }
+    /// <summary>true si en esa quincena hay una planilla guardada (para distinguir 0 de "sin datos").</summary>
+    public bool TieneDatos { get; set; }
 }
 
-/// <summary>Ficha anual de ISR de un empleado.</summary>
+/// <summary>Ficha anual de ISR de un empleado: la hoja del contador.</summary>
 public class FichaIsrAnualDto
 {
+    // ── Cabecera de la hoja ──
     public int EmpleadoId { get; set; }
-    public string NombreEmpleado { get; set; } = string.Empty;
+
+    /// <summary>Celda "Empleado".</summary>
+    public string Empleado { get; set; } = string.Empty;
+
     public string? Cedula { get; set; }
     public int Anio { get; set; }
 
-    /// <summary>Frecuencia de pago con la que se hace la proyección.</summary>
-    public string Frecuencia { get; set; } = string.Empty;
+    /// <summary>Celda "Salario Base": el salario mensual.</summary>
+    public decimal SalarioBase { get; set; }
 
-    /// <summary>Períodos equivalentes del año: 26 en quincenal, 13 en mensual.</summary>
-    public decimal PeriodosEquivalentes { get; set; }
+    /// <summary>Celda "Conyuge es dependiente": SI / NO.</summary>
+    public string ConyugeDependiente { get; set; } = "NO";
 
-    // Saldos que el empleado traía de otro sistema
-    public decimal IngresoGravableInicial { get; set; }
-    public decimal DecimoInicial { get; set; }
-    public decimal IsrRetenidoInicial { get; set; }
-    public decimal GastoRepresentacionInicial { get; set; }
-    public decimal IsrGastoRepresentacionInicial { get; set; }
+    /// <summary>Celda "Periodos de Pagos": 26 en quincenal, 13 en mensual.</summary>
+    public decimal PeriodosDePago { get; set; }
 
+    /// <summary>La palabra que va al lado: "Quincenas", "Meses", "Semanas", "Bisemanas".</summary>
+    public string NombrePeriodo { get; set; } = "Quincenas";
+
+    // ── Cuerpo ──
     public List<FilaFichaIsrDto> Filas { get; set; } = new();
 
-    // Totales del año
-    public decimal TotalGravable { get; set; }
-    public decimal TotalDecimo { get; set; }
-    public decimal TotalIsrRetenido { get; set; }
-
-    public decimal TotalGastoRepresentacion { get; set; }
-
-    /// <summary>Parte del ISR retenido que viene de gastos de representación.</summary>
-    public decimal TotalIsrGastoRepresentacion { get; set; }
-
-    /// <summary>
-    /// Impuesto que le corresponde según lo que realmente ganó en el año.
-    /// Solo tiene sentido leerlo con el año cerrado.
-    /// </summary>
-    public decimal IsrDelAnioSegunIngresoReal { get; set; }
-
-    /// <summary>Diferencia entre lo retenido y el impuesto real. Positivo: se retuvo de más.</summary>
-    public decimal DiferenciaRetenido { get; set; }
+    // ── Fila de totales ──
+    public decimal TotalSalarios { get; set; }
+    public decimal TotalVacaciones { get; set; }
+    public decimal TotalExtras { get; set; }
+    public decimal TotalComision { get; set; }
+    public decimal TotalXiiiMes { get; set; }
 }
