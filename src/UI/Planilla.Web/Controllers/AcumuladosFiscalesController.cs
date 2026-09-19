@@ -56,6 +56,26 @@ public class AcumuladosFiscalesController : ControllerBase
     }
 
     // ====================================================================
+    // GET /api/acumulados-fiscales/{empleadoId}/ficha/{anio}/excel
+    // La misma hoja del contador, con sus fórmulas, para comparar celda a celda.
+    // ====================================================================
+    [HttpGet("{empleadoId:int}/ficha/{anio:int}/excel")]
+    [RequirePermission(SystemPermission.PayrollView)]
+    public async Task<IActionResult> GetFichaExcel(int empleadoId, int anio)
+    {
+        if (anio < 2000 || anio > 2100)
+            return BadRequest(new { message = "Año fuera de rango." });
+
+        var ficha = await _acumuladoFiscalService.ObtenerFichaAnualAsync(empleadoId, anio);
+        if (ficha is null)
+            return NotFound(new { message = "Empleado no encontrado." });
+
+        var bytes = Infrastructure.Services.FichaIsrExcelExporter.Exportar(ficha);
+        var nombre = $"CALCULO RENTA {ficha.Empleado} {anio}.xlsx";
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", nombre);
+    }
+
+    // ====================================================================
     // GET /api/acumulados-fiscales/{empleadoId}/saldos/{anio}
     // ====================================================================
     [HttpGet("{empleadoId:int}/saldos/{anio:int}")]
@@ -77,6 +97,7 @@ public class AcumuladosFiscalesController : ControllerBase
             Anio = anio,
             IngresoGravableInicial = saldos?.IngresoGravableInicial ?? 0m,
             DecimoInicial = saldos?.DecimoInicial ?? 0m,
+            PartidasDecimoInicial = saldos?.PartidasDecimoInicial ?? 0,
             IsrRetenidoInicial = saldos?.IsrRetenidoInicial ?? 0m,
             GastoRepresentacionInicial = saldos?.GastoRepresentacionInicial ?? 0m,
             IsrGastoRepresentacionInicial = saldos?.IsrGastoRepresentacionInicial ?? 0m
@@ -129,6 +150,7 @@ public class AcumuladosFiscalesController : ControllerBase
 
         saldos.IngresoGravableInicial = dto.IngresoGravableInicial;
         saldos.DecimoInicial = dto.DecimoInicial;
+        saldos.PartidasDecimoInicial = Math.Clamp(dto.PartidasDecimoInicial, 0, 3);
         saldos.IsrRetenidoInicial = dto.IsrRetenidoInicial;
         saldos.GastoRepresentacionInicial = dto.GastoRepresentacionInicial;
         saldos.IsrGastoRepresentacionInicial = dto.IsrGastoRepresentacionInicial;
@@ -141,6 +163,7 @@ public class AcumuladosFiscalesController : ControllerBase
             Anio = anio,
             IngresoGravableInicial = saldos.IngresoGravableInicial,
             DecimoInicial = saldos.DecimoInicial,
+            PartidasDecimoInicial = saldos.PartidasDecimoInicial,
             IsrRetenidoInicial = saldos.IsrRetenidoInicial,
             GastoRepresentacionInicial = saldos.GastoRepresentacionInicial,
             IsrGastoRepresentacionInicial = saldos.IsrGastoRepresentacionInicial
@@ -159,6 +182,9 @@ public class SaldosInicialesDto
 
     /// <summary>Décimo tercer mes ya pagado en el año antes de migrar.</summary>
     public decimal DecimoInicial { get; set; }
+
+    /// <summary>Cuántas partidas de décimo (0 a 3) ya se habían pagado al migrar.</summary>
+    public int PartidasDecimoInicial { get; set; }
 
     /// <summary>ISR ya retenido antes de migrar. Se descuenta del impuesto debido.</summary>
     public decimal IsrRetenidoInicial { get; set; }

@@ -96,8 +96,8 @@ public class AcumuladoFiscalServiceTests
         var servicio = new AcumuladoFiscalService(db);
         var acumulado = await servicio.ObtenerAcumuladoAsync(EmpleadoId, Anio);
 
-        // La base gravable resta únicamente el Seguro Social.
-        acumulado.IngresoGravableTotal.Should().Be(3200m - 312m);
+        // La base es el bruto: no se resta el Seguro Social (criterio del contador).
+        acumulado.IngresoGravableTotal.Should().Be(3200m);
         acumulado.IsrRetenidoTotal.Should().Be(65m);
         (await servicio.ObtenerNumeroPeriodoAsync(EmpleadoId, Anio)).Should().Be(4);
     }
@@ -114,7 +114,7 @@ public class AcumuladoFiscalServiceTests
         var acumulado = await servicio.ObtenerAcumuladoAsync(EmpleadoId, Anio, excluirPayrollHeaderId: 2);
         var periodo = await servicio.ObtenerNumeroPeriodoAsync(EmpleadoId, Anio, excluirPayrollHeaderId: 2);
 
-        acumulado.IngresoGravableTotal.Should().Be(1000m - 97.50m);
+        acumulado.IngresoGravableTotal.Should().Be(1000m);
         acumulado.IsrRetenidoTotal.Should().Be(20m);
         periodo.Should().Be(2, "recalcular la segunda planilla la deja siendo la segunda, no la tercera");
     }
@@ -186,7 +186,7 @@ public class AcumuladoFiscalServiceTests
         var servicio = new AcumuladoFiscalService(db);
         var acumulado = await servicio.ObtenerAcumuladoAsync(EmpleadoId, Anio);
 
-        acumulado.IngresoGravableTotal.Should().Be(9_000m + 902.50m);
+        acumulado.IngresoGravableTotal.Should().Be(9_000m + 1_000m);
         acumulado.DecimoTotal.Should().Be(500m);
         acumulado.IsrRetenidoTotal.Should().Be(170m, "lo retenido antes de migrar no se le vuelve a cobrar");
     }
@@ -222,85 +222,34 @@ public class AcumuladoFiscalServiceTests
         var servicio = new AcumuladoFiscalService(db);
         var acumulado = await servicio.ObtenerAcumuladoAsync(EmpleadoId, Anio);
 
-        acumulado.IngresoGravableTotal.Should().Be(902.50m, "el décimo no se mezcla con el salario");
-        acumulado.DecimoTotal.Should().Be(333.33m - 24.17m);
+        acumulado.IngresoGravableTotal.Should().Be(1_000m, "el décimo no se mezcla con el salario");
+        acumulado.DecimoTotal.Should().Be(333.33m, "bruto, como en la columna XIII MEX de la hoja");
+        acumulado.PartidasDecimoTotal.Should().Be(1);
         acumulado.IsrRetenidoTotal.Should().Be(27.69m, "el ISR del décimo también cuenta como retenido");
         (await servicio.ObtenerNumeroPeriodoAsync(EmpleadoId, Anio))
             .Should().Be(2, "el décimo no suma una corrida de salario al contador");
     }
 
 
-    [Fact]
-    public async Task FichaAnual__ReproduceElLibroDelContadorQuincenaAQuincena()
-    {
-        using var db = NuevoContexto();
+    // ====================================================================
+    // La ficha es la hoja del contador, celda por celda
+    // ====================================================================
 
+    private static void SembrarEmpleadoQuincenal(ApplicationDbContext db, decimal salarioBase = 713.44m)
+    {
         db.Empleados.Add(new Empleado
         {
             Id = EmpleadoId,
             TenantId = TenantId,
-            Nombre = "Ana",
-            Apellido = "Perez",
-            NumeroIdentificacion = "8-888-8888",
+            Nombre = "Orlando",
+            Apellido = "Barroso",
+            NumeroIdentificacion = "8-000-0000",
+            SalarioBase = salarioBase,
             PayPeriodType = PayPeriodType.Quincenal
         });
-
-        // Año quincenal completo de B/.500, con las tres partidas de décimo.
-        // El Seguro Social se deja en cero para que los números de la ficha se
-        // puedan seguir a mano contra el libro.
-        for (var q = 1; q <= 24; q++)
-        {
-            SembrarPlanilla(db, q, FechaQuincena(q), bruto: 500m, css: 0m, isr: 0m);
-        }
-
-        var partidas = new[] { (id: 1, quincena: 7), (id: 2, quincena: 15), (id: 3, quincena: 23) };
-        foreach (var (id, quincena) in partidas)
-        {
-            db.PlanillasDecimo.Add(new PlanillaDecimo
-            {
-                Id = id,
-                TenantId = TenantId,
-                Numero = $"D-{id}",
-                PeriodoDesde = new DateTime(Anio, 1, 1),
-                PeriodoHasta = FechaQuincena(quincena),
-                FechaPago = FechaQuincena(quincena),
-                Estado = EstadoDecimo.Pagada
-            });
-            db.DetallesDecimo.Add(new DetalleDecimo
-            {
-                Id = id,
-                TenantId = TenantId,
-                PlanillaDecimoId = id,
-                EmpleadoId = EmpleadoId,
-                MontoDecimo = 333.33m,
-                CssEmpleado = 0m,
-                ISR = 0m
-            });
-        }
-        await db.SaveChangesAsync();
-
-        var ficha = await new AcumuladoFiscalService(db).ObtenerFichaAnualAsync(EmpleadoId, Anio);
-
-        ficha.Should().NotBeNull();
-        ficha!.PeriodosEquivalentes.Should().Be(26m, "una quincenal reparte el año en 26, no en 24");
-        ficha.Filas.Should().HaveCount(27, "24 quincenas más las tres partidas de décimo");
-
-        // La columna PERIODOS del libro: el contador salta al pagarse cada partida.
-        var enDecimos = ficha.Filas.Where(f => f.EsDecimo).Select(f => f.PeriodoEquivalente).ToList();
-        enDecimos[0].Should().BeApproximately(7.667m, 0.001m);
-        enDecimos[1].Should().BeApproximately(16.333m, 0.001m);
-        enDecimos[2].Should().BeApproximately(25.000m, 0.001m);
-
-        ficha.Filas.Last().PeriodoEquivalente.Should().BeApproximately(26.000m, 0.001m,
-            "al cerrar el año el contador llega justo a los períodos equivalentes");
-
-        // Ingreso real: 12,000 de salario más 1,000 de décimo.
-        ficha.TotalGravable.Should().Be(12_000m);
-        ficha.TotalDecimo.Should().Be(999.99m);
-        ficha.IsrDelAnioSegunIngresoReal.Should().Be(300m, "(12,999.99 - 11,000) x 15%");
     }
 
-    /// <summary>Fecha de pago de la quincena n: 15 y último de cada mes.</summary>
+    /// <summary>Fin de período de la quincena n: 15 y último de cada mes.</summary>
     private static DateTime FechaQuincena(int n)
     {
         var mes = (n + 1) / 2;
@@ -309,67 +258,198 @@ public class AcumuladoFiscalServiceTests
             : new DateTime(Anio, mes, DateTime.DaysInMonth(Anio, mes));
     }
 
-
-    [Fact]
-    public async Task GastoDeRepresentacion__SaleDeLaBaseDelSalarioConSuParteDelSeguroSocial()
+    private static void SembrarDecimo(ApplicationDbContext db, int id, int mes, decimal monto)
     {
-        using var db = NuevoContexto();
-
-        // Bruto 1,500 = 1,000 de salario + 500 de gasto de representación.
-        // El Seguro Social corre sobre los 1,500 (para la CSS todo es salario):
-        // 1,500 x 9.75% = 146.25, de los cuales 97.50 tocan al salario.
-        // ISR total 120 = 70 del salario + 50 del gasto de representación.
-        SembrarPlanilla(db, 1, new DateTime(Anio, 1, 15),
-            bruto: 1500m, css: 146.25m, isr: 120m,
-            gastoRepresentacion: 500m, isrGastoRepresentacion: 50m);
-        await db.SaveChangesAsync();
-
-        var acumulado = await new AcumuladoFiscalService(db).ObtenerAcumuladoAsync(EmpleadoId, Anio);
-
-        acumulado.IngresoGravableTotal.Should().Be(902.50m,
-            "la base del salario son sus 1,000 menos los 97.50 de Seguro Social que le tocan");
-        acumulado.GastoRepresentacionTotal.Should().Be(500m,
-            "el gasto de representación va por cuenta aparte, sin restarle nada");
-        acumulado.IsrRetenidoTotal.Should().Be(70m,
-            "del ISR guardado, los 50 del gasto de representación no cuentan como retención del salario");
-        acumulado.IsrGastoRepresentacionTotal.Should().Be(50m);
+        db.PlanillasDecimo.Add(new PlanillaDecimo
+        {
+            Id = id,
+            TenantId = TenantId,
+            Numero = $"D-{id}",
+            PeriodoDesde = new DateTime(Anio, 1, 1),
+            PeriodoHasta = new DateTime(Anio, mes, 15),
+            FechaPago = new DateTime(Anio, mes, 15),
+            Estado = EstadoDecimo.Pagada
+        });
+        db.DetallesDecimo.Add(new DetalleDecimo
+        {
+            Id = id,
+            TenantId = TenantId,
+            PlanillaDecimoId = id,
+            EmpleadoId = EmpleadoId,
+            MontoDecimo = monto,
+            CssEmpleado = Math.Round(monto * 0.0725m, 2),
+            ISR = 0m
+        });
     }
 
     [Fact]
-    public async Task FichaAnual__SeparaElGastoDeRepresentacionYLoGravaConSuPropiaTarifa()
+    public async Task Ficha__TieneLasMismasColumnasYCeldasQueLibro1()
     {
+        // Libro1.xlsx, hoja Orlando_Barroso: cuatro quincenas cargadas y el resto vacío.
         using var db = NuevoContexto();
-
-        db.Empleados.Add(new Empleado
-        {
-            Id = EmpleadoId,
-            TenantId = TenantId,
-            Nombre = "Luis",
-            Apellido = "Gomez",
-            NumeroIdentificacion = "8-111-1111",
-            PayPeriodType = PayPeriodType.Mensual
-        });
-
-        // Doce meses de 2,000 de salario más 1,000 de gasto de representación.
-        // Sin Seguro Social para poder seguir los números a mano.
-        for (var mes = 1; mes <= 12; mes++)
-        {
-            SembrarPlanilla(db, mes, new DateTime(Anio, mes, 28),
-                bruto: 3_000m, css: 0m, isr: 100m,
-                gastoRepresentacion: 1_000m, isrGastoRepresentacion: 100m);
-        }
+        SembrarEmpleadoQuincenal(db);
+        SembrarPlanilla(db, 1, FechaQuincena(1), bruto: 356.72m, css: 34.78m, isr: 0m);
+        SembrarPlanilla(db, 2, FechaQuincena(2), bruto: 445.90m, css: 43.48m, isr: 0m);
+        SembrarPlanilla(db, 3, FechaQuincena(3), bruto: 466.48m, css: 45.48m, isr: 0m);
+        SembrarPlanilla(db, 4, FechaQuincena(4), bruto: 466.48m, css: 45.48m, isr: 6.49m);
         await db.SaveChangesAsync();
 
         var ficha = await new AcumuladoFiscalService(db).ObtenerFichaAnualAsync(EmpleadoId, Anio);
 
         ficha.Should().NotBeNull();
-        ficha!.TotalGravable.Should().Be(24_000m, "solo el salario");
-        ficha.TotalGastoRepresentacion.Should().Be(12_000m);
-        ficha.TotalIsrGastoRepresentacion.Should().Be(1_200m);
 
-        // Salario: (24,000 - 11,000) x 15% = 1,950.
-        // Gasto de representación: 12,000 x 10% = 1,200. Cada uno con su tarifa.
-        ficha.IsrDelAnioSegunIngresoReal.Should().Be(1_950m + 1_200m);
+        // Cabecera de la hoja
+        ficha!.Empleado.Should().Be("Orlando Barroso");
+        ficha.SalarioBase.Should().Be(713.44m);
+        ficha.ConyugeDependiente.Should().Be("NO");
+        ficha.PeriodosDePago.Should().Be(26m);
+        ficha.NombrePeriodo.Should().Be("Quincenas");
+
+        // 24 filas fijas, con MESES solo en la primera de cada mes
+        ficha.Filas.Should().HaveCount(24);
+        ficha.Filas[0].Mes.Should().Be("Enero");
+        ficha.Filas[1].Mes.Should().BeEmpty();
+        ficha.Filas[22].Mes.Should().Be("Diciembre");
+
+        // Fila 1: 356.72 / 1 x 26 = 9,274.72 (restando el Seguro Social daba 8,370.44)
+        var q1 = ficha.Filas[0];
+        q1.Salarios.Should().Be(356.72m);
+        q1.Acumulado.Should().Be(356.72m);
+        q1.Periodos.Should().Be(1m);
+        q1.IngresoGravable.Should().Be(9_274.72m);
+        q1.RentaAnual.Should().Be(0m);
+
+        ficha.Filas[1].IngresoGravable.Should().Be(10_434.06m);
+        ficha.Filas[2].IngresoGravable.Should().Be(10_998.87m);
+
+        // Fila 4: acumulado 1,735.58 -> 11,281.27 -> renta 42.19 -> 1.62 por período -> causado 6.49
+        var q4 = ficha.Filas[3];
+        q4.Acumulado.Should().Be(1_735.58m);
+        q4.IngresoGravable.Should().Be(11_281.27m);
+        q4.RentaAnual.Should().Be(42.19m);
+        q4.RentaPorPeriodo.Should().Be(1.62m);
+        q4.ImpuestoCausado.Should().Be(6.49m);
+        q4.ImpuestoAPagar.Should().Be(6.49m);
+        q4.RentaAcumulada.Should().Be(6.49m);
+
+        // Las quincenas vacías siguen ahí: el acumulado se arrastra y la proyección baja.
+        var q5 = ficha.Filas[4];
+        q5.TieneDatos.Should().BeFalse();
+        q5.Acumulado.Should().Be(1_735.58m);
+        q5.IngresoGravable.Should().Be(9_025.02m);
+        q5.RentaAnual.Should().Be(0m);
+
+        // PERIODOS sin décimo: entero hasta el final.
+        ficha.Filas[23].Periodos.Should().Be(24m);
+
+        // Totales
+        ficha.TotalSalarios.Should().Be(1_735.58m);
+        ficha.TotalXiiiMes.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task Ficha__ElDecimoVaEnLaColumnaXiiiMesYSaltaLosPeriodos()
+    {
+        // CALCULO RENTA.xlsx, hoja Marianela_Barroso: 2,000 por quincena y décimo
+        // de 1,333.33 en abril, agosto y diciembre. Cierra en 6,350.00.
+        using var db = NuevoContexto();
+        SembrarEmpleadoQuincenal(db, 4_000m);
+        for (var q = 1; q <= 24; q++)
+            SembrarPlanilla(db, q, FechaQuincena(q), bruto: 2_000m, css: 195m, isr: 0m);
+        SembrarDecimo(db, 1, mes: 4, 1_333.33m);
+        SembrarDecimo(db, 2, mes: 8, 1_333.33m);
+        SembrarDecimo(db, 3, mes: 12, 1_333.33m);
+        await db.SaveChangesAsync();
+
+        var ficha = await new AcumuladoFiscalService(db).ObtenerFichaAnualAsync(EmpleadoId, Anio);
+
+        ficha.Should().NotBeNull();
+        ficha!.Filas.Should().HaveCount(24, "el décimo no agrega filas: va en la columna XIII MEX");
+
+        // Columna XIII MEX en la primera quincena de abril, agosto y diciembre
+        ficha.Filas[6].XiiiMes.Should().Be(1_333.33m);
+        ficha.Filas[14].XiiiMes.Should().Be(1_333.33m);
+        ficha.Filas[22].XiiiMes.Should().Be(1_333.33m);
+        ficha.Filas[7].XiiiMes.Should().Be(0m);
+
+        // Columna PERIODOS: 7.667 / 16.333 / 25.000 / 26.000
+        ficha.Filas[6].Periodos.Should().Be(7.667m);
+        ficha.Filas[7].Periodos.Should().Be(8.667m);
+        ficha.Filas[14].Periodos.Should().Be(16.333m);
+        ficha.Filas[22].Periodos.Should().Be(25.000m);
+        ficha.Filas[23].Periodos.Should().Be(26.000m);
+
+        // Los meses con décimo se resaltan enteros
+        ficha.Filas[6].EsMesDecimo.Should().BeTrue();
+        ficha.Filas[7].EsMesDecimo.Should().BeTrue();
+        ficha.Filas[8].EsMesDecimo.Should().BeFalse();
+
+        // Celdas de la hoja
+        ficha.Filas[6].Acumulado.Should().Be(15_333.33m);
+        ficha.Filas[6].ImpuestoCausado.Should().Be(1_872.35m);
+        ficha.Filas[23].Acumulado.Should().Be(51_999.99m);
+        ficha.Filas[23].RentaAnual.Should().Be(6_350.00m);
+        ficha.Filas[23].ImpuestoCausado.Should().Be(6_350.00m);
+
+        ficha.TotalSalarios.Should().Be(48_000m);
+        ficha.TotalXiiiMes.Should().Be(3_999.99m);
+    }
+
+    [Fact]
+    public async Task Ficha__SeparaVacacionesExtrasYComisionDelSalario()
+    {
+        using var db = NuevoContexto();
+        SembrarEmpleadoQuincenal(db, 1_000m);
+
+        db.PayrollHeaders.Add(new PayrollHeader
+        {
+            Id = 1, TenantId = TenantId, PayrollNumber = "P-1",
+            PeriodStartDate = new DateTime(Anio, 1, 1), PeriodEndDate = new DateTime(Anio, 1, 15),
+            PayDate = new DateTime(Anio, 1, 15), PayPeriodType = PayPeriodType.Quincenal,
+            Status = PayrollStatus.Approved
+        });
+        db.PayrollDetails.Add(new PayrollDetail
+        {
+            Id = 100, TenantId = TenantId, PayrollHeaderId = 1, EmpleadoId = EmpleadoId,
+            GrossPay = 1_000m,                 // 500 salario + 100 vacaciones + 150 extras + 250 comisión
+            MontoVacaciones = 100m,
+            OvertimePay = 120m,
+            MontoHorasExtraExceso = 30m,
+            Commissions = 250m,
+            CssEmployee = 97.50m
+        });
+        await db.SaveChangesAsync();
+
+        var fila = (await new AcumuladoFiscalService(db).ObtenerFichaAnualAsync(EmpleadoId, Anio))!.Filas[0];
+
+        fila.Salarios.Should().Be(500m, "lo que queda del bruto tras separar los demás conceptos");
+        fila.Vacaciones.Should().Be(100m);
+        fila.Extras.Should().Be(150m);
+        fila.Comision.Should().Be(250m);
+        fila.Acumulado.Should().Be(1_000m, "la suma de la fila es siempre el bruto real");
+        fila.IngresoGravable.Should().Be(26_000m);
+    }
+
+    [Fact]
+    public async Task Ficha__ElGastoDeRepresentacionNoEntraALaHoja()
+    {
+        // Tributa aparte con su propia tarifa; la hoja del contador no lo tiene.
+        using var db = NuevoContexto();
+        SembrarEmpleadoQuincenal(db, 2_000m);
+        SembrarPlanilla(db, 1, FechaQuincena(1), bruto: 1_500m, css: 146.25m, isr: 120m,
+            gastoRepresentacion: 500m, isrGastoRepresentacion: 50m);
+        await db.SaveChangesAsync();
+
+        var servicio = new AcumuladoFiscalService(db);
+        var fila = (await servicio.ObtenerFichaAnualAsync(EmpleadoId, Anio))!.Filas[0];
+        fila.Salarios.Should().Be(1_000m);
+        fila.Acumulado.Should().Be(1_000m);
+
+        var acumulado = await servicio.ObtenerAcumuladoAsync(EmpleadoId, Anio);
+        acumulado.IngresoGravableTotal.Should().Be(1_000m, "bruto sin el gasto de representación");
+        acumulado.GastoRepresentacionTotal.Should().Be(500m);
+        acumulado.IsrRetenidoTotal.Should().Be(70m);
+        acumulado.IsrGastoRepresentacionTotal.Should().Be(50m);
     }
 
     private class BypassTenantContext : ITenantContext

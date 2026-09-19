@@ -82,21 +82,13 @@ public class PayrollProcessingService
 
         // El gasto de representación viaja dentro del bruto porque para la Caja de
         // Seguro Social es salario (Ley 51 de 2005, Art. 91 num. 6), pero la renta
-        // lo grava aparte. Hay que separarlo antes de proyectar, y con él la parte
-        // del Seguro Social que le toca: se reparte a prorrata del bruto, que con
-        // una tasa plana da lo mismo que aplicarle el porcentaje directamente.
+        // lo grava aparte: hay que separarlo antes de proyectar.
         var gastoRepresentacion = Math.Min(gastoRepresentacionPeriodo, resultado.GrossPay);
-        var salarioPeriodo = resultado.GrossPay - gastoRepresentacion;
 
-        var cssDelSalario = resultado.GrossPay > 0m
-            ? Math.Round(resultado.CssEmployee * salarioPeriodo / resultado.GrossPay, 2,
-                MidpointRounding.AwayFromZero)
-            : 0m;
-
-        // La base del salario resta el Seguro Social, criterio confirmado por el
-        // contador. La del gasto de representación no resta nada: su tarifa corre
-        // sobre el total devengado.
-        var gravablePeriodo = salarioPeriodo - cssDelSalario;
+        // La base es el BRUTO del período, sin restar nada —ni el Seguro Social—.
+        // Es el criterio del contador y es como está armado su libro: la columna
+        // ACUMULADO suma salarios, vacaciones, extras, comisión y décimo tal cual.
+        var gravablePeriodo = resultado.GrossPay - gastoRepresentacion;
 
         var movimientos = new List<MovimientoIsr>
         {

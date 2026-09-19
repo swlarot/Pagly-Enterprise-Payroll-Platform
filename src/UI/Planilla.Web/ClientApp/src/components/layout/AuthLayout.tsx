@@ -111,7 +111,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       '/vacaciones': 'Gestión de Vacaciones',
       '/planillas': 'Gestión de Planillas',
       '/decimo': 'Planilla de Décimo Tercer Mes',
-      '/ficha-isr': 'Ficha Anual de ISR',
+      '/ficha-isr': 'Cálculo de Renta',
       '/liquidaciones': 'Liquidaciones Laborales',
       '/reportes': 'Reportes de Planilla',
       '/configuracion': 'Configuración del Sistema',
@@ -546,7 +546,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                 }`}
               >
                 <Receipt className="w-[19px] h-[19px] flex-shrink-0 text-emerald-400" />
-                <span>Ficha ISR</span>
+                <span>Cálculo de Renta</span>
               </NavLink>
             )}
 
