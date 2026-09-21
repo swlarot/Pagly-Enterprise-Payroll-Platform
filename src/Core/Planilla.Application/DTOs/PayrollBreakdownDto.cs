@@ -50,14 +50,28 @@ public record SeBreakdownDto(
     decimal Monto
 );
 
+/// <summary>
+/// De dónde sale la renta de este empleado en esta planilla, con las mismas
+/// columnas de la ficha anual: así se puede comprobar "si la renta pegó" sin
+/// salir de la planilla.
+/// </summary>
 public record IsrBreakdownDto(
-    decimal SalarioPeriodo,
-    int PeriodosAlAno,
-    decimal SalarioAnualizado,
-    decimal DeduccionDependientes,
-    decimal IngresoNetoGravable,
-    decimal IsrAnual,
-    decimal IsrPeriodo
+    decimal IngresoGravablePeriodo,
+    int NumeroPeriodo,
+    decimal PeriodoEquivalente,
+    decimal PeriodosDePago,
+    decimal Acumulado,
+    decimal IngresoAnualProyectado,
+    decimal RentaAnual,
+    decimal RentaPorPeriodo,
+    decimal ImpuestoCausado,
+    decimal RetenidoAntes,
+    decimal ADescontar,
+    decimal GastoRepresentacion,
+    decimal IsrGastoRepresentacion,
+    decimal IsrPeriodo,
+    bool TieneSaldoInicial,
+    bool TieneMesesImportados
 );
 
 public record AcreedorItemDto(
