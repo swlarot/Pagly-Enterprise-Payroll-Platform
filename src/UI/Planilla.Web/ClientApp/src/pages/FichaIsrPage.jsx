@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Loader2, FileSpreadsheet, Download, Save } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
@@ -37,9 +38,14 @@ const SALDOS_VACIOS = {
 };
 
 export default function FichaIsrPage() {
+  // Desde la planilla se llega con ?empleado=ID&anio=AAAA (bloque RENTA del desglose).
+  const [params] = useSearchParams();
+  const empleadoInicial = params.get('empleado') ?? '';
+  const anioInicial = Number(params.get('anio')) || ANIO_ACTUAL;
+
   const [empleados, setEmpleados] = useState([]);
-  const [empleadoId, setEmpleadoId] = useState('');
-  const [anio, setAnio] = useState(ANIO_ACTUAL);
+  const [empleadoId, setEmpleadoId] = useState(empleadoInicial);
+  const [anio, setAnio] = useState(anioInicial);
 
   const [ficha, setFicha] = useState(null);
   const [isLoadingEmpleados, setIsLoadingEmpleados] = useState(true);
@@ -63,7 +69,9 @@ export default function FichaIsrPage() {
       const data = await api.get('/api/empleados');
       const lista = Array.isArray(data) ? data : [];
       setEmpleados(lista);
-      if (lista.length > 0) setEmpleadoId(String(lista[0].id));
+      const pedido = lista.find(e => String(e.id) === empleadoInicial);
+      if (pedido) setEmpleadoId(String(pedido.id));
+      else if (lista.length > 0) setEmpleadoId(String(lista[0].id));
     } catch (error) {
       toast.error(error.message || 'No se pudo cargar la lista de empleados');
     } finally {
