@@ -298,19 +298,16 @@ public class ImportacionEmpleadosService : IImportacionEmpleadosService
     }
 
     /// <summary>
-    /// Saldo inicial de renta del año en curso. El ingreso acumulado se deriva de los
-    /// meses del año que trae la hoja Salarios (los anteriores al mes actual); lo
-    /// retenido y el décimo vienen de la hoja Saldos renta.
+    /// Saldo inicial de renta del año en curso: lo retenido y el décimo vienen de la
+    /// hoja Saldos renta. El ingreso del año NO se guarda aquí: ya está mes a mes en
+    /// DevengadoMensual, y la ficha y el motor lo leen de ahí con sus períodos.
+    /// Guardarlo también como saldo lo contaría dos veces.
     /// </summary>
     private async Task<bool> GuardarSaldosAsync(Empleado e, FilaImportacionDto f, DateTime hoy, int tenantId, CancellationToken ct)
     {
         var anio = hoy.Year;
-        var ingresoDelAnio = f.Meses
-            .Where(m => m.Monto is not null && m.Anio == anio && m.Mes < hoy.Month)
-            .Sum(m => m.Monto!.Value);
-
         var s = f.Saldos;
-        var hayAlgo = ingresoDelAnio > 0m || (s is not null && (
+        var hayAlgo = (s is not null && (
             (s.IsrRetenido ?? 0) > 0 || (s.DecimoPagado ?? 0) > 0 || (s.PartidasDecimo ?? 0) > 0 ||
             (s.GastoRepresentacionPagado ?? 0) > 0 || (s.IsrGastoRepresentacion ?? 0) > 0));
         if (!hayAlgo) return false;
@@ -324,7 +321,7 @@ public class ImportacionEmpleadosService : IImportacionEmpleadosService
         }
         else saldo.UpdatedAt = DateTime.UtcNow;
 
-        saldo.IngresoGravableInicial = ingresoDelAnio;
+        saldo.IngresoGravableInicial = 0m;
         saldo.DecimoInicial = s?.DecimoPagado ?? 0m;
         saldo.PartidasDecimoInicial = Math.Clamp(s?.PartidasDecimo ?? 0, 0, 3);
         saldo.IsrRetenidoInicial = s?.IsrRetenido ?? 0m;

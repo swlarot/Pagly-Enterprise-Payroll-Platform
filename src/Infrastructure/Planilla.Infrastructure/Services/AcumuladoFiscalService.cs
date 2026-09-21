@@ -82,9 +82,14 @@ public class AcumuladoFiscalService : IAcumuladoFiscalService
         var isrDecimo = decimos.Sum(d => d.ISR);
         var partidasDecimo = decimos.Count(d => d.MontoDecimo > 0m);
 
+        // Meses del año importados o escritos a mano que NO tienen planilla en
+        // Pagly. Entran al acumulado igual que una planilla: son ingreso del año.
+        var importados = await MesesImportadosSinPlanillaAsync(empleadoId, anio, cancellationToken);
+        var ingresoImportado = importados.Sum(m => m.Total);
+
         return new AcumuladoIsr
         {
-            IngresoGravableInicial = saldos?.IngresoGravableInicial ?? 0m,
+            IngresoGravableInicial = (saldos?.IngresoGravableInicial ?? 0m) + ingresoImportado,
             DecimoInicial = saldos?.DecimoInicial ?? 0m,
             IsrRetenidoInicial = saldos?.IsrRetenidoInicial ?? 0m,
             IngresoGravableProcesado = ingresoGravable,
@@ -109,8 +114,61 @@ public class AcumuladoFiscalService : IAcumuladoFiscalService
         var corridasPrevias = await ConsultaRegulares(empleadoId, anio, excluirPayrollHeaderId)
             .CountAsync(cancellationToken);
 
+        // Los meses importados sin planilla también son períodos corridos del año:
+        // un mes quincenal son dos quincenas. Sin esto, ocho meses importados se
+        // proyectarían como si fueran una sola quincena y la renta se dispararía.
+        var frecuencia = await _context.Empleados
+            .Where(e => e.Id == empleadoId)
+            .Select(e => e.PayPeriodType)
+            .FirstOrDefaultAsync(cancellationToken);
+        var importados = await MesesImportadosSinPlanillaAsync(empleadoId, anio, cancellationToken);
+        var periodosImportados = importados.Count * PeriodosPorMes(frecuencia);
+
         // La corrida que se está calculando todavía no está guardada, por eso el +1.
-        return corridasPrevias + 1;
+        return corridasPrevias + periodosImportados + 1;
+    }
+
+    /// <summary>Cuántos períodos de pago tiene un mes según la frecuencia (2 en quincenal, 1 en mensual…).</summary>
+    private static int PeriodosPorMes(PayPeriodType frecuencia) => frecuencia switch
+    {
+        PayPeriodType.Semanal => 4,
+        PayPeriodType.Bisemanal => 2,
+        PayPeriodType.Mensual => 1,
+        _ => 2
+    };
+
+    private sealed record MesImportado(int Anio, int Mes, decimal Salario, decimal Vacaciones, decimal Extras, decimal Comision)
+    {
+        public decimal Total => Salario + Vacaciones + Extras + Comision;
+    }
+
+    /// <summary>
+    /// Meses del año cargados en DevengadoMensual (importados o manuales) que no
+    /// tienen ninguna planilla aprobada o pagada. Un mes con planilla se deriva de
+    /// ella y lo importado se ignora, igual que en DevengadoMensualService.
+    /// </summary>
+    private async Task<List<MesImportado>> MesesImportadosSinPlanillaAsync(int empleadoId, int anio, CancellationToken ct)
+    {
+        var cargados = await _context.DevengadosMensuales
+            .AsNoTracking()
+            .Where(d => d.EmpleadoId == empleadoId && d.Anio == anio)
+            .Select(d => new MesImportado(d.Anio, d.Mes, d.Salario, d.Vacaciones, d.Extras, d.Comision))
+            .ToListAsync(ct);
+        if (cargados.Count == 0) return cargados;
+
+        var inicio = new DateTime(anio, 1, 1);
+        var fin = inicio.AddYears(1);
+        var mesesConPlanilla = await _context.PayrollDetails
+            .AsNoTracking()
+            .Where(d => d.EmpleadoId == empleadoId
+                     && d.PayrollHeader!.PeriodStartDate >= inicio
+                     && d.PayrollHeader.PeriodStartDate < fin
+                     && (d.PayrollHeader.Status == PayrollStatus.Approved || d.PayrollHeader.Status == PayrollStatus.Paid))
+            .Select(d => d.PayrollHeader!.PeriodStartDate.Month)
+            .Distinct()
+            .ToListAsync(ct);
+
+        return cargados.Where(m => !mesesConPlanilla.Contains(m.Mes)).OrderBy(m => m.Mes).ToList();
     }
 
 
@@ -185,6 +243,30 @@ public class AcumuladoFiscalService : IAcumuladoFiscalService
             fila.Comision += d.Commissions;
             fila.Salarios += d.GrossPay - gasto - d.MontoVacaciones - extras - d.Commissions;
             fila.TieneDatos = true;
+        }
+
+        // Meses importados o manuales sin planilla: se reparten en partes iguales
+        // entre las filas de su mes (un mes quincenal, dos quincenas), como si
+        // fueran planillas. Así la columna PERIODOS avanza y la proyección es real.
+        var mesesConPlanilla = regulares.Select(d => d.PeriodEndDate.Month).ToHashSet();
+        var importadosDelAnio = await MesesImportadosSinPlanillaAsync(empleadoId, anio, cancellationToken);
+        foreach (var m in importadosDelAnio.Where(m => !mesesConPlanilla.Contains(m.Mes)))
+        {
+            var filasDelMes = filas.Where(f => MesDeLaFila(frecuencia, f.Quincena) == Meses[m.Mes - 1]).ToList();
+            if (filasDelMes.Count == 0) continue;
+            var partes = filasDelMes.Count;
+            decimal Reparto(decimal total, int i) =>
+                i < partes - 1 ? Redondear(total / partes) : total - Redondear(total / partes) * (partes - 1);
+            for (var i = 0; i < partes; i++)
+            {
+                var fila = filasDelMes[i];
+                fila.Salarios += Reparto(m.Salario, i);
+                fila.Vacaciones += Reparto(m.Vacaciones, i);
+                fila.Extras += Reparto(m.Extras, i);
+                fila.Comision += Reparto(m.Comision, i);
+                fila.TieneDatos = true;
+                fila.EsImportado = true;
+            }
         }
 
         // Partidas de décimo: van en la fila de la primera quincena del mes en que
