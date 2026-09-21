@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { X, AlertTriangle, AlertCircle, CheckCircle2, SkipForward, Undo2 } from 'lucide-react';
 import CuadriculaMeses from './CuadriculaMeses';
 import { TIPOS_PERIODO, TIPOS_CONTRATO, CLASES_RIESGO } from '../../utils/validacionImportacion';
@@ -28,6 +28,21 @@ const inputCls = (conError) =>
   }`;
 
 export default function PanelEmpleadoImportado({ fila, problemas, omitida, onChange, onOmitir, onCerrar }) {
+  // Al abrir, el foco entra al panel; Esc lo cierra; al cerrar, el foco vuelve
+  // a donde estaba (la fila de la tabla). Sin esto, quien navega por teclado
+  // se queda en la tabla de atrás mientras el panel tapa la pantalla.
+  const panelRef = useRef(null);
+  useEffect(() => {
+    const anterior = document.activeElement;
+    panelRef.current?.querySelector('input, select, button')?.focus();
+    const onKey = (e) => { if (e.key === 'Escape') onCerrar(); };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      if (anterior && typeof anterior.focus === 'function') anterior.focus();
+    };
+  }, [onCerrar]);
+
   const errores = useMemo(() => Object.fromEntries(problemas.filter(p => p.tipo === 'Error').map(p => [p.campo, p.mensaje])), [problemas]);
   const avisos = useMemo(() => Object.fromEntries(problemas.filter(p => p.tipo === 'Aviso').map(p => [p.campo, p.mensaje])), [problemas]);
 
@@ -46,8 +61,10 @@ export default function PanelEmpleadoImportado({ fila, problemas, omitida, onCha
 
   return (
     <aside
+      ref={panelRef}
       className="fixed inset-y-0 right-0 z-40 w-full lg:w-[720px] bg-slate-900 border-l border-slate-700 shadow-2xl flex flex-col"
       role="dialog"
+      aria-modal="true"
       aria-labelledby="panel-titulo"
     >
       {/* Cabecera */}
