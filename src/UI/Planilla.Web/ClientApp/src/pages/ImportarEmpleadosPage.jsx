@@ -22,7 +22,7 @@ const PASOS = ['Plantilla', 'Subir', 'Revisar', 'Confirmar'];
 
 function Pasos({ actual }) {
   return (
-    <ol className="flex items-center gap-2 text-sm">
+    <ol className="flex flex-wrap items-center gap-2 text-sm">
       {PASOS.map((p, i) => {
         const n = i + 1;
         const activo = n === actual;
@@ -261,7 +261,7 @@ export default function ImportarEmpleadosPage() {
       {paso >= 3 && filas.length > 0 && (
         <>
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
               {[
                 ['todas', `${filas.length} en el archivo`, 'text-gray-200'],
                 ['listos', `${conteo.listos} listos`, 'text-primary-300'],
