@@ -159,8 +159,9 @@ public class ImportacionEmpleadosServiceTests
         saldo.IsrRetenidoInicial.Should().Be(120.50m);
         saldo.DecimoInicial.Should().Be(300m);
         saldo.PartidasDecimoInicial.Should().Be(2);
-        // Ingreso del año: enero a agosto (el mes actual, septiembre, no cuenta como saldo)
-        saldo.IngresoGravableInicial.Should().Be(700.96m + 615.87m + 648.73m + 602.39m + 627.66m + 572.06m + 562.79m + 619.24m);
+        // El ingreso del año NO se guarda como saldo: ya está mes a mes en DevengadoMensual
+        // y la ficha lo lee de ahí con sus períodos. Guardarlo aquí lo contaría dos veces.
+        saldo.IngresoGravableInicial.Should().Be(0m);
     }
 
     [Fact]

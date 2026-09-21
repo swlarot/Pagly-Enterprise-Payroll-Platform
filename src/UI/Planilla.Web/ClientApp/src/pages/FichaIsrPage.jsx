@@ -254,6 +254,7 @@ export default function FichaIsrPage() {
               {filas.map((f, i) => {
                 const claseFila = f.esMesDecimo
                   ? 'bg-amber-400/15 text-amber-50'
+                  : f.esImportado ? 'text-sky-200'
                   : f.tieneDatos ? 'text-gray-100' : 'text-gray-500';
                 const num = (v, bold = false) => (
                   <td className={`px-2 py-1.5 text-right font-mono border border-slate-700/70 ${bold ? 'font-semibold' : ''}`}>
@@ -261,7 +262,11 @@ export default function FichaIsrPage() {
                   </td>
                 );
                 return (
-                  <tr key={f.quincena} className={`${claseFila} hover:bg-slate-700/30`}>
+                  <tr
+                    key={f.quincena}
+                    className={`${claseFila} hover:bg-slate-700/30`}
+                    title={f.esImportado ? 'Mes importado al migrar (no viene de una planilla de Pagly)' : undefined}
+                  >
                     {f.mes && (
                       <td
                         rowSpan={rowSpanDeMes[i]}
@@ -302,6 +307,11 @@ export default function FichaIsrPage() {
               </tr>
             </tfoot>
           </table>
+          {filas.some(f => f.esImportado) && (
+            <p className="px-3 py-2 text-xs text-gray-400 border-t border-slate-700">
+              Las quincenas en <span className="text-sky-200">azul</span> salen de los salarios importados al migrar; las demás, de planillas de Pagly.
+            </p>
+          )}
         </div>
       )}
 

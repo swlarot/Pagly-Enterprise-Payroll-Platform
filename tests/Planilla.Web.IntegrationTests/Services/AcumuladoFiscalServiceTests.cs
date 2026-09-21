@@ -49,7 +49,9 @@ public class AcumuladoFiscalServiceTests
             Id = headerId,
             TenantId = TenantId,
             PayrollNumber = $"P-{headerId}",
-            PeriodStartDate = fechaPago.AddDays(-15),
+            // Inicio real de la quincena (día 1 o 16): el mes de una planilla lo
+            // define PeriodStartDate, y "fechaPago - 15 días" caía en el mes anterior.
+            PeriodStartDate = fechaPago.Day <= 15 ? new DateTime(fechaPago.Year, fechaPago.Month, 1) : new DateTime(fechaPago.Year, fechaPago.Month, 16),
             PeriodEndDate = fechaPago,
             PayDate = fechaPago,
             PayPeriodType = PayPeriodType.Quincenal,
@@ -450,6 +452,82 @@ public class AcumuladoFiscalServiceTests
         acumulado.GastoRepresentacionTotal.Should().Be(500m);
         acumulado.IsrRetenidoTotal.Should().Be(70m);
         acumulado.IsrGastoRepresentacionTotal.Should().Be(50m);
+    }
+
+
+    // ====================================================================
+    // Meses importados del año: entran a la ficha y al motor como períodos
+    // ====================================================================
+
+    private static void SembrarMesImportado(ApplicationDbContext db, int mes, decimal salario)
+    {
+        db.DevengadosMensuales.Add(new DevengadoMensual
+        {
+            TenantId = TenantId, EmpleadoId = EmpleadoId, Anio = Anio, Mes = mes,
+            Salario = salario, Origen = OrigenDevengado.Importado
+        });
+    }
+
+    [Fact]
+    public async Task Ficha__LosMesesImportadosLlenanSusQuincenasYLaProyeccionEsReal()
+    {
+        // Empresa que migra en septiembre con enero–agosto importados (713.44 al mes)
+        // y la primera planilla de Pagly en la 1.ª quincena de septiembre.
+        using var db = NuevoContexto();
+        SembrarEmpleadoQuincenal(db);
+        for (var m = 1; m <= 8; m++) SembrarMesImportado(db, m, 713.44m);
+        SembrarPlanilla(db, 1, FechaQuincena(17), bruto: 356.72m, css: 34.78m, isr: 0m);
+        await db.SaveChangesAsync();
+
+        var ficha = await new AcumuladoFiscalService(db).ObtenerFichaAnualAsync(EmpleadoId, Anio);
+
+        // Cada mes importado se reparte en sus dos quincenas y se marca como importado.
+        ficha!.Filas[0].Salarios.Should().Be(356.72m);
+        ficha.Filas[0].EsImportado.Should().BeTrue();
+        ficha.Filas[15].Salarios.Should().Be(356.72m);
+        ficha.Filas[15].EsImportado.Should().BeTrue();
+
+        // La planilla de septiembre es la corrida 17 y NO es importada.
+        ficha.Filas[16].Salarios.Should().Be(356.72m);
+        ficha.Filas[16].EsImportado.Should().BeFalse();
+        ficha.Filas[16].Periodos.Should().Be(17m);
+
+        // Acumulado 17 x 356.72 = 6,064.24 → proyecta 9,274.72, como con salario fijo.
+        ficha.Filas[16].Acumulado.Should().Be(6_064.24m);
+        ficha.Filas[16].IngresoGravable.Should().Be(9_274.72m);
+
+        // Sin este arreglo la fila 1 acumulaba ocho meses con PERIODOS 1 y proyectaba ~150,000.
+        ficha.Filas[0].IngresoGravable.Should().Be(9_274.72m);
+    }
+
+    [Fact]
+    public async Task Acumulado__LosMesesImportadosCuentanComoIngresoYComoPeriodos()
+    {
+        using var db = NuevoContexto();
+        SembrarEmpleadoQuincenal(db);
+        for (var m = 1; m <= 8; m++) SembrarMesImportado(db, m, 713.44m);
+        await db.SaveChangesAsync();
+
+        var servicio = new AcumuladoFiscalService(db);
+        var acumulado = await servicio.ObtenerAcumuladoAsync(EmpleadoId, Anio);
+        var periodo = await servicio.ObtenerNumeroPeriodoAsync(EmpleadoId, Anio);
+
+        acumulado.IngresoGravableTotal.Should().Be(8 * 713.44m);
+        periodo.Should().Be(17, "ocho meses quincenales son 16 períodos; la planilla nueva es la 17");
+    }
+
+    [Fact]
+    public async Task Acumulado__UnMesConPlanillaIgnoraLoImportadoDeEseMes()
+    {
+        using var db = NuevoContexto();
+        SembrarEmpleadoQuincenal(db);
+        SembrarMesImportado(db, 1, 999m);                                    // importado…
+        SembrarPlanilla(db, 1, FechaQuincena(1), bruto: 356.72m, css: 0m, isr: 0m); // …pero enero tiene planilla
+        await db.SaveChangesAsync();
+
+        var servicio = new AcumuladoFiscalService(db);
+        (await servicio.ObtenerAcumuladoAsync(EmpleadoId, Anio)).IngresoGravableTotal.Should().Be(356.72m);
+        (await servicio.ObtenerNumeroPeriodoAsync(EmpleadoId, Anio)).Should().Be(2);
     }
 
     private class BypassTenantContext : ITenantContext

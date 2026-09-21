@@ -52,6 +52,9 @@ public class FilaFichaIsrDto
 
     /// <summary>true si en esa quincena hay una planilla guardada (para distinguir 0 de "sin datos").</summary>
     public bool TieneDatos { get; set; }
+
+    /// <summary>true si la fila viene de un mes importado o escrito a mano, no de una planilla de Pagly.</summary>
+    public bool EsImportado { get; set; }
 }
 
 /// <summary>Ficha anual de ISR de un empleado: la hoja del contador.</summary>
