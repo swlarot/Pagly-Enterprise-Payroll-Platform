@@ -530,6 +530,38 @@ public class AcumuladoFiscalServiceTests
         (await servicio.ObtenerNumeroPeriodoAsync(EmpleadoId, Anio)).Should().Be(2);
     }
 
+
+    [Fact]
+    public async Task Ficha__ElDecimoDelSaldoInicialSeUbicaEnSusPartidas()
+    {
+        // Migra en septiembre con enero-agosto importados, 300 de décimo ya pagado en
+        // dos partidas (abril y agosto) y 120.50 de ISR retenido.
+        using var db = NuevoContexto();
+        SembrarEmpleadoQuincenal(db);
+        for (var m = 1; m <= 8; m++) SembrarMesImportado(db, m, 713.44m);
+        db.AcumuladosFiscalesEmpleados.Add(new AcumuladoFiscalEmpleado
+        {
+            TenantId = TenantId, EmpleadoId = EmpleadoId, Anio = Anio,
+            DecimoInicial = 300m, PartidasDecimoInicial = 2, IsrRetenidoInicial = 120.50m
+        });
+        await db.SaveChangesAsync();
+
+        var ficha = await new AcumuladoFiscalService(db).ObtenerFichaAnualAsync(EmpleadoId, Anio);
+
+        // La quincena 1 no sabe nada del décimo todavía.
+        ficha!.Filas[0].Periodos.Should().Be(1m);
+        ficha.Filas[0].XiiiMes.Should().Be(0m);
+
+        // 150 en la 1.ª quincena de abril y 150 en la de agosto, y PERIODOS salta ahí.
+        ficha.Filas[6].XiiiMes.Should().Be(150m);
+        ficha.Filas[6].Periodos.Should().Be(7.667m);
+        ficha.Filas[14].XiiiMes.Should().Be(150m);
+        ficha.Filas[14].Periodos.Should().Be(16.333m);
+        ficha.Filas[16].Periodos.Should().Be(18.333m);
+
+        ficha.TotalXiiiMes.Should().Be(300m);
+    }
+
     private class BypassTenantContext : ITenantContext
     {
         public int TenantId => 0;

@@ -282,9 +282,31 @@ public class AcumuladoFiscalService : IAcumuladoFiscalService
             fila.TieneDatos = true;
         }
 
-        // Saldos de migración: entran como si fueran la fila 0 de la hoja.
-        var acumulado = (saldos?.IngresoGravableInicial ?? 0m) + (saldos?.DecimoInicial ?? 0m);
-        var partidas = saldos?.PartidasDecimoInicial ?? 0;
+        // Saldos de migración. El ingreso entra como fila 0 de la hoja. El décimo ya
+        // pagado, en cambio, se coloca en las filas de sus partidas (abril, agosto,
+        // diciembre) repartido en partes iguales: así la columna PERIODOS salta donde
+        // de verdad se pagó, y no desde la quincena 1.
+        var acumulado = saldos?.IngresoGravableInicial ?? 0m;
+        var partidas = 0;
+        var decimoInicial = saldos?.DecimoInicial ?? 0m;
+        var partidasIniciales = Math.Clamp(saldos?.PartidasDecimoInicial ?? 0, 0, 3);
+        if (decimoInicial > 0m && partidasIniciales > 0)
+        {
+            var mesesPartida = new[] { 4, 8, 12 }.Take(partidasIniciales).ToList();
+            var porPartida = Redondear(decimoInicial / partidasIniciales);
+            for (var i = 0; i < mesesPartida.Count; i++)
+            {
+                var fila = filas[IndiceDeFilaDecimo(frecuencia, new DateTime(anio, mesesPartida[i], 15)) - 1];
+                if (fila.XiiiMes > 0m) continue;   // ya hay partida real de Pagly ese mes
+                fila.XiiiMes += i < mesesPartida.Count - 1 ? porPartida : decimoInicial - porPartida * (mesesPartida.Count - 1);
+                fila.EsImportado = true;
+                fila.TieneDatos = true;
+            }
+        }
+        else if (decimoInicial > 0m)
+        {
+            acumulado += decimoInicial;   // sin partidas conocidas: fila 0
+        }
 
         // Y ahora las fórmulas de la hoja, fila por fila.
         foreach (var fila in filas)
