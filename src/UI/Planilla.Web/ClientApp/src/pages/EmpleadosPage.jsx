@@ -8,6 +8,8 @@ import { LinkUserModal } from '../components/empleados/LinkUserModal';
 import { DeleteEmployeeModal } from '../components/empleados/DeleteEmployeeModal';
 import { formatBalboas } from '../utils/currency';
 import { PAY_PERIOD_CONFIG, CSS_RISK_OPTIONS } from '../constants/payroll';
+import { Link } from 'react-router-dom';
+import SalariosHistoricosEmpleado from '../components/empleados/SalariosHistoricosEmpleado';
 
 const EmpleadosPage = () => {
     // Auth context for permissions
@@ -419,6 +421,7 @@ const EmpleadosPage = () => {
                 {/* Fila superior: botón + stats */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     {canWrite() && (
+                        <div className="flex items-center gap-2">
                         <button
                             onClick={openNewModal}
                             className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
@@ -428,6 +431,13 @@ const EmpleadosPage = () => {
                             </svg>
                             Agregar Empleado
                         </button>
+                        <Link
+                            to="/empleados/importar"
+                            className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-navy-600 text-gray-200 px-4 py-2.5 rounded-lg font-medium transition-colors"
+                        >
+                            Importar desde Excel
+                        </Link>
+                        </div>
                     )}
 
                     {/* Stats bar compacta */}
@@ -956,6 +966,13 @@ const EmpleadosPage = () => {
                                                 </ul>
                                             )}
                                         </div>
+                                    </div>
+                                )}
+
+                                {/* Salarios devengados por mes (solo en edición) */}
+                                {editingId && (
+                                    <div className="md:col-span-2">
+                                        <SalariosHistoricosEmpleado empleadoId={editingId} />
                                     </div>
                                 )}
 

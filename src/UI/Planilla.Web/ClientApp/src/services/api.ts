@@ -235,6 +235,35 @@ export const api = {
     return handleResponse<T>(response, { url, method: 'DELETE', headers });
   },
 
+  /**
+   * Sube un archivo como multipart/form-data. No fija Content-Type: el navegador
+   * lo pone con el boundary. Reporta el progreso real del envío con XHR, porque
+   * fetch no expone el progreso de subida.
+   */
+  async upload<T>(endpoint: string, file: File, fieldName = 'archivo', onProgress?: (pct: number) => void): Promise<T> {
+    const url = `${API_BASE_URL}${endpoint}`;
+    const token = localStorage.getItem('auth_token');
+    const form = new FormData();
+    form.append(fieldName, file, file.name);
+
+    return new Promise<T>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.upload.onprogress = (e) => {
+        if (onProgress && e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        let data: any = null;
+        try { data = xhr.responseText ? JSON.parse(xhr.responseText) : null; } catch { data = null; }
+        if (xhr.status >= 200 && xhr.status < 300) resolve(data as T);
+        else reject(new ApiException(xhr.status, data?.message || `Error ${xhr.status}`, data?.code, data));
+      };
+      xhr.onerror = () => reject(new ApiException(0, 'No se pudo conectar con el servidor'));
+      xhr.send(form);
+    });
+  },
+
   async download(endpoint: string, filename: string): Promise<void> {
     const doFetch = (token: string | null) => {
       const headers: HeadersInit = {};

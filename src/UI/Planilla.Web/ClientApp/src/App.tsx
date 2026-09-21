@@ -43,6 +43,7 @@ import VacacionesPage from './pages/VacacionesPage.jsx';
 import PlanillasPage from './pages/PlanillasPage.jsx';
 import DecimoPage from './pages/DecimoPage.jsx';
 import FichaIsrPage from './pages/FichaIsrPage.jsx';
+import ImportarEmpleadosPage from './pages/ImportarEmpleadosPage.jsx';
 import ConfiguracionPage from './pages/ConfiguracionPage.jsx';
 import SalarioMinimoPage from './pages/SalarioMinimoPage.jsx';
 import ReportesPage from './pages/ReportesPage.jsx';
@@ -430,6 +431,17 @@ function App() {
             <ProtectedRoute>
               <AuthLayout>
                 <DecimoPage />
+              </AuthLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/empleados/importar"
+          element={
+            <ProtectedRoute>
+              <AuthLayout>
+                <ImportarEmpleadosPage />
               </AuthLayout>
             </ProtectedRoute>
           }
