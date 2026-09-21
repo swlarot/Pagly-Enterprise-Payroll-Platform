@@ -46,6 +46,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     public DbSet<PayrollTaxConfiguration> PayrollTaxConfigurations { get; set; }
     public DbSet<OvertimeFactorConfiguration> OvertimeFactorConfigurations { get; set; }
     public DbSet<AcumuladoFiscalEmpleado> AcumuladosFiscalesEmpleados { get; set; }
+    public DbSet<DevengadoMensual> DevengadosMensuales { get; set; }
     public DbSet<TaxBracket> TaxBrackets { get; set; }
 
     // Phase D: Workflow de planilla
@@ -169,6 +170,19 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
         });
 
         // Phase A: Configuraci�n de PayrollTaxConfiguration
+        modelBuilder.Entity<DevengadoMensual>(entity =>
+        {
+            // Un solo registro por empleado y mes.
+            entity.HasIndex(d => new { d.TenantId, d.EmpleadoId, d.Anio, d.Mes })
+                .IsUnique()
+                .HasDatabaseName("IX_DevengadoMensual_Tenant_Empleado_Anio_Mes");
+
+            entity.HasOne(d => d.Empleado)
+                .WithMany()
+                .HasForeignKey(d => d.EmpleadoId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<AcumuladoFiscalEmpleado>(entity =>
         {
             // Un solo acumulado por empleado y año fiscal.

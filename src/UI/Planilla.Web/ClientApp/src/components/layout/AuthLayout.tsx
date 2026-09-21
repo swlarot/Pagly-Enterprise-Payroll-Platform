@@ -112,6 +112,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       '/planillas': 'Gestión de Planillas',
       '/decimo': 'Planilla de Décimo Tercer Mes',
       '/ficha-isr': 'Cálculo de Renta',
+      '/empleados/importar': 'Importar empleados',
       '/liquidaciones': 'Liquidaciones Laborales',
       '/reportes': 'Reportes de Planilla',
       '/configuracion': 'Configuración del Sistema',
