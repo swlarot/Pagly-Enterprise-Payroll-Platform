@@ -409,8 +409,10 @@ public class AcumuladoFiscalService : IAcumuladoFiscalService
     {
         var query = _context.PayrollDetails
             .AsNoTracking()
+            // El año fiscal lo da el PERÍODO trabajado, no la fecha de pago: la
+            // fecha de pago la elige cada empresa y no define nada.
             .Where(d => d.EmpleadoId == empleadoId
-                     && d.PayrollHeader!.PayDate.Year == anio
+                     && d.PayrollHeader!.PeriodEndDate.Year == anio
                      && d.PayrollHeader.Status != PayrollStatus.Cancelled);
 
         if (excluirPayrollHeaderId.HasValue)

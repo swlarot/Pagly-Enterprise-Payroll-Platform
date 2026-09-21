@@ -1,1858 +1,251 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
-import {
-    CheckCircle2,
-    Circle,
-    Calculator,
-    CheckCheck,
-    CreditCard,
-    Banknote,
-    Clock,
-    Settings,
-    Eye,
-    RotateCcw,
-    Plus,
-    Zap,
-    Upload,
-    Save,
-    AlertTriangle,
-    X,
-    Trash2,
-} from 'lucide-react';
-import { SkeletonCard, SkeletonTable } from '../components/Skeleton';
-import EmptyState from '../components/EmptyState';
-import { Modal } from '../components/ui/Modal';
-import { Button } from '../components/ui/Button';
 import { api } from '../services/api';
-import ConfirmModal from '../components/ConfirmModal';
+import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../utils/currency';
-import { formatDate } from '../utils/date';
-import { PAY_PERIOD_CONFIG } from '../constants/payroll';
+import { NOMBRES_MES } from '../utils/periodos';
+import SelectorMes from '../components/planillas/SelectorMes';
+import FilaPlanilla from '../components/planillas/FilaPlanilla';
+import NuevaPlanillaInline from '../components/planillas/NuevaPlanillaInline';
+import ConfirmModal from '../components/ConfirmModal';
+import { Modal } from '../components/ui/Modal';
 
-// Parsea fechas ISO de la API sin desplazamiento de timezone (UTC-5 Panama)
-const parseUTCDate = (dateStr) => {
-    if (!dateStr) return new Date();
-    const d = new Date(dateStr);
-    return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-};
+// ============================================================
+// Planillas por mes.
+//
+// Sitio donde va: manda la planilla desplegada del mes. Arriba, solo el
+// selector de mes y una línea de resumen. Cada planilla lleva sus acciones;
+// no hay botones globales. Crear es una fila más al final, sin modal.
+//
+// Estados: cargando el mes → esqueleto; una planilla corriendo (calcular,
+// aprobar, pagar, anular) → esa fila marcada y las demás atenuadas; fallo →
+// frase del producto en la fila. La planilla recién creada queda abierta.
+// ============================================================
 
-// Pasos del workflow de la planilla
-const WORKFLOW_STEPS = [
-    { status: 0, label: 'Borrador', icon: Circle },
-    { status: 1, label: 'Calculado', icon: Calculator },
-    { status: 2, label: 'Aprobado', icon: CheckCheck },
-    { status: 3, label: 'Pagado', icon: Banknote },
-];
+const CLAVE_MES = 'pagly.planillas.mes';
 
-const PlanillasPage = () => {
-    const [planillas, setPlanillas] = useState([]);
-    const [empleados, setEmpleados] = useState([]);
-    const [empleadosCount, setEmpleadosCount] = useState(0);
-    // Una sola fuente de verdad para el estado de carga asíncrona:
-    // 'init' | 'calculating' | 'approving' | 'hours' | 'taxConfig' | 'importing' | 'deleting' | null
-    const [loadingAction, setLoadingAction] = useState('init');
-    const [selectedPlanilla, setSelectedPlanilla] = useState(null);
-    const [showNewModal, setShowNewModal] = useState(false);
-    const [showDetailsModal, setShowDetailsModal] = useState(false);
-    const [planillaDetails, setPlanillaDetails] = useState(null);
-    const [showApproveConfirmModal, setShowApproveConfirmModal] = useState(false);
-    const [formData, setFormData] = useState({
-        payrollNumber: '',
-        payPeriodType: 2,
-        tipoPlanilla: 0,
-        periodStartDate: '',
-        periodEndDate: '',
-        payDate: '',
-        companyId: 1
-    });
+function mesInicial() {
+  try {
+    const g = JSON.parse(localStorage.getItem(CLAVE_MES) || 'null');
+    if (g?.anio && g?.mes) return g;
+  } catch { /* sin memoria del mes: se usa el actual */ }
+  const h = new Date();
+  return { anio: h.getFullYear(), mes: h.getMonth() + 1 };
+}
 
-    // Estado del panel de horas trabajadas
-    const [showHoursPanel, setShowHoursPanel] = useState(false);
-    const [employeeHours, setEmployeeHours] = useState([]);
-    // Ref para rastrear timers de debounce por empleadoId
-    const debounceTimers = useRef({});
-    // Ref para rastrear si estamos abriendo el panel desde la tabla
-    const openingFromTable = useRef(false);
-    const [showImportConfirmModal, setShowImportConfirmModal] = useState(false);
-    const [importConfirmData, setImportConfirmData] = useState(null);
+export default function PlanillasPage() {
+  const { canWrite } = useAuth();
+  const [{ anio, mes }, setPeriodo] = useState(mesInicial);
+  const [planillas, setPlanillas] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [abierta, setAbierta] = useState(null);      // id
+  const [ocupada, setOcupada] = useState(null);      // id con acción en curso
+  const [errores, setErrores] = useState({});        // id → mensaje
+  const [confirmacion, setConfirmacion] = useState(null); // { tipo, planilla }
+  const [motivoAnulacion, setMotivoAnulacion] = useState('');
 
-    // Estados para eliminar planilla
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [planillaToDelete, setPlanillaToDelete] = useState(null);
+  const cambiarMes = (a, m) => {
+    setPeriodo({ anio: a, mes: m });
+    setAbierta(null);
+    try { localStorage.setItem(CLAVE_MES, JSON.stringify({ anio: a, mes: m })); } catch { /* sin memoria */ }
+  };
 
-    // Estados para desglose detallado del modal "Ver"
-    const [expandedDetails, setExpandedDetails] = useState(new Set());
-    const [breakdowns, setBreakdowns] = useState({});
-    const [loadingBreakdown, setLoadingBreakdown] = useState(null);
-
-    useEffect(() => {
-        fetchData();
-    }, []);
-
-    // Al cambiar la planilla seleccionada, cerrar panel de horas solo si no se está abriendo desde la tabla
-    useEffect(() => {
-        // Si estamos abriendo desde la tabla, no cerrar el panel
-        if (openingFromTable.current) {
-            openingFromTable.current = false;
-            return;
-        }
-        // Si cambiamos de planilla y el panel está abierto, cerrarlo
-        if (showHoursPanel) {
-            setShowHoursPanel(false);
-        }
-    }, [selectedPlanilla?.id]);
-
-    // Enriquece una planilla con totales calculados desde details
-    const enrichPlanillaWithTotals = (planilla) => {
-        if (!planilla.details || planilla.details.length === 0) {
-            return {
-                ...planilla,
-                totalEmployeeCss: 0,
-                totalEmployerCss: 0,
-                totalEmployeeSe: 0,
-                totalEmployerSe: 0,
-                totalIncomeTax: 0
-            };
-        }
-
-        const totals = planilla.details.reduce((acc, detail) => ({
-            totalEmployeeCss: acc.totalEmployeeCss + (detail.cssEmployee || 0),
-            totalEmployerCss: acc.totalEmployerCss + (detail.cssEmployer || 0),
-            totalEmployeeSe: acc.totalEmployeeSe + (detail.educationalInsuranceEmployee || 0),
-            totalEmployerSe: acc.totalEmployerSe + (detail.educationalInsuranceEmployer || 0),
-            totalIncomeTax: acc.totalIncomeTax + (detail.incomeTax || 0)
-        }), {
-            totalEmployeeCss: 0,
-            totalEmployerCss: 0,
-            totalEmployeeSe: 0,
-            totalEmployerSe: 0,
-            totalIncomeTax: 0
-        });
-
-        return { ...planilla, ...totals };
-    };
-
-    const fetchData = async () => {
-        try {
-            setLoadingAction('init');
-
-            // Fetch planillas
-            const planillasData = await api.get('/api/payrollheaders');
-
-            // Enriquecer planillas con totales calculados
-            const enrichedPlanillas = planillasData.map(enrichPlanillaWithTotals);
-            setPlanillas(enrichedPlanillas);
-
-            // Seleccionar planilla por defecto o sincronizar la seleccionada con datos frescos
-            if (enrichedPlanillas.length > 0) {
-                if (!selectedPlanilla) {
-                    setSelectedPlanilla(enrichedPlanillas[0]);
-                } else {
-                    // BUG-007 FIX: Sincronizar selectedPlanilla con la versión fresca del servidor.
-                    // Sin esto, después de Calcular/Aprobar la UI muestra datos viejos hasta refrescar.
-                    const updated = enrichedPlanillas.find(p => p.id === selectedPlanilla.id);
-                    if (updated) setSelectedPlanilla(updated);
-                }
-            }
-
-            // Fetch empleados activos
-            const empleadosData = await api.get('/api/empleados');
-            const activos = empleadosData.filter(e => e.estaActivo);
-            setEmpleados(activos);
-            setEmpleadosCount(activos.length);
-
-        } catch (err) {
-            toast.error(err.message || 'Error al cargar datos');
-        } finally {
-            setLoadingAction(null);
-        }
-    };
-
-    const handleDeletePlanilla = async () => {
-        if (!planillaToDelete) return;
-        try {
-            setLoadingAction('deleting');
-            await api.delete(`/api/payrollheaders/${planillaToDelete.id}`);
-            toast.success(`Planilla ${planillaToDelete.payrollNumber} eliminada`);
-            setShowDeleteModal(false);
-            setPlanillaToDelete(null);
-            // Si era la seleccionada, deseleccionar
-            if (selectedPlanilla?.id === planillaToDelete.id) {
-                setSelectedPlanilla(null);
-                setShowHoursPanel(false);
-            }
-            await fetchData();
-        } catch (error) {
-            toast.error(error.message || 'Error al eliminar la planilla');
-        } finally {
-            setLoadingAction(null);
-        }
-    };
-
-    // Normaliza campos numéricos de horas (evita "09" / "07" cuando la API devuelve strings)
-    const normalizeHoursRow = (row) => {
-        const n = (v) => (v != null && v !== '' && !Number.isNaN(Number(v))) ? Number(v) : 0;
-        return {
-            ...row,
-            regularHours: n(row.regularHours),
-            sundayHours: n(row.sundayHours),
-            holidayHours: n(row.holidayHours),
-            overtimeDayHours: n(row.overtimeDayHours),
-            overtimeNightHours: n(row.overtimeNightHours),
-            overtimeHolidayHours: n(row.overtimeHolidayHours),
-            overtimeMixedHours: n(row.overtimeMixedHours),
-            overtimeExcessHours: n(row.overtimeExcessHours),
-            absenceHours: n(row.absenceHours),
-            commissions: n(row.commissions)
-        };
-    };
-
-    // Carga las horas trabajadas de la planilla seleccionada
-    const fetchHours = async (planillaId) => {
-        try {
-            setLoadingAction('hours');
-            const data = await api.get(`/api/payrollheaders/${planillaId}/hours`);
-            setEmployeeHours(Array.isArray(data) ? data.map(normalizeHoursRow) : data);
-        } catch (err) {
-            toast.error(err.message || 'Error al cargar horas trabajadas');
-        } finally {
-            setLoadingAction(null);
-        }
-    };
-
-    // Abre o cierra el panel de horas
-    const toggleHoursPanel = async () => {
-        if (!showHoursPanel) {
-            setShowHoursPanel(true);
-            await fetchHours(selectedPlanilla.id);
-        } else {
-            setShowHoursPanel(false);
-        }
-    };
-
-    // Crear/verificar configuración de impuestos (CSS, SE, ISR) si falta
-    const handleEnsureTaxConfig = async () => {
-        try {
-            setLoadingAction('taxConfig');
-            await api.post('/api/payrollheaders/ensure-tax-config');
-            toast.success('Configuración de planilla creada o verificada. Vuelve a intentar Calcular Planilla.');
-        } catch (err) {
-            toast.error(err.message || 'Error al crear configuración');
-        } finally {
-            setLoadingAction(null);
-        }
-    };
-
-    // Auto-llena horas regulares con defaults del backend
-    const handleGenerateDefaultHours = async () => {
-        try {
-            setLoadingAction('hours');
-            await api.post(`/api/payrollheaders/${selectedPlanilla.id}/hours/generate-defaults`);
-            toast.success('Horas regulares generadas exitosamente');
-            await fetchHours(selectedPlanilla.id);
-        } catch (err) {
-            toast.error(err.message || 'Error al generar horas por defecto');
-        } finally {
-            setLoadingAction(null);
-        }
-    };
-
-    // Importa horas extra y ausencias desde módulos separados
-    const handleImportNovedades = async (mode = 'overwrite') => {
-        try {
-            setLoadingAction('importing');
-            const response = await api.post(`/api/payrollheaders/${selectedPlanilla.id}/hours/import-novedades?mode=${mode}`);
-
-            if (response.requiresConfirmation) {
-                setImportConfirmData({
-                    employeesCount: response.employeesWithExistingValues,
-                    message: response.message
-                });
-                setShowImportConfirmModal(true);
-                return;
-            }
-
-            const summary = response.summary;
-            toast.success(
-                `Importadas ${(summary.totalOvertimeHours || 0).toFixed(1)} horas extra y ${(summary.absenceHours || 0).toFixed(1)} horas de ausencias de ${summary.employeesProcessed || 0} empleado(s)`,
-                { duration: 5000 }
-            );
-            await fetchHours(selectedPlanilla.id);
-            setShowImportConfirmModal(false);
-        } catch (err) {
-            toast.error(err.message || 'Error al importar novedades');
-        } finally {
-            setLoadingAction(null);
-        }
-    };
-
-    // Actualiza un campo de horas en el estado local con debounce para guardar
-    const handleHoursChange = (empleadoId, field, value) => {
-        const numericValue = parseFloat(value) || 0;
-
-        setEmployeeHours(prev =>
-            prev.map(row =>
-                row.empleadoId === empleadoId
-                    ? { ...row, [field]: numericValue }
-                    : row
-            )
-        );
-
-        // Debounce: esperar 800ms antes de guardar para no saturar la API
-        if (debounceTimers.current[empleadoId]) {
-            clearTimeout(debounceTimers.current[empleadoId]);
-        }
-
-        debounceTimers.current[empleadoId] = setTimeout(() => {
-            saveEmployeeHours(empleadoId);
-        }, 800);
-    };
-
-    // Guarda todas las horas pendientes y cierra el panel
-    const handleSaveAndClose = async () => {
-        try {
-            // Limpiar todos los timers de debounce pendientes y guardar inmediatamente
-            const empleadosConCambiosPendientes = new Set();
-
-            Object.keys(debounceTimers.current).forEach(empleadoId => {
-                if (debounceTimers.current[empleadoId]) {
-                    clearTimeout(debounceTimers.current[empleadoId]);
-                    delete debounceTimers.current[empleadoId];
-                    empleadosConCambiosPendientes.add(parseInt(empleadoId));
-                }
-            });
-
-            // Guardar solo las horas de empleados con cambios pendientes
-            const savePromises = Array.from(empleadosConCambiosPendientes).map(empleadoId =>
-                saveEmployeeHours(empleadoId)
-            );
-
-            // Si hay cambios pendientes, esperar a que se completen
-            if (savePromises.length > 0) {
-                await Promise.all(savePromises);
-                toast.success('Horas guardadas correctamente');
-            }
-
-            // Cerrar el panel
-            setShowHoursPanel(false);
-        } catch (err) {
-            toast.error(err.message || 'Error al guardar horas');
-        }
-    };
-
-    // Guarda las horas de un empleado en la API
-    const saveEmployeeHours = async (empleadoId) => {
-        const row = employeeHours.find(r => r.empleadoId === empleadoId);
-        if (!row) return;
-
-        try {
-            await api.put(`/api/payrollheaders/${selectedPlanilla.id}/hours/${empleadoId}`, {
-                empleadoId: row.empleadoId,
-                regularHours: row.regularHours || 0,
-                sundayHours: row.sundayHours || 0,
-                holidayHours: row.holidayHours || 0,
-                overtimeDayHours: row.overtimeDayHours || 0,
-                overtimeNightHours: row.overtimeNightHours || 0,
-                overtimeHolidayHours: row.overtimeHolidayHours || 0,
-                overtimeMixedHours: row.overtimeMixedHours || 0,
-                overtimeExcessHours: row.overtimeExcessHours || 0,
-                absenceHours: row.absenceHours || 0,
-                commissions: row.commissions || 0
-            });
-        } catch (err) {
-            toast.error(`Error al guardar horas de empleado: ${err.message}`);
-        }
-    };
-
-    const getStatusBadge = (status) => {
-        const statuses = {
-            0: { label: 'Borrador', bg: 'bg-amber-500/15', text: 'text-amber-400', dot: 'bg-amber-600' },
-            1: { label: 'Calculado', bg: 'bg-blue-500/15', text: 'text-blue-400', dot: 'bg-blue-600' },
-            2: { label: 'Aprobado', bg: 'bg-green-500/15', text: 'text-green-400', dot: 'bg-green-600' },
-            3: { label: 'Pagado', bg: 'bg-emerald-500/15', text: 'text-emerald-400', dot: 'bg-emerald-600' },
-            4: { label: 'Cancelado', bg: 'bg-red-500/15', text: 'text-red-400', dot: 'bg-red-600' }
-        };
-        const s = statuses[status] || statuses[0];
-        return (
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${s.bg} ${s.text}`}>
-                <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${s.dot}`}></span>
-                {s.label}
-            </span>
-        );
-    };
-
-    // Badge para tipo de período
-    const getPayPeriodBadge = (payPeriodType) => {
-        const config = PAY_PERIOD_CONFIG[payPeriodType];
-        if (!config) return null;
-        return (
-            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-navy-700 text-gray-400 border border-navy-600 ml-1.5">
-                {config.name}
-            </span>
-        );
-    };
-
-    const generatePayrollNumber = () => {
-        const year = new Date().getFullYear();
-        const nextNumber = planillas.length + 1;
-        return `${year}-${String(nextNumber).padStart(3, '0')}`;
-    };
-
-    const openNewModal = () => {
-        setFormData({
-            payrollNumber: generatePayrollNumber(),
-            payPeriodType: 2,
-            tipoPlanilla: 0,
-            periodStartDate: '',
-            periodEndDate: '',
-            payDate: '',
-            companyId: 1
-        });
-        setShowNewModal(true);
-    };
-
-    const handleCreatePlanilla = async (e) => {
-        e.preventDefault();
-
-        // Validación
-        const startDate = new Date(formData.periodStartDate);
-        const endDate = new Date(formData.periodEndDate);
-        const payDate = new Date(formData.payDate);
-
-        if (endDate <= startDate) {
-            toast.error('La fecha fin debe ser posterior a la fecha inicio');
-            return;
-        }
-
-        if (payDate < endDate) {
-            toast.error('La fecha de pago debe ser igual o posterior a la fecha fin del período');
-            return;
-        }
-
-        try {
-            await api.post('/api/payrollheaders', formData);
-
-            toast.success('Planilla creada exitosamente');
-            setShowNewModal(false);
-            await fetchData();
-        } catch (err) {
-            toast.error(err.message || 'Error al crear planilla');
-        }
-    };
-
-    const handleCalculate = async () => {
-        if (!selectedPlanilla) return;
-
-        try {
-            setLoadingAction('calculating');
-
-            const result = await api.post(`/api/payrollheaders/${selectedPlanilla.id}/calculate`);
-            const employeeCount = result.details?.length || empleadosCount;
-
-            toast.success(`Planilla calculada: ${employeeCount} empleados procesados`);
-
-            await fetchData();
-        } catch (err) {
-            toast.error(err.message || 'Error al calcular planilla');
-        } finally {
-            setLoadingAction(null);
-        }
-    };
-
-    // handleApprove ahora abre el modal de confirmación
-    const handleApprove = () => {
-        setShowApproveConfirmModal(true);
-    };
-
-    // confirmedApprove ejecuta la llamada API real
-    const confirmedApprove = async () => {
-        if (!selectedPlanilla) return;
-
-        try {
-            setLoadingAction('approving');
-            setShowApproveConfirmModal(false);
-
-            await api.post(`/api/payrollheaders/${selectedPlanilla.id}/approve`);
-
-            toast.success('Planilla aprobada exitosamente');
-            await fetchData();
-        } catch (err) {
-            toast.error(err.message || 'Error al aprobar planilla');
-        } finally {
-            setLoadingAction(null);
-        }
-    };
-
-    const viewDetails = async (planilla) => {
-        try {
-            const data = await api.get(`/api/payrollheaders/${planilla.id}`);
-            setPlanillaDetails(data);
-            setExpandedDetails(new Set());
-            setBreakdowns({});
-            setShowDetailsModal(true);
-        } catch (err) {
-            toast.error(err.message || 'Error al cargar detalles');
-        }
-    };
-
-    const toggleDetailExpand = async (payrollId, detailId) => {
-        const newExpanded = new Set(expandedDetails);
-        if (newExpanded.has(detailId)) {
-            newExpanded.delete(detailId);
-            setExpandedDetails(newExpanded);
-            return;
-        }
-        newExpanded.add(detailId);
-        setExpandedDetails(newExpanded);
-
-        if (breakdowns[detailId]) return; // ya en caché
-
-        setLoadingBreakdown(detailId);
-        try {
-            const data = await api.get(`/api/payrollheaders/${payrollId}/details/${detailId}/breakdown`);
-            setBreakdowns(prev => ({ ...prev, [detailId]: data }));
-        } catch (err) {
-            toast.error('Error al cargar desglose: ' + (err.message || ''));
-        } finally {
-            setLoadingBreakdown(null);
-        }
-    };
-
-    // Formatea la etiqueta del selector de planilla
-    const formatPlanillaOption = (planilla) => {
-        const periodoLabel = PAY_PERIOD_CONFIG[planilla.payPeriodType]?.name || '';
-        const fechaLabel = parseUTCDate(planilla.periodStartDate).toLocaleDateString('es-PA', { month: 'short', year: 'numeric' });
-        return `${planilla.payrollNumber} — ${fechaLabel}${periodoLabel ? ` (${periodoLabel})` : ''}`;
-    };
-
-    if (loadingAction === 'init') {
-        return (
-            <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <SkeletonCard />
-                    <SkeletonCard />
-                    <SkeletonCard />
-                    <SkeletonCard />
-                </div>
-                <SkeletonTable rows={5} columns={7} />
-            </div>
-        );
+  const cargar = useCallback(async (silencioso = false) => {
+    try {
+      if (!silencioso) setCargando(true);
+      const data = await api.get(`/api/payrollheaders?anio=${anio}&mes=${mes}`);
+      setPlanillas(Array.isArray(data) ? data : []);
+    } catch (e) {
+      toast.error(e.message || 'No se pudieron cargar las planillas del mes');
+    } finally {
+      setCargando(false);
     }
+  }, [anio, mes]);
 
-    // Determina si la planilla tiene datos calculados
-    const hasCalculatedData = selectedPlanilla && selectedPlanilla.status >= 1;
+  useEffect(() => { cargar(); }, [cargar]);
 
-    // Cuántos empleados hay EN ESTA PLANILLA. Antes se mostraba empleadosCount,
-    // que es la plantilla activa completa de la empresa: toda planilla decía
-    // "30 empleados" aunque hubiera pagado a una sola persona. Las filas se
-    // generan para todo el personal, así que solo cuentan las que devengaron.
-    const empleadosEnPlanilla = selectedPlanilla?.details
-        ? selectedPlanilla.details.filter(d => (d.grossPay || 0) > 0).length
-        : 0;
+  const resumen = useMemo(() => {
+    const activas = planillas.filter(p => p.status !== 4);
+    return {
+      total: activas.length,
+      bruto: activas.reduce((s, p) => s + (p.totalGrossPay || 0), 0),
+      neto: activas.reduce((s, p) => s + (p.totalNetPay || 0), 0),
+      pendientes: activas.filter(p => p.status === 1).length,
+      borradores: activas.filter(p => p.status === 0).length,
+    };
+  }, [planillas]);
 
-    return (
-        <div className="space-y-6">
+  const tipoPorDefecto = useMemo(() => {
+    const ultima = [...planillas].sort((a, b) => (a.periodStartDate < b.periodStartDate ? 1 : -1))[0];
+    return ultima?.payPeriodType ?? 2;
+  }, [planillas]);
 
-            {/* ==================== HEADER ==================== */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-100">Planillas de Nómina</h1>
-                    <p className="text-sm text-gray-500 mt-0.5">Gestiona y aprueba tus planillas de pago</p>
-                </div>
-                <Button
-                    icon={Plus}
-                    variant="success"
-                    size="md"
-                    onClick={openNewModal}
-                >
-                    Nueva Planilla
-                </Button>
-            </div>
+  // ── Acciones por planilla ──
+  const ejecutar = async (planilla, tipo) => {
+    if (tipo === 'aprobar' || tipo === 'anular' || tipo === 'eliminar') {
+      setConfirmacion({ tipo, planilla });
+      return;
+    }
+    await correr(planilla, tipo);
+  };
 
-            {/* Selector mejorado de planilla */}
-            {planillas.length > 0 && (
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                    <label className="text-sm font-medium text-gray-400 whitespace-nowrap">
-                        Seleccionar planilla
-                    </label>
-                    <div className="relative w-full sm:w-80">
-                        <select
-                            value={selectedPlanilla?.id || ''}
-                            onChange={(e) => {
-                                const planilla = planillas.find(p => p.id === parseInt(e.target.value));
-                                setSelectedPlanilla(planilla);
-                            }}
-                            className="w-full pl-3 pr-8 py-2.5 bg-navy-900 border border-navy-600 rounded-lg text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent appearance-none cursor-pointer"
-                        >
-                            {planillas.map(p => (
-                                <option key={p.id} value={p.id}>
-                                    {formatPlanillaOption(p)}
-                                </option>
-                            ))}
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5">
-                            <svg className="w-4 h-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                        </div>
-                    </div>
-                </div>
-            )}
+  const correr = async (planilla, tipo) => {
+    const id = planilla.id;
+    setOcupada(id);
+    setErrores(prev => ({ ...prev, [id]: null }));
+    try {
+      if (tipo === 'calcular') {
+        // La configuración de impuestos se asegura sola; antes era un botón aparte.
+        await api.post('/api/payrollheaders/ensure-tax-config').catch(() => {});
+        const r = await api.post(`/api/payrollheaders/${id}/calculate`);
+        toast.success(`Planilla ${planilla.payrollNumber} calculada: ${r.employeesProcessed ?? ''} empleados`);
+        setAbierta(id);
+      } else if (tipo === 'aprobar') {
+        await api.post(`/api/payrollheaders/${id}/approve`);
+        toast.success(`Planilla ${planilla.payrollNumber} aprobada`);
+      } else if (tipo === 'pagar') {
+        await api.post(`/api/payrollheaders/${id}/pay`);
+        toast.success(`Planilla ${planilla.payrollNumber} marcada como pagada`);
+      } else if (tipo === 'anular') {
+        await api.post(`/api/payrollheaders/${id}/cancel`, { reason: motivoAnulacion || 'Anulada desde Planillas' });
+        toast.success(`Planilla ${planilla.payrollNumber} anulada`);
+      } else if (tipo === 'eliminar') {
+        await api.delete(`/api/payrollheaders/${id}`);
+        toast.success(`Borrador ${planilla.payrollNumber} eliminado`);
+        if (abierta === id) setAbierta(null);
+      }
+      await cargar(true);
+    } catch (e) {
+      const frase = {
+        calcular: 'No se pudo calcular',
+        aprobar: 'No se pudo aprobar',
+        pagar: 'No se pudo marcar como pagada',
+        anular: 'No se pudo anular',
+        eliminar: 'No se pudo eliminar',
+      }[tipo];
+      setErrores(prev => ({ ...prev, [id]: `${frase}: ${e.message}` }));
+    } finally {
+      setOcupada(null);
+      setConfirmacion(null);
+      setMotivoAnulacion('');
+    }
+  };
 
-            {/* ==================== WORKFLOW STEPPER ==================== */}
-            {selectedPlanilla && (
-                <div className="bg-navy-900 border border-navy-700 rounded-xl p-5">
-                    {/* Nombre y fechas */}
-                    <div className="mb-5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <h2 className="text-lg font-bold text-gray-100 font-display">
-                                Planilla {selectedPlanilla.payrollNumber}
-                            </h2>
-                            {selectedPlanilla.payPeriodType !== undefined && selectedPlanilla.payPeriodType !== null &&
-                                getPayPeriodBadge(selectedPlanilla.payPeriodType)
-                            }
-                            {selectedPlanilla.tipoPlanilla === 1 && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-500/15 text-orange-400 border border-orange-500/20 ml-1">
-                                    Sin Deducciones Legales
-                                </span>
-                            )}
-                            {selectedPlanilla.status === 4 && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-500/15 text-red-400 border border-red-500/20 ml-1">
-                                    Cancelada
-                                </span>
-                            )}
-                        </div>
-                        <p className="text-sm text-gray-400 mt-0.5">
-                            Período: {parseUTCDate(selectedPlanilla.periodStartDate).toLocaleDateString('es-PA')} — {parseUTCDate(selectedPlanilla.periodEndDate).toLocaleDateString('es-PA')}
-                            {selectedPlanilla.payDate && (
-                                <span className="ml-3 text-gray-500">
-                                    Fecha de pago: {parseUTCDate(selectedPlanilla.payDate).toLocaleDateString('es-PA')}
-                                </span>
-                            )}
-                        </p>
-                    </div>
+  const abrir = (id, forzar = false) => setAbierta(prev => (prev === id && !forzar ? null : id));
 
-                    {/* Stepper horizontal */}
-                    <div className="flex items-center">
-                        {WORKFLOW_STEPS.map((step, index) => {
-                            const currentStatus = selectedPlanilla.status === 4 ? -1 : selectedPlanilla.status;
-                            const isPast = currentStatus > step.status;
-                            const isActive = currentStatus === step.status;
-                            const isFuture = currentStatus < step.status;
+  const titulo = `${NOMBRES_MES[mes - 1]} ${anio}`;
+  const conf = confirmacion;
+  const empleadosDe = (p) => (p.details ?? []).filter(d => (d.grossPay || 0) > 0).length;
 
-                            return (
-                                <React.Fragment key={step.status}>
-                                    {/* Paso */}
-                                    <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
-                                        <div className={`
-                                            w-9 h-9 rounded-full flex items-center justify-center transition-all
-                                            ${isPast ? 'bg-emerald-500/20 border-2 border-emerald-500 text-emerald-400' : ''}
-                                            ${isActive ? 'bg-primary-600 border-2 border-primary-400 text-white ring-4 ring-primary-500/20' : ''}
-                                            ${isFuture ? 'bg-navy-800 border-2 border-navy-600 text-gray-600' : ''}
-                                        `}>
-                                            {isPast ? (
-                                                <CheckCircle2 className="w-5 h-5" />
-                                            ) : (
-                                                <step.icon className="w-4 h-4" />
-                                            )}
-                                        </div>
-                                        <span className={`text-xs font-medium ${
-                                            isPast ? 'text-emerald-400' :
-                                            isActive ? 'text-primary-400' :
-                                            'text-gray-600'
-                                        }`}>
-                                            {step.label}
-                                        </span>
-                                    </div>
-
-                                    {/* Línea conectora */}
-                                    {index < WORKFLOW_STEPS.length - 1 && (
-                                        <div className={`flex-1 h-0.5 mx-2 rounded-full ${
-                                            currentStatus > step.status ? 'bg-emerald-500' : 'bg-navy-700'
-                                        }`} />
-                                    )}
-                                </React.Fragment>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-
-            {/* ==================== SUMMARY CARDS ==================== */}
-            {selectedPlanilla ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-                    {/* Salario Bruto */}
-                    <div className="bg-navy-900 rounded-xl border border-navy-700 p-5">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Salario Bruto</p>
-                        {hasCalculatedData ? (
-                            <>
-                                <p className="text-2xl font-bold text-gray-100 font-mono">{formatCurrency(selectedPlanilla.totalGrossPay)}</p>
-                                <p className="text-xs text-gray-400 mt-1.5">
-                                    {empleadosEnPlanilla} {empleadosEnPlanilla === 1 ? 'empleado' : 'empleados'}
-                                    {empleadosEnPlanilla > 0 && selectedPlanilla.totalGrossPay > 0 && (
-                                        <span className="ml-1">
-                                            • Promedio {formatCurrency(selectedPlanilla.totalGrossPay / empleadosEnPlanilla)}
-                                        </span>
-                                    )}
-                                </p>
-                            </>
-                        ) : (
-                            <>
-                                <p className="text-2xl font-bold text-gray-600 font-mono" title="Calcula la planilla para ver los totales">—</p>
-                                <p className="text-xs text-gray-400 mt-1.5">{empleadosCount} en plantilla</p>
-                            </>
-                        )}
-                    </div>
-
-                    {/* Neto a Pagar */}
-                    <div className="bg-navy-900 rounded-xl border border-navy-700 p-5">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Neto a Pagar</p>
-                        {hasCalculatedData ? (
-                            <>
-                                <p className="text-2xl font-bold text-emerald-400 font-mono">{formatCurrency(selectedPlanilla.totalNetPay)}</p>
-                                {selectedPlanilla.totalGrossPay > 0 && (
-                                    <p className="text-xs text-gray-500 mt-1.5">
-                                        Ahorro deducc: B/. {(selectedPlanilla.totalGrossPay - selectedPlanilla.totalNetPay).toLocaleString('es-PA', { minimumFractionDigits: 2 })}
-                                    </p>
-                                )}
-                            </>
-                        ) : (
-                            <>
-                                <p className="text-2xl font-bold text-gray-600 font-mono" title="Calcula la planilla para ver los totales">—</p>
-                                <p className="text-xs text-gray-600 mt-1.5">Pendiente de cálculo</p>
-                            </>
-                        )}
-                    </div>
-
-                    {/* Aportes CSS */}
-                    <div className="bg-navy-900 rounded-xl border border-navy-700 p-5">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Aportes CSS</p>
-                        {hasCalculatedData ? (
-                            <>
-                                <p className="text-2xl font-bold text-amber-400 font-mono">
-                                    {formatCurrency((selectedPlanilla.totalEmployeeCss || 0) + (selectedPlanilla.totalEmployerCss || 0))}
-                                </p>
-                                <div className="mt-1.5 space-y-0.5">
-                                    <div className="flex justify-between text-xs text-gray-500">
-                                        <span>Empleado:</span>
-                                        <span className="font-mono">{formatCurrency(selectedPlanilla.totalEmployeeCss)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-xs text-gray-500">
-                                        <span>Patrono:</span>
-                                        <span className="font-mono">{formatCurrency(selectedPlanilla.totalEmployerCss)}</span>
-                                    </div>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <p className="text-2xl font-bold text-gray-600 font-mono" title="Calcula la planilla para ver los totales">—</p>
-                                <p className="text-xs text-gray-600 mt-1.5">Empleado + Patrono</p>
-                            </>
-                        )}
-                    </div>
-
-                    {/* Seguro Educativo */}
-                    <div className="bg-navy-900 rounded-xl border border-navy-700 p-5">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Seguro Educativo</p>
-                        {hasCalculatedData ? (
-                            <>
-                                <p className="text-2xl font-bold text-purple-400 font-mono">
-                                    {formatCurrency((selectedPlanilla.totalEmployeeSe || 0) + (selectedPlanilla.totalEmployerSe || 0))}
-                                </p>
-                                <div className="mt-1.5 space-y-0.5">
-                                    <div className="flex justify-between text-xs text-gray-500">
-                                        <span>Empleado:</span>
-                                        <span className="font-mono">{formatCurrency(selectedPlanilla.totalEmployeeSe)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-xs text-gray-500">
-                                        <span>Patrono:</span>
-                                        <span className="font-mono">{formatCurrency(selectedPlanilla.totalEmployerSe)}</span>
-                                    </div>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                <p className="text-2xl font-bold text-gray-600 font-mono" title="Calcula la planilla para ver los totales">—</p>
-                                <p className="text-xs text-gray-600 mt-1.5">Empleado + Patrono</p>
-                            </>
-                        )}
-                    </div>
-
-                    {/* ISR Retenido */}
-                    <div className="bg-navy-900 rounded-xl border border-navy-700 p-5">
-                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">ISR Retenido</p>
-                        {hasCalculatedData ? (
-                            <>
-                                <p className="text-2xl font-bold text-red-400 font-mono">{formatCurrency(selectedPlanilla.totalIncomeTax)}</p>
-                                <p className="text-xs text-gray-500 mt-1.5">Según tabla DGI</p>
-                            </>
-                        ) : (
-                            <>
-                                <p className="text-2xl font-bold text-gray-600 font-mono" title="Calcula la planilla para ver los totales">—</p>
-                                <p className="text-xs text-gray-600 mt-1.5">Según tabla DGI</p>
-                            </>
-                        )}
-                    </div>
-                </div>
-            ) : planillas.length > 0 ? (
-                // Solo cuando hay planillas y ninguna elegida. Sin esta condición se
-                // apilaban dos estados vacíos con el mismo icono diciendo lo mismo:
-                // este y el del historial, que además ya ofrece crear la primera.
-                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 p-6">
-                    <EmptyState
-                        icon={
-                            <svg className="w-16 h-16 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                            </svg>
-                        }
-                        title="Ninguna planilla seleccionada"
-                        description="Elige una planilla del historial para ver sus totales y acciones"
-                    />
-                </div>
-            ) : null}
-
-            {/* ==================== PANEL DE ACCIONES ==================== */}
-            {selectedPlanilla && (
-                <div className="bg-navy-900 border border-navy-700 rounded-xl overflow-hidden">
-                    {/* Header del panel sin badge de estado (ya está en el stepper) */}
-                    <div className="px-5 py-3 bg-navy-950/60 border-b border-navy-700 flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-primary-400 animate-pulse" />
-                        <span className="text-sm font-semibold text-gray-300">
-                            Acciones — Planilla {selectedPlanilla.payrollNumber}
-                        </span>
-                    </div>
-
-                    {/* Botones de acción */}
-                    <div className="p-5">
-
-                        {/* ESTADO: Borrador */}
-                        {selectedPlanilla.status === 0 && (
-                            <div className="flex flex-wrap gap-3 items-center">
-                                {/* Acción Principal */}
-                                <button
-                                    onClick={handleCalculate}
-                                    disabled={loadingAction === 'calculating'}
-                                    className="group inline-flex items-center gap-3 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all shadow-lg shadow-primary-900/40 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5 hover:shadow-xl"
-                                >
-                                    {loadingAction === 'calculating' ? (
-                                        <>
-                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                            Calculando...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Calculator className="w-5 h-5" />
-                                            Calcular Planilla
-                                        </>
-                                    )}
-                                </button>
-
-                                {/* Separador visual */}
-                                <div className="w-px h-8 bg-navy-700 hidden sm:block" />
-
-                                {/* Herramientas secundarias */}
-                                <button
-                                    onClick={toggleHoursPanel}
-                                    className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-emerald-500/50 text-gray-200 hover:text-emerald-300 px-4 py-2.5 rounded-xl font-medium text-sm transition-all hover:-translate-y-0.5"
-                                >
-                                    <Clock className="w-4 h-4" />
-                                    {showHoursPanel ? 'Cerrar Horas' : 'Editar Horas'}
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={handleEnsureTaxConfig}
-                                    disabled={loadingAction === 'taxConfig'}
-                                    title="Si Calcular Planilla falla por falta de configuración CSS/SE/ISR, haz clic aquí"
-                                    className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-amber-500/40 text-gray-300 hover:text-amber-300 px-4 py-2.5 rounded-xl font-medium text-sm transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {loadingAction === 'taxConfig' ? (
-                                        <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                                    ) : (
-                                        <Settings className="w-4 h-4" />
-                                    )}
-                                    Config. Impuestos
-                                </button>
-
-                                <button
-                                    onClick={() => viewDetails(selectedPlanilla)}
-                                    className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-primary-500/40 text-gray-400 hover:text-primary-300 px-4 py-2.5 rounded-xl font-medium text-sm transition-all hover:-translate-y-0.5"
-                                >
-                                    <Eye className="w-4 h-4" />
-                                    Ver Detalles
-                                </button>
-                            </div>
-                        )}
-
-                        {/* ESTADO: Calculado */}
-                        {selectedPlanilla.status === 1 && (
-                            <div className="flex flex-wrap gap-3 items-center">
-                                {/* Acción Principal */}
-                                <button
-                                    onClick={handleApprove}
-                                    disabled={loadingAction === 'approving'}
-                                    className="inline-flex items-center gap-3 bg-primary-600 hover:bg-primary-700 text-white px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all shadow-lg shadow-primary-900/40 disabled:opacity-50 disabled:cursor-not-allowed hover:-translate-y-0.5 hover:shadow-xl"
-                                >
-                                    {loadingAction === 'approving' ? (
-                                        <>
-                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                            Aprobando...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <CheckCheck className="w-5 h-5" />
-                                            Aprobar Planilla
-                                        </>
-                                    )}
-                                </button>
-
-                                {/* Separador visual */}
-                                <div className="w-px h-8 bg-navy-700 hidden sm:block" />
-
-                                {/* Herramientas secundarias */}
-                                <button
-                                    onClick={handleCalculate}
-                                    disabled={loadingAction === 'calculating'}
-                                    className="inline-flex items-center gap-2 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-600/30 hover:border-amber-500/50 text-amber-400 px-4 py-2.5 rounded-xl font-medium text-sm transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {loadingAction === 'calculating' ? (
-                                        <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                                    ) : (
-                                        <RotateCcw className="w-4 h-4" />
-                                    )}
-                                    Recalcular
-                                </button>
-
-                                <button
-                                    onClick={toggleHoursPanel}
-                                    className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-emerald-500/50 text-gray-200 hover:text-emerald-300 px-4 py-2.5 rounded-xl font-medium text-sm transition-all hover:-translate-y-0.5"
-                                >
-                                    <Clock className="w-4 h-4" />
-                                    {showHoursPanel ? 'Cerrar Horas' : 'Editar Horas'}
-                                </button>
-
-                                <button
-                                    onClick={() => viewDetails(selectedPlanilla)}
-                                    className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-primary-500/40 text-gray-400 hover:text-primary-300 px-4 py-2.5 rounded-xl font-medium text-sm transition-all hover:-translate-y-0.5"
-                                >
-                                    <Eye className="w-4 h-4" />
-                                    Ver Detalles
-                                </button>
-                            </div>
-                        )}
-
-                        {/* ESTADO: Aprobado */}
-                        {selectedPlanilla.status === 2 && (
-                            <div className="flex flex-wrap gap-3 items-center">
-                                <button
-                                    disabled
-                                    className="inline-flex items-center gap-3 bg-emerald-600/20 text-emerald-400/50 px-6 py-3.5 rounded-xl font-semibold text-[15px] cursor-not-allowed border border-emerald-700/20"
-                                >
-                                    <CreditCard className="w-5 h-5" />
-                                    Procesar Pago
-                                    <span className="text-xs bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">Próximamente</span>
-                                </button>
-                                <button
-                                    onClick={() => viewDetails(selectedPlanilla)}
-                                    className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-primary-500/40 text-gray-200 hover:text-primary-300 px-4 py-2.5 rounded-xl font-medium text-sm transition-all hover:-translate-y-0.5"
-                                >
-                                    <Eye className="w-4 h-4" />
-                                    Ver Detalles
-                                </button>
-                            </div>
-                        )}
-
-                        {/* ESTADO: Pagado o Cancelado */}
-                        {(selectedPlanilla.status === 3 || selectedPlanilla.status === 4) && (
-                            <button
-                                onClick={() => viewDetails(selectedPlanilla)}
-                                className="inline-flex items-center gap-2 bg-navy-800 hover:bg-navy-700 border border-navy-600 hover:border-primary-500/40 text-gray-200 hover:text-primary-300 px-6 py-3.5 rounded-xl font-semibold text-[15px] transition-all hover:-translate-y-0.5"
-                            >
-                                <Eye className="w-5 h-5" />
-                                Ver Detalles Completos
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Nota de ayuda contextual */}
-                    {selectedPlanilla.status === 0 && (
-                        <div className="px-5 pb-4">
-                            <p className="text-xs text-gray-600 flex items-center gap-1.5">
-                                <svg className="w-3.5 h-3.5 text-gray-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                Si "Calcular" falla por configuración faltante, usa "Config. Impuestos" primero e intenta de nuevo.
-                            </p>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* ==================== PANEL DE HORAS TRABAJADAS ==================== */}
-            {selectedPlanilla && (selectedPlanilla.status === 0 || selectedPlanilla.status === 1) && showHoursPanel && (
-                <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-emerald-700/50 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-navy-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div>
-                            <h3 className="text-lg font-semibold text-gray-100">
-                                Horas Trabajadas
-                                <span className="ml-2 text-sm font-normal text-gray-500">
-                                    — {selectedPlanilla.payrollNumber}
-                                </span>
-                                {selectedPlanilla.status === 1 && (
-                                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-500/15 text-blue-400">
-                                        Calculada
-                                    </span>
-                                )}
-                            </h3>
-                            <p className="text-xs text-gray-500 mt-0.5">
-                                Los cambios se guardan automáticamente al dejar de editar un campo
-                                {selectedPlanilla.status === 1 && ' • Recuerda recalcular la planilla después de editar'}
-                            </p>
-                        </div>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={handleGenerateDefaultHours}
-                                disabled={loadingAction === 'hours'}
-                                className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {loadingAction === 'hours' ? (
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                ) : (
-                                    <Zap className="w-4 h-4" />
-                                )}
-                                Auto-llenar Regulares
-                            </button>
-                            <button
-                                onClick={() => handleImportNovedades('overwrite')}
-                                disabled={loadingAction === 'importing' || loadingAction === 'hours'}
-                                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {loadingAction === 'importing' ? (
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                ) : (
-                                    <Upload className="w-4 h-4" />
-                                )}
-                                Importar Novedades
-                            </button>
-                            <button
-                                onClick={handleSaveAndClose}
-                                disabled={loadingAction === 'hours' || loadingAction === 'importing'}
-                                className="inline-flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-black/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                                title="Guardar cambios y cerrar el panel"
-                            >
-                                <Save className="w-4 h-4" />
-                                Guardar y Cerrar
-                            </button>
-                        </div>
-                    </div>
-
-                    {loadingAction === 'hours' && employeeHours.length === 0 ? (
-                        <div className="flex items-center justify-center py-12">
-                            <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                        </div>
-                    ) : employeeHours.length === 0 ? (
-                        <div className="text-center py-10 text-gray-500">
-                            <Clock className="w-12 h-12 mx-auto mb-3 text-gray-600" />
-                            <p className="font-medium text-gray-400">No hay registros de horas</p>
-                            <p className="text-sm mt-1">Usa "Auto-llenar Regulares" para generar los registros con horas estándar</p>
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto p-4">
-                            {/* Leyenda de colores */}
-                            <div className="flex flex-wrap items-center gap-4 mb-4 px-1 py-2 bg-navy-950/40 rounded-lg border border-navy-700">
-                                <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Leyenda:</span>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="w-3 h-3 rounded-sm bg-emerald-500/30 border border-emerald-400" />
-                                    <span className="text-xs text-gray-400">Horas base</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="w-3 h-3 rounded-sm bg-orange-500/30 border border-orange-400" />
-                                    <span className="text-xs text-gray-400">H. Extra</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="w-3 h-3 rounded-sm bg-purple-500/30 border border-purple-400" />
-                                    <span className="text-xs text-gray-400">H. Extra especiales</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="w-3 h-3 rounded-sm bg-red-500/30 border border-red-400" />
-                                    <span className="text-xs text-gray-400">Ausencias</span>
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                    <span className="w-3 h-3 rounded-sm bg-blue-500/30 border border-blue-400" />
-                                    <span className="text-xs text-gray-400">Comisiones (B/.)</span>
-                                </div>
-                            </div>
-
-                            <table className="w-full text-sm">
-                                <colgroup>
-                                    <col className="w-[min(200px,22%)]" />
-                                    <col className="w-[70px]" />
-                                    <col className="w-[70px]" />
-                                    <col className="w-[70px]" />
-                                    <col className="w-[70px]" />
-                                    <col className="w-[70px]" />
-                                    <col className="w-[70px]" />
-                                    <col className="w-[70px]" />
-                                    <col className="w-[70px]" />
-                                    <col className="w-[70px]" />
-                                    <col className="w-[90px]" />
-                                </colgroup>
-                                <thead className="bg-navy-950 border-b-2 border-navy-600 sticky top-0 z-10">
-                                    <tr>
-                                        <th className="text-left py-4 px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider">Empleado</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-emerald-500 uppercase tracking-wider" title="Horas regulares">Regulares</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-emerald-500 uppercase tracking-wider" title="Horas domingo">Domingo</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-emerald-500 uppercase tracking-wider" title="Horas feriado">Feriado</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-orange-400 uppercase tracking-wider" title="Horas extra diurnas">Extra Diurna</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-orange-400 uppercase tracking-wider" title="Horas extra nocturnas">Extra Nocturna</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-purple-400 uppercase tracking-wider" title="Horas extra en festivos nacionales">Extra Festivos</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-purple-400 uppercase tracking-wider" title="Horas extra mixtas">Extra Mixtas</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-purple-400 uppercase tracking-wider" title="Horas extra con exceso">Extra Exceso</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-red-400 uppercase tracking-wider" title="Horas de ausencia">Ausencias</th>
-                                        <th className="text-center py-4 px-3 text-xs font-semibold text-blue-400 uppercase tracking-wider" title="Comisiones del período (B/.)">Comisión B/.</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-navy-700/50">
-                                    {employeeHours.map((row) => {
-                                        const emp = empleados.find(e => e.id === row.empleadoId);
-                                        const nombreCompleto = emp
-                                            ? `${emp.nombre} ${emp.apellido}`
-                                            : `Empleado #${row.empleadoId}`;
-                                        const num = (v) => (v != null && v !== '' && !Number.isNaN(Number(v))) ? Number(v) : 0;
-                                        return (
-                                            <tr key={row.empleadoId} className="hover:bg-navy-800/50 transition-colors">
-                                                <td className="py-3 px-4 text-gray-100 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
-                                                    {nombreCompleto}
-                                                </td>
-                                                {/* Horas base — verde esmeralda */}
-                                                <td className="py-3 px-3 text-center align-middle">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.5"
-                                                        value={num(row.regularHours)}
-                                                        onChange={(e) => handleHoursChange(row.empleadoId, 'regularHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-emerald-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
-                                                    />
-                                                </td>
-                                                <td className="py-3 px-3 text-center align-middle">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.5"
-                                                        value={num(row.sundayHours)}
-                                                        onChange={(e) => handleHoursChange(row.empleadoId, 'sundayHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-emerald-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
-                                                    />
-                                                </td>
-                                                <td className="py-3 px-3 text-center align-middle">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.5"
-                                                        value={num(row.holidayHours)}
-                                                        onChange={(e) => handleHoursChange(row.empleadoId, 'holidayHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-emerald-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
-                                                    />
-                                                </td>
-                                                {/* Horas extra diurna/nocturna — naranja */}
-                                                <td className="py-3 px-3 text-center align-middle">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.5"
-                                                        value={num(row.overtimeDayHours)}
-                                                        onChange={(e) => handleHoursChange(row.empleadoId, 'overtimeDayHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-orange-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
-                                                    />
-                                                </td>
-                                                <td className="py-3 px-3 text-center align-middle">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.5"
-                                                        value={num(row.overtimeNightHours)}
-                                                        onChange={(e) => handleHoursChange(row.empleadoId, 'overtimeNightHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-orange-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
-                                                    />
-                                                </td>
-                                                {/* Horas extra especiales — morado */}
-                                                <td className="py-3 px-3 text-center align-middle">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.5"
-                                                        value={num(row.overtimeHolidayHours)}
-                                                        onChange={(e) => handleHoursChange(row.empleadoId, 'overtimeHolidayHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-purple-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                                                    />
-                                                </td>
-                                                <td className="py-3 px-3 text-center align-middle">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.5"
-                                                        value={num(row.overtimeMixedHours)}
-                                                        onChange={(e) => handleHoursChange(row.empleadoId, 'overtimeMixedHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-purple-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                                                    />
-                                                </td>
-                                                <td className="py-3 px-3 text-center align-middle">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.5"
-                                                        value={num(row.overtimeExcessHours)}
-                                                        onChange={(e) => handleHoursChange(row.empleadoId, 'overtimeExcessHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-purple-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                                                    />
-                                                </td>
-                                                {/* Ausencias — rojo */}
-                                                <td className="py-3 px-3 text-center align-middle">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.5"
-                                                        value={num(row.absenceHours)}
-                                                        onChange={(e) => handleHoursChange(row.empleadoId, 'absenceHours', e.target.value)}
-                                                        className="w-full min-w-[70px] max-w-[70px] mx-auto block px-2 py-2 bg-navy-800 border border-red-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-colors"
-                                                    />
-                                                </td>
-                                                {/* Comisiones — azul */}
-                                                <td className="py-3 px-3 text-center align-middle">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        step="0.01"
-                                                        value={num(row.commissions)}
-                                                        onChange={(e) => handleHoursChange(row.empleadoId, 'commissions', e.target.value)}
-                                                        className="w-full min-w-[80px] max-w-[80px] mx-auto block px-2 py-2 bg-navy-800 border border-blue-300/40 rounded-md text-gray-100 text-sm text-center focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                                                    />
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* ==================== MODAL: CONFIRMAR IMPORTACIÓN ==================== */}
-            <Modal
-                isOpen={showImportConfirmModal}
-                onClose={() => {
-                    setShowImportConfirmModal(false);
-                    setImportConfirmData(null);
-                }}
-                title="Confirmar importación"
-                size="sm"
-            >
-                {importConfirmData && (
-                    <div className="space-y-4">
-                        <p className="text-gray-300">{importConfirmData.message}</p>
-                        <div className="flex gap-3">
-                            <button
-                                onClick={() => {
-                                    setShowImportConfirmModal(false);
-                                    handleImportNovedades('overwrite');
-                                }}
-                                className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                            >
-                                Sobrescribir
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setShowImportConfirmModal(false);
-                                    handleImportNovedades('sum');
-                                }}
-                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                            >
-                                Sumar
-                            </button>
-                            <button
-                                onClick={() => {
-                                    setShowImportConfirmModal(false);
-                                    setImportConfirmData(null);
-                                }}
-                                className="flex-1 bg-navy-700 hover:bg-navy-600 text-gray-200 px-4 py-2 rounded-lg font-medium transition-colors"
-                            >
-                                Cancelar
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </Modal>
-
-            {/* ==================== MODAL: CONFIRMAR APROBACIÓN ==================== */}
-            <Modal
-                isOpen={showApproveConfirmModal}
-                onClose={() => setShowApproveConfirmModal(false)}
-                title="Confirmar Aprobación"
-                size="sm"
-            >
-                <div className="space-y-4">
-                    <div className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                        <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-amber-300">
-                            Esta acción es irreversible. Al aprobar, la planilla no podrá editarse.
-                        </p>
-                    </div>
-                    {selectedPlanilla && (
-                        <div className="bg-navy-800 rounded-lg p-4 border border-navy-600">
-                            <p className="text-xs text-gray-500 mb-1">Total neto a pagar</p>
-                            <p className="text-2xl font-bold text-emerald-400 font-mono">
-                                {formatCurrency(selectedPlanilla.totalNetPay)}
-                            </p>
-                            <p className="text-xs text-gray-500 mt-1">
-                                Planilla {selectedPlanilla.payrollNumber} — {empleadosCount} empleados
-                            </p>
-                        </div>
-                    )}
-                    <div className="flex gap-3 pt-2">
-                        <button
-                            onClick={() => setShowApproveConfirmModal(false)}
-                            className="flex-1 bg-navy-700 hover:bg-navy-600 text-gray-200 px-4 py-2.5 rounded-lg font-medium transition-colors"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            onClick={confirmedApprove}
-                            className="flex-1 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg shadow-primary-900/40"
-                        >
-                            Confirmar Aprobación
-                        </button>
-                    </div>
-                </div>
-            </Modal>
-
-            {/* ==================== HISTORIAL DE PLANILLAS ==================== */}
-            <div className="bg-navy-900 rounded-xl shadow-lg shadow-black/20 border border-navy-700 overflow-hidden">
-                <div className="px-6 py-4 border-b border-navy-700">
-                    <h3 className="text-lg font-semibold text-gray-100">
-                        Historial de Planillas
-                        <span className="ml-2 text-sm font-normal text-gray-500">
-                            ({planillas.length} {planillas.length === 1 ? 'planilla' : 'planillas'})
-                        </span>
-                    </h3>
-                </div>
-
-                {planillas.length === 0 ? (
-                    <EmptyState
-                        icon={
-                            <svg className="w-16 h-16 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                            </svg>
-                        }
-                        title="No hay planillas creadas"
-                        description="Crea una nueva planilla para comenzar el proceso de nómina"
-                        action={
-                            <button
-                                onClick={openNewModal}
-                                className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
-                            >
-                                <Plus className="w-5 h-5" />
-                                Nueva Planilla
-                            </button>
-                        }
-                    />
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-navy-950 border-b border-navy-700">
-                                <tr>
-                                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">#Planilla</th>
-                                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Período</th>
-                                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Empleados</th>
-                                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Bruto</th>
-                                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Deducciones</th>
-                                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Neto</th>
-                                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                                    <th className="text-left py-3 px-6 text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-navy-900 divide-y divide-navy-700">
-                                {planillas.map((planilla) => (
-                                    <tr
-                                        key={planilla.id}
-                                        className={`border-l-2 transition-all cursor-pointer hover:bg-navy-800/50 ${
-                                            selectedPlanilla?.id === planilla.id
-                                                ? 'border-primary-500 bg-navy-800/30'
-                                                : 'border-transparent hover:border-primary-500'
-                                        }`}
-                                        onClick={() => setSelectedPlanilla(planilla)}
-                                    >
-                                        <td className="py-4 px-6 text-sm font-medium text-gray-100">
-                                            <div className="flex items-center flex-wrap gap-1">
-                                                <span>{planilla.payrollNumber}</span>
-                                                {planilla.payPeriodType !== undefined && planilla.payPeriodType !== null &&
-                                                    getPayPeriodBadge(planilla.payPeriodType)
-                                                }
-                                                {planilla.tipoPlanilla === 1 && (
-                                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-500/15 text-orange-400 border border-orange-500/20">
-                                                        Sin Ded. Legales
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="py-4 px-6 text-sm text-gray-500">
-                                            {parseUTCDate(planilla.periodStartDate).toLocaleDateString('es-PA', { day: '2-digit', month: 'short' })}
-                                            {' — '}
-                                            {parseUTCDate(planilla.periodEndDate).toLocaleDateString('es-PA', { day: '2-digit', month: 'short', year: 'numeric' })}
-                                        </td>
-                                        <td className="py-4 px-6 text-sm text-gray-300">{planilla.employeeCount || empleadosCount}</td>
-                                        {/* Montos con font-mono y prefijo B/. */}
-                                        <td className="py-4 px-6 text-sm font-mono text-gray-200">
-                                            B/. {Number(planilla.totalGrossPay || 0).toLocaleString('es-PA', { minimumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="py-4 px-6 text-sm font-mono text-gray-400">
-                                            B/. {Number(planilla.totalDeductions || 0).toLocaleString('es-PA', { minimumFractionDigits: 2 })}
-                                        </td>
-                                        <td className="py-4 px-6 text-sm font-mono font-semibold text-gray-200">
-                                            B/. {Number(planilla.totalNetPay || 0).toLocaleString('es-PA', { minimumFractionDigits: 2 })}
-                                        </td>
-                                        {/* Badge de estado colorido en español */}
-                                        <td className="py-4 px-6">
-                                            <span className={`px-2 py-1 rounded-lg text-xs font-bold uppercase ${
-                                                planilla.status === 0 ? 'bg-yellow-500/15 text-yellow-400' :
-                                                planilla.status === 1 ? 'bg-blue-500/15 text-blue-400' :
-                                                planilla.status === 2 ? 'bg-green-500/15 text-green-400' :
-                                                planilla.status === 3 ? 'bg-emerald-500/15 text-emerald-400' :
-                                                'bg-red-500/15 text-red-400'
-                                            }`}>
-                                                {['Borrador', 'Calculado', 'Aprobado', 'Pagado', 'Cancelado'][planilla.status] || 'Borrador'}
-                                            </span>
-                                        </td>
-                                        {/* Acciones con texto */}
-                                        <td className="py-4 px-6" onClick={(e) => e.stopPropagation()}>
-                                            <div className="flex items-center gap-2">
-                                                {(planilla.status === 0 || planilla.status === 1) && (
-                                                    <button
-                                                        onClick={async (e) => {
-                                                            e.stopPropagation();
-                                                            openingFromTable.current = true;
-                                                            setSelectedPlanilla(planilla);
-                                                            await fetchHours(planilla.id);
-                                                            setShowHoursPanel(true);
-                                                        }}
-                                                        className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded-lg transition-all"
-                                                    >
-                                                        <Clock className="w-4 h-4" />
-                                                        Horas
-                                                    </button>
-                                                )}
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); viewDetails(planilla); }}
-                                                    className="flex items-center gap-1.5 px-3 py-2 text-[13px] font-medium text-gray-300 bg-navy-800 hover:bg-primary-500/10 hover:text-primary-400 border border-navy-600 hover:border-primary-500/30 rounded-lg transition-all"
-                                                >
-                                                    <Eye className="w-4 h-4" />
-                                                    Ver
-                                                </button>
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); setPlanillaToDelete(planilla); setShowDeleteModal(true); }}
-                                                    className="p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-colors"
-                                                    title="Eliminar planilla"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-
-            {/* ==================== MODAL: NUEVA PLANILLA ==================== */}
-            <Modal
-                isOpen={showNewModal}
-                onClose={() => setShowNewModal(false)}
-                title="Nueva Planilla"
-                size="lg"
-            >
-                <form onSubmit={handleCreatePlanilla}>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                        {/* Número de Planilla */}
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                                Número de Planilla <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="text"
-                                required
-                                value={formData.payrollNumber}
-                                onChange={(e) => setFormData({ ...formData, payrollNumber: e.target.value })}
-                                className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
-                                placeholder="2025-001"
-                            />
-                        </div>
-
-                        {/* Tipo de Período */}
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                                Tipo de Período <span className="text-red-500">*</span>
-                            </label>
-                            <select
-                                value={formData.payPeriodType}
-                                onChange={(e) => setFormData({ ...formData, payPeriodType: parseInt(e.target.value) })}
-                                className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
-                            >
-                                {Object.entries(PAY_PERIOD_CONFIG).map(([key, config]) => (
-                                    <option key={key} value={key}>
-                                        {config.name} — {config.periodsPerYear} períodos / año
-                                    </option>
-                                ))}
-                            </select>
-                            <p className="mt-1 text-xs text-gray-500">
-                                Define la frecuencia de pago para esta planilla
-                            </p>
-                        </div>
-
-                        {/* Tipo de Planilla */}
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                                Tipo de Planilla
-                            </label>
-                            <select
-                                value={formData.tipoPlanilla}
-                                onChange={(e) => setFormData({ ...formData, tipoPlanilla: parseInt(e.target.value) })}
-                                className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
-                            >
-                                <option value={0}>Regular (con deducciones legales)</option>
-                                <option value={1}>Sin Deducciones Legales (solo bruto + ded. adicionales)</option>
-                            </select>
-                            <p className="mt-1 text-xs text-gray-500">
-                                Sin Deducciones omite CSS, SE e ISR. Las deducciones voluntarias y judiciales se mantienen.
-                            </p>
-                        </div>
-
-                        {/* Fecha Inicio */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                                Fecha Inicio Período <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="date"
-                                required
-                                value={formData.periodStartDate}
-                                onChange={(e) => setFormData({ ...formData, periodStartDate: e.target.value })}
-                                className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
-                            />
-                            {formData.periodStartDate && (
-                                <p className="text-xs text-gray-400 mt-1">{formatDate(formData.periodStartDate)}</p>
-                            )}
-                        </div>
-
-                        {/* Fecha Fin */}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                                Fecha Fin Período <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="date"
-                                required
-                                value={formData.periodEndDate}
-                                onChange={(e) => setFormData({ ...formData, periodEndDate: e.target.value })}
-                                className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
-                            />
-                            {formData.periodEndDate && (
-                                <p className="text-xs text-gray-400 mt-1">{formatDate(formData.periodEndDate)}</p>
-                            )}
-                        </div>
-
-                        {/* Fecha de Pago */}
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-300 mb-2">
-                                Fecha de Pago <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="date"
-                                required
-                                value={formData.payDate}
-                                onChange={(e) => setFormData({ ...formData, payDate: e.target.value })}
-                                className="w-full px-3 py-2 border border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-navy-800 text-gray-100"
-                            />
-                            {formData.payDate && (
-                                <p className="text-xs text-gray-400 mt-1">{formatDate(formData.payDate)}</p>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end gap-3 pt-4 border-t border-navy-700">
-                        <button
-                            type="button"
-                            onClick={() => setShowNewModal(false)}
-                            className="px-4 py-2 border border-navy-600 rounded-lg text-gray-300 hover:bg-navy-800 font-medium transition-colors"
-                        >
-                            Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors shadow-lg shadow-black/20"
-                        >
-                            Crear Planilla
-                        </button>
-                    </div>
-                </form>
-            </Modal>
-
-            {/* ==================== MODAL: DETALLES DE PLANILLA ==================== */}
-            <Modal
-                isOpen={showDetailsModal}
-                onClose={() => setShowDetailsModal(false)}
-                title={planillaDetails ? `Detalles — ${planillaDetails.payrollNumber}` : 'Detalles de Planilla'}
-                size="full"
-            >
-                {planillaDetails && (
-                    <div>
-                        {/* Header Info — 4 cards de resumen */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                            <div className="bg-navy-800 rounded-xl p-4 border border-emerald-700/30">
-                                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Bruto Total</p>
-                                <p className="font-bold text-lg text-emerald-400 font-mono">{formatCurrency(planillaDetails.totalGrossPay)}</p>
-                                <p className="text-xs text-gray-500 mt-1">
-                                    {parseUTCDate(planillaDetails.periodStartDate).toLocaleDateString('es-PA')} — {parseUTCDate(planillaDetails.periodEndDate).toLocaleDateString('es-PA')}
-                                </p>
-                            </div>
-                            <div className="bg-navy-800 rounded-xl p-4 border border-amber-700/30">
-                                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">CSS + SE</p>
-                                <p className="font-bold text-lg text-amber-400 font-mono">
-                                    {formatCurrency((planillaDetails.details?.reduce((s, d) => s + (d.cssEmployee || 0) + (d.educationalInsuranceEmployee || 0), 0)) || 0)}
-                                </p>
-                                <p className="text-xs text-gray-500 mt-1">Deducciones legales sociales</p>
-                            </div>
-                            <div className="bg-navy-800 rounded-xl p-4 border border-orange-700/30">
-                                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">ISR</p>
-                                <p className="font-bold text-lg text-orange-400 font-mono">
-                                    {formatCurrency(planillaDetails.details?.reduce((s, d) => s + (d.incomeTax || 0), 0) || 0)}
-                                </p>
-                                <p className="text-xs text-gray-500 mt-1">Impuesto sobre la renta</p>
-                            </div>
-                            <div className="bg-navy-800 rounded-xl p-4 border border-blue-700/30">
-                                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Neto a Pagar</p>
-                                <p className="font-bold text-lg text-blue-300 font-mono">{formatCurrency(planillaDetails.totalNetPay)}</p>
-                                <p className="text-xs text-gray-500 mt-1">{getStatusBadge(planillaDetails.status)}</p>
-                            </div>
-                        </div>
-
-                        {/* Details Table con filas expandibles */}
-                        {planillaDetails.details && planillaDetails.details.length > 0 ? (() => {
-                            const _det = planillaDetails.details;
-                            const hasPension   = _det.some(d => (d.pensionAlimenticia || 0) > 0);
-                            const hasEmbargos  = _det.some(d => (d.embargos || 0) > 0);
-                            const hasFijas     = _det.some(d => (d.deduccionesFijas || 0) > 0);
-                            const hasPrestamos = _det.some(d => (d.prestamos || 0) > 0);
-                            const hasAnticipos = _det.some(d => (d.anticipos || 0) > 0);
-                            const colSpan = 8 + [hasPension, hasEmbargos, hasFijas, hasPrestamos, hasAnticipos].filter(Boolean).length;
-                            return (
-                            <div className="overflow-x-auto">
-                                <p className="text-xs text-gray-500 mb-2 flex items-center gap-1">
-                                    <span className="text-gray-400">▸</span> Haz clic en una fila para ver el desglose detallado del cálculo
-                                </p>
-                                <table className="w-full">
-                                    <thead className="bg-navy-950 border-b border-navy-700">
-                                        <tr>
-                                            <th className="py-3 px-2 w-8"></th>
-                                            <th className="text-left py-3 px-3 text-xs font-medium text-gray-500 uppercase">Empleado</th>
-                                            <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">Bruto</th>
-                                            <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">CSS</th>
-                                            <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">SE</th>
-                                            <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">ISR</th>
-                                            {hasPension   && <th className="text-right py-3 px-3 text-xs font-medium text-red-400 uppercase">Pensión</th>}
-                                            {hasEmbargos  && <th className="text-right py-3 px-3 text-xs font-medium text-orange-400 uppercase">Embargos</th>}
-                                            {hasFijas     && <th className="text-right py-3 px-3 text-xs font-medium text-blue-400 uppercase">Ded. Fijas</th>}
-                                            {hasPrestamos && <th className="text-right py-3 px-3 text-xs font-medium text-purple-400 uppercase">Préstamos</th>}
-                                            {hasAnticipos && <th className="text-right py-3 px-3 text-xs font-medium text-teal-400 uppercase">Anticipos</th>}
-                                            <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">Total Ded.</th>
-                                            <th className="text-right py-3 px-3 text-xs font-medium text-gray-500 uppercase">Neto</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-navy-900 divide-y divide-navy-700">
-                                        {planillaDetails.details.map((detail) => {
-                                            const isExpanded = expandedDetails.has(detail.id);
-                                            const isLoadingThis = loadingBreakdown === detail.id;
-                                            const bd = breakdowns[detail.id];
-                                            return (
-                                                <React.Fragment key={detail.id}>
-                                                    <tr
-                                                        className="hover:bg-navy-800 cursor-pointer transition-colors"
-                                                        onClick={() => toggleDetailExpand(planillaDetails.id, detail.id)}
-                                                    >
-                                                        <td className="py-3 px-2 text-center text-gray-400 text-xs select-none">
-                                                            {isLoadingThis ? (
-                                                                <div className="w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                                                            ) : (
-                                                                <span>{isExpanded ? '▾' : '▸'}</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-3 px-3 text-sm text-gray-100">{detail.empleado?.nombre} {detail.empleado?.apellido}</td>
-                                                        <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.grossPay)}</td>
-                                                        <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.cssEmployee)}</td>
-                                                        <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.educationalInsuranceEmployee)}</td>
-                                                        <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.incomeTax)}</td>
-                                                        {hasPension   && <td className="py-3 px-3 text-sm text-right text-red-400 font-mono">{formatCurrency(detail.pensionAlimenticia || 0)}</td>}
-                                                        {hasEmbargos  && <td className="py-3 px-3 text-sm text-right text-orange-400 font-mono">{formatCurrency(detail.embargos || 0)}</td>}
-                                                        {hasFijas     && <td className="py-3 px-3 text-sm text-right text-blue-400 font-mono">{formatCurrency(detail.deduccionesFijas || 0)}</td>}
-                                                        {hasPrestamos && <td className="py-3 px-3 text-sm text-right text-purple-400 font-mono">{formatCurrency(detail.prestamos || 0)}</td>}
-                                                        {hasAnticipos && <td className="py-3 px-3 text-sm text-right text-teal-400 font-mono">{formatCurrency(detail.anticipos || 0)}</td>}
-                                                        <td className="py-3 px-3 text-sm text-right text-gray-100 font-mono">{formatCurrency(detail.totalDeductions)}</td>
-                                                        <td className="py-3 px-3 text-sm text-right font-medium font-mono">
-                                                            <span className="text-gray-100">{formatCurrency(detail.netPay)}</span>
-                                                            {detail.tuvoLimitacionSalarioMinimo && (
-                                                                <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/15 text-amber-400" title="Deducción limitada por salario mínimo">
-                                                                    SM
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                    </tr>
-                                                    {/* Fila de desglose expandida */}
-                                                    {isExpanded && (
-                                                        <tr className="bg-navy-950/60">
-                                                            <td colSpan={colSpan} className="p-0">
-                                                                {isLoadingThis || !bd ? (
-                                                                    <div className="flex items-center justify-center py-6">
-                                                                        <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mr-2"></div>
-                                                                        <span className="text-gray-400 text-sm">Cargando desglose...</span>
-                                                                    </div>
-                                                                ) : (
-                                                                    <div className="px-6 py-4 space-y-4">
-                                                                        {/* Ingresos */}
-                                                                        <div>
-                                                                            <h4 className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2">Ingresos</h4>
-                                                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1 text-xs">
-                                                                                {bd.ingresos.horasRegulares > 0 && <div className="flex justify-between"><span className="text-gray-400">Salario base</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.horasRegulares)}</span></div>}
-                                                                                {bd.ingresos.horasDomingo > 0 && <div className="flex justify-between"><span className="text-gray-400">H. Domingo</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.horasDomingo)}</span></div>}
-                                                                                {bd.ingresos.horasFeriado > 0 && <div className="flex justify-between"><span className="text-gray-400">H. Feriado</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.horasFeriado)}</span></div>}
-                                                                                {bd.ingresos.horasExtraDiurnas > 0 && <div className="flex justify-between"><span className="text-gray-400">H.E. Diurnas</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.horasExtraDiurnas)}</span></div>}
-                                                                                {bd.ingresos.horasExtraNocturnas > 0 && <div className="flex justify-between"><span className="text-gray-400">H.E. Nocturnas</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.horasExtraNocturnas)}</span></div>}
-                                                                                {bd.ingresos.horasExtraFestivos > 0 && <div className="flex justify-between"><span className="text-gray-400">H.E. Festivos</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.horasExtraFestivos)}</span></div>}
-                                                                                {bd.ingresos.horasExtraMixtas > 0 && <div className="flex justify-between"><span className="text-gray-400">H.E. Mixtas</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.horasExtraMixtas)}</span></div>}
-                                                                                {bd.ingresos.horasExtraExceso > 0 && <div className="flex justify-between"><span className="text-gray-400">H.E. Exceso</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.horasExtraExceso)}</span></div>}
-                                                                                {bd.ingresos.comisiones > 0 && <div className="flex justify-between"><span className="text-gray-400">Comisiones</span><span className="font-mono text-blue-300">{formatCurrency(bd.ingresos.comisiones)}</span></div>}
-                                                                                {bd.ingresos.bonos > 0 && <div className="flex justify-between"><span className="text-gray-400">Bonificaciones</span><span className="font-mono text-gray-200">{formatCurrency(bd.ingresos.bonos)}</span></div>}
-                                                                                <div className="flex justify-between font-semibold border-t border-navy-700 pt-1 col-span-2 md:col-span-4">
-                                                                                    <span className="text-gray-300">Total Bruto</span>
-                                                                                    <span className="font-mono text-emerald-400">{formatCurrency(bd.ingresos.grossPay)}</span>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-
-                                                                        {/* Deducciones legales */}
-                                                                        <div>
-                                                                            <h4 className="text-xs font-semibold text-amber-400 uppercase tracking-wider mb-2">Deducciones Legales</h4>
-                                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                                                                                {/* CSS */}
-                                                                                <div className="bg-navy-800/60 rounded-lg p-3">
-                                                                                    <p className="font-semibold text-gray-300 mb-1.5">CSS — 9.75%</p>
-                                                                                    <div className="space-y-0.5">
-                                                                                        <div className="flex justify-between"><span className="text-gray-400">Base usada</span><span className="font-mono text-gray-200">{formatCurrency(bd.css.baseUsada)}</span></div>
-                                                                                        {bd.css.seAplicoTope && <div className="flex justify-between"><span className="text-amber-400">⚠ Tope aplicado</span><span className="font-mono text-amber-400">{formatCurrency(bd.css.topeSalarial)}</span></div>}
-                                                                                        <div className="flex justify-between font-semibold border-t border-navy-700 pt-1 mt-1"><span className="text-gray-300">Deducción</span><span className="font-mono text-red-400">{formatCurrency(bd.css.monto)}</span></div>
-                                                                                    </div>
-                                                                                </div>
-                                                                                {/* SE */}
-                                                                                <div className="bg-navy-800/60 rounded-lg p-3">
-                                                                                    <p className="font-semibold text-gray-300 mb-1.5">Seg. Educativo — 1.25%</p>
-                                                                                    <div className="space-y-0.5">
-                                                                                        <div className="flex justify-between"><span className="text-gray-400">Base</span><span className="font-mono text-gray-200">{formatCurrency(bd.se.base)}</span></div>
-                                                                                        <div className="flex justify-between font-semibold border-t border-navy-700 pt-1 mt-1"><span className="text-gray-300">Deducción</span><span className="font-mono text-red-400">{formatCurrency(bd.se.monto)}</span></div>
-                                                                                    </div>
-                                                                                </div>
-                                                                                {/* ISR */}
-                                                                                <div className="bg-navy-800/60 rounded-lg p-3">
-                                                                                    <p className="font-semibold text-gray-300 mb-1.5">ISR — Brackets progresivos</p>
-                                                                                    <div className="space-y-0.5">
-                                                                                        <div className="flex justify-between"><span className="text-gray-400">Salario período</span><span className="font-mono text-gray-200">{formatCurrency(bd.isr.salarioPeriodo)}</span></div>
-                                                                                        <div className="flex justify-between"><span className="text-gray-400">× {bd.isr.periodosAlAno} períodos/año</span><span className="font-mono text-gray-200">{formatCurrency(bd.isr.salarioAnualizado)}</span></div>
-                                                                                        <div className="flex justify-between"><span className="text-gray-400">ISR anual</span><span className="font-mono text-gray-200">{formatCurrency(bd.isr.isrAnual)}</span></div>
-                                                                                        <div className="flex justify-between font-semibold border-t border-navy-700 pt-1 mt-1"><span className="text-gray-300">ISR período</span><span className="font-mono text-red-400">{formatCurrency(bd.isr.isrPeriodo)}</span></div>
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-
-                                                                        {/* Acreedores */}
-                                                                        {bd.acreedores && bd.acreedores.length > 0 && (
-                                                                            <div>
-                                                                                <h4 className="text-xs font-semibold text-orange-400 uppercase tracking-wider mb-2">Acreedores / Deducciones Adicionales</h4>
-                                                                                <div className="space-y-1">
-                                                                                    {bd.acreedores.map((a, i) => (
-                                                                                        <div key={i} className="flex items-center justify-between text-xs bg-navy-800/40 rounded px-3 py-1.5">
-                                                                                            <div>
-                                                                                                <span className="text-gray-200">{a.descripcion}</span>
-                                                                                                <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-navy-700 text-gray-400">{a.categoria}</span>
-                                                                                                {a.fueLimitado && <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-400" title={a.razonLimitacion || ''}>Limitado</span>}
-                                                                                            </div>
-                                                                                            <span className="font-mono text-orange-300">{formatCurrency(a.montoAplicado)}</span>
-                                                                                        </div>
-                                                                                    ))}
-                                                                                </div>
-                                                                            </div>
-                                                                        )}
-
-                                                                        {/* Resumen neto */}
-                                                                        <div className="flex justify-between items-center pt-2 border-t border-navy-700 text-sm font-semibold">
-                                                                            <span className="text-gray-300">Neto a pagar</span>
-                                                                            <span className="font-mono text-emerald-400 text-base">{formatCurrency(bd.netPay)}</span>
-                                                                        </div>
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                </React.Fragment>
-                                            );
-                                        })}
-                                    </tbody>
-                                    <tfoot className="bg-navy-950 border-t-2 border-navy-600">
-                                        <tr>
-                                            <td></td>
-                                            <td className="py-3 px-3 text-sm font-bold text-gray-100">TOTALES</td>
-                                            <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalGrossPay)}</td>
-                                            <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.cssEmployee || 0), 0) || 0)}</td>
-                                            <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.educationalInsuranceEmployee || 0), 0) || 0)}</td>
-                                            <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.details?.reduce((sum, d) => sum + (d.incomeTax || 0), 0) || 0)}</td>
-                                            {hasPension   && <td className="py-3 px-3 text-sm text-right font-bold text-red-400 font-mono">{formatCurrency(_det.reduce((sum, d) => sum + (d.pensionAlimenticia || 0), 0))}</td>}
-                                            {hasEmbargos  && <td className="py-3 px-3 text-sm text-right font-bold text-orange-400 font-mono">{formatCurrency(_det.reduce((sum, d) => sum + (d.embargos || 0), 0))}</td>}
-                                            {hasFijas     && <td className="py-3 px-3 text-sm text-right font-bold text-blue-400 font-mono">{formatCurrency(_det.reduce((sum, d) => sum + (d.deduccionesFijas || 0), 0))}</td>}
-                                            {hasPrestamos && <td className="py-3 px-3 text-sm text-right font-bold text-purple-400 font-mono">{formatCurrency(_det.reduce((sum, d) => sum + (d.prestamos || 0), 0))}</td>}
-                                            {hasAnticipos && <td className="py-3 px-3 text-sm text-right font-bold text-teal-400 font-mono">{formatCurrency(_det.reduce((sum, d) => sum + (d.anticipos || 0), 0))}</td>}
-                                            <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalDeductions)}</td>
-                                            <td className="py-3 px-3 text-sm text-right font-bold text-gray-100 font-mono">{formatCurrency(planillaDetails.totalNetPay)}</td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
-                            </div>
-                            );
-                        })() : (
-                            <div className="text-center py-8 text-gray-500">
-                                No hay detalles de empleados para esta planilla
-                            </div>
-                        )}
-                    </div>
-                )}
-            </Modal>
-
-            <ConfirmModal
-                isOpen={showDeleteModal}
-                onClose={() => { setShowDeleteModal(false); setPlanillaToDelete(null); }}
-                onConfirm={handleDeletePlanilla}
-                title="Eliminar Planilla"
-                message={
-                    planillaToDelete?.status >= 1
-                        ? `⚠️ La planilla "${planillaToDelete?.payrollNumber}" tiene datos calculados. Al eliminarla se revertirán los préstamos y anticipos del período. Esta acción no se puede deshacer.`
-                        : `¿Está seguro de eliminar la planilla "${planillaToDelete?.payrollNumber}"? Esta acción no se puede deshacer.`
-                }
-                confirmText="Eliminar"
-                variant="danger"
-                isLoading={loadingAction === 'deleting'}
-            />
-
+  return (
+    <div className="space-y-5">
+      {/* Cabecera */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Planillas</h1>
+          <p className="text-gray-400 mt-1">Cada planilla con sus horas, su cálculo y sus acciones</p>
         </div>
-    );
-};
+        <SelectorMes anio={anio} mes={mes} onChange={cambiarMes} />
+      </div>
 
-export default PlanillasPage;
+      {/* Resumen del mes */}
+      {!cargando && (
+        <p className="text-sm text-gray-400">
+          {resumen.total === 0 ? (
+            <>Sin planillas en {titulo}.</>
+          ) : (
+            <>
+              <span className="text-gray-200">{resumen.total} {resumen.total === 1 ? 'planilla' : 'planillas'}</span>
+              {' · '}Bruto <span className="font-mono text-gray-200">{formatCurrency(resumen.bruto)}</span>
+              {' · '}Neto <span className="font-mono text-emerald-400">{formatCurrency(resumen.neto)}</span>
+              {resumen.pendientes > 0 && <> · <span className="text-blue-300">{resumen.pendientes} por aprobar</span></>}
+              {resumen.borradores > 0 && <> · <span className="text-gray-300">{resumen.borradores} en borrador</span></>}
+            </>
+          )}
+        </p>
+      )}
+
+      {/* Lista del mes */}
+      {cargando ? (
+        <div className="space-y-3" aria-busy="true">
+          {[0, 1].map(i => (
+            <div key={i} className="h-20 rounded-xl bg-navy-900 border border-navy-700 overflow-hidden">
+              <div className="h-1 bg-primary-500/60 animate-pulse w-1/3" />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {planillas.map(p => (
+            <FilaPlanilla
+              key={p.id}
+              planilla={p}
+              abierta={abierta === p.id}
+              ocupada={ocupada === p.id}
+              atenuada={ocupada != null && ocupada !== p.id}
+              error={errores[p.id]}
+              onAbrir={(forzar) => abrir(p.id, forzar === true)}
+              onAccion={(tipo) => ejecutar(p, tipo)}
+              onRecargar={() => cargar(true)}
+            />
+          ))}
+
+          {canWrite() && (
+            <NuevaPlanillaInline
+              anio={anio}
+              mes={mes}
+              planillasDelMes={planillas}
+              tipoPorDefecto={tipoPorDefecto}
+              onCreada={async (nueva) => { await cargar(true); setAbierta(nueva.id); }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Confirmaciones */}
+      <ConfirmModal
+        isOpen={conf?.tipo === 'eliminar'}
+        onClose={() => setConfirmacion(null)}
+        onConfirm={() => correr(conf.planilla, 'eliminar')}
+        title="Eliminar borrador"
+        message={conf ? `Se eliminará el borrador ${conf.planilla.payrollNumber} (${titulo}). Solo se pueden eliminar borradores; una planilla calculada se anula.` : ''}
+        confirmText="Eliminar"
+        variant="danger"
+        isLoading={ocupada === conf?.planilla?.id}
+      />
+
+      <Modal isOpen={conf?.tipo === 'aprobar'} onClose={() => setConfirmacion(null)} title="Aprobar planilla" size="md">
+        {conf && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-300">Al aprobar, los descuentos de préstamos, anticipos y acreedores se aplican y la planilla queda lista para pagar.</p>
+            <div className="bg-navy-950/60 border border-navy-700 rounded-lg p-4">
+              <p className="text-xs text-gray-500 mb-1">Total neto a pagar</p>
+              <p className="text-2xl font-bold text-emerald-400 font-mono">{formatCurrency(conf.planilla.totalNetPay)}</p>
+              <p className="text-xs text-gray-500 mt-1">Planilla {conf.planilla.payrollNumber} — {empleadosDe(conf.planilla)} {empleadosDe(conf.planilla) === 1 ? 'empleado' : 'empleados'}</p>
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setConfirmacion(null)} className="flex-1 bg-navy-700 hover:bg-navy-600 text-gray-200 px-4 py-2.5 rounded-lg font-medium">Cancelar</button>
+              <button onClick={() => correr(conf.planilla, 'aprobar')} disabled={ocupada != null} className="flex-1 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white px-4 py-2.5 rounded-lg font-semibold">Confirmar aprobación</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={conf?.tipo === 'anular'} onClose={() => setConfirmacion(null)} title="Anular planilla" size="md">
+        {conf && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-300">La planilla {conf.planilla.payrollNumber} quedará anulada: no cuenta para el mes, la renta ni el SIPE, pero se conserva para auditoría.</p>
+            <div>
+              <label htmlFor="motivo-anulacion" className="block text-xs text-gray-400 mb-1">Motivo</label>
+              <input id="motivo-anulacion" value={motivoAnulacion} onChange={e => setMotivoAnulacion(e.target.value)} placeholder="Ej. fechas equivocadas" className="w-full bg-navy-800 border border-navy-600 text-gray-100 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setConfirmacion(null)} className="flex-1 bg-navy-700 hover:bg-navy-600 text-gray-200 px-4 py-2.5 rounded-lg font-medium">Cancelar</button>
+              <button onClick={() => correr(conf.planilla, 'anular')} disabled={ocupada != null} className="flex-1 bg-red-700 hover:bg-red-600 disabled:opacity-60 text-white px-4 py-2.5 rounded-lg font-semibold">Anular</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}

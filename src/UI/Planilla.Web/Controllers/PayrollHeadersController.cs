@@ -40,6 +40,8 @@ public class PayrollHeadersController : ControllerBase
     private readonly IAsistenciaCalculationService _asistenciaService;
     private readonly PayrollProcessingService _processingService;
 
+    private readonly IAcumuladoFiscalService _acumuladoFiscalService;
+
     public PayrollHeadersController(
         ApplicationDbContext context,
         PayrollStateMachine stateMachine,
@@ -48,8 +50,10 @@ public class PayrollHeadersController : ControllerBase
         IAuditLogService auditLogService,
         ICurrentUserService currentUserService,
         IAsistenciaCalculationService asistenciaService,
-        PayrollProcessingService processingService)
+        PayrollProcessingService processingService,
+        IAcumuladoFiscalService acumuladoFiscalService)
     {
+        _acumuladoFiscalService = acumuladoFiscalService ?? throw new ArgumentNullException(nameof(acumuladoFiscalService));
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _stateMachine = stateMachine ?? throw new ArgumentNullException(nameof(stateMachine));
         _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
@@ -69,8 +73,13 @@ public class PayrollHeadersController : ControllerBase
     [RequirePermission(SystemPermission.PayrollView, SystemPermission.PayrollViewSelf)]
     public async Task<ActionResult<IEnumerable<PayrollHeader>>> GetPayrollHeaders(
         [FromQuery] PayrollStatus? status,
-        [FromQuery] int? empleadoId = null)
+        [FromQuery] int? empleadoId = null,
+        [FromQuery] int? anio = null,
+        [FromQuery] int? mes = null)
     {
+        if (mes is < 1 or > 12) return BadRequest(new { message = "El mes debe estar entre 1 y 12." });
+        if (anio is < 2000 or > 2100) return BadRequest(new { message = "Año fuera de rango." });
+
         var tenantId = _tenantContext.TenantId;
         var linkedEmployeeId = _currentUserService.GetLinkedEmployeeId();
 
@@ -98,9 +107,18 @@ public class PayrollHeadersController : ControllerBase
             query = query.Where(p => p.Status == status.Value);
         }
 
-        var payrollHeaders = await query
-            .OrderByDescending(p => p.PeriodStartDate)
-            .ToListAsync();
+        // Vista por mes: una planilla pertenece al mes de su PERÍODO TRABAJADO
+        // (PeriodStartDate), nunca al de su fecha de pago. Es la misma regla del
+        // reporte mensual, del SIPE y del año fiscal de la ficha de renta.
+        if (anio.HasValue)
+        {
+            query = query.Where(p => p.PeriodStartDate.Year == anio.Value);
+            if (mes.HasValue) query = query.Where(p => p.PeriodStartDate.Month == mes.Value);
+        }
+
+        var payrollHeaders = anio.HasValue
+            ? await query.OrderBy(p => p.PeriodStartDate).ThenBy(p => p.Id).ToListAsync()
+            : await query.OrderByDescending(p => p.PeriodStartDate).ToListAsync();
 
         // 🎯 Si es empleado vinculado, filtrar detalles para mostrar solo SU línea
         if (linkedEmployeeId.HasValue)
@@ -168,10 +186,20 @@ public class PayrollHeadersController : ControllerBase
     {
         var tenantId = _tenantContext.TenantId;
 
+        // Validación de fechas en el servidor (antes solo la hacía la pantalla).
+        if (request.PeriodEndDate.Date <= request.PeriodStartDate.Date)
+            return BadRequest(new { message = "La fecha de fin del período debe ser posterior a la de inicio." });
+        if (request.PayDate.HasValue && request.PayDate.Value.Date < request.PeriodStartDate.Date)
+            return BadRequest(new { message = "La fecha de pago no puede ser anterior al inicio del período." });
+        if ((request.PeriodEndDate.Date - request.PeriodStartDate.Date).TotalDays > 62)
+            return BadRequest(new { message = "Un período no puede durar más de dos meses." });
+
+        var payDate = request.PayDate ?? request.PeriodEndDate;
+
         // ====================================================================
         // Auto-generar PayrollNumber si no se proporciona o si ya existe
         // ====================================================================
-        string payrollNumber = request.PayrollNumber;
+        string payrollNumber = request.PayrollNumber ?? string.Empty;
 
         // Verificar si el PayrollNumber ya existe para este tenant
         bool numberExists = await _context.PayrollHeaders
@@ -210,7 +238,7 @@ public class PayrollHeadersController : ControllerBase
             PayrollNumber = payrollNumber,
             PeriodStartDate = DateTime.SpecifyKind(request.PeriodStartDate, DateTimeKind.Utc),
             PeriodEndDate = DateTime.SpecifyKind(request.PeriodEndDate, DateTimeKind.Utc),
-            PayDate = DateTime.SpecifyKind(request.PayDate, DateTimeKind.Utc),
+            PayDate = DateTime.SpecifyKind(payDate, DateTimeKind.Utc),
             PayPeriodType = request.PayPeriodType,
             TipoPlanilla = request.TipoPlanilla,
             Status = PayrollStatus.Draft,
@@ -658,7 +686,7 @@ public class PayrollHeadersController : ControllerBase
     /// </summary>
     [HttpPost("{id}/cancel")]
     [RequirePermission(SystemPermission.PayrollApprove)]
-    public async Task<ActionResult> CancelPayroll(int id)
+    public async Task<ActionResult> CancelPayroll(int id, [FromBody] CancelPayrollRequest? request = null)
     {
         var tenantId = _tenantContext.TenantId;
         var payrollHeader = await _context.PayrollHeaders
@@ -680,6 +708,7 @@ public class PayrollHeadersController : ControllerBase
         }
 
         // Marcar como cancelada
+        var estadoAnterior = payrollHeader.Status;
         payrollHeader.Status = PayrollStatus.Cancelled;
         payrollHeader.UpdatedAt = DateTime.UtcNow;
 
@@ -697,8 +726,9 @@ public class PayrollHeadersController : ControllerBase
                     new Dictionary<string, string>
                     {
                         ["PayrollNumber"] = payrollHeader.PayrollNumber,
-                        ["PreviousStatus"] = PayrollStatus.Approved.ToString(), // Asumimos que venía de Approved
-                        ["CancelledDate"] = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm")
+                        ["PreviousStatus"] = estadoAnterior.ToString(),
+                        ["CancelledDate"] = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm"),
+                        ["Reason"] = request?.Reason ?? string.Empty
                     });
             }
             catch (Exception)
@@ -1320,22 +1350,54 @@ public class PayrollHeadersController : ControllerBase
             Monto: detail.EducationalInsuranceEmployee
         );
 
-        // --- ISR ---
+        // --- ISR: el mismo camino del motor acumulativo, para que el número
+        //     coincida con la fila de la ficha anual del empleado ---
         var payPeriodType = detail.PayrollHeader?.PayPeriodType ?? Vorluno.Planilla.Domain.Enums.PayPeriodType.Quincenal;
-        int periodosAlAno = Vorluno.Planilla.Application.Helpers.PayrollConstants.GetPeriodsPerYear(payPeriodType);
-        // Proyección anual incluyendo décimo tercer mes (×13)
-        decimal salarioMensual = detail.GrossPay * periodosAlAno / 12m;
-        decimal salarioAnualizado = salarioMensual * Vorluno.Planilla.Application.Helpers.PayrollConstants.MonthsIncludingDecimo;
-        decimal isrAnual = detail.IncomeTax * periodosAlAno;
+        var anioFiscal = (detail.PayrollHeader?.PeriodEndDate ?? DateTime.UtcNow).Year;
+        var acumuladoAnterior = await _acumuladoFiscalService.ObtenerAcumuladoAsync(
+            detail.EmpleadoId, anioFiscal, excluirPayrollHeaderId: id);
+        var numeroPeriodo = await _acumuladoFiscalService.ObtenerNumeroPeriodoAsync(
+            detail.EmpleadoId, anioFiscal, excluirPayrollHeaderId: id);
+
+        var gastoRepresentacion = Math.Min(detail.GastoRepresentacion, detail.GrossPay);
+        var gravablePeriodo = detail.GrossPay - gastoRepresentacion;
+        var movimientos = new List<Vorluno.Planilla.Application.Services.MovimientoIsr>
+        {
+            new(Vorluno.Planilla.Domain.Enums.TratamientoIsr.GravableAcumulable, gravablePeriodo)
+        };
+        if (gastoRepresentacion > 0m)
+            movimientos.Add(new(Vorluno.Planilla.Domain.Enums.TratamientoIsr.GastoRepresentacion, gastoRepresentacion));
+
+        var motor = Vorluno.Planilla.Application.Services.MotorIsrPanama.Calcular(
+            new Vorluno.Planilla.Application.Services.CorridaIsr
+            {
+                Frecuencia = payPeriodType,
+                NumeroPeriodoEmpleado = numeroPeriodo,
+                AcumuladoAnterior = acumuladoAnterior,
+                Movimientos = movimientos
+            });
+
+        var periodosDePago = Vorluno.Planilla.Application.Services.MotorIsrPanama.ObtenerPeriodosEquivalentesAnuales(payPeriodType);
+        var tieneSaldo = acumuladoAnterior.IsrRetenidoInicial > 0m || acumuladoAnterior.DecimoInicial > 0m || acumuladoAnterior.IngresoGravableInicial > 0m;
+        var tieneImportados = await _context.DevengadosMensuales.AnyAsync(d => d.EmpleadoId == detail.EmpleadoId && d.Anio == anioFiscal);
 
         var isr = new IsrBreakdownDto(
-            SalarioPeriodo: detail.GrossPay,
-            PeriodosAlAno: periodosAlAno,
-            SalarioAnualizado: salarioAnualizado,
-            DeduccionDependientes: 0, // No almacenado actualmente
-            IngresoNetoGravable: salarioAnualizado,
-            IsrAnual: isrAnual,
-            IsrPeriodo: detail.IncomeTax
+            IngresoGravablePeriodo: gravablePeriodo,
+            NumeroPeriodo: numeroPeriodo,
+            PeriodoEquivalente: motor.PeriodoEquivalente,
+            PeriodosDePago: Math.Round(periodosDePago, 2),
+            Acumulado: motor.IngresoGravableAcumulado + motor.DecimoAcumulado,
+            IngresoAnualProyectado: motor.IngresoAnualProyectado,
+            RentaAnual: motor.IsrAnualProyectado,
+            RentaPorPeriodo: Math.Round(motor.IsrAnualProyectado / periodosDePago, 2, MidpointRounding.AwayFromZero),
+            ImpuestoCausado: motor.IsrDebidoAcumulado,
+            RetenidoAntes: motor.IsrRetenidoTotalAnterior,
+            ADescontar: motor.IsrDescontarPeriodo,
+            GastoRepresentacion: gastoRepresentacion,
+            IsrGastoRepresentacion: motor.IsrGastoRepresentacionPeriodo,
+            IsrPeriodo: detail.IncomeTax,
+            TieneSaldoInicial: tieneSaldo,
+            TieneMesesImportados: tieneImportados
         );
 
         // --- Acreedores ---
@@ -1368,11 +1430,18 @@ public class PayrollHeadersController : ControllerBase
 /// <summary>
 /// DTO para crear una nueva planilla.
 /// </summary>
+/// <summary>Motivo de anulación, para auditoría.</summary>
+public record CancelPayrollRequest(string? Reason);
+
 public record CreatePayrollHeaderRequest(
-    string PayrollNumber,
+    string? PayrollNumber,
     DateTime PeriodStartDate,
     DateTime PeriodEndDate,
-    DateTime PayDate,
+    /// <summary>
+    /// Opcional: cada empresa paga cuando quiere y la fecha de pago no define
+    /// nada en el cálculo. Si no viene, se usa el fin del período.
+    /// </summary>
+    DateTime? PayDate = null,
     PayPeriodType PayPeriodType = PayPeriodType.Quincenal,
     TipoPlanilla TipoPlanilla = TipoPlanilla.Regular
 );
