@@ -42,6 +42,7 @@ export default function PlanillasPage() {
   const [ocupada, setOcupada] = useState(null);      // id con acción en curso
   const [errores, setErrores] = useState({});        // id → mensaje
   const [confirmacion, setConfirmacion] = useState(null); // { tipo, planilla }
+  const [recienCreada, setRecienCreada] = useState(null); // id: se abre en Horas
   const [motivoAnulacion, setMotivoAnulacion] = useState('');
 
   const cambiarMes = (a, m) => {
@@ -135,7 +136,7 @@ export default function PlanillasPage() {
 
   const titulo = `${NOMBRES_MES[mes - 1]} ${anio}`;
   const conf = confirmacion;
-  const empleadosDe = (p) => (p.details ?? []).filter(d => (d.grossPay || 0) > 0).length;
+  const empleadosDe = (p) => p.cantidadEmpleados ?? 0;
 
   return (
     <div className="space-y-5">
@@ -187,6 +188,7 @@ export default function PlanillasPage() {
               onAbrir={(forzar) => abrir(p.id, forzar === true)}
               onAccion={(tipo) => ejecutar(p, tipo)}
               onRecargar={() => cargar(true)}
+              pestanaInicial={recienCreada === p.id ? 'horas' : 'planilla'}
             />
           ))}
 
@@ -196,7 +198,14 @@ export default function PlanillasPage() {
               mes={mes}
               planillasDelMes={planillas}
               tipoPorDefecto={tipoPorDefecto}
-              onCreada={async (nueva) => { await cargar(true); setAbierta(nueva.id); }}
+              onCreada={async (nueva, mesDestino) => {
+                // La planilla nueva se abre directamente en Horas; si cae en
+                // otro mes, la pantalla cambia a ese mes.
+                setRecienCreada(nueva.id);
+                if (mesDestino) cambiarMes(mesDestino.anio, mesDestino.mes);
+                else await cargar(true);
+                setAbierta(nueva.id);
+              }}
             />
           )}
         </div>

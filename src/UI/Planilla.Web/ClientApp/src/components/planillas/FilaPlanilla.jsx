@@ -39,11 +39,11 @@ const Btn = ({ onClick, icon: Icon, children, primario, peligro, disabled, title
   </button>
 );
 
-export default function FilaPlanilla({ planilla, abierta, ocupada, atenuada, error, onAbrir, onAccion, onRecargar }) {
-  const [pestana, setPestana] = useState('planilla');
+export default function FilaPlanilla({ planilla, abierta, ocupada, atenuada, error, onAbrir, onAccion, onRecargar, pestanaInicial = 'planilla' }) {
+  const [pestana, setPestana] = useState(pestanaInicial);
   const st = ESTADO[planilla.status] ?? ESTADO[0];
   const tipo = PAY_PERIOD_CONFIG[planilla.payPeriodType]?.name ?? '';
-  const empleados = (planilla.details ?? []).filter(d => (d.grossPay || 0) > 0).length;
+  const empleados = planilla.cantidadEmpleados ?? 0;
   const calculada = planilla.status >= 1 && planilla.status !== 4;
   const editable = planilla.status === 0 || planilla.status === 1;
 
