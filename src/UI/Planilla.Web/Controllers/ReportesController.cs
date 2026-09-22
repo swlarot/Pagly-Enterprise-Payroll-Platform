@@ -283,6 +283,40 @@ public class ReportesController : ControllerBase
         }
     }
 
+    /// <summary>SIPE mensual: planillas + décimo + liquidaciones del mes. GET api/reportes/sipe?mes=4&amp;anio=2026</summary>
+    [HttpGet("sipe")]
+    public async Task<IActionResult> GetSipeMensual([FromQuery] int mes, [FromQuery] int anio)
+    {
+        if (mes is < 1 or > 12 || anio is < 2000 or > 2100)
+            return BadRequest(new { message = "Mes o año fuera de rango." });
+        var reporte = await _reportesService.GenerarReporteSipMensual(mes, anio);
+        return Ok(reporte);
+    }
+
+    [HttpGet("sipe/excel")]
+    [PlanLimits(PlanLimitType.ExportExcel)]
+    public async Task<IActionResult> ExportarSipeMensualExcel([FromQuery] int mes, [FromQuery] int anio)
+    {
+        if (mes is < 1 or > 12 || anio is < 2000 or > 2100)
+            return BadRequest(new { message = "Mes o año fuera de rango." });
+        var reporte = await _reportesService.GenerarReporteSipMensual(mes, anio);
+        var bytes = _exportacionService.ExportarExcelSip(reporte);
+        if (bytes.Length == 0) return NotFound(new { message = "No hay nada que cotice en ese mes." });
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"SIPE_{anio}-{mes:D2}.xlsx");
+    }
+
+    [HttpGet("sipe/pdf")]
+    [PlanLimits(PlanLimitType.ExportPdf)]
+    public async Task<IActionResult> ExportarSipeMensualPdf([FromQuery] int mes, [FromQuery] int anio)
+    {
+        if (mes is < 1 or > 12 || anio is < 2000 or > 2100)
+            return BadRequest(new { message = "Mes o año fuera de rango." });
+        var reporte = await _reportesService.GenerarReporteSipMensual(mes, anio);
+        var bytes = _exportacionService.ExportarPdfSip(reporte);
+        if (bytes.Length == 0) return NotFound(new { message = "No hay nada que cotice en ese mes." });
+        return File(bytes, "application/pdf", $"SIPE_{anio}-{mes:D2}.pdf");
+    }
+
     /// <summary>Exporta el reporte SIP a Excel.</summary>
     [HttpGet("sip/{planillaId}/excel")]
     [PlanLimits(PlanLimitType.ExportExcel)]

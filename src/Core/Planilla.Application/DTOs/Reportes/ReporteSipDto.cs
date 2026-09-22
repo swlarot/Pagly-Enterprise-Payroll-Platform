@@ -9,7 +9,10 @@ public record ReporteSipDto(
     string NombreEmpresa, string Ruc,
     string NumeroPlanilla, string Periodo, DateTime FechaGeneracion,
     List<EmpleadoSipItem> Empleados,
-    TotalesSip Totales
+    TotalesSip Totales,
+    // SIPE mensual: qué entró en el mes (planillas, décimo, liquidaciones).
+    List<string>? Fuentes = null,
+    decimal TotalVacaciones = 0m
 );
 
 public record EmpleadoSipItem(
@@ -17,7 +20,9 @@ public record EmpleadoSipItem(
     decimal SalarioBruto, decimal BaseCss,
     decimal CssEmpleado, decimal CssPatronal,
     decimal SeEmpleado, decimal SePatronal,
-    decimal RiesgoProfesional, decimal TotalSip
+    decimal RiesgoProfesional, decimal TotalSip,
+    // Informativa: cuánto del bruto cotizable fue vacaciones (van dentro del bruto).
+    decimal Vacaciones = 0m
 );
 
 public record TotalesSip(

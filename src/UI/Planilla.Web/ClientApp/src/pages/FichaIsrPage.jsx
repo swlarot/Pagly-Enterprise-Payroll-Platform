@@ -55,6 +55,8 @@ export default function FichaIsrPage() {
   const [showSaldos, setShowSaldos] = useState(false);
   const [saldos, setSaldos] = useState(SALDOS_VACIOS);
   const [savingSaldos, setSavingSaldos] = useState(false);
+  const [confirmandoSaldos, setConfirmandoSaldos] = useState(false); // paso 2 del modal: resumen antes de guardar
+  const [saldosGuardados, setSaldosGuardados] = useState(null);      // lo que ya hay en el año, para la nota fija
 
   useEffect(() => { loadEmpleados(); }, []);
 
@@ -82,7 +84,12 @@ export default function FichaIsrPage() {
   const loadFicha = async () => {
     try {
       setIsLoadingFicha(true);
-      setFicha(await api.get(`/api/acumulados-fiscales/${empleadoId}/ficha/${anio}`));
+      const [f, sg] = await Promise.all([
+        api.get(`/api/acumulados-fiscales/${empleadoId}/ficha/${anio}`),
+        api.get(`/api/acumulados-fiscales/${empleadoId}/saldos/${anio}`).catch(() => null),
+      ]);
+      setFicha(f);
+      setSaldosGuardados(sg);
     } catch (error) {
       setFicha(null);
       toast.error(error.message || 'No se pudo cargar la ficha');
@@ -114,10 +121,29 @@ export default function FichaIsrPage() {
         gastoRepresentacionInicial: String(data?.gastoRepresentacionInicial ?? 0),
         isrGastoRepresentacionInicial: String(data?.isrGastoRepresentacionInicial ?? 0),
       });
+      setConfirmandoSaldos(false);
       setShowSaldos(true);
     } catch (error) {
       toast.error(error.message || 'No se pudieron cargar los saldos iniciales');
     }
+  };
+
+  const valoresSaldos = () => ({
+    ingresoGravableInicial: parseFloat(saldos.ingresoGravableInicial) || 0,
+    decimoInicial: parseFloat(saldos.decimoInicial) || 0,
+    partidasDecimoInicial: parseInt(saldos.partidasDecimoInicial) || 0,
+    isrRetenidoInicial: parseFloat(saldos.isrRetenidoInicial) || 0,
+    gastoRepresentacionInicial: parseFloat(saldos.gastoRepresentacionInicial) || 0,
+    isrGastoRepresentacionInicial: parseFloat(saldos.isrGastoRepresentacionInicial) || 0,
+  });
+
+  // Paso 1 → 2: se enseña el resumen; el PUT solo sale al confirmar.
+  const revisarSaldos = () => {
+    if (Object.values(valoresSaldos()).some(v => v < 0)) {
+      toast.error('Los saldos iniciales no pueden ser negativos');
+      return;
+    }
+    setConfirmandoSaldos(true);
   };
 
   const guardarSaldos = async () => {
@@ -140,6 +166,7 @@ export default function FichaIsrPage() {
       });
       toast.success('Saldos iniciales guardados');
       setShowSaldos(false);
+      setConfirmandoSaldos(false);
       await loadFicha();
     } catch (error) {
       toast.error(error.message || 'No se pudieron guardar los saldos');
@@ -233,6 +260,21 @@ export default function FichaIsrPage() {
           </div>
         </div>
       </div>
+
+      {/* Nota fija: de dónde viene el acumulado cuando hay saldos o meses importados */}
+      {!isLoadingFicha && ficha && saldosGuardados && haySaldos(saldosGuardados) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-sky-200 bg-sky-950/40 border border-sky-900 rounded-lg px-4 py-2">
+          <span className="font-medium">Saldos iniciales {anio} cargados:</span>
+          {saldosGuardados.ingresoGravableInicial > 0 && <span>ingreso bruto <span className="font-mono">{fmt(saldosGuardados.ingresoGravableInicial)}</span></span>}
+          {(saldosGuardados.decimoInicial > 0 || saldosGuardados.partidasDecimoInicial > 0) && (
+            <span>décimo <span className="font-mono">{fmt(saldosGuardados.decimoInicial)}</span> ({saldosGuardados.partidasDecimoInicial} {saldosGuardados.partidasDecimoInicial === 1 ? 'partida' : 'partidas'})</span>
+          )}
+          {saldosGuardados.isrRetenidoInicial > 0 && <span>ISR retenido <span className="font-mono">{fmt(saldosGuardados.isrRetenidoInicial)}</span></span>}
+          {saldosGuardados.gastoRepresentacionInicial > 0 && <span>gastos de representación <span className="font-mono">{fmt(saldosGuardados.gastoRepresentacionInicial)}</span> (ISR <span className="font-mono">{fmt(saldosGuardados.isrGastoRepresentacionInicial)}</span>)</span>}
+          {ficha.filas?.some(f => f.esImportado) && <span className="text-sky-300/80">· los meses marcados vienen de la importación</span>}
+          <button onClick={abrirSaldos} className="ml-auto text-xs underline underline-offset-2 hover:text-white">Editar</button>
+        </div>
+      )}
 
       {isLoadingFicha && (
         <div className="flex items-center justify-center h-40">
@@ -371,25 +413,59 @@ export default function FichaIsrPage() {
               value={saldos.isrGastoRepresentacionInicial}
               onChange={v => setSaldos(s => ({ ...s, isrGastoRepresentacionInicial: v }))} />
 
-            <div className="flex justify-end gap-3 pt-2">
-              <button onClick={() => setShowSaldos(false)} className="px-4 py-2 text-gray-300 hover:text-white transition-colors">
-                Cancelar
-              </button>
-              <button
-                onClick={guardarSaldos}
-                disabled={savingSaldos}
-                className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white rounded-lg font-medium transition-colors"
-              >
-                {savingSaldos ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                Guardar
-              </button>
-            </div>
+            {confirmandoSaldos ? (
+              <div className="bg-slate-900/70 border border-slate-600 rounded-lg p-4 space-y-2">
+                <p className="text-sm text-white font-medium">Revisa antes de guardar</p>
+                <p className="text-xs text-gray-400">Estos saldos entran en la columna ACUMULADO y en PERIODOS de {anio}: cambian la renta de todas las planillas del año desde la primera corrida.</p>
+                <dl className="text-sm grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 mt-2">
+                  {[
+                    ['Ingreso bruto acumulado', fmt(valoresSaldos().ingresoGravableInicial)],
+                    ['Décimo pagado', fmt(valoresSaldos().decimoInicial)],
+                    ['Partidas de décimo pagadas', String(valoresSaldos().partidasDecimoInicial)],
+                    ['ISR ya retenido', fmt(valoresSaldos().isrRetenidoInicial)],
+                    ['Gastos de representación pagados', fmt(valoresSaldos().gastoRepresentacionInicial)],
+                    ['ISR retenido sobre esos gastos', fmt(valoresSaldos().isrGastoRepresentacionInicial)],
+                  ].map(([k, v]) => (
+                    <React.Fragment key={k}>
+                      <dt className="text-gray-400">{k}</dt>
+                      <dd className="font-mono text-white text-right">{v}</dd>
+                    </React.Fragment>
+                  ))}
+                </dl>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button onClick={() => setConfirmandoSaldos(false)} className="px-4 py-2 text-gray-300 hover:text-white transition-colors">Volver a editar</button>
+                  <button
+                    onClick={guardarSaldos}
+                    disabled={savingSaldos}
+                    className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white rounded-lg font-medium transition-colors"
+                  >
+                    {savingSaldos ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    Confirmar y guardar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setShowSaldos(false)} className="px-4 py-2 text-gray-300 hover:text-white transition-colors">
+                  Cancelar
+                </button>
+                <button
+                  onClick={revisarSaldos}
+                  className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  <Save className="w-4 h-4" /> Revisar y guardar
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 }
+
+const haySaldos = (s) => ['ingresoGravableInicial', 'decimoInicial', 'partidasDecimoInicial', 'isrRetenidoInicial', 'gastoRepresentacionInicial', 'isrGastoRepresentacionInicial']
+  .some(k => Number(s?.[k] ?? 0) > 0);
 
 function CampoSaldo({ id, label, ayuda, value, onChange }) {
   return (

@@ -397,6 +397,153 @@ public class ReportesService
         );
     }
 
+    /// <summary>
+    /// Reporte 4b: SIPE mensual — lo que la empresa declara a la CSS por el mes.
+    /// Entra todo lo que cotiza con período trabajado en ese mes: planillas
+    /// aprobadas o pagadas (por PeriodStartDate), décimo calculado o pagado
+    /// (por FechaPago) y la parte cotizable de las liquidaciones (por
+    /// FechaTerminacion: salario pendiente, vacaciones y décimo
+    /// proporcionales; prima, indemnización, preaviso y cesantía no cotizan,
+    /// Ley 51 Art. 92). Un empleado sale una sola vez con todo sumado.
+    /// </summary>
+    public async Task<ReporteSipDto> GenerarReporteSipMensual(int mes, int anio)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var inicio = new DateTime(anio, mes, 1, 0, 0, 0, DateTimeKind.Utc);
+        var fin = inicio.AddMonths(1);
+        var (nombre, ruc) = await GetTenantInfo();
+
+        var acumulado = new Dictionary<int, Acum>();
+        Acum De(int empleadoId, string cedula, string nombreCompleto)
+        {
+            if (!acumulado.TryGetValue(empleadoId, out var a))
+                acumulado[empleadoId] = a = new Acum { Cedula = cedula, Nombre = nombreCompleto };
+            return a;
+        }
+        var fuentes = new List<string>();
+
+        // Planillas del mes (período trabajado), aprobadas o pagadas.
+        var planillas = await _context.PayrollHeaders
+            .AsNoTracking()
+            .Where(p => p.TenantId == tenantId
+                     && p.PeriodStartDate >= inicio && p.PeriodStartDate < fin
+                     && (p.Status == PayrollStatus.Approved || p.Status == PayrollStatus.Paid))
+            .OrderBy(p => p.PeriodStartDate)
+            .Select(p => new
+            {
+                p.PayrollNumber, p.PeriodStartDate, p.PeriodEndDate,
+                Detalles = p.Details.Select(d => new
+                {
+                    d.EmpleadoId, d.Empleado!.NumeroIdentificacion, d.Empleado.Nombre, d.Empleado.Apellido,
+                    d.GrossPay, d.CssEmployee, d.CssEmployer, d.EducationalInsuranceEmployee, d.EducationalInsuranceEmployer,
+                    d.RiskContribution, d.MontoVacaciones
+                })
+            })
+            .ToListAsync();
+
+        foreach (var p in planillas)
+        {
+            fuentes.Add($"Planilla {p.PayrollNumber} ({p.PeriodStartDate:dd/MM}–{p.PeriodEndDate:dd/MM})");
+            foreach (var d in p.Detalles)
+            {
+                var a = De(d.EmpleadoId, d.NumeroIdentificacion, $"{d.Nombre} {d.Apellido}");
+                // Base CSS = bruto cotizable real (no se reconstruye dividiendo por la tasa).
+                a.Bruto += d.GrossPay; a.Base += d.GrossPay;
+                a.CssEmp += d.CssEmployee; a.CssPat += d.CssEmployer;
+                a.SeEmp += d.EducationalInsuranceEmployee; a.SePat += d.EducationalInsuranceEmployer;
+                a.Riesgo += d.RiskContribution; a.Vacaciones += d.MontoVacaciones;
+            }
+        }
+
+        // Décimo pagado en el mes (calculado o pagado). Riesgo profesional: no aplica.
+        var decimos = await _context.PlanillasDecimo
+            .AsNoTracking()
+            .Where(x => x.TenantId == tenantId
+                     && x.FechaPago >= inicio && x.FechaPago < fin
+                     && (x.Estado == EstadoDecimo.Calculada || x.Estado == EstadoDecimo.Pagada))
+            .Select(x => new
+            {
+                x.Numero, x.FechaPago,
+                Detalles = x.Detalles.Select(d => new
+                {
+                    d.EmpleadoId, d.Empleado!.NumeroIdentificacion, d.Empleado.Nombre, d.Empleado.Apellido,
+                    d.MontoDecimo, d.CssEmpleado, d.CssPatrono, d.SeEmpleado, d.SePatrono
+                })
+            })
+            .ToListAsync();
+
+        foreach (var x in decimos)
+        {
+            fuentes.Add($"Décimo {x.Numero} (pagado {x.FechaPago:dd/MM})");
+            foreach (var d in x.Detalles)
+            {
+                var a = De(d.EmpleadoId, d.NumeroIdentificacion, $"{d.Nombre} {d.Apellido}");
+                a.Bruto += d.MontoDecimo; a.Base += d.MontoDecimo;
+                a.CssEmp += d.CssEmpleado; a.CssPat += d.CssPatrono;
+                a.SeEmp += d.SeEmpleado; a.SePat += d.SePatrono;
+            }
+        }
+
+        // Liquidaciones con terminación en el mes: solo la parte cotizable.
+        var liquidaciones = await _context.Liquidaciones
+            .AsNoTracking()
+            .Where(l => l.TenantId == tenantId
+                     && l.FechaTerminacion >= inicio && l.FechaTerminacion < fin
+                     && l.Estado != EstadoLiquidacion.Borrador)
+            .Select(l => new
+            {
+                l.Numero, l.FechaTerminacion, l.EmpleadoId,
+                l.Empleado!.NumeroIdentificacion, l.Empleado.Nombre, l.Empleado.Apellido,
+                l.SalarioPendiente, l.VacacionesProporcionales, l.DecimoTercerMesProporcional,
+                l.CssEmpleado, l.CssPatronal, l.SeEmpleado, l.SePatronal
+            })
+            .ToListAsync();
+
+        foreach (var l in liquidaciones)
+        {
+            fuentes.Add($"Liquidación {l.Numero} ({l.Nombre} {l.Apellido}, {l.FechaTerminacion:dd/MM})");
+            var a = De(l.EmpleadoId, l.NumeroIdentificacion, $"{l.Nombre} {l.Apellido}");
+            var cotizable = l.SalarioPendiente + l.VacacionesProporcionales + l.DecimoTercerMesProporcional;
+            a.Bruto += cotizable; a.Base += cotizable;
+            a.CssEmp += l.CssEmpleado; a.CssPat += l.CssPatronal;
+            a.SeEmp += l.SeEmpleado; a.SePat += l.SePatronal;
+            a.Vacaciones += l.VacacionesProporcionales;
+        }
+
+        var empleados = acumulado.Values
+            .Select(a => new EmpleadoSipItem(
+                a.Cedula, a.Nombre, a.Bruto, a.Base, a.CssEmp, a.CssPat, a.SeEmp, a.SePat, a.Riesgo,
+                a.CssEmp + a.CssPat + a.SeEmp + a.SePat + a.Riesgo, a.Vacaciones))
+            .OrderBy(e => e.NombreCompleto)
+            .ToList();
+
+        var totales = new TotalesSip(
+            empleados.Sum(e => e.SalarioBruto),
+            empleados.Sum(e => e.BaseCss),
+            empleados.Sum(e => e.CssEmpleado),
+            empleados.Sum(e => e.CssPatronal),
+            empleados.Sum(e => e.SeEmpleado),
+            empleados.Sum(e => e.SePatronal),
+            empleados.Sum(e => e.RiesgoProfesional),
+            empleados.Sum(e => e.TotalSip));
+
+        var nombresMes = new[] { "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre" };
+        return new ReporteSipDto(
+            nombre, ruc,
+            $"SIPE {anio}-{mes:D2}",
+            $"{nombresMes[mes - 1]} {anio}",
+            DateTimeHelper.NowPanama(),
+            empleados, totales,
+            fuentes,
+            empleados.Sum(e => e.Vacaciones));
+    }
+
+    private sealed class Acum
+    {
+        public string Cedula = "", Nombre = "";
+        public decimal Bruto, Base, CssEmp, CssPat, SeEmp, SePat, Riesgo, Vacaciones;
+    }
+
     /// <summary>Reporte 5: Comprobantes de Pago — recibos individuales por empleado</summary>
     public async Task<ReporteComprobantesDto> GenerarReporteComprobantes(int planillaId)
     {

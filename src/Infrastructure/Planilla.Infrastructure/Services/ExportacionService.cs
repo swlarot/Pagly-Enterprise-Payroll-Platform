@@ -850,9 +850,18 @@ public class ExportacionService
 
         const int cols = 10;
         AplicarEstiloEncabezado(ws, "REPORTE SIP — CAJA DE SEGURO SOCIAL", reporte.NombreEmpresa, reporte.Ruc, reporte.Periodo, cols);
-        ws.Cell("A5").Value = $"Generado: {reporte.FechaGeneracion:dd/MM/yyyy HH:mm}  |  N° Planilla: {reporte.NumeroPlanilla}";
+        ws.Cell("A5").Value = $"Generado: {reporte.FechaGeneracion:dd/MM/yyyy HH:mm}  |  {(reporte.Fuentes is { Count: > 0 } ? reporte.NumeroPlanilla : "N° Planilla: " + reporte.NumeroPlanilla)}";
 
         var hr = 7;
+        if (reporte.Fuentes is { Count: > 0 })
+        {
+            // SIPE mensual: se lista qué entró en el mes antes de la tabla.
+            ws.Cell(6, 1).Value = "Incluye: " + string.Join(" · ", reporte.Fuentes)
+                + (reporte.TotalVacaciones > 0 ? $"  |  De los cuales vacaciones: {reporte.TotalVacaciones:N2}" : "");
+            ws.Range(6, 1, 6, cols).Merge().Style.Font.Italic = true;
+            ws.Row(6).Style.Alignment.WrapText = true;
+            hr = 8;
+        }
         ws.Cell(hr, 1).Value = "Cédula";
         ws.Cell(hr, 2).Value = "Nombre";
         ws.Cell(hr, 3).Value = "Sal. Bruto";
@@ -924,6 +933,12 @@ public class ExportacionService
                     col.Item().Text($"RUC: {reporte.Ruc}").FontSize(9);
                     col.Item().Text($"REPORTE SIP — CAJA DE SEGURO SOCIAL — {reporte.NumeroPlanilla}").FontSize(12).Bold();
                     col.Item().Text($"Período: {reporte.Periodo}  |  Generado: {reporte.FechaGeneracion:dd/MM/yyyy HH:mm}").FontSize(9);
+                    if (reporte.Fuentes is { Count: > 0 })
+                    {
+                        col.Item().PaddingTop(2).Text("Incluye: " + string.Join(" · ", reporte.Fuentes)).FontSize(8).Italic();
+                        if (reporte.TotalVacaciones > 0)
+                            col.Item().Text($"De los cuales vacaciones: B/.{reporte.TotalVacaciones:N2}").FontSize(8).Italic();
+                    }
                     col.Item().PaddingBottom(8);
                 });
 

@@ -29,7 +29,9 @@ const ReportesPage = () => {
 
     // Selectors independientes por reporte
     const [selPlanillaRegular, setSelPlanillaRegular] = useState('');
-    const [selSip, setSelSip] = useState('');
+    // SIPE: mensual (planillas + décimo + liquidaciones del mes), no por planilla.
+    const [sipMes, setSipMes] = useState(new Date().getMonth() + 1);
+    const [sipAnio, setSipAnio] = useState(CURRENT_YEAR);
     const [selAcreedores, setSelAcreedores] = useState('');
     const [selComprobantes, setSelComprobantes] = useState('');
     const [selMes, setSelMes] = useState(new Date().getMonth() + 1);
@@ -83,9 +85,8 @@ const ReportesPage = () => {
                 url = `/api/reportes/planilla-regular/${selPlanillaRegular}`;
                 titulo = 'Planilla Regular';
             } else if (tipo === 'sip') {
-                if (!selSip) { toast('Seleccione una planilla', { icon: '⚠️' }); return; }
-                url = `/api/reportes/sip/${selSip}`;
-                titulo = 'SIP — CSS Patronal';
+                url = `/api/reportes/sipe?mes=${sipMes}&anio=${sipAnio}`;
+                titulo = `SIPE — ${MESES.find(m => m.value === sipMes)?.label} ${sipAnio}`;
             } else if (tipo === 'acreedores') {
                 if (!selAcreedores) { toast('Seleccione una planilla', { icon: '⚠️' }); return; }
                 url = `/api/reportes/acreedores/${selAcreedores}`;
@@ -102,7 +103,7 @@ const ReportesPage = () => {
             setModalOpen(true);
             // Registrar si la selección actual está vacía para deshabilitar botones en las cards
             const selKey = tipo === 'planilla-regular' ? selPlanillaRegular
-                : tipo === 'sip' ? selSip
+                : tipo === 'sip' ? `${sipMes}-${sipAnio}`
                 : tipo === 'acreedores' ? selAcreedores
                 : `${selMes}-${selAnio}`;
             const dataEmpty = !((data.empleados?.length > 0) || (data.acreedores?.length > 0));
@@ -124,9 +125,8 @@ const ReportesPage = () => {
                 url = `/api/reportes/planilla-regular/${selPlanillaRegular}/excel`;
                 filename = `PlanillaRegular_${selPlanillaRegular}_${fecha}.xlsx`;
             } else if (tipo === 'sip') {
-                if (!selSip) { toast('Seleccione una planilla', { icon: '⚠️' }); return; }
-                url = `/api/reportes/sip/${selSip}/excel`;
-                filename = `SIP_${selSip}_${fecha}.xlsx`;
+                url = `/api/reportes/sipe/excel?mes=${sipMes}&anio=${sipAnio}`;
+                filename = `SIPE_${sipAnio}-${String(sipMes).padStart(2, '0')}.xlsx`;
             } else if (tipo === 'acreedores') {
                 if (!selAcreedores) { toast('Seleccione una planilla', { icon: '⚠️' }); return; }
                 url = `/api/reportes/acreedores/${selAcreedores}/excel`;
@@ -154,9 +154,8 @@ const ReportesPage = () => {
                 url = `/api/reportes/planilla-regular/${selPlanillaRegular}/pdf`;
                 filename = `PlanillaRegular_${selPlanillaRegular}_${fecha}.pdf`;
             } else if (tipo === 'sip') {
-                if (!selSip) { toast('Seleccione una planilla', { icon: '⚠️' }); return; }
-                url = `/api/reportes/sip/${selSip}/pdf`;
-                filename = `SIP_${selSip}_${fecha}.pdf`;
+                url = `/api/reportes/sipe/pdf?mes=${sipMes}&anio=${sipAnio}`;
+                filename = `SIPE_${sipAnio}-${String(sipMes).padStart(2, '0')}.pdf`;
             } else if (tipo === 'acreedores') {
                 if (!selAcreedores) { toast('Seleccione una planilla', { icon: '⚠️' }); return; }
                 url = `/api/reportes/acreedores/${selAcreedores}/pdf`;
@@ -320,14 +319,26 @@ const ReportesPage = () => {
 
         // SIP
         if (modalType === 'sip') {
+            const fuentes = reporteData.fuentes || [];
+            const hayVac = (reporteData.totalVacaciones || 0) > 0;
             return (
                 <div className="overflow-x-auto">
+                    {fuentes.length > 0 && (
+                        <div className="mb-3 text-xs text-gray-400">
+                            <span className="text-gray-500">Incluye:</span> {fuentes.join(' · ')}
+                            {hayVac && <span className="ml-2 text-gray-500">· de los cuales vacaciones <span className="font-mono text-gray-300">{formatCurrency(reporteData.totalVacaciones)}</span></span>}
+                        </div>
+                    )}
+                    {fuentes.length === 0 && (reporteData.empleados || []).length === 0 && (
+                        <p className="text-sm text-gray-400 mb-3">Nada cotiza en este mes: no hay planillas aprobadas, décimo ni liquidaciones con período en él.</p>
+                    )}
                     <table className="w-full text-xs">
                         <thead className="bg-navy-800">
                             <tr>
                                 <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Cédula</th>
                                 <th className="px-3 py-2 text-left font-medium text-gray-500 uppercase">Nombre</th>
                                 <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Sal. Bruto</th>
+                                {hayVac && <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase" title="Parte del bruto que fue vacaciones">Vacac.</th>}
                                 <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">Base CSS</th>
                                 <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">CSS Emp.</th>
                                 <th className="px-3 py-2 text-right font-medium text-gray-500 uppercase">CSS Pat.</th>
@@ -343,6 +354,7 @@ const ReportesPage = () => {
                                     <td className="px-3 py-2 text-gray-300">{emp.cedula}</td>
                                     <td className="px-3 py-2 text-gray-300">{emp.nombreCompleto}</td>
                                     <td className="px-3 py-2 text-right font-mono text-gray-100">{formatCurrency(emp.salarioBruto)}</td>
+                                    {hayVac && <td className="px-3 py-2 text-right font-mono text-gray-400">{formatCurrency(emp.vacaciones)}</td>}
                                     <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.baseCss)}</td>
                                     <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.cssEmpleado)}</td>
                                     <td className="px-3 py-2 text-right font-mono text-gray-300">{formatCurrency(emp.cssPatronal)}</td>
@@ -355,6 +367,7 @@ const ReportesPage = () => {
                             <tr className="bg-amber-500/15 font-bold">
                                 <td className="px-3 py-2 text-amber-400" colSpan="2">TOTALES</td>
                                 <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.totalSalarios)}</td>
+                                {hayVac && <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totalVacaciones)}</td>}
                                 <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.totalBaseCss)}</td>
                                 <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.totalCssEmpleado)}</td>
                                 <td className="px-3 py-2 text-right font-mono text-amber-400">{formatCurrency(reporteData.totales?.totalCssPatronal)}</td>
@@ -534,7 +547,7 @@ const ReportesPage = () => {
 
     // Selecciones conocidas como vacías tras un "Ver" — deshabilitan Excel/PDF en las cards
     const regularVacia    = emptySelections['planilla-regular'] === selPlanillaRegular && !!selPlanillaRegular;
-    const sipVacio        = emptySelections['sip'] === selSip && !!selSip;
+    const sipVacio        = emptySelections['sip'] === `${sipMes}-${sipAnio}`;
     const acreedoresVacio = emptySelections['acreedores'] === selAcreedores && !!selAcreedores;
     const mensualVacio    = emptySelections['mensual'] === `${selMes}-${selAnio}`;
 
@@ -558,7 +571,7 @@ const ReportesPage = () => {
             {/* Header */}
             <div className="mb-6">
                 <h2 className="text-2xl font-display font-bold text-gray-100">Reportes de Planilla</h2>
-                <p className="text-gray-400 mt-1">Cinco reportes operativos: planilla, SIP, acreedores, comprobantes y consolidado mensual</p>
+                <p className="text-gray-400 mt-1">Cinco reportes operativos: planilla, SIPE mensual, acreedores, comprobantes y consolidado mensual</p>
             </div>
 
             {/* Grid 2 + 2 + 1 */}
@@ -588,13 +601,26 @@ const ReportesPage = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                         </svg>
                     </div>
-                    <h3 className="text-base font-bold text-gray-100 font-display mb-1">SIP — CSS Patronal</h3>
-                    <p className="text-sm text-gray-500 mb-4 leading-relaxed">Datos exactos para ingresar en la plataforma CSS: base, CSS emp/pat, SE emp/pat y riesgo profesional</p>
-                    <PlanillaSelect value={selSip} onChange={setSelSip} />
+                    <h3 className="text-base font-bold text-gray-100 font-display mb-1">SIPE — CSS mensual</h3>
+                    <p className="text-sm text-gray-500 mb-4 leading-relaxed">Lo que se declara a la CSS por el mes: todas las planillas aprobadas del período, el décimo pagado y la parte cotizable de las liquidaciones, con base, CSS, SE y riesgo profesional</p>
+                    <div className="flex gap-3 mb-4">
+                        <div className="flex-1">
+                            <label htmlFor="sipe-mes" className="block text-xs text-gray-500 mb-1">Mes</label>
+                            <select id="sipe-mes" value={sipMes} onChange={e => setSipMes(parseInt(e.target.value))} className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm">
+                                {MESES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                            </select>
+                        </div>
+                        <div className="w-28">
+                            <label htmlFor="sipe-anio" className="block text-xs text-gray-500 mb-1">Año</label>
+                            <select id="sipe-anio" value={sipAnio} onChange={e => setSipAnio(parseInt(e.target.value))} className="w-full px-3 py-2 border border-navy-600 bg-navy-800 text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm">
+                                {ANIOS.map(a => <option key={a} value={a}>{a}</option>)}
+                            </select>
+                        </div>
+                    </div>
                     <div className="flex items-center gap-2 pt-3 border-t border-navy-700">
-                        <AccionBtn onClick={() => verReporte('sip')} disabled={!selSip} colorClass="hover:bg-primary-600 hover:border-primary-600 hover:text-white" icon={iconVer} label="Ver" />
-                        <AccionBtn onClick={() => descargarExcel('sip')} disabled={!selSip || sipVacio} colorClass="hover:bg-emerald-600 hover:border-emerald-600 hover:text-white" icon={iconExcel} label="Excel" />
-                        <AccionBtn onClick={() => descargarPdf('sip')} disabled={!selSip || sipVacio} colorClass="hover:bg-red-600 hover:border-red-600 hover:text-white" icon={iconPdf} label="PDF" />
+                        <AccionBtn onClick={() => verReporte('sip')} colorClass="hover:bg-primary-600 hover:border-primary-600 hover:text-white" icon={iconVer} label="Ver" />
+                        <AccionBtn onClick={() => descargarExcel('sip')} disabled={sipVacio} colorClass="hover:bg-emerald-600 hover:border-emerald-600 hover:text-white" icon={iconExcel} label="Excel" />
+                        <AccionBtn onClick={() => descargarPdf('sip')} disabled={sipVacio} colorClass="hover:bg-red-600 hover:border-red-600 hover:text-white" icon={iconPdf} label="PDF" />
                     </div>
                 </div>
 
