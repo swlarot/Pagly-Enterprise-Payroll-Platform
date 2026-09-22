@@ -23,17 +23,20 @@ public class LiquidacionesController : ControllerBase
     private readonly ITenantContext _tenantContext;
     private readonly IAuditLogService _auditLogService;
     private readonly LiquidacionCalculationService _calculationService;
+    private readonly IBasesLiquidacionProvider _basesProvider;
 
     public LiquidacionesController(
         ApplicationDbContext context,
         ITenantContext tenantContext,
         IAuditLogService auditLogService,
-        LiquidacionCalculationService calculationService)
+        LiquidacionCalculationService calculationService,
+        IBasesLiquidacionProvider basesProvider)
     {
         _context = context;
         _tenantContext = tenantContext;
         _auditLogService = auditLogService;
         _calculationService = calculationService;
+        _basesProvider = basesProvider;
     }
 
     /// <summary>
@@ -87,6 +90,54 @@ public class LiquidacionesController : ControllerBase
     }
 
     /// <summary>
+    /// Calcula una liquidación SIN guardarla, y devuelve además de dónde sale
+    /// cada partida: los 60 meses devengados, el promedio de 6 meses, el
+    /// último salario y los dos cortes (última vacación, última partida de
+    /// décimo). Es lo que la pantalla enseña antes de crear.
+    /// POST /api/liquidaciones/previsualizar
+    /// </summary>
+    [HttpPost("previsualizar")]
+    [RequirePermission(SystemPermission.PayrollCalculate)]
+    public async Task<IActionResult> Previsualizar(CreateLiquidacionRequest request)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        var empleado = await _context.Empleados
+            .Where(e => e.Id == request.EmpleadoId && e.TenantId == tenantId)
+            .Include(e => e.HistorialSalarial)
+            .FirstOrDefaultAsync();
+
+        if (empleado == null)
+            return BadRequest(new { message = "Empleado no encontrado" });
+        if (request.FechaTerminacion < empleado.FechaContratacion)
+            return BadRequest(new { message = "La fecha de terminación no puede ser anterior a la fecha de contratación" });
+
+        var bases = await _basesProvider.ObtenerAsync(empleado.Id, empleado.FechaContratacion, request.FechaTerminacion);
+        var r = _calculationService.Calcular(empleado, request, ultimaFechaVacaciones: null, bases: bases);
+
+        return Ok(new
+        {
+            empleado = new { empleado.Id, empleado.Nombre, empleado.Apellido, empleado.NumeroIdentificacion, empleado.FechaContratacion },
+            calculo = r,
+            // Sin historial se liquida con el salario base: la pantalla lo avisa.
+            usaDevengadoReal = bases is not null,
+            bases = bases is null ? null : new
+            {
+                devengado60Meses = bases.Devengado60Meses,
+                mesesConDatos = bases.MesesConDatos,
+                semanas = LiquidacionCalculator.SemanasDeMeses(Math.Clamp(bases.MesesConDatos, 1, 60)),
+                promedio6Meses = bases.Meses6ConDatos > 0 ? bases.Devengado6Meses / bases.Meses6ConDatos : 0m,
+                bases.UltimoMesDevengado,
+                bases.DevengadoDesdeUltimaVacacion,
+                bases.VacacionesDesde,
+                bases.DevengadoDesdeUltimaPartidaDecimo,
+                bases.DecimoDesde,
+                meses = bases.Meses60,
+            },
+        });
+    }
+
+    /// <summary>
     /// Crea y calcula una nueva liquidación.
     /// </summary>
     [HttpPost]
@@ -117,8 +168,12 @@ public class LiquidacionesController : ControllerBase
         if (liquidacionExistente != null)
             return BadRequest(new { message = "Ya existe una liquidación pendiente para este empleado. Debe pagarla o eliminarla antes de crear otra." });
 
-        // Calcular liquidación
-        var resultado = _calculationService.Calcular(empleado, request);
+        // Calcular liquidación con el devengado real del empleado (60 meses,
+        // última vacación y última partida de décimo). Sin historial, el
+        // servicio cae al método basado en el salario base.
+        var bases = await _basesProvider.ObtenerAsync(
+            empleado.Id, empleado.FechaContratacion, request.FechaTerminacion);
+        var resultado = _calculationService.Calcular(empleado, request, ultimaFechaVacaciones: null, bases: bases);
 
         // Generar número correlativo
         var anio = DateTime.UtcNow.Year;

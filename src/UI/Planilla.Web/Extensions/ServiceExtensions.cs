@@ -58,6 +58,7 @@ namespace Vorluno.Planilla.Web.Extensions
             services.AddScoped<Vorluno.Planilla.Application.Interfaces.IAcumuladoFiscalService, Vorluno.Planilla.Infrastructure.Services.AcumuladoFiscalService>();
             services.AddScoped<Vorluno.Planilla.Application.Interfaces.IDevengadoMensualService, Vorluno.Planilla.Infrastructure.Services.DevengadoMensualService>();
             services.AddScoped<Vorluno.Planilla.Application.Interfaces.IHorasPlanillaService, Vorluno.Planilla.Infrastructure.Services.HorasPlanillaService>();
+            services.AddScoped<Vorluno.Planilla.Application.Interfaces.IBasesLiquidacionProvider, Vorluno.Planilla.Infrastructure.Services.BasesLiquidacionProvider>();
             services.AddScoped<Vorluno.Planilla.Infrastructure.Services.IImportacionEmpleadosService, Vorluno.Planilla.Infrastructure.Services.ImportacionEmpleadosService>();
             services.AddScoped<PayrollProcessingService>();
 
