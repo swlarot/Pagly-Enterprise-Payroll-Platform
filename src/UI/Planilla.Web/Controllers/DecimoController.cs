@@ -19,15 +19,18 @@ public class DecimoController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly ITenantContext _tenantContext;
     private readonly IDecimoCalculationService _decimoCalculationService;
+    private readonly IAuditLogService _auditLogService;
 
     public DecimoController(
         ApplicationDbContext context,
         ITenantContext tenantContext,
-        IDecimoCalculationService decimoCalculationService)
+        IDecimoCalculationService decimoCalculationService,
+        IAuditLogService auditLogService)
     {
         _context = context;
         _tenantContext = tenantContext;
         _decimoCalculationService = decimoCalculationService;
+        _auditLogService = auditLogService;
     }
 
     // ====================================================================
@@ -36,8 +39,10 @@ public class DecimoController : ControllerBase
     // ====================================================================
     [HttpGet]
     [RequirePermission(SystemPermission.PayrollView)]
-    public async Task<ActionResult<List<PlanillaDecimoListDto>>> GetAll([FromQuery] int? ano)
+    public async Task<ActionResult<List<PlanillaDecimoListDto>>> GetAll([FromQuery] int? ano, [FromQuery] int? mes)
     {
+        if (mes is < 1 or > 12) return BadRequest(new { message = "El mes debe estar entre 1 y 12." });
+
         var tenantId = _tenantContext.TenantId;
 
         var query = _context.PlanillasDecimo
@@ -45,6 +50,10 @@ public class DecimoController : ControllerBase
 
         if (ano.HasValue)
             query = query.Where(p => p.FechaPago.Year == ano.Value);
+
+        // La partida pertenece al mes en que se paga (abril, agosto o diciembre).
+        if (mes.HasValue)
+            query = query.Where(p => p.FechaPago.Month == mes.Value);
 
         var planillas = await query
             .OrderByDescending(p => p.FechaPago)
@@ -172,17 +181,41 @@ public class DecimoController : ControllerBase
     }
 
     // ====================================================================
+    // POST /api/decimo/previsualizar
+    // Qué se pagaría, empleado por empleado y mes por mes, SIN crear nada.
+    // Es lo que la pantalla enseña antes de crear la partida, y lo que
+    // permite escribir a mano los meses que no tienen planilla en Pagly.
+    // ====================================================================
+    [HttpPost("previsualizar")]
+    [RequirePermission(SystemPermission.PayrollCalculate)]
+    public async Task<ActionResult> Previsualizar([FromBody] PrevisualizarDecimoRequest request)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        if (request.PeriodoDesde >= request.PeriodoHasta)
+            return BadRequest(new { message = "La fecha de inicio debe ser anterior a la fecha de fin" });
+
+        var preview = await _decimoCalculationService.PrevisualizarAsync(
+            request.PeriodoDesde.Date, request.PeriodoHasta.Date, request.FechaPago.Date, tenantId,
+            request.Ajustes?.Select(a => new AjusteMesDecimo(a.EmpleadoId, a.Anio, a.Mes, a.Monto)).ToList());
+
+        return Ok(ADto(preview));
+    }
+
+    // ====================================================================
     // POST /api/decimo/{id}/calcular
-    // Calcula el décimo para todos los empleados activos
+    // Calcula y guarda la partida con lo que se vio en pantalla. Los meses
+    // escritos a mano quedan además como devengado manual del empleado.
     // ====================================================================
     [HttpPost("{id}/calcular")]
     [RequirePermission(SystemPermission.PayrollCalculate)]
-    public async Task<ActionResult> Calcular(int id)
+    public async Task<ActionResult> Calcular(int id, [FromBody] CalcularDecimoRequest? request = null)
     {
         var tenantId = _tenantContext.TenantId;
         try
         {
-            var resultado = await _decimoCalculationService.CalcularAsync(id, tenantId);
+            var resultado = await _decimoCalculationService.CalcularAsync(id, tenantId,
+                request?.Ajustes?.Select(a => new AjusteMesDecimo(a.EmpleadoId, a.Anio, a.Mes, a.Monto)).ToList());
             return Ok(new { message = $"Décimo calculado para {resultado.EmpleadosProcesados} empleados", totalDecimo = resultado.TotalDecimo });
         }
         catch (InvalidOperationException ex)
@@ -190,6 +223,112 @@ public class DecimoController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    // ====================================================================
+    // PATCH /api/decimo/{id}/reabrir
+    // Una partida pagada vuelve a Calculada para poder corregirla.
+    // ====================================================================
+    [HttpPatch("{id}/reabrir")]
+    [RequirePermission(SystemPermission.PayrollApprove)]
+    public async Task<ActionResult> Reabrir(int id)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        var planilla = await _context.PlanillasDecimo
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
+
+        if (planilla == null)
+            return NotFound(new { message = "Partida de décimo no encontrada" });
+        if (planilla.Estado != EstadoDecimo.Pagada)
+            return BadRequest(new { message = "Solo se reabre una partida pagada." });
+
+        planilla.Estado = EstadoDecimo.Calculada;
+        planilla.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync("DecimoReabierto", "PlanillaDecimo", planilla.Id.ToString(),
+            new Dictionary<string, string> { ["Numero"] = planilla.Numero });
+
+        return Ok(new { message = $"La partida {planilla.Numero} volvió a Calculada" });
+    }
+
+    // ====================================================================
+    // DELETE /api/decimo/{id}
+    // Borrado PERMANENTE en cualquier estado, pedido explícitamente: exige
+    // escribir el número de la partida y queda en auditoría. Es la única
+    // excepción a la regla de no borrar datos.
+    // ====================================================================
+    [HttpDelete("{id}")]
+    [RequirePermission(SystemPermission.PayrollApprove)]
+    public async Task<ActionResult> Eliminar(int id, [FromBody] EliminarDecimoRequest request)
+    {
+        var tenantId = _tenantContext.TenantId;
+
+        var planilla = await _context.PlanillasDecimo
+            .Include(p => p.Detalles)
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
+
+        if (planilla == null)
+            return NotFound(new { message = "Partida de décimo no encontrada" });
+
+        if (!string.Equals(request?.Confirmacion?.Trim(), planilla.Numero, StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = $"Para borrarla, escribe su número exacto: {planilla.Numero}" });
+
+        var estado = planilla.Estado.ToString();
+        var total = planilla.TotalDecimo;
+        var empleados = planilla.Detalles.Count;
+        var numero = planilla.Numero;
+
+        _context.DetallesDecimo.RemoveRange(planilla.Detalles);
+        _context.PlanillasDecimo.Remove(planilla);
+        await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync("DecimoEliminado", "PlanillaDecimo", id.ToString(),
+            new Dictionary<string, string>
+            {
+                ["Numero"] = numero,
+                ["EstadoQueTenia"] = estado,
+                ["TotalDecimo"] = total.ToString("F2"),
+                ["Empleados"] = empleados.ToString(),
+                ["FechaPago"] = planilla.FechaPago.ToString("yyyy-MM-dd"),
+            });
+
+        return Ok(new { message = $"La partida {numero} se borró de forma permanente" });
+    }
+
+    private static object ADto(DecimoPreview p) => new
+    {
+        totalDevengado = p.TotalDevengado,
+        totalDecimo = p.TotalDecimo,
+        totalNeto = p.TotalNeto,
+        empleadosConMesesSinDatos = p.EmpleadosConMesesSinDatos,
+        empleados = p.Empleados.Select(e => new
+        {
+            e.EmpleadoId,
+            e.NombreCompleto,
+            e.NumeroIdentificacion,
+            e.TotalDevengado,
+            e.MontoDecimo,
+            e.CssEmpleado,
+            e.CssPatrono,
+            e.SeEmpleado,
+            e.SePatrono,
+            e.Isr,
+            e.TotalDeducciones,
+            e.NetoPago,
+            e.TieneMesesSinDatos,
+            meses = e.Meses.Select(m => new
+            {
+                m.Anio,
+                m.Mes,
+                m.Monto,
+                origen = m.Origen.ToString(),
+                m.Fraccion,
+                m.Planillas,
+                editable = m.Origen != OrigenDevengado.Planilla,
+            }),
+        }),
+    };
 
     // ====================================================================
     // PATCH /api/decimo/{id}/pagar
@@ -228,6 +367,21 @@ public record CreatePlanillaDecimoRequest(
     DateTime PeriodoHasta,
     DateTime FechaPago
 );
+
+/// <summary>Un mes escrito a mano en la pantalla del décimo.</summary>
+public record AjusteMesDecimoRequest(int EmpleadoId, int Anio, int Mes, decimal Monto);
+
+public record PrevisualizarDecimoRequest(
+    DateTime PeriodoDesde,
+    DateTime PeriodoHasta,
+    DateTime FechaPago,
+    List<AjusteMesDecimoRequest>? Ajustes
+);
+
+public record CalcularDecimoRequest(List<AjusteMesDecimoRequest>? Ajustes);
+
+/// <summary>Borrar es permanente: hay que escribir el número de la partida.</summary>
+public record EliminarDecimoRequest(string? Confirmacion);
 
 public record PlanillaDecimoListDto(
     int Id,

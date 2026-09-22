@@ -225,14 +225,17 @@ export const api = {
     return handleResponse<T>(response, { url, method: 'PATCH', headers, body });
   },
 
-  async delete<T>(endpoint: string): Promise<T> {
+  // Algunos borrados exigen confirmación en el cuerpo (p. ej. el número de la
+  // partida de décimo, que se borra de forma permanente).
+  async delete<T>(endpoint: string, body?: any): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     const headers = getHeaders();
     const response = await fetch(url, {
       method: 'DELETE',
       headers,
+      body: body ? JSON.stringify(body) : undefined,
     });
-    return handleResponse<T>(response, { url, method: 'DELETE', headers });
+    return handleResponse<T>(response, { url, method: 'DELETE', headers, body });
   },
 
   /**

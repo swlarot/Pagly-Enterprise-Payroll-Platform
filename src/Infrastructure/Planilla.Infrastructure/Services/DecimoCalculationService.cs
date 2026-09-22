@@ -1,13 +1,27 @@
 // ====================================================================
-// Planilla - DecimoCalculationService (DEV-173)
-// Extracción de la lógica de cálculo del décimo tercer mes
-// desde DecimoController a un servicio de infraestructura
+// Planilla - DecimoCalculationService
+//
+// El décimo sale del devengado mes a mes del cuatrimestre, y el devengado
+// lo da IDevengadoMensualService: planillas aprobadas de Pagly primero, y
+// si un mes no tiene planilla, lo importado al migrar o escrito a mano.
+// Así dejan de perderse los meses previos a Pagly y las planillas cuyo
+// período cruza el borde del cuatrimestre (una planilla cuenta en el mes
+// de su período trabajado).
+//
+// Los meses parciales (el primero y el último del cuatrimestre, que suele
+// empezar el 16 y terminar el 15) se prorratean por los días que caen
+// dentro del período cuando el mes NO viene de planillas; los meses de
+// planilla ya traen exactamente lo que se pagó en ellos.
+//
+// Previsualizar no guarda nada: es lo que la pantalla enseña antes de
+// crear la partida. Al calcular, los meses escritos a mano se guardan como
+// devengado manual del empleado para que la liquidación y la ficha de
+// renta los vean también.
 // ====================================================================
 
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Vorluno.Planilla.Application.DTOs;
-using Vorluno.Planilla.Application.DTOs.Reportes;
 using Vorluno.Planilla.Application.Helpers;
 using Vorluno.Planilla.Application.Interfaces;
 using Vorluno.Planilla.Domain.Entities;
@@ -20,168 +34,236 @@ public class DecimoCalculationService : IDecimoCalculationService
 {
     private readonly ApplicationDbContext _context;
     private readonly IPayrollConfigProvider _configProvider;
+    private readonly IDevengadoMensualService _devengado;
 
     public DecimoCalculationService(
         ApplicationDbContext context,
-        IPayrollConfigProvider configProvider)
+        IPayrollConfigProvider configProvider,
+        IDevengadoMensualService devengado)
     {
         _context = context ?? throw new ArgumentNullException(nameof(context));
         _configProvider = configProvider ?? throw new ArgumentNullException(nameof(configProvider));
+        _devengado = devengado ?? throw new ArgumentNullException(nameof(devengado));
     }
 
-    public async Task<DecimoCalculationSummary> CalcularAsync(int planillaDecimoId, int tenantId)
+    public async Task<DecimoPreview> PrevisualizarAsync(
+        DateTime periodoDesde, DateTime periodoHasta, DateTime fechaPago, int tenantId,
+        IReadOnlyList<AjusteMesDecimo>? ajustes = null, CancellationToken ct = default)
+    {
+        var empleados = await _context.Empleados
+            .AsNoTracking()
+            .Where(e => e.TenantId == tenantId && e.EstaActivo && !e.IsDeleted)
+            .OrderBy(e => e.Apellido).ThenBy(e => e.Nombre)
+            .ToListAsync(ct);
+
+        var taxConfig = await _configProvider.GetTaxConfigAsync(tenantId, fechaPago);
+        var taxBrackets = await _configProvider.GetTaxBracketsAsync(tenantId, fechaPago.Year);
+        var porAjuste = (ajustes ?? Array.Empty<AjusteMesDecimo>())
+            .ToDictionary(a => (a.EmpleadoId, a.Anio, a.Mes), a => a.Monto);
+
+        var lista = new List<EmpleadoDecimoPreview>();
+        foreach (var empleado in empleados)
+            lista.Add(await CalcularEmpleadoAsync(empleado, periodoDesde, periodoHasta, tenantId, taxConfig, taxBrackets, porAjuste, ct));
+
+        return new DecimoPreview(lista);
+    }
+
+    public async Task<DecimoCalculationSummary> CalcularAsync(
+        int planillaDecimoId, int tenantId,
+        IReadOnlyList<AjusteMesDecimo>? ajustes = null, CancellationToken ct = default)
     {
         var planilla = await _context.PlanillasDecimo
             .Include(p => p.Detalles)
-            .FirstOrDefaultAsync(p => p.Id == planillaDecimoId && p.TenantId == tenantId)
+            .FirstOrDefaultAsync(p => p.Id == planillaDecimoId && p.TenantId == tenantId, ct)
             ?? throw new InvalidOperationException("Planilla de décimo no encontrada");
 
         if (planilla.Estado == EstadoDecimo.Pagada)
-            throw new InvalidOperationException("No se puede recalcular una planilla ya pagada");
+            throw new InvalidOperationException("No se puede recalcular una partida ya pagada: reábrela primero.");
 
-        var empleados = await _context.Empleados
-            .Where(e => e.TenantId == tenantId && e.EstaActivo)
-            .ToListAsync();
+        var preview = await PrevisualizarAsync(
+            planilla.PeriodoDesde, planilla.PeriodoHasta, planilla.FechaPago, tenantId, ajustes, ct);
 
-        var taxConfig = await _configProvider.GetTaxConfigAsync(tenantId, planilla.FechaPago);
-        var taxBrackets = await _configProvider.GetTaxBracketsAsync(tenantId, planilla.FechaPago.Year);
+        // Los meses escritos a mano se guardan como devengado manual del empleado:
+        // desde ahí los verán la liquidación, la ficha de renta y el próximo décimo.
+        foreach (var a in ajustes ?? Array.Empty<AjusteMesDecimo>())
+        {
+            if (a.Monto < 0) throw new InvalidOperationException("Un mes escrito a mano no puede ser negativo.");
+            if (await _devengado.MesTienePlanillaAsync(a.EmpleadoId, a.Anio, a.Mes, ct))
+                throw new InvalidOperationException(
+                    $"El mes {a.Mes:D2}/{a.Anio} ya tiene planilla en Pagly: su devengado se toma de ahí y no se escribe a mano.");
+            await _devengado.GuardarMesAsync(a.EmpleadoId, a.Anio, a.Mes,
+                salario: a.Monto, vacaciones: 0m, extras: 0m, comision: 0m,
+                origen: OrigenDevengado.Manual, nota: $"Escrito al crear el décimo {planilla.Numero}", ct: ct);
+        }
 
-        // Limpiar detalles existentes para recalcular
         if (planilla.Detalles.Any())
         {
             _context.DetallesDecimo.RemoveRange(planilla.Detalles);
             planilla.Detalles.Clear();
         }
 
-        decimal totalDevengado = 0, totalDecimo = 0;
-        decimal totalCssEmp = 0, totalCssPat = 0;
-        decimal totalSeEmp = 0, totalSePat = 0;
-        decimal totalIsr = 0, totalNeto = 0;
-        int empleadosProcesados = 0;
-
-        foreach (var empleado in empleados)
+        var procesados = 0;
+        foreach (var e in preview.Empleados)
         {
-            // 1. PayrollDetails del período — solo planillas Approved/Paid (DEV-172)
-            var details = await _context.PayrollDetails
-                .Include(d => d.PayrollHeader)
-                .Where(d => d.TenantId == tenantId
-                         && d.EmpleadoId == empleado.Id
-                         && d.PayrollHeader.PeriodStartDate >= planilla.PeriodoDesde
-                         && d.PayrollHeader.PeriodEndDate <= planilla.PeriodoHasta
-                         && (d.PayrollHeader.Status == PayrollStatus.Approved
-                             || d.PayrollHeader.Status == PayrollStatus.Paid))
-                .ToListAsync();
-
-            if (details.Count == 0)
-                continue;
-
-            // 2. Desglose mensual agrupado por año+mes
-            var desgloseMensual = details
-                .GroupBy(d => new { d.PayrollHeader.PeriodStartDate.Year, d.PayrollHeader.PeriodStartDate.Month })
-                .Select(g => new DesgloseMensualItem(g.Key.Year, g.Key.Month, g.Sum(d => d.GrossPay)))
-                .OrderBy(x => x.Ano).ThenBy(x => x.Mes)
-                .ToList();
-
-            decimal totalDev = details.Sum(d => d.GrossPay);
-
-            // 3. MontoDecimo = TotalDevengado / 12
-            decimal montoDecimo = RoundingPolicy.Round(totalDev / 12m);
-
-            // 4. CSS reducida del décimo: 7.25% empleado / 10.75% patronal
-            //    (Ley 51/2005 Art. 96.4-96.5, Texto Único modif. Ley 462). El SE NO se reduce.
-            decimal cssEmp = RoundingPolicy.Round(montoDecimo * PayrollConstants.CssTasaDecimoEmpleado);
-            decimal cssPat = RoundingPolicy.Round(montoDecimo * PayrollConstants.CssTasaDecimoPatronal);
-
-            // 5. Seguro Educativo (1.25% / 1.50%, sin reducción sobre el décimo)
-            bool seActivo = empleado.IsSubjectToEducationalInsurance;
-            decimal seEmp = seActivo ? RoundingPolicy.Round(montoDecimo * PayrollConstants.SeTasaEmpleado) : 0;
-            decimal sePat = seActivo ? RoundingPolicy.Round(montoDecimo * PayrollConstants.SeTasaPatronal) : 0;
-
-            // 6. ISR del décimo: (salario mensual + décimo) × 13 → tramos → / 13
-            decimal isr = 0;
-            if (empleado.IsSubjectToIncomeTax && taxBrackets.Count > 0)
-            {
-                // DEV-185: se obtiene el GrossPay del último período y se convierte a mensual
-                // usando PayPeriodType del empleado, para no subestimar el ISR en empleados quincenales.
-                var ultimoPeriodoGross = await _context.PayrollDetails
-                    .Where(d => d.TenantId == tenantId
-                             && d.EmpleadoId == empleado.Id
-                             && d.PayrollHeader.PeriodEndDate <= planilla.PeriodoHasta
-                             && (d.PayrollHeader.Status == PayrollStatus.Approved
-                                 || d.PayrollHeader.Status == PayrollStatus.Paid))
-                    .OrderByDescending(d => d.PayrollHeader.PeriodEndDate)
-                    .Select(d => d.GrossPay)
-                    .FirstOrDefaultAsync();
-
-                int periodsPerYear = PayrollConstants.GetPeriodsPerYear(empleado.PayPeriodType);
-                decimal salarioMensual = ultimoPeriodoGross * periodsPerYear / 12m;
-                decimal baseDecimo = salarioMensual + montoDecimo;
-                decimal annualBase = baseDecimo * 13m;
-
-                decimal depDeduccion = 0;
-                if (taxConfig != null)
-                {
-                    var validDeps = Math.Min(empleado.Dependents, taxConfig.MaxDependents);
-                    depDeduccion = validDeps * taxConfig.DependentDeductionAmount;
-                }
-
-                // El Seguro Educativo NO se deduce de la base del ISR: el Art. 24 de la Ley 8
-                // de 2010 eliminó esa deducción del numeral 4 del Art. 709. Consistente con la
-                // planilla regular (IncomeTaxCalculationServicePortable).
-                decimal seDeduccion = 0m;
-                decimal netGravable = Math.Max(0, annualBase - depDeduccion - seDeduccion);
-                decimal isrAnual = CalcularIsrAnual(netGravable, taxBrackets);
-                isr = RoundingPolicy.Round(isrAnual / 13m);
-            }
-
-            // 7. Totales del empleado
-            decimal totalDedEmp = cssEmp + seEmp + isr;
-            decimal neto = montoDecimo - totalDedEmp;
+            // Un empleado sin nada devengado en el cuatrimestre no entra en la partida.
+            if (e.TotalDevengado <= 0m) continue;
 
             _context.DetallesDecimo.Add(new DetalleDecimo
             {
                 TenantId = tenantId,
                 PlanillaDecimoId = planilla.Id,
-                EmpleadoId = empleado.Id,
-                DesgloseMensualJson = JsonSerializer.Serialize(desgloseMensual),
-                TotalDevengado = totalDev,
-                MontoDecimo = montoDecimo,
-                CssEmpleado = cssEmp,
-                CssPatrono = cssPat,
-                SeEmpleado = seEmp,
-                SePatrono = sePat,
-                ISR = isr,
-                TotalDeducciones = totalDedEmp,
-                NetoPago = neto,
+                EmpleadoId = e.EmpleadoId,
+                DesgloseMensualJson = JsonSerializer.Serialize(
+                    e.Meses.Select(m => new DesgloseMensualItem(m.Anio, m.Mes, m.Monto)).ToList()),
+                TotalDevengado = e.TotalDevengado,
+                MontoDecimo = e.MontoDecimo,
+                CssEmpleado = e.CssEmpleado,
+                CssPatrono = e.CssPatrono,
+                SeEmpleado = e.SeEmpleado,
+                SePatrono = e.SePatrono,
+                ISR = e.Isr,
+                TotalDeducciones = e.TotalDeducciones,
+                NetoPago = e.NetoPago,
                 CreatedAt = DateTime.UtcNow
             });
-
-            totalDevengado += totalDev;
-            totalDecimo += montoDecimo;
-            totalCssEmp += cssEmp;
-            totalCssPat += cssPat;
-            totalSeEmp += seEmp;
-            totalSePat += sePat;
-            totalIsr += isr;
-            totalNeto += neto;
-            empleadosProcesados++;
+            procesados++;
         }
 
-        // 8. Actualizar cabecera
-        planilla.TotalDevengado = totalDevengado;
-        planilla.TotalDecimo = totalDecimo;
-        planilla.TotalCssEmpleado = totalCssEmp;
-        planilla.TotalCssPatrono = totalCssPat;
-        planilla.TotalSeEmpleado = totalSeEmp;
-        planilla.TotalSePatrono = totalSePat;
-        planilla.TotalISR = totalIsr;
-        planilla.TotalNetoPago = totalNeto;
+        var conDatos = preview.Empleados.Where(e => e.TotalDevengado > 0m).ToList();
+        planilla.TotalDevengado = conDatos.Sum(e => e.TotalDevengado);
+        planilla.TotalDecimo = conDatos.Sum(e => e.MontoDecimo);
+        planilla.TotalCssEmpleado = conDatos.Sum(e => e.CssEmpleado);
+        planilla.TotalCssPatrono = conDatos.Sum(e => e.CssPatrono);
+        planilla.TotalSeEmpleado = conDatos.Sum(e => e.SeEmpleado);
+        planilla.TotalSePatrono = conDatos.Sum(e => e.SePatrono);
+        planilla.TotalISR = conDatos.Sum(e => e.Isr);
+        planilla.TotalNetoPago = conDatos.Sum(e => e.NetoPago);
         planilla.Estado = EstadoDecimo.Calculada;
         planilla.UpdatedAt = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+        await _context.SaveChangesAsync(ct);
+        return new DecimoCalculationSummary(procesados, planilla.TotalDecimo);
+    }
 
-        return new DecimoCalculationSummary(empleadosProcesados, totalDecimo);
+    // ────────────────────────────────────────────────────────────────
+
+    private async Task<EmpleadoDecimoPreview> CalcularEmpleadoAsync(
+        Empleado empleado, DateTime desde, DateTime hasta, int tenantId,
+        PayrollTaxConfigDto? taxConfig, List<TaxBracketDto> taxBrackets,
+        Dictionary<(int, int, int), decimal> porAjuste, CancellationToken ct)
+    {
+        var meses = await _devengado.ObtenerMesesAsync(empleado.Id, desde, hasta, ct);
+        var numerosPlanilla = await NumerosDePlanillaPorMesAsync(empleado.Id, tenantId, desde, hasta, ct);
+
+        var filas = new List<MesDecimo>();
+        foreach (var m in meses)
+        {
+            var fraccion = FraccionDelMesDentroDelPeriodo(m.Anio, m.Mes, desde, hasta);
+            var clave = (empleado.Id, m.Anio, m.Mes);
+
+            if (porAjuste.TryGetValue(clave, out var manual))
+            {
+                // Lo escrito a mano manda, salvo que el mes venga de una planilla de Pagly.
+                if (m.Origen != OrigenDevengado.Planilla)
+                {
+                    filas.Add(new MesDecimo(m.Anio, m.Mes, RoundingPolicy.Round(manual), OrigenDevengado.Manual, fraccion, Array.Empty<string>()));
+                    continue;
+                }
+            }
+
+            var numeros = numerosPlanilla.TryGetValue((m.Anio, m.Mes), out var ns) ? ns : new List<string>();
+            var monto = m.Origen switch
+            {
+                // Las planillas ya traen lo que se pagó en ese mes dentro del período.
+                OrigenDevengado.Planilla => m.Total,
+                OrigenDevengado.SinDatos => 0m,
+                // Un mes importado/manual es un mes completo: si el período solo
+                // cubre parte de él, se prorratea por días.
+                _ => RoundingPolicy.Round(m.Total * fraccion),
+            };
+            filas.Add(new MesDecimo(m.Anio, m.Mes, monto, m.Origen, fraccion, numeros));
+        }
+
+        var totalDev = RoundingPolicy.Round(filas.Sum(f => f.Monto));
+        var montoDecimo = RoundingPolicy.Round(totalDev / 12m);
+
+        // CSS reducida del décimo: 7.25 % empleado / 10.75 % patronal
+        // (Ley 51/2005 Art. 96.4-96.5). El Seguro Educativo no se reduce.
+        var cssEmp = RoundingPolicy.Round(montoDecimo * PayrollConstants.CssTasaDecimoEmpleado);
+        var cssPat = RoundingPolicy.Round(montoDecimo * PayrollConstants.CssTasaDecimoPatronal);
+
+        var seActivo = empleado.IsSubjectToEducationalInsurance;
+        var seEmp = seActivo ? RoundingPolicy.Round(montoDecimo * PayrollConstants.SeTasaEmpleado) : 0m;
+        var sePat = seActivo ? RoundingPolicy.Round(montoDecimo * PayrollConstants.SeTasaPatronal) : 0m;
+
+        var isr = 0m;
+        if (empleado.IsSubjectToIncomeTax && taxBrackets.Count > 0 && montoDecimo > 0m)
+        {
+            // ISR del décimo: (salario mensual + décimo) × 13 → tramos → ÷ 13.
+            // El salario mensual sale del último mes con devengado del período.
+            var ultimoConDatos = filas.LastOrDefault(f => f.Monto > 0m);
+            var salarioMensual = ultimoConDatos is null
+                ? 0m
+                : (ultimoConDatos.Fraccion > 0m ? RoundingPolicy.Round(ultimoConDatos.Monto / ultimoConDatos.Fraccion) : ultimoConDatos.Monto);
+
+            var annualBase = (salarioMensual + montoDecimo) * 13m;
+            var depDeduccion = 0m;
+            if (taxConfig != null)
+            {
+                var validDeps = Math.Min(empleado.Dependents, taxConfig.MaxDependents);
+                depDeduccion = validDeps * taxConfig.DependentDeductionAmount;
+            }
+            // El Seguro Educativo no se deduce de la base del ISR (Ley 8 de 2010, Art. 24).
+            var netGravable = Math.Max(0m, annualBase - depDeduccion);
+            isr = RoundingPolicy.Round(CalcularIsrAnual(netGravable, taxBrackets) / 13m);
+        }
+
+        var totalDed = cssEmp + seEmp + isr;
+        return new EmpleadoDecimoPreview(
+            empleado.Id,
+            $"{empleado.Nombre} {empleado.Apellido}".Trim(),
+            empleado.NumeroIdentificacion,
+            filas,
+            totalDev, montoDecimo,
+            cssEmp, cssPat, seEmp, sePat, isr,
+            totalDed, montoDecimo - totalDed);
+    }
+
+    /// <summary>Los números de planilla que aportan a cada mes, para poder decirlo en pantalla.</summary>
+    private async Task<Dictionary<(int, int), List<string>>> NumerosDePlanillaPorMesAsync(
+        int empleadoId, int tenantId, DateTime desde, DateTime hasta, CancellationToken ct)
+    {
+        var inicio = new DateTime(desde.Year, desde.Month, 1);
+        var finExclusivo = new DateTime(hasta.Year, hasta.Month, 1).AddMonths(1);
+
+        var filas = await _context.PayrollDetails
+            .AsNoTracking()
+            .Where(d => d.TenantId == tenantId && d.EmpleadoId == empleadoId
+                     && d.PayrollHeader!.PeriodStartDate >= inicio
+                     && d.PayrollHeader.PeriodStartDate < finExclusivo
+                     && (d.PayrollHeader.Status == PayrollStatus.Approved || d.PayrollHeader.Status == PayrollStatus.Paid))
+            .Select(d => new { d.PayrollHeader!.PeriodStartDate.Year, d.PayrollHeader.PeriodStartDate.Month, d.PayrollHeader.PayrollNumber })
+            .ToListAsync(ct);
+
+        return filas
+            .GroupBy(f => (f.Year, f.Month))
+            .ToDictionary(g => g.Key, g => g.Select(x => x.PayrollNumber).Distinct().OrderBy(x => x).ToList());
+    }
+
+    /// <summary>
+    /// Qué parte de un mes cae dentro del período (1 = completo). El cuatrimestre
+    /// del décimo suele ir del 16 al 15, así que el primero y el último mes son
+    /// parciales.
+    /// </summary>
+    public static decimal FraccionDelMesDentroDelPeriodo(int anio, int mes, DateTime desde, DateTime hasta)
+    {
+        var primero = new DateTime(anio, mes, 1);
+        var ultimo = primero.AddMonths(1).AddDays(-1);
+        var d = desde.Date > primero ? desde.Date : primero;
+        var h = hasta.Date < ultimo ? hasta.Date : ultimo;
+        if (h < d) return 0m;
+        var dias = (decimal)(h - d).TotalDays + 1m;
+        return Math.Round(dias / DateTime.DaysInMonth(anio, mes), 4);
     }
 
     private static decimal CalcularIsrAnual(decimal netGravable, List<TaxBracketDto> brackets)
