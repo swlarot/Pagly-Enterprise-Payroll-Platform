@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../../services/api';
 import { formatCurrency } from '../../utils/currency';
@@ -7,9 +8,15 @@ import { formatCurrency } from '../../utils/currency';
 // ============================================================
 // La planilla tal como se ve: una fila por empleado con bruto, deducciones y
 // neto, y al hacer clic el desglose completo. Es la tabla que antes vivía
-// en el modal de "Ver detalles", extraída tal cual, más el bloque RENTA que
-// enseña de dónde sale el ISR con las columnas de la ficha anual.
+// en el modal de "Ver detalles", más el bloque RENTA que enseña de dónde
+// sale el ISR con las columnas de la ficha anual.
+//
+// Los empleados llegan paginados del servidor (50 por página) con búsqueda
+// por nombre o cédula; los totales del pie son de toda la planilla, no de
+// la página. Así una planilla de miles de empleados abre igual de rápido.
 // ============================================================
+
+const TAMANO = 50;
 
 const fmt = (n) => formatCurrency(n);
 const fmt3 = (n) => Number(n ?? 0).toFixed(3);
@@ -64,24 +71,61 @@ export default function TablaPlanilla({ planilla }) {
   const [expandidos, setExpandidos] = useState(new Set());
   const [cargando, setCargando] = useState(null);
   const [desgloses, setDesgloses] = useState({});
+  const [det, setDet] = useState([]);
+  const [totales, setTotales] = useState(null);
+  const [total, setTotal] = useState(0);
+  const [pagina, setPagina] = useState(1);
+  const [busqueda, setBusqueda] = useState('');
+  const [q, setQ] = useState('');
+  const [cargandoLista, setCargandoLista] = useState(true);
 
-  const det = planilla?.details ?? [];
-  if (det.length === 0) {
+  // Se recarga también cuando la planilla cambia de totales o estado (recalcular).
+  const cargar = useCallback(async () => {
+    try {
+      setCargandoLista(true);
+      const r = await api.get(`/api/payrollheaders/${planilla.id}/details?page=${pagina}&size=${TAMANO}&q=${encodeURIComponent(q)}`);
+      setDet(r.items ?? []);
+      setTotal(r.total ?? 0);
+      setTotales(r.totales ?? null);
+      setDesgloses({});
+    } catch (e) {
+      toast.error(e.message || 'No se pudieron cargar los empleados de la planilla');
+    } finally {
+      setCargandoLista(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planilla.id, pagina, q, planilla.totalNetPay, planilla.status, planilla.processedDate]);
+
+  useEffect(() => { cargar(); }, [cargar]);
+
+  useEffect(() => {
+    const t = setTimeout(() => { setQ(busqueda.trim()); setPagina(1); }, 350);
+    return () => clearTimeout(t);
+  }, [busqueda]);
+
+  if (cargandoLista && det.length === 0 && !q) {
+    return <div className="flex items-center justify-center py-10"><span className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
+  }
+
+  if (total === 0 && !q) {
     return (
       <div className="px-4 py-10 text-center text-gray-400 text-sm">
-        Esta planilla todavía no tiene empleados calculados. Carga las horas y pulsa Calcular.
+        Esta planilla todavía no tiene empleados calculados. Revisa las horas y pulsa Calcular.
       </div>
     );
   }
 
   const anio = new Date(planilla.periodEndDate).getUTCFullYear();
-  const hasPension = det.some(d => (d.pensionAlimenticia || 0) > 0);
-  const hasEmbargos = det.some(d => (d.embargos || 0) > 0);
-  const hasFijas = det.some(d => (d.deduccionesFijas || 0) > 0);
-  const hasPrestamos = det.some(d => (d.prestamos || 0) > 0);
-  const hasAnticipos = det.some(d => (d.anticipos || 0) > 0);
+  const t = totales ?? {};
+  const hasPension = (t.pension || 0) > 0;
+  const hasEmbargos = (t.embargos || 0) > 0;
+  const hasFijas = (t.fijas || 0) > 0;
+  const hasPrestamos = (t.prestamos || 0) > 0;
+  const hasAnticipos = (t.anticipos || 0) > 0;
   const colSpan = 8 + [hasPension, hasEmbargos, hasFijas, hasPrestamos, hasAnticipos].filter(Boolean).length;
-  const suma = (k) => det.reduce((s, d) => s + (d[k] || 0), 0);
+  const paginas = Math.max(1, Math.ceil(total / TAMANO));
+  const desde = total === 0 ? 0 : (pagina - 1) * TAMANO + 1;
+  const hasta = Math.min(pagina * TAMANO, total);
 
   const alternar = async (detailId) => {
     const n = new Set(expandidos);
@@ -102,8 +146,22 @@ export default function TablaPlanilla({ planilla }) {
   const th = (txt, extra = 'text-gray-500') => <th className={`text-right py-2.5 px-3 text-[11px] font-medium ${extra} uppercase`}>{txt}</th>;
 
   return (
-    <div className="overflow-x-auto">
-      <p className="text-xs text-gray-500 px-3 pt-3 pb-2">▸ Haz clic en un empleado para ver el desglose y de dónde sale su renta</p>
+    <div>
+      <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b border-navy-700">
+        <label className="relative">
+          <span className="sr-only">Buscar empleado</span>
+          <Search className="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+          <input
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            placeholder="Nombre o cédula"
+            className="w-56 pl-8 pr-2.5 py-1.5 bg-navy-800 border border-navy-600 rounded-lg text-sm text-gray-100 placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+        </label>
+        <span className="text-xs text-gray-500">{total === 0 ? `Nadie coincide con «${q}»` : `${desde}–${hasta} de ${total}`}</span>
+        <span className="text-xs text-gray-500 ml-auto hidden md:inline">Haz clic en un empleado para ver el desglose y de dónde sale su renta</span>
+      </div>
+      <div className={`overflow-x-auto transition-opacity ${cargandoLista ? 'opacity-50' : ''}`} aria-busy={cargandoLista || undefined}>
       <table className="w-full min-w-[820px]">
         <thead className="bg-navy-950 border-b border-navy-700">
           <tr>
@@ -220,20 +278,30 @@ export default function TablaPlanilla({ planilla }) {
         <tfoot className="bg-navy-950 border-t-2 border-navy-600">
           <tr>
             <td></td>
-            <td className="py-2.5 px-3 text-sm font-bold text-gray-100">TOTALES</td>
-            {[planilla.totalGrossPay, suma('cssEmployee'), suma('educationalInsuranceEmployee'), suma('incomeTax')].map((v, i) => (
+            <td className="py-2.5 px-3 text-sm font-bold text-gray-100">TOTALES{q ? <span className="ml-1 text-[10px] font-normal text-gray-500">de la búsqueda</span> : ''}</td>
+            {[t.bruto, t.css, t.se, t.isr].map((v, i) => (
               <td key={i} className="py-2.5 px-3 text-sm text-right font-bold text-gray-100 font-mono">{fmt(v)}</td>
             ))}
-            {hasPension && <td className="py-2.5 px-3 text-sm text-right font-bold text-red-400 font-mono">{fmt(suma('pensionAlimenticia'))}</td>}
-            {hasEmbargos && <td className="py-2.5 px-3 text-sm text-right font-bold text-orange-400 font-mono">{fmt(suma('embargos'))}</td>}
-            {hasFijas && <td className="py-2.5 px-3 text-sm text-right font-bold text-blue-400 font-mono">{fmt(suma('deduccionesFijas'))}</td>}
-            {hasPrestamos && <td className="py-2.5 px-3 text-sm text-right font-bold text-purple-400 font-mono">{fmt(suma('prestamos'))}</td>}
-            {hasAnticipos && <td className="py-2.5 px-3 text-sm text-right font-bold text-teal-400 font-mono">{fmt(suma('anticipos'))}</td>}
-            <td className="py-2.5 px-3 text-sm text-right font-bold text-gray-100 font-mono">{fmt(planilla.totalDeductions)}</td>
-            <td className="py-2.5 px-3 text-sm text-right font-bold text-gray-100 font-mono">{fmt(planilla.totalNetPay)}</td>
+            {hasPension && <td className="py-2.5 px-3 text-sm text-right font-bold text-red-400 font-mono">{fmt(t.pension)}</td>}
+            {hasEmbargos && <td className="py-2.5 px-3 text-sm text-right font-bold text-orange-400 font-mono">{fmt(t.embargos)}</td>}
+            {hasFijas && <td className="py-2.5 px-3 text-sm text-right font-bold text-blue-400 font-mono">{fmt(t.fijas)}</td>}
+            {hasPrestamos && <td className="py-2.5 px-3 text-sm text-right font-bold text-purple-400 font-mono">{fmt(t.prestamos)}</td>}
+            {hasAnticipos && <td className="py-2.5 px-3 text-sm text-right font-bold text-teal-400 font-mono">{fmt(t.anticipos)}</td>}
+            <td className="py-2.5 px-3 text-sm text-right font-bold text-gray-100 font-mono">{fmt(t.deducciones)}</td>
+            <td className="py-2.5 px-3 text-sm text-right font-bold text-gray-100 font-mono">{fmt(t.neto)}</td>
           </tr>
         </tfoot>
       </table>
+      </div>
+      {paginas > 1 && (
+        <div className="flex items-center justify-between px-4 py-2.5 border-t border-navy-700 text-xs text-gray-400">
+          <span>Página {pagina} de {paginas}</span>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPagina(p => Math.max(1, p - 1))} disabled={pagina === 1 || cargandoLista} aria-label="Página anterior" className="p-1.5 rounded-lg bg-navy-800 border border-navy-600 text-gray-200 disabled:opacity-40"><ChevronLeft className="w-4 h-4" /></button>
+            <button onClick={() => setPagina(p => Math.min(paginas, p + 1))} disabled={pagina === paginas || cargandoLista} aria-label="Página siguiente" className="p-1.5 rounded-lg bg-navy-800 border border-navy-600 text-gray-200 disabled:opacity-40"><ChevronRight className="w-4 h-4" /></button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
