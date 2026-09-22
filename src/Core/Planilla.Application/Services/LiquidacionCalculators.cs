@@ -143,6 +143,72 @@ public static class LiquidacionCalculator
     public static bool PagaIndemnizacionArt225(CausaTerminacion causa)
         => CausasConIndemnizacionArt225.Contains(causa);
 
+    // ================================================================
+    // Cálculo con devengado real (la hoja del contador)
+    //
+    // La ley manda sobre el salario DEVENGADO, no sobre el salario base:
+    // por eso estas piezas reciben sumas de meses reales. Son las que usa
+    // Pagly cuando el empleado tiene historial; las de arriba quedan para
+    // el caso sin historial.
+    // ================================================================
+
+    /// <summary>Semanas de un período de meses: 52/12 por mes (260 en 60 meses).</summary>
+    public static decimal SemanasDeMeses(int meses) => meses * WeeksPerMonth;
+
+    /// <summary>
+    /// Prima de antigüedad (Art. 224 + 226) con devengado real: la suma de los
+    /// últimos 60 meses —más las vacaciones proporcionales que se pagan en esta
+    /// misma liquidación, como hace la hoja— dividida entre las 260 semanas del
+    /// período, por los años de servicio.
+    ///
+    /// Si el empleado tiene menos de 60 meses con datos, se divide entre las
+    /// semanas de los meses que sí traen datos, para no diluir el promedio.
+    /// </summary>
+    public static decimal PrimaDesdeDevengado(
+        decimal devengado60Meses, decimal vacacionesProporcionales, int mesesConDatos, decimal yearsWorked)
+    {
+        if (yearsWorked <= 0m) return 0m;
+        var meses = Math.Clamp(mesesConDatos, 1, 60);
+        var semanas = SemanasDeMeses(meses);
+        if (semanas <= 0m) return 0m;
+        // Sin redondeos intermedios: el semanal se lleva entero al producto.
+        // La hoja del contador redondea el semanal (137.20) y los años (13.33),
+        // así que puede diferir en centavos; el motor se queda con la cifra exacta.
+        var semanal = (devengado60Meses + vacacionesProporcionales) / semanas;
+        return RoundingPolicy.Round(semanal * yearsWorked);
+    }
+
+    /// <summary>
+    /// Salario semanal para la indemnización (Art. 225 c + Art. 149): el más
+    /// favorable entre el promedio de los últimos 6 meses y el último salario
+    /// devengado, llevado a semanas (÷ 52/12).
+    /// </summary>
+    public static decimal SemanalIndemnizacionDesdeDevengado(
+        decimal devengado6Meses, int meses6ConDatos, decimal ultimoMesDevengado)
+    {
+        var promedio = meses6ConDatos > 0 ? devengado6Meses / meses6ConDatos : 0m;
+        var mensualFavorable = Math.Max(promedio, ultimoMesDevengado);
+        return mensualFavorable / WeeksPerMonth;
+    }
+
+    /// <summary>
+    /// Vacaciones proporcionales (Art. 54): el devengado del período de
+    /// referencia —desde la última vacación tomada— entre 11.
+    /// </summary>
+    public static decimal VacacionesDesdeDevengado(decimal devengadoDesdeUltimaVacacion)
+        => devengadoDesdeUltimaVacacion <= 0m ? 0m
+            : RoundingPolicy.Round(devengadoDesdeUltimaVacacion / DiasVacacionUnit);
+
+    /// <summary>
+    /// Décimo proporcional (Art. 142): el devengado desde la última partida
+    /// pagada, más las vacaciones proporcionales de esta liquidación, entre 12.
+    /// </summary>
+    public static decimal DecimoDesdeDevengado(decimal devengadoDesdeUltimaPartida, decimal vacacionesProporcionales)
+    {
+        var baseDecimo = devengadoDesdeUltimaPartida + vacacionesProporcionales;
+        return baseDecimo <= 0m ? 0m : RoundingPolicy.Round(baseDecimo / 12m);
+    }
+
     /// <summary>
     /// Prima de antigüedad (Art. 224): una semana de salario por año laborado, sin escalones.
     /// La parte proporcional de un año incompleto se respeta vía decimales en yearsWorked.

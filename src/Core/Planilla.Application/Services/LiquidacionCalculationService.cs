@@ -58,13 +58,17 @@ public class LiquidacionCalculationService
     public LiquidacionCalculationResult Calcular(
         Empleado empleado,
         CreateLiquidacionRequest request,
-        DateTime? ultimaFechaVacaciones = null)
+        DateTime? ultimaFechaVacaciones = null,
+        BasesDevengadasLiquidacion? bases = null)
     {
         var salarioMensual = empleado.SalarioBase;
         var salarioDiario = salarioMensual / 30m;
 
         var anosServicio = CalcularAnosServicio(empleado.FechaContratacion, request.FechaTerminacion);
         var diasVacVencidas = request.DiasVacacionesPendientes is > 0 ? request.DiasVacacionesPendientes!.Value : 0m;
+
+        if (bases is not null)
+            return CalcularConDevengado(empleado, request, bases, anosServicio, salarioDiario, diasVacVencidas);
 
         // ====================================================================
         // Núcleo legal: calculadoras puras (Código de Trabajo Panamá).
@@ -151,6 +155,117 @@ public class LiquidacionCalculationService
             TotalBruto = totalBruto,
             TotalDeducciones = totalDeducciones,
             TotalNeto = totalNeto
+        };
+    }
+
+    /// <summary>
+    /// Cálculo con el devengado real del empleado, que es lo que manda la ley
+    /// y lo que hace la hoja del contador:
+    ///   Prima          = (Σ 60 meses + vacaciones proporcionales) ÷ 260 × años
+    ///   Indemnización  = semanas Art. 225 × (lo más favorable entre el promedio
+    ///                    de 6 meses y el último mes) ÷ (52/12)
+    ///   Vacaciones     = devengado desde la última vacación ÷ 11
+    ///   Décimo         = (devengado desde la última partida + vacaciones) ÷ 12
+    /// Cotizan las vacaciones, el décimo y los salarios vencidos (días
+    /// trabajados); prima, indemnización, recargo, preaviso y cesantía no
+    /// (Ley 51/2005 Art. 92).
+    /// </summary>
+    private static LiquidacionCalculationResult CalcularConDevengado(
+        Empleado empleado,
+        CreateLiquidacionRequest request,
+        BasesDevengadasLiquidacion bases,
+        decimal anosServicio,
+        decimal salarioDiario,
+        decimal diasVacVencidas)
+    {
+        var causa = request.TipoTerminacion.ToCausaTerminacion();
+        var esIndefinido = empleado.TipoContrato == TipoContratoDuracion.Indefinido;
+
+        // Vacaciones proporcionales: base de la prima y del décimo, así que van primero.
+        var vacacionesProp = LiquidacionCalculator.VacacionesDesdeDevengado(bases.DevengadoDesdeUltimaVacacion);
+        var vacacionesVencidas = RoundingPolicy.Round(diasVacVencidas * salarioDiario);
+
+        var prima = esIndefinido && anosServicio >= 1m
+            ? LiquidacionCalculator.PrimaDesdeDevengado(bases.Devengado60Meses, vacacionesProp, bases.MesesConDatos, anosServicio)
+            : 0m;
+
+        var semanasIndem = LiquidacionCalculator.PagaIndemnizacionArt225(causa)
+            ? LiquidacionCalculator.IndemnizacionDespidoWeeks(anosServicio)
+            : 0m;
+        var semanalIndem = LiquidacionCalculator.SemanalIndemnizacionDesdeDevengado(
+            bases.Devengado6Meses, bases.Meses6ConDatos, bases.UltimoMesDevengado);
+        var indemnizacion = RoundingPolicy.Round(semanasIndem * semanalIndem);
+
+        var recargoPct = 0m; // el recargo Art. 219 lo fija un tribunal; no se calcula solo.
+        var recargo = 0m;
+
+        var decimoProp = LiquidacionCalculator.DecimoDesdeDevengado(bases.DevengadoDesdeUltimaPartidaDecimo, vacacionesProp);
+
+        var cesantia = LiquidacionCalculator.CalcularCesantia(
+            bases.UltimoMesDevengado > 0 ? bases.UltimoMesDevengado : empleado.SalarioBase,
+            anosServicio, empleado.TipoContrato);
+
+        var preaviso = LiquidacionCalculator.CalcularPreaviso(
+            anosServicio, causa, isDomestic: false,
+            request.IncluyePreaviso, preavisoDiasOtorgados: null,
+            monthlySalary: bases.UltimoMesDevengado > 0 ? bases.UltimoMesDevengado : empleado.SalarioBase);
+
+        var diasPend = request.DiasSalarioPendiente is > 0 ? request.DiasSalarioPendiente!.Value : 0m;
+        var salarioPendiente = RoundingPolicy.Round(diasPend * salarioDiario);
+
+        // Cotizan: vacaciones (9.75 %), décimo (7.25 % reducida) y salarios
+        // vencidos (9.75 %), que son días efectivamente trabajados.
+        var baseVacaciones = vacacionesVencidas + vacacionesProp;
+        var baseSalario = salarioPendiente;
+        var seActivo = empleado.IsSubjectToEducationalInsurance;
+
+        var cssEmpleado = RoundingPolicy.Round(
+            (baseVacaciones + baseSalario) * PayrollConstants.CssTasaEmpleado +
+            decimoProp * PayrollConstants.CssTasaDecimoEmpleado);
+        var cssPatronal = RoundingPolicy.Round(
+            (baseVacaciones + baseSalario) * PayrollConstants.CssTasaPatronal +
+            decimoProp * PayrollConstants.CssTasaDecimoPatronal);
+        var seEmpleado = seActivo
+            ? RoundingPolicy.Round((baseVacaciones + baseSalario + decimoProp) * PayrollConstants.SeTasaEmpleado)
+            : 0m;
+        var sePatronal = seActivo
+            ? RoundingPolicy.Round((baseVacaciones + baseSalario + decimoProp) * PayrollConstants.SeTasaPatronal)
+            : 0m;
+
+        var totalBruto = RoundingPolicy.Round(
+            prima + indemnizacion + recargo + baseVacaciones + decimoProp + cesantia
+            + preaviso.CompensacionAmount + salarioPendiente);
+        var totalDeducciones = RoundingPolicy.Round(cssEmpleado + seEmpleado);
+
+        return new LiquidacionCalculationResult
+        {
+            AnosServicio = anosServicio,
+            SalarioDiario = RoundingPolicy.Round(salarioDiario),
+            SalarioSemanal = RoundingPolicy.Round(semanalIndem),
+
+            PrimaAntiguedad = prima,
+            Indemnizacion = indemnizacion,
+            IndemnizacionSemanas = RoundingPolicy.Round(semanasIndem),
+            RecargoArt219 = recargo,
+            Preaviso = preaviso.CompensacionAmount,
+            VacacionesProporcionales = RoundingPolicy.Round(baseVacaciones),
+            DiasVacacionesProporcionales = diasVacVencidas > 0
+                ? diasVacVencidas
+                : (salarioDiario > 0 ? RoundingPolicy.Round(vacacionesProp / salarioDiario) : 0m),
+            DecimoTercerMesProporcional = decimoProp,
+            Cesantia = cesantia,
+            SalarioPendiente = salarioPendiente,
+            DiasSalarioPendiente = diasPend,
+
+            CssEmpleado = cssEmpleado,
+            SeEmpleado = seEmpleado,
+            Isr = 0m,
+            CssPatronal = cssPatronal,
+            SePatronal = sePatronal,
+
+            TotalBruto = totalBruto,
+            TotalDeducciones = totalDeducciones,
+            TotalNeto = RoundingPolicy.Round(totalBruto - totalDeducciones),
         };
     }
 
