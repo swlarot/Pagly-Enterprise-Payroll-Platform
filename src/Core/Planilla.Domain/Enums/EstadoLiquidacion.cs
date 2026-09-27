@@ -15,7 +15,12 @@ public enum EstadoLiquidacion
     Aprobada = 2,
 
     /// <summary>Liquidación pagada al empleado</summary>
-    Pagada = 3
+    Pagada = 3,
+
+    /// <summary>
+    /// Anulada: se conserva para auditoría pero no cuenta para el mes ni el SIPE.
+    /// </summary>
+    Anulada = 4
 }
 
 public static class EstadoLiquidacionExtensions
@@ -28,6 +33,7 @@ public static class EstadoLiquidacionExtensions
             EstadoLiquidacion.Calculada => "Calculada",
             EstadoLiquidacion.Aprobada => "Aprobada",
             EstadoLiquidacion.Pagada => "Pagada",
+            EstadoLiquidacion.Anulada => "Anulada",
             _ => estado.ToString()
         };
     }

@@ -489,7 +489,8 @@ public class ReportesService
             .AsNoTracking()
             .Where(l => l.TenantId == tenantId
                      && l.FechaTerminacion >= inicio && l.FechaTerminacion < fin
-                     && l.Estado != EstadoLiquidacion.Borrador)
+                     && l.Estado != EstadoLiquidacion.Borrador
+                     && l.Estado != EstadoLiquidacion.Anulada)
             .Select(l => new
             {
                 l.Numero, l.FechaTerminacion, l.EmpleadoId,
