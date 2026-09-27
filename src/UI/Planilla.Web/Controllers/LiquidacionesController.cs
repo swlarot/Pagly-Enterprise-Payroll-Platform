@@ -46,8 +46,12 @@ public class LiquidacionesController : ControllerBase
     [RequirePermission(SystemPermission.PayrollView)]
     public async Task<IActionResult> GetAll(
         [FromQuery] int? empleadoId,
-        [FromQuery] EstadoLiquidacion? estado)
+        [FromQuery] EstadoLiquidacion? estado,
+        [FromQuery] int? anio = null,
+        [FromQuery] int? mes = null)
     {
+        if (mes is < 1 or > 12) return BadRequest(new { message = "El mes debe estar entre 1 y 12." });
+
         var tenantId = _tenantContext.TenantId;
         var query = _context.Liquidaciones
             .Where(l => l.TenantId == tenantId)
@@ -61,9 +65,17 @@ public class LiquidacionesController : ControllerBase
         if (estado.HasValue)
             query = query.Where(l => l.Estado == estado.Value);
 
-        var liquidaciones = await query
-            .OrderByDescending(l => l.FechaLiquidacion)
-            .ToListAsync();
+        // Vista por mes: la liquidación pertenece al mes en que termina la
+        // relación laboral, que es el que declara el SIPE.
+        if (anio.HasValue)
+        {
+            query = query.Where(l => l.FechaTerminacion.Year == anio.Value);
+            if (mes.HasValue) query = query.Where(l => l.FechaTerminacion.Month == mes.Value);
+        }
+
+        var liquidaciones = anio.HasValue
+            ? await query.OrderBy(l => l.FechaTerminacion).ThenBy(l => l.Id).ToListAsync()
+            : await query.OrderByDescending(l => l.FechaLiquidacion).ToListAsync();
 
         var dtos = liquidaciones.Select(MapToDto);
         return Ok(dtos);
@@ -162,7 +174,8 @@ public class LiquidacionesController : ControllerBase
         var liquidacionExistente = await _context.Liquidaciones
             .Where(l => l.EmpleadoId == request.EmpleadoId
                 && l.TenantId == tenantId
-                && l.Estado != EstadoLiquidacion.Pagada)
+                && l.Estado != EstadoLiquidacion.Pagada
+                && l.Estado != EstadoLiquidacion.Anulada)
             .FirstOrDefaultAsync();
 
         if (liquidacionExistente != null)
@@ -367,6 +380,52 @@ public class LiquidacionesController : ControllerBase
     }
 
     /// <summary>
+    /// Anula una liquidación calculada, aprobada o pagada. No se borra: deja
+    /// de contar para el mes y para el SIPE, pero se conserva para auditoría.
+    /// POST /api/liquidaciones/{id}/anular
+    /// </summary>
+    [HttpPost("{id}/anular")]
+    [RequirePermission(SystemPermission.PayrollApprove)]
+    public async Task<IActionResult> Anular(int id, [FromBody] AnularLiquidacionRequest? request = null)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var liquidacion = await _context.Liquidaciones
+            .FirstOrDefaultAsync(l => l.Id == id && l.TenantId == tenantId);
+
+        if (liquidacion == null)
+            return NotFound();
+        if (liquidacion.Estado == EstadoLiquidacion.Anulada)
+            return BadRequest(new { message = "Esta liquidación ya está anulada." });
+        if (liquidacion.Estado == EstadoLiquidacion.Borrador)
+            return BadRequest(new { message = "Un borrador se elimina, no se anula." });
+
+        var estadoAnterior = liquidacion.Estado;
+        liquidacion.Estado = EstadoLiquidacion.Anulada;
+        liquidacion.UpdatedAt = DateTime.UtcNow;
+        var motivo = request?.Motivo?.Trim();
+        liquidacion.Observaciones = string.IsNullOrWhiteSpace(motivo)
+            ? liquidacion.Observaciones
+            : $"{liquidacion.Observaciones}\nAnulada: {motivo}".Trim();
+
+        await _context.SaveChangesAsync();
+
+        try
+        {
+            await _auditLogService.LogAsync("LiquidacionAnulada", "Liquidacion", id.ToString(),
+                new Dictionary<string, string>
+                {
+                    ["Numero"] = liquidacion.Numero,
+                    ["EstadoAnterior"] = estadoAnterior.ToString(),
+                    ["Motivo"] = motivo ?? "sin motivo",
+                    ["TotalNeto"] = liquidacion.TotalNeto.ToString("N2"),
+                });
+        }
+        catch (Exception) { }
+
+        return Ok(new { message = $"La liquidación {liquidacion.Numero} quedó anulada" });
+    }
+
+    /// <summary>
     /// Exportar PDF de liquidación (stub — retorna NotImplemented por ahora).
     /// </summary>
     [HttpGet("{id}/pdf")]
@@ -428,3 +487,6 @@ public class LiquidacionesController : ControllerBase
         );
     }
 }
+
+/// <summary>Motivo opcional al anular una liquidación.</summary>
+public record AnularLiquidacionRequest(string? Motivo);
