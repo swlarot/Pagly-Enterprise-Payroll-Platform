@@ -196,7 +196,7 @@ public class LiquidacionCalculationService
             bases.Devengado6Meses, bases.Meses6ConDatos, bases.UltimoMesDevengado);
         var indemnizacion = RoundingPolicy.Round(semanasIndem * semanalIndem);
 
-        var recargoPct = 0m; // el recargo Art. 219 lo fija un tribunal; no se calcula solo.
+        // El recargo Art. 219 lo fija un tribunal; no se calcula solo.
         var recargo = 0m;
 
         var decimoProp = LiquidacionCalculator.DecimoDesdeDevengado(bases.DevengadoDesdeUltimaPartidaDecimo, vacacionesProp);

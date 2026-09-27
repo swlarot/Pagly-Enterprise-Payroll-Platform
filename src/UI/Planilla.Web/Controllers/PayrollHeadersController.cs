@@ -1397,10 +1397,8 @@ public record CreatePayrollHeaderRequest(
     string? PayrollNumber,
     DateTime PeriodStartDate,
     DateTime PeriodEndDate,
-    /// <summary>
-    /// Opcional: cada empresa paga cuando quiere y la fecha de pago no define
-    /// nada en el cálculo. Si no viene, se usa el fin del período.
-    /// </summary>
+    // Opcional: cada empresa paga cuando quiere y la fecha de pago no define
+    // nada en el cálculo. Si no viene, se usa el fin del período.
     DateTime? PayDate = null,
     PayPeriodType PayPeriodType = PayPeriodType.Quincenal,
     TipoPlanilla TipoPlanilla = TipoPlanilla.Regular
