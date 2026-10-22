@@ -27,6 +27,13 @@ public class DispositivoReloj : ITenantEntity
     /// </summary>
     public DateTime? EsperandoVinculoHasta { get; set; }
 
+    /// <summary>
+    /// IP desde la que alguien de la empresa registró el reloj (o reabrió la
+    /// espera). Si el reloj se conecta desde esa misma, se vincula solo: está
+    /// en la misma red que quien lo registró.
+    /// </summary>
+    public string? IpEsperada { get; set; }
+
     /// <summary>IP desde la que se conectó por primera vez, a la espera de que alguien la confirme.</summary>
     public string? IpPendiente { get; set; }
 

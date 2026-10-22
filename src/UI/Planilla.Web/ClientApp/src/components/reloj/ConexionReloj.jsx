@@ -48,7 +48,7 @@ export default function ConexionReloj() {
         setGuardando(true);
         try {
             await api.post('/api/reloj/dispositivos', nuevo);
-            toast.success('Reloj registrado. Conéctalo en los próximos 30 minutos y confirma aquí su dirección.');
+            toast.success('Reloj registrado. Conéctalo en los próximos 30 minutos desde la red del colegio y se vinculará solo.');
             setNuevo({ numeroSerie: '', nombre: '' });
             await cargar();
         } catch (e) {
@@ -61,7 +61,9 @@ export default function ConexionReloj() {
     const accion = async (r, que) => {
         setOcupado(r.id);
         try {
-            await api.post(`/api/reloj/dispositivos/${r.id}/${que}`);
+            // Confirmar y aceptar envían la dirección que se vio: si cambió, el servidor no la acepta.
+            const ip = que === 'confirmar' ? r.ipPendiente : que === 'aceptar-ip' ? r.ipRechazada : undefined;
+            await api.post(`/api/reloj/dispositivos/${r.id}/${que}`, ip ? { ip } : undefined);
             if (que === 'confirmar' || que === 'aceptar-ip') toast.success('Dirección confirmada; sus marcas ya entran');
             await cargar();
         } catch (e) {
@@ -76,7 +78,12 @@ export default function ConexionReloj() {
     const vinculo = (r) => {
         if (!r.activo) return <span className="text-gray-500">desactivado</span>;
         if (r.ipVinculada) return <span className="text-gray-400">vinculado a <span className="font-mono">{r.ipVinculada}</span> · última conexión {haceCuanto(r.ultimaConexion)}</span>;
-        if (r.ipPendiente) return <span className="text-amber-200">se conectó desde <span className="font-mono">{r.ipPendiente}</span>: ¿es la dirección de internet del colegio?</span>;
+        if (r.ipPendiente) return (
+            <span className="text-amber-200">
+                se conectó desde <span className="font-mono">{r.ipPendiente}</span>, que no es la red desde la que lo registraste
+                {r.ipEsperada && <> (<span className="font-mono">{r.ipEsperada}</span>)</>}. Confírmala solo si sabes que es la del colegio.
+            </span>
+        );
         if (r.esperandoVinculoHasta && new Date(r.esperandoVinculoHasta) > new Date())
             return <span className="text-gray-400">esperando su primera conexión hasta las {new Date(r.esperandoVinculoHasta).toLocaleTimeString('es-PA', { hour: '2-digit', minute: '2-digit' })}</span>;
         return <span className="text-gray-500">sin vincular: abre la espera y conecta el reloj</span>;
@@ -99,7 +106,10 @@ export default function ConexionReloj() {
                         {' · '}Usar nombre de dominio: <span className="text-gray-100">Sí</span>
                         {conexion.https && <> · HTTPS: <span className="text-gray-100">Sí</span></>}
                     </li>
-                    <li>Registra aquí su número de serie (está en <span className="text-gray-100">Menú → Información del sistema</span> o en la etiqueta trasera).</li>
+                    <li>
+                        Registra aquí su número de serie (está en <span className="text-gray-100">Menú → Información del sistema</span> o en la etiqueta trasera),
+                        <span className="text-gray-100"> desde una computadora del colegio</span>: así Pagly reconoce la red y lo vincula solo al conectarse.
+                    </li>
                 </ol>
             ) : (
                 <p className="text-sm text-amber-200">Falta configurar la dirección de Pagly en el servidor; avísanos para activarlo.</p>
@@ -136,7 +146,7 @@ export default function ConexionReloj() {
                             <span className="ml-auto flex flex-wrap gap-2">
                                 {ocupado === r.id && <Loader2 className="w-4 h-4 text-primary-400 animate-spin self-center" />}
                                 {r.activo && r.ipPendiente && !r.ipVinculada && (
-                                    <button onClick={() => accion(r, 'confirmar')} disabled={ocupado === r.id} className={boton}>Sí, confirmar</button>
+                                    <button onClick={() => accion(r, 'confirmar')} disabled={ocupado === r.id} className={boton}>Es la del colegio</button>
                                 )}
                                 {r.activo && !r.ipVinculada && !r.ipPendiente && !(r.esperandoVinculoHasta && new Date(r.esperandoVinculoHasta) > new Date()) && (
                                     <button onClick={() => accion(r, 'esperar')} disabled={ocupado === r.id} className={boton}>Esperar conexión</button>
@@ -145,7 +155,7 @@ export default function ConexionReloj() {
                                     {r.activo ? 'Desactivar' : 'Activar'}
                                 </button>
                             </span>
-                            {r.activo && r.ipRechazada && (
+                            {r.activo && r.ipVinculada && r.ipRechazada && (
                                 <span className="basis-full flex flex-wrap items-center gap-2 text-xs text-amber-200">
                                     Se rechazó una conexión desde <span className="font-mono">{r.ipRechazada}</span>
                                     {r.ipRechazadaEn && <> ({haceCuanto(r.ipRechazadaEn)})</>}. Si el colegio cambió de internet, acéptala:

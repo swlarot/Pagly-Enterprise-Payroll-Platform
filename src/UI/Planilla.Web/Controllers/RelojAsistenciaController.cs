@@ -17,6 +17,7 @@ public record GuardarHorarioRequest(string Nombre, string HoraEntrada, string Ho
     int ToleranciaMinutos, int MinutosParaHoraExtra, bool EsPredeterminado);
 public record AsignarHorarioRequest(int? HorarioId, List<int> EmpleadoIds);
 public record RegistrarDispositivoRequest(string? NumeroSerie, string? Nombre);
+public record VincularDispositivoRequest(string? Ip);
 
 /// <summary>
 /// Reloj de asistencia: importar sus marcaciones, asociar cada número a una
@@ -147,6 +148,8 @@ public class RelojAsistenciaController : ControllerBase
     // Relojes conectados por internet (ADMS)
     // ----------------------------------------------------------------
 
+    private string IpDeQuienPide => HttpContext.Connection.RemoteIpAddress?.ToString() ?? "desconocida";
+
     /// <summary>Qué escribir en el reloj para que envíe las marcaciones solo.</summary>
     [HttpGet("conexion")]
     public IActionResult Conexion([FromServices] IConfiguration config)
@@ -167,7 +170,7 @@ public class RelojAsistenciaController : ControllerBase
             .Select(d => new
             {
                 d.Id, d.NumeroSerie, d.Nombre, d.Activo, d.UltimaConexion, d.UltimaMarcacion, d.MarcasRecibidas,
-                d.EsperandoVinculoHasta, d.IpPendiente, d.IpVinculada, d.VinculadoEn, d.IpRechazada, d.IpRechazadaEn,
+                d.EsperandoVinculoHasta, d.IpEsperada, d.IpPendiente, d.IpVinculada, d.VinculadoEn, d.IpRechazada, d.IpRechazadaEn,
             })
             .ToListAsync();
         return Ok(lista);
@@ -196,6 +199,7 @@ public class RelojAsistenciaController : ControllerBase
         {
             TenantId = tenantId, NumeroSerie = sn, Nombre = nombre, Activo = true, CreatedAt = DateTime.UtcNow,
             EsperandoVinculoHasta = DateTime.UtcNow.AddMinutes(30),
+            IpEsperada = IpDeQuienPide,
         };
         _context.DispositivosReloj.Add(d);
         await _context.SaveChangesAsync();
@@ -209,7 +213,7 @@ public class RelojAsistenciaController : ControllerBase
     /// «esperar» abre otra ventana de 30 minutos para vincularlo de nuevo.
     /// </summary>
     [HttpPost("dispositivos/{id:int}/{accion:regex(^(confirmar|aceptar-ip|esperar)$)}")]
-    public async Task<IActionResult> Vincular(int id, string accion)
+    public async Task<IActionResult> Vincular(int id, string accion, [FromBody] VincularDispositivoRequest? request = null)
     {
         var tenantId = _tenant.TenantId;
         var d = await _context.DispositivosReloj.FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId);
@@ -219,13 +223,18 @@ public class RelojAsistenciaController : ControllerBase
         {
             case "confirmar":
                 if (d.IpPendiente == null) return BadRequest(new { message = "Todavía no se ha conectado: no hay dirección que confirmar." });
+                // Solo la dirección que la persona vio: si cambió mientras tanto, no se acepta.
+                if (request?.Ip != d.IpPendiente) return Conflict(new { message = "La dirección cambió mientras la mirabas. Revisa la nueva antes de confirmar." });
                 d.IpVinculada = d.IpPendiente;
                 d.IpPendiente = null;
                 d.VinculadoEn = DateTime.UtcNow;
                 d.EsperandoVinculoHasta = null;
                 break;
             case "aceptar-ip":
+                // Solo para un reloj ya vinculado que cambió de internet; uno nuevo se vincula con la espera.
+                if (d.IpVinculada == null) return BadRequest(new { message = "Este reloj todavía no está vinculado: abre la espera y conéctalo." });
                 if (d.IpRechazada == null) return BadRequest(new { message = "No hay otra dirección que aceptar." });
+                if (request?.Ip != d.IpRechazada) return Conflict(new { message = "La dirección cambió mientras la mirabas. Revisa la nueva antes de aceptarla." });
                 d.IpVinculada = d.IpRechazada;
                 d.IpRechazada = null;
                 d.IpRechazadaEn = null;
@@ -234,6 +243,7 @@ public class RelojAsistenciaController : ControllerBase
             default: // esperar
                 d.IpVinculada = null;
                 d.IpPendiente = null;
+                d.IpEsperada = IpDeQuienPide;
                 d.EsperandoVinculoHasta = DateTime.UtcNow.AddMinutes(30);
                 break;
         }

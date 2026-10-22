@@ -408,9 +408,19 @@ public class RelojAsistenciaService
             aceptada = dispositivo.IpVinculada == ip;
             if (!aceptada) { dispositivo.IpRechazada = ip; dispositivo.IpRechazadaEn = ahora; }
         }
+        else if (dispositivo.EsperandoVinculoHasta >= ahora && dispositivo.IpEsperada == ip && EsIpPublica(ip))
+        {
+            // Llega desde la misma red (pública) desde la que se registró: se vincula solo.
+            // Con una IP privada, de loopback o desconocida no se adivina: se confirma a mano.
+            dispositivo.IpVinculada = ip;
+            dispositivo.VinculadoEn = ahora;
+            dispositivo.IpPendiente = null;
+            dispositivo.EsperandoVinculoHasta = null;
+            aceptada = true;
+        }
         else
         {
-            // Sin vincular todavía: solo dentro de la ventana, y queda pendiente de confirmar.
+            // Desde otra red: queda pendiente de que alguien la confirme viéndola.
             if (dispositivo.EsperandoVinculoHasta >= ahora && dispositivo.IpPendiente == null)
                 dispositivo.IpPendiente = ip;
             else if (dispositivo.IpPendiente != ip)
@@ -477,6 +487,26 @@ public class RelojAsistenciaService
     // ----------------------------------------------------------------
     // Ayudantes
     // ----------------------------------------------------------------
+
+    /// <summary>
+    /// ¿Es una IP de internet de verdad? Las privadas, de loopback, de enlace
+    /// local o desconocidas pueden ser la del propio proxy o de la red interna:
+    /// con esas no se vincula un reloj automáticamente.
+    /// </summary>
+    public static bool EsIpPublica(string? ip)
+    {
+        if (!System.Net.IPAddress.TryParse(ip, out var a)) return false;
+        if (a.IsIPv4MappedToIPv6) a = a.MapToIPv4();
+        if (System.Net.IPAddress.IsLoopback(a) || a.Equals(System.Net.IPAddress.Any) || a.Equals(System.Net.IPAddress.IPv6Any)) return false;
+        if (a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+            return !(a.IsIPv6LinkLocal || a.IsIPv6SiteLocal || a.IsIPv6UniqueLocal);
+        var b = a.GetAddressBytes();
+        return !(b[0] == 10
+              || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
+              || (b[0] == 192 && b[1] == 168)
+              || (b[0] == 169 && b[1] == 254)
+              || (b[0] == 100 && b[1] >= 64 && b[1] <= 127)); // CGNAT
+    }
 
     /// <summary>La hora del reloj se guarda tal cual, marcada como UTC solo por la base de datos.</summary>
     private static DateTime Utc(DateTime d) => DateTime.SpecifyKind(d, DateTimeKind.Utc);
