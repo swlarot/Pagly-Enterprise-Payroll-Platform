@@ -48,4 +48,13 @@ public interface IHorasPlanillaService
     /// devuelve RequiereConfirmacion = true.
     /// </summary>
     Task<ResumenNovedades> ImportarNovedadesAsync(PayrollHeader planilla, ModoNovedades modo, CancellationToken ct = default);
+
+    /// <summary>
+    /// Antes de calcular: a cada empleado con horas extra registradas en el
+    /// período (sin pagar), le deja en su fila exactamente las aprobadas en
+    /// este momento. Lo que el director aprobó o rechazó después de crear la
+    /// planilla entra o sale. A quien no tiene registros no se le toca lo que
+    /// se escribió a mano. No guarda. Devuelve cuántas filas cambiaron.
+    /// </summary>
+    Task<int> SincronizarHorasExtraAsync(PayrollHeader planilla, CancellationToken ct = default);
 }

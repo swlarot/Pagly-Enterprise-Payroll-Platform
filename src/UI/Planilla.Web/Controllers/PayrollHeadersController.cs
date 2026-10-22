@@ -399,6 +399,11 @@ public class PayrollHeadersController : ControllerBase
             decimal totalEmployerSe = 0;
             decimal totalRiskInsurance = 0;
 
+            // Las horas extra de la cuadrícula se ponen al día con lo que el
+            // director tiene aprobado ahora (pudo decidir después de crearla).
+            await _horasService.SincronizarHorasExtraAsync(payrollHeader);
+            await _context.SaveChangesAsync();
+
             // Obtener horas registradas para esta planilla (si existen)
             var employeeHoursMap = await _context.PayrollEmployeeHours
                 .Where(h => h.PayrollHeaderId == payrollHeader.Id && h.TenantId == tenantId)
