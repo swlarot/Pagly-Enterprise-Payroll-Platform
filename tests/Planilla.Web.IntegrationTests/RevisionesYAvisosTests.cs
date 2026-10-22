@@ -35,8 +35,11 @@ public class RevisionesYAvisosTests : IClassFixture<CustomWebApplicationFactory>
         return c;
     }
 
-    /// <summary>Otra persona de la misma empresa, con su propio usuario.</summary>
-    private async Task<(string Token, string UserId, string Email)> CompaneroAsync(string tokenDueno, string nombre)
+    /// <summary>
+    /// Otra persona de la misma empresa, con su propio usuario y un rol con
+    /// esos permisos (sin permisos es como un empleado de autoservicio).
+    /// </summary>
+    private async Task<(string Token, string UserId, string Email)> CompaneroAsync(string tokenDueno, string nombre, params string[] permisos)
     {
         var tenantId = int.Parse(new JwtSecurityTokenHandler().ReadJwtToken(tokenDueno).Claims.First(c => c.Type == "tenant_id").Value);
         using var scope = _factory.Services.CreateScope();
@@ -46,7 +49,20 @@ public class RevisionesYAvisosTests : IClassFixture<CustomWebApplicationFactory>
         var email = $"companero-{Guid.NewGuid():N}@example.com";
         var user = new AppUser { UserName = email, Email = email, EmailConfirmed = true, NombreCompleto = nombre };
         (await users.CreateAsync(user, "Test@1234")).Succeeded.Should().BeTrue();
-        db.TenantUsers.Add(new TenantUser { TenantId = tenantId, UserId = user.Id, Role = TenantRole.User, IsActive = true, JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow });
+        CustomTenantRole? rol = null;
+        if (permisos.Length > 0)
+        {
+            rol = new CustomTenantRole { TenantId = tenantId, Name = $"Rol de {nombre}" };
+            foreach (var permiso in permisos)
+                rol.Permissions.Add(new RolePermission { TenantId = tenantId, Permission = permiso });
+            db.CustomTenantRoles.Add(rol);
+            await db.SaveChangesAsync();
+        }
+        db.TenantUsers.Add(new TenantUser
+        {
+            TenantId = tenantId, UserId = user.Id, Role = TenantRole.User, CustomTenantRoleId = rol?.Id,
+            IsActive = true, JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow,
+        });
         await db.SaveChangesAsync();
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("test-secret-key-must-be-at-least-32-characters-long-for-hmacsha256"));
@@ -88,14 +104,25 @@ public class RevisionesYAvisosTests : IClassFixture<CustomWebApplicationFactory>
     public async Task PedirRevision_AvisoYCorreo_DevolverConComentario_Aprobar()
     {
         var tokenAdmin = await TestTenantHelper.CreateTenantAndGetTokenAsync(_factory, "Colegio Revisiones E2E");
-        var (tokenDirectora, directoraId, directoraEmail) = await CompaneroAsync(tokenAdmin, "Directora Rivas");
+        var (tokenDirectora, directoraId, directoraEmail) = await CompaneroAsync(tokenAdmin, "Directora Rivas", SystemPermission.PayrollView);
+        var (tokenEmpleado, empleadoId, _) = await CompaneroAsync(tokenAdmin, "Docente sin permisos");
         var admin = Cliente(tokenAdmin);
         var directora = Cliente(tokenDirectora);
         var planillaId = await PlanillaBorradorAsync(admin);
 
-        // A quién se le puede pedir: a la directora, no a uno mismo.
-        var revisores = (await admin.GetFromJsonAsync<JsonElement>("/api/revisiones/revisores")).EnumerateArray().ToList();
-        revisores.Select(r => r.GetProperty("userId").GetString()).Should().Contain(directoraId).And.NotContain(IdDe(tokenAdmin));
+        // A quién se le puede pedir: a la directora; no a uno mismo ni a quien no puede ver planillas.
+        var revisores = (await admin.GetFromJsonAsync<JsonElement>("/api/revisiones/revisores?tipo=1")).EnumerateArray().ToList();
+        revisores.Select(r => r.GetProperty("userId").GetString()).Should().Contain(directoraId)
+            .And.NotContain(IdDe(tokenAdmin)).And.NotContain(empleadoId);
+        (await admin.PostAsJsonAsync("/api/revisiones", new { tipo = 1, entidadId = planillaId, revisorId = empleadoId }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest, "no puede revisar lo que no puede abrir");
+
+        // Un empleado sin permisos no ve la lista de usuarios ni el historial, ni pide revisiones.
+        var empleado = Cliente(tokenEmpleado);
+        (await empleado.GetAsync("/api/revisiones/revisores?tipo=1")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await empleado.GetAsync($"/api/revisiones?tipo=1&entidadId={planillaId}")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await empleado.PostAsJsonAsync("/api/revisiones", new { tipo = 1, entidadId = planillaId, revisorId = directoraId }))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
         // 1) Pedir la revisión: le llega el aviso a la campana y el correo.
         var pedir = await admin.PostAsJsonAsync("/api/revisiones", new
@@ -152,7 +179,7 @@ public class RevisionesYAvisosTests : IClassFixture<CustomWebApplicationFactory>
     public async Task RetirarHorasExtraDelMes_YCadaQuienVeSoloLoSuyo()
     {
         var tokenAdmin = await TestTenantHelper.CreateTenantAndGetTokenAsync(_factory, "Colegio Retirar E2E");
-        var (tokenDirectora, directoraId, _) = await CompaneroAsync(tokenAdmin, "Director Pinzón");
+        var (tokenDirectora, directoraId, _) = await CompaneroAsync(tokenAdmin, "Director Pinzón", SystemPermission.OvertimeApprove, SystemPermission.PayrollView);
         var admin = Cliente(tokenAdmin);
         var directora = Cliente(tokenDirectora);
 

@@ -31,15 +31,11 @@ public class RevisionesController : ControllerBase
 
     private string Usuario => _tenant.UserId ?? User.FindFirst("sub")?.Value ?? string.Empty;
 
-    /// <summary>Dirección de la app para los enlaces del correo.</summary>
-    private string BaseUrl
-    {
-        get
-        {
-            var configurada = _config["App:BaseUrl"];
-            return !string.IsNullOrWhiteSpace(configurada) ? configurada : $"{Request.Scheme}://{Request.Host}";
-        }
-    }
+    /// <summary>
+    /// Dirección de la app para los enlaces del correo. Solo de la
+    /// configuración: nunca del Host de la petición, que se puede falsificar.
+    /// </summary>
+    private string? BaseUrl => string.IsNullOrWhiteSpace(_config["App:BaseUrl"]) ? null : _config["App:BaseUrl"];
 
     private IActionResult Responder(ResultadoRevision r, bool creada = false)
     {
@@ -48,22 +44,32 @@ public class RevisionesController : ControllerBase
         return creada ? StatusCode(201, r.Solicitud) : Ok(r.Solicitud);
     }
 
-    /// <summary>A quiénes se les puede pedir revisión.</summary>
+    /// <summary>A quiénes se les puede pedir revisión de un tipo de cosa. GET api/revisiones/revisores?tipo=1</summary>
     [HttpGet("revisores")]
-    public async Task<IActionResult> Revisores() => Ok(await _revisiones.RevisoresAsync(Usuario));
+    public async Task<IActionResult> Revisores([FromQuery] TipoRevision tipo = TipoRevision.Planilla)
+    {
+        if (!await _revisiones.PuedeVerAsync(Usuario, tipo)) return Forbid();
+        return Ok(await _revisiones.RevisoresAsync(Usuario, tipo));
+    }
 
     /// <summary>Historial de revisiones de una cosa. GET api/revisiones?tipo=1&amp;entidadId=5</summary>
     [HttpGet]
-    public async Task<IActionResult> Historial([FromQuery] TipoRevision tipo, [FromQuery] int entidadId) =>
-        Ok(await _revisiones.HistorialAsync(tipo, entidadId));
+    public async Task<IActionResult> Historial([FromQuery] TipoRevision tipo, [FromQuery] int entidadId)
+    {
+        if (!await _revisiones.PuedeVerAsync(Usuario, tipo)) return Forbid();
+        return Ok(await _revisiones.HistorialAsync(tipo, entidadId));
+    }
 
     /// <summary>Lo que el usuario tiene pendiente de revisar.</summary>
     [HttpGet("para-mi")]
     public async Task<IActionResult> ParaMi() => Ok(await _revisiones.PendientesParaAsync(Usuario));
 
     [HttpPost]
-    public async Task<IActionResult> Pedir([FromBody] PedirRevisionRequest request) =>
-        Responder(await _revisiones.PedirAsync(request.Tipo, request.EntidadId, request.RevisorId, request.Comentario, Usuario, BaseUrl), creada: true);
+    public async Task<IActionResult> Pedir([FromBody] PedirRevisionRequest request)
+    {
+        if (!await _revisiones.PuedeVerAsync(Usuario, request.Tipo)) return Forbid();
+        return Responder(await _revisiones.PedirAsync(request.Tipo, request.EntidadId, request.RevisorId, request.Comentario, Usuario, BaseUrl), creada: true);
+    }
 
     [HttpPost("{id:int}/aprobar")]
     public async Task<IActionResult> Aprobar(int id, [FromBody] ResponderRevisionRequest? request = null) =>

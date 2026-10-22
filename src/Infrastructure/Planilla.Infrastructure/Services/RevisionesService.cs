@@ -64,11 +64,33 @@ public class RevisionesService
         _logger = logger;
     }
 
-    /// <summary>Personas activas de la empresa a quienes se les puede pedir revisión (menos quien pide).</summary>
-    public async Task<List<RevisorDto>> RevisoresAsync(string usuarioActual)
+    /// <summary>Permisos con los que se puede ver (y por tanto revisar) cada cosa.</summary>
+    public static string[] PermisosParaVer(TipoRevision tipo) => tipo == TipoRevision.HorasExtra
+        ? new[] { SystemPermission.OvertimeManage, SystemPermission.OvertimeApprove }
+        : new[] { SystemPermission.PayrollView };
+
+    /// <summary>¿Puede esta persona ver lo que se revisa? Misma regla que RequirePermission.</summary>
+    public async Task<bool> PuedeVerAsync(string usuarioId, TipoRevision tipo)
     {
         var tenantId = _tenant.TenantId;
-        return await _context.TenantUsers
+        var tu = await _context.TenantUsers.AsNoTracking()
+            .Include(x => x.CustomRole).ThenInclude(r => r!.Permissions)
+            .FirstOrDefaultAsync(x => x.UserId == usuarioId && x.TenantId == tenantId && x.IsActive);
+        if (tu == null) return false;
+        var permisos = tu.CustomTenantRoleId.HasValue && tu.CustomRole != null
+            ? tu.CustomRole.Permissions.Where(p => p.IsActive).Select(p => p.Permission).ToList()
+            : SystemPermission.GetDefaultPermissionsForSystemRole(tu.Role);
+        return PermisosParaVer(tipo).Any(permisos.Contains);
+    }
+
+    /// <summary>
+    /// Personas activas de la empresa (menos quien pide) que pueden ver lo que
+    /// se va a revisar: a nadie se le pide revisar algo que no puede abrir.
+    /// </summary>
+    public async Task<List<RevisorDto>> RevisoresAsync(string usuarioActual, TipoRevision tipo)
+    {
+        var tenantId = _tenant.TenantId;
+        var candidatos = await _context.TenantUsers
             .AsNoTracking()
             .Where(tu => tu.TenantId == tenantId && tu.IsActive && !tu.IsPendingInvitation
                       && tu.UserId != usuarioActual && tu.User != null && !tu.User.IsDeleted)
@@ -78,6 +100,11 @@ public class RevisionesService
                 tu.User!.NombreCompleto ?? tu.User.Email ?? "",
                 tu.User.Email ?? ""))
             .ToListAsync();
+
+        var habilitados = new List<RevisorDto>();
+        foreach (var c in candidatos)
+            if (await PuedeVerAsync(c.UserId, tipo)) habilitados.Add(c);
+        return habilitados;
     }
 
     /// <summary>Historial de revisiones de una cosa, la más reciente primero.</summary>
@@ -103,7 +130,7 @@ public class RevisionesService
     }
 
     public async Task<ResultadoRevision> PedirAsync(
-        TipoRevision tipo, int entidadId, string revisorId, string? comentario, string solicitante, string baseUrl)
+        TipoRevision tipo, int entidadId, string revisorId, string? comentario, string solicitante, string? baseUrl)
     {
         var tenantId = _tenant.TenantId;
         if (string.IsNullOrWhiteSpace(revisorId))
@@ -120,6 +147,8 @@ public class RevisionesService
             .FirstOrDefaultAsync();
         if (revisor == null)
             return ResultadoRevision.Falla("Esa persona no tiene acceso activo a esta empresa.");
+        if (!await PuedeVerAsync(revisor.UserId, tipo))
+            return ResultadoRevision.Falla("Esa persona no tiene permiso para ver esto; elige a alguien que pueda abrirlo.");
 
         var (referencia, enlace, error) = await ResolverAsync(tipo, entidadId);
         if (error != null)
@@ -165,7 +194,7 @@ public class RevisionesService
         return new ResultadoRevision((await ADtosAsync(new List<SolicitudRevision> { solicitud }))[0], null);
     }
 
-    public async Task<ResultadoRevision> ResponderAsync(int id, bool aprobar, string? respuesta, string usuarioId, string baseUrl)
+    public async Task<ResultadoRevision> ResponderAsync(int id, bool aprobar, string? respuesta, string usuarioId, string? baseUrl)
     {
         var tenantId = _tenant.TenantId;
         var solicitud = await _context.SolicitudesRevision.FirstOrDefaultAsync(r => r.Id == id && r.TenantId == tenantId);
@@ -296,7 +325,7 @@ public class RevisionesService
 
     /// <summary>Deja el aviso en la campana y manda el correo. Si el correo falla, el aviso queda igual.</summary>
     private async Task AvisarAsync(string usuarioId, string nombre, string email, SolicitudRevision solicitud,
-        string titulo, string mensaje, string textoBoton, string baseUrl)
+        string titulo, string mensaje, string textoBoton, string? baseUrl)
     {
         _context.Avisos.Add(new Aviso
         {
@@ -309,6 +338,14 @@ public class RevisionesService
             CreatedAt = DateTime.UtcNow,
         });
         await _context.SaveChangesAsync();
+
+        // El enlace del correo sale solo de la configuración, nunca de la
+        // petición: un Host falsificado no puede llevar a otro sitio.
+        if (string.IsNullOrWhiteSpace(baseUrl))
+        {
+            _logger.LogWarning("App:BaseUrl no está configurado: el aviso «{Titulo}» queda solo en la campana", titulo);
+            return;
+        }
 
         try
         {
