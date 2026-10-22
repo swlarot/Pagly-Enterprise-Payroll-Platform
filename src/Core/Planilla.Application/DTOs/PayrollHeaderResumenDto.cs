@@ -23,4 +23,5 @@ public sealed record PayrollHeaderResumenDto(
     DateTime? ProcessedDate,
     DateTime? ApprovedDate,
     DateTime? PaidDate,
-    DateTime CreatedAt);
+    DateTime CreatedAt,
+    bool EsExtraordinaria = false);

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Loader2, ArrowRight } from 'lucide-react';
+import { Plus, Loader2, ArrowRight, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../../services/api';
 import { PAY_PERIOD_CONFIG } from '../../constants/payroll';
 import { finDePeriodo, inicioSugerido, parsear, NOMBRES_MES } from '../../utils/periodos';
 import DatePicker from '../ui/DatePicker';
+import SelectorPersonas from './SelectorPersonas';
 
 // ============================================================
 // Crear una planilla en el mes, sin modal: una sola fila de controles.
@@ -16,6 +17,10 @@ import DatePicker from '../ui/DatePicker';
 // fila lo dice y el botón crea en ese mes y lleva allí. Al crear, el servidor
 // genera las horas de todos los empleados activos y trae las novedades
 // aprobadas; la pantalla abre la planilla nueva en Horas.
+//
+// «Extraordinaria» es para pagarle a quien se quedó fuera de la planilla
+// de su período: se eligen las personas y, antes de crear, se avisa si
+// alguna ya está en otra planilla de esas fechas (para no pagar dos veces).
 // ============================================================
 
 const selectCls = 'bg-navy-800 border border-navy-600 text-gray-100 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 h-[34px]';
@@ -39,8 +44,31 @@ export default function NuevaPlanillaInline({ anio, mes, planillasDelMes, tipoPo
   const [fin, setFin] = useState(() => finDePeriodo(inicioSugerido(anio, mes, tipoPorDefecto, planillasDelMes), tipoPorDefecto) ?? '');
   const [finTocado, setFinTocado] = useState(false);
   const [pago, setPago] = useState('');
-  const [tipoPlanilla, setTipoPlanilla] = useState(0);
+  const [tipoPlanilla, setTipoPlanilla] = useState(0);   // 0 regular · 1 sin deducciones · 'ext' extraordinaria
   const [creando, setCreando] = useState(false);
+  const [empleados, setEmpleados] = useState(null);
+  const [personas, setPersonas] = useState([]);
+  const [yaCobraron, setYaCobraron] = useState([]);
+  const esExtra = tipoPlanilla === 'ext';
+
+  // La lista de empleados se pide solo cuando se elige «Extraordinaria».
+  useEffect(() => {
+    if (!esExtra || empleados) return;
+    api.get('/api/empleados')
+      .then(d => setEmpleados((Array.isArray(d) ? d : d?.items ?? []).filter(e => e.estaActivo !== false)))
+      .catch(() => setEmpleados([]));
+  }, [esExtra, empleados]);
+
+  // ¿Alguna ya está en otra planilla de esas fechas? Se revisa al elegir.
+  useEffect(() => {
+    if (!esExtra || personas.length === 0 || !inicio || !fin || fin <= inicio) { setYaCobraron([]); return undefined; }
+    const t = setTimeout(() => {
+      api.post('/api/payrollheaders/extraordinaria/verificar', { periodStartDate: inicio, periodEndDate: fin, empleadoIds: personas })
+        .then(r => setYaCobraron(Array.isArray(r) ? r : []))
+        .catch(() => setYaCobraron([]));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [esExtra, personas, inicio, fin]);
 
   // Cambia el mes o el tipo → se vuelve a sugerir inicio y fin.
   useEffect(() => {
@@ -55,7 +83,7 @@ export default function NuevaPlanillaInline({ anio, mes, planillasDelMes, tipoPo
     if (!finTocado) setFin(finDePeriodo(v, tipo) ?? '');
   };
 
-  const invalido = !inicio || !fin || fin <= inicio || (pago && pago < inicio);
+  const invalido = !inicio || !fin || fin <= inicio || (pago && pago < inicio) || (esExtra && personas.length === 0);
   const pIni = parsear(inicio);
   const mesDestino = pIni && (pIni.y !== anio || pIni.m !== mes) ? { anio: pIni.y, mes: pIni.m } : null;
   const nombreDestino = mesDestino ? `${NOMBRES_MES[mesDestino.mes - 1]}${mesDestino.anio !== anio ? ' ' + mesDestino.anio : ''}` : null;
@@ -71,13 +99,18 @@ export default function NuevaPlanillaInline({ anio, mes, planillasDelMes, tipoPo
         periodEndDate: fin,
         payDate: pago || null,
         payPeriodType: Number(tipo),
-        tipoPlanilla: Number(tipoPlanilla),
+        tipoPlanilla: esExtra ? 0 : Number(tipoPlanilla),
+        esExtraordinaria: esExtra,
+        empleadoIds: esExtra ? personas : null,
       });
       const n = r.novedades ?? {};
       const partes = [`${r.horasGeneradas ?? 0} empleados con horas`];
       if (n.empleados > 0) partes.push(`${n.empleados} con novedades aprobadas`);
-      toast.success(`Planilla ${r.payrollNumber} creada · ${partes.join(' · ')}`, { duration: 5000 });
+      toast.success(esExtra
+        ? `Planilla extraordinaria ${r.payrollNumber} creada para ${personas.length} ${personas.length === 1 ? 'persona' : 'personas'}`
+        : `Planilla ${r.payrollNumber} creada · ${partes.join(' · ')}`, { duration: 5000 });
       setPago('');
+      if (esExtra) { setPersonas([]); setTipoPlanilla(0); }
       onCreada?.(r, mesDestino);
     } catch (e) {
       toast.error(e.message || 'No se pudo crear la planilla');
@@ -115,9 +148,10 @@ export default function NuevaPlanillaInline({ anio, mes, planillasDelMes, tipoPo
           <DatePicker id="np-pago" value={pago} min={inicio} onChange={setPago} limpiable placeholder="fin del período" ariaLabel="Fecha de pago" />
         </Campo>
         <Campo id="np-clase" label="Planilla" ancho="w-[190px]">
-          <select id="np-clase" value={tipoPlanilla} onChange={e => setTipoPlanilla(Number(e.target.value))} className={selectCls + ' w-full'}>
+          <select id="np-clase" value={tipoPlanilla} onChange={e => setTipoPlanilla(e.target.value === 'ext' ? 'ext' : Number(e.target.value))} className={selectCls + ' w-full'}>
             <option value={0}>Regular</option>
             <option value={1}>Sin deducciones legales</option>
+            <option value="ext">Extraordinaria</option>
           </select>
         </Campo>
         <button
@@ -132,6 +166,29 @@ export default function NuevaPlanillaInline({ anio, mes, planillasDelMes, tipoPo
 
       {fin && inicio && fin <= inicio && <p className="text-xs text-red-300 mt-2">El fin debe ser posterior al inicio.</p>}
       {pago && inicio && pago < inicio && <p className="text-xs text-red-300 mt-2">La fecha de pago no puede ser anterior al inicio.</p>}
+      {esExtra && (
+        <div className="mt-3 space-y-2">
+          <p className="text-xs text-gray-400">
+            Para quien se quedó fuera de la planilla de ese período. Se calcula como si hubiera estado en ella: misma renta, mismas cuotas.
+          </p>
+          {empleados == null
+            ? <Loader2 className="w-4 h-4 text-primary-400 animate-spin" aria-label="Cargando empleados" />
+            : <SelectorPersonas empleados={empleados} seleccion={personas} onCambio={setPersonas} />}
+          {yaCobraron.length > 0 && (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200 space-y-1">
+              <p className="flex items-center gap-1.5 font-medium"><AlertTriangle className="w-4 h-4" /> Ya están en otra planilla de esas fechas; revisa que no se les pague dos veces:</p>
+              <ul className="list-disc pl-6 text-amber-100/90">
+                {yaCobraron.map(y => <li key={y.empleadoId}>{y.nombre}: {y.planillas.join('; ')}</li>)}
+              </ul>
+            </div>
+          )}
+          {pIni && (pIni.y < new Date().getFullYear() || (pIni.y === new Date().getFullYear() && pIni.m < new Date().getMonth() + 1)) && (
+            <p className="text-xs text-gray-400">
+              Si el SIPE de {NOMBRES_MES[pIni.m - 1]} ya se presentó a la CSS, esta planilla va en una declaración complementaria; aparecerá marcada como extraordinaria en el SIPE de ese mes.
+            </p>
+          )}
+        </div>
+      )}
       {mesDestino && !mesCompleto && !invalido && (
         <p className="text-xs text-gray-400 mt-2">El inicio cae en {nombreDestino}: la planilla se creará allí y la pantalla cambiará a ese mes.</p>
       )}

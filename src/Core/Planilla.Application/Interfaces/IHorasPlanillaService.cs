@@ -39,7 +39,7 @@ public interface IHorasPlanillaService
     /// activo que todavía no la tenga. No guarda: el llamador decide cuándo.
     /// Devuelve cuántas filas se agregaron.
     /// </summary>
-    Task<int> GenerarHorasPorDefectoAsync(PayrollHeader planilla, CancellationToken ct = default);
+    Task<int> GenerarHorasPorDefectoAsync(PayrollHeader planilla, IReadOnlyCollection<int>? soloEmpleados = null, CancellationToken ct = default);
 
     /// <summary>
     /// Lleva a las filas de horas las horas extra aprobadas y las ausencias que

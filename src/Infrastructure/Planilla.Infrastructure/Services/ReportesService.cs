@@ -432,7 +432,7 @@ public class ReportesService
             .OrderBy(p => p.PeriodStartDate)
             .Select(p => new
             {
-                p.PayrollNumber, p.PeriodStartDate, p.PeriodEndDate,
+                p.PayrollNumber, p.PeriodStartDate, p.PeriodEndDate, p.EsExtraordinaria,
                 Detalles = p.Details.Select(d => new
                 {
                     d.EmpleadoId, d.Empleado!.NumeroIdentificacion, d.Empleado.Nombre, d.Empleado.Apellido,
@@ -444,7 +444,7 @@ public class ReportesService
 
         foreach (var p in planillas)
         {
-            fuentes.Add($"Planilla {p.PayrollNumber} ({p.PeriodStartDate:dd/MM}–{p.PeriodEndDate:dd/MM})");
+            fuentes.Add($"Planilla {p.PayrollNumber}{(p.EsExtraordinaria ? " extraordinaria" : "")} ({p.PeriodStartDate:dd/MM}–{p.PeriodEndDate:dd/MM})");
             foreach (var d in p.Detalles)
             {
                 var a = De(d.EmpleadoId, d.NumeroIdentificacion, $"{d.Nombre} {d.Apellido}");
