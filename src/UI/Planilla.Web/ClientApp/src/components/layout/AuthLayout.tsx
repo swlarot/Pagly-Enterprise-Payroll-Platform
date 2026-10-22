@@ -11,7 +11,7 @@ import {
   DollarSign, CreditCard, Minus, Clock, XCircle, TreePalm,
   ClipboardList, BarChart3, ShieldCheck, FileText, Settings,
   ChevronDown, ChevronRight, Search, Bell, LogOut, Banknote, Check, Loader2,
-  Key, Activity, Receipt,
+  Key, Activity, Receipt, Menu, X,
 } from 'lucide-react';
 
 interface AuthLayoutProps {
@@ -30,6 +30,17 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [switchingTenant, setSwitchingTenant] = useState(false);
   const userDropdownRef = useRef<HTMLDivElement>(null);
+
+  // En pantallas angostas el menú lateral es un panel que se abre con un
+  // botón; se cierra al cambiar de página y con Escape.
+  const [menuAbierto, setMenuAbierto] = useState(false);
+  useEffect(() => { setMenuAbierto(false); }, [location.pathname]);
+  useEffect(() => {
+    if (!menuAbierto) return;
+    const alEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuAbierto(false); };
+    window.addEventListener('keydown', alEscape);
+    return () => window.removeEventListener('keydown', alEscape);
+  }, [menuAbierto]);
 
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
@@ -232,6 +243,17 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
 
       <header className="h-12 sticky top-0 z-50 bg-navy-950/90 backdrop-blur-xl border-b border-white/[0.06] flex items-center flex-shrink-0">
 
+        {/* Botón del menú — solo en pantallas angostas */}
+        <button
+          onClick={() => setMenuAbierto(prev => !prev)}
+          aria-label={menuAbierto ? 'Cerrar menú' : 'Abrir menú'}
+          aria-expanded={menuAbierto}
+          aria-controls="menu-lateral"
+          className="md:hidden ml-2 p-1.5 rounded-lg text-gray-300 hover:bg-white/[0.06]"
+        >
+          {menuAbierto ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
+
         {/* Logo compacto */}
         <div className="flex items-center gap-1.5 pl-3 pr-2 flex-shrink-0">
           <PaglyLogo variant="icon" theme="dark" size="sm" />
@@ -245,7 +267,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         <div className="flex-1" />
 
         {/* Tabs de navegación primaria */}
-        <nav aria-label="Secciones principales" className="flex items-center gap-0.5 px-2 overflow-x-auto flex-shrink-0">
+        <nav aria-label="Secciones principales" className="hidden md:flex items-center gap-0.5 px-2 overflow-x-auto flex-shrink-0">
           {canAccessModuleCheck('dashboard') && (
             <NavLink to="/dashboard" className={topNavTabClass}>
               <LayoutDashboard className="w-4 h-4 flex-shrink-0" />
@@ -405,13 +427,51 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       ══════════════════════════════════════════ */}
       <div className="flex flex-1 overflow-hidden">
 
+        {/* Fondo del menú abierto en pantallas angostas: un toque fuera lo cierra */}
+        {menuAbierto && (
+          <div
+            aria-hidden="true"
+            onClick={() => setMenuAbierto(false)}
+            className="md:hidden fixed inset-0 top-12 z-40 bg-black/60"
+          />
+        )}
+
         {/* ══════════════════════════════════════════
             SIDEBAR — navegación secundaria/avanzada
         ══════════════════════════════════════════ */}
-        <aside className="w-[220px] bg-gradient-to-b from-navy-950 via-navy-950 to-[#0a1929] border-r border-white/[0.06] flex flex-col flex-shrink-0">
+        <aside
+          id="menu-lateral"
+          className={`w-[260px] md:w-[220px] bg-gradient-to-b from-navy-950 via-navy-950 to-[#0a1929] border-r border-white/[0.06] flex flex-col flex-shrink-0
+            fixed top-12 bottom-0 left-0 z-50 transition-transform duration-200 md:static md:z-auto md:translate-x-0
+            ${menuAbierto ? 'translate-x-0' : '-translate-x-full'}`}
+        >
 
           {/* Navegación principal */}
           <nav aria-label="Módulos de planilla" className="flex-1 px-2.5 py-2 space-y-0.5 overflow-y-auto">
+
+            {/* Secciones principales: en pantallas angostas viven aquí, no en la barra de arriba */}
+            <div className="md:hidden space-y-0.5 pb-1 mb-1 border-b border-white/[0.05]">
+              {canAccessModuleCheck('dashboard') && (
+                <NavLink to="/dashboard" className={primaryItemClass}>
+                  <LayoutDashboard className="w-4 h-4 flex-shrink-0" /><span>Dashboard</span>
+                </NavLink>
+              )}
+              {canAccessModuleCheck('empleados') && (
+                <NavLink to="/empleados" className={primaryItemClass}>
+                  <Users className="w-4 h-4 flex-shrink-0" /><span>Empleados</span>
+                </NavLink>
+              )}
+              {canAccessModuleCheck('departamentos') && (
+                <NavLink to="/departamentos" className={primaryItemClass}>
+                  <Building2 className="w-4 h-4 flex-shrink-0" /><span>Departamentos</span>
+                </NavLink>
+              )}
+              {canAccessModuleCheck('posiciones') && (
+                <NavLink to="/posiciones" className={primaryItemClass}>
+                  <Briefcase className="w-4 h-4 flex-shrink-0" /><span>Posiciones</span>
+                </NavLink>
+              )}
+            </div>
 
             {/* Mi Perfil / Perfiles de Empleados */}
             <NavLink to="/mi-perfil" className={primaryItemClass}>
@@ -653,7 +713,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
         {/* ══════════════════════════════════════════
             MAIN CONTENT
         ══════════════════════════════════════════ */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
 
           {/* Breadcrumb contextual — solo en rutas secundarias */}
           {!isPrimaryRoute && (
@@ -672,7 +732,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           <main
             id="contenido-principal"
             tabIndex={-1}
-            className="flex-1 overflow-y-auto bg-navy-950 p-6 focus:outline-none"
+            className="flex-1 overflow-y-auto bg-navy-950 p-4 md:p-6 focus:outline-none"
           >
             {children}
           </main>
