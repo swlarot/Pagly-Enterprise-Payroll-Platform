@@ -454,9 +454,23 @@ namespace Vorluno.Planilla.Web.Controllers
             var emailOriginal = empleado.Email;
 
             var salarioOriginal = empleado.SalarioBase;
+            var valoresOriginales = _context.Entry(empleado).CurrentValues.Clone();
 
             // Mantiene NumeroIdentificacion y FechaContratacion originales - solo actualiza campos permitidos
             _mapper.Map(empleadoDto, empleado);
+
+            // Autoservicio (sin permiso de gestionar empleados): solo sus datos
+            // básicos. Su salario, cargo, estado y datos de planilla no los puede
+            // cambiar quien los cobra.
+            var roles = HttpContext.RequestServices.GetRequiredService<ICustomTenantRoleService>();
+            var puedeGestionar = await roles.HasPermissionAsync(SystemPermission.EmployeesUpdate);
+            if (!(puedeGestionar.Success && puedeGestionar.Value))
+            {
+                var permitidos = new HashSet<string> { nameof(Empleado.Nombre), nameof(Empleado.Apellido), nameof(Empleado.Email) };
+                foreach (var propiedad in _context.Entry(empleado).Properties)
+                    if (!permitidos.Contains(propiedad.Metadata.Name))
+                        propiedad.CurrentValue = valoresOriginales[propiedad.Metadata];
+            }
 
             if (!string.IsNullOrEmpty(empleado.UserId))
                 empleado.Email = emailOriginal;
