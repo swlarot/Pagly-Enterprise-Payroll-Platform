@@ -12,7 +12,7 @@ import {
   DollarSign, CreditCard, Minus, Clock, XCircle, TreePalm,
   ClipboardList, BarChart3, ShieldCheck, FileText, Settings,
   ChevronDown, ChevronRight, Search, LogOut, Banknote, Check, Loader2,
-  Key, Activity, Receipt, Menu, X,
+  Key, Activity, Receipt, Menu, X, Baby,
 } from 'lucide-react';
 
 interface AuthLayoutProps {
@@ -121,6 +121,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       '/horas-extra': 'Gestión de Horas Extra',
       '/ausencias': 'Gestión de Ausencias',
       '/vacaciones': 'Gestión de Vacaciones',
+      '/maternidad': 'Licencias de maternidad',
       '/planillas': 'Gestión de Planillas',
       '/decimo': 'Planilla de Décimo Tercer Mes',
       '/ficha-isr': 'Cálculo de Renta',
@@ -143,7 +144,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
     // En rutas primarias no hay breadcrumb — el tab activo es suficiente contexto
     if (PRIMARY_ROUTES.includes(path)) return null;
     if (['/anticipos', '/prestamos', '/deducciones', '/acreedores'].includes(path)) return 'Novedades';
-    if (['/horas-extra', '/ausencias', '/vacaciones'].includes(path)) return 'Asistencia';
+    if (['/horas-extra', '/ausencias', '/vacaciones', '/maternidad'].includes(path)) return 'Asistencia';
     if (['/roles', '/audit', '/configuracion', '/settings/api-keys', '/settings/api-usage'].includes(path)) return 'Admin';
     return null;
   };
@@ -563,6 +564,10 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
                     <NavLink to="/vacaciones" className={subItemClass}>
                       <TreePalm className="w-4 h-4 flex-shrink-0" />
                       Vacaciones
+                    </NavLink>
+                    <NavLink to="/maternidad" className={subItemClass}>
+                      <Baby className="w-4 h-4 flex-shrink-0" />
+                      Maternidad
                     </NavLink>
                   </div>
                 )}

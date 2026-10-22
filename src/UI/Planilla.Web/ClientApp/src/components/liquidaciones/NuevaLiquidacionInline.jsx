@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Loader2, Eye, ArrowRight } from 'lucide-react';
+import { Plus, Loader2, Eye, ArrowRight, ShieldAlert } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../../services/api';
 import { NOMBRES_MES, formatear, diasDelMes } from '../../utils/periodos';
 import DatePicker from '../ui/DatePicker';
 import DetalleLiquidacion from './DetalleLiquidacion';
+import { formatDate } from '../../utils/date';
 
 // ============================================================
 // Crear una liquidación en el mes, sin modal: empleado, fecha de salida,
@@ -30,6 +31,7 @@ export default function NuevaLiquidacionInline({ anio, mes, onCreada }) {
   const [preview, setPreview] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [creando, setCreando] = useState(false);
+  const [confirmaFuero, setConfirmaFuero] = useState(false);
 
   useEffect(() => { setFecha(formatear(anio, mes, diasDelMes(anio, mes))); setPreview(null); }, [anio, mes]);
 
@@ -52,9 +54,14 @@ export default function NuevaLiquidacionInline({ anio, mes, onCreada }) {
     tipoTerminacion: Number(tipo),
     incluyePreaviso: preaviso,
     diasSalarioPendiente: diasSalario === '' ? null : Number(diasSalario),
+    confirmaFueroMaternidad: confirmaFuero,
   });
 
   const invalido = !empleadoId || !fecha;
+  // Despedir a quien tiene fuero de maternidad pide autorización judicial previa.
+  const fueroHasta = preview?.fueroMaternidadHasta ?? null;
+  const esDespido = Number(tipo) === 0 || Number(tipo) === 3;
+  const bloqueaFuero = !!fueroHasta && esDespido && !confirmaFuero;
   const mesDestino = fecha && (Number(fecha.slice(0, 4)) !== anio || Number(fecha.slice(5, 7)) !== mes)
     ? { anio: Number(fecha.slice(0, 4)), mes: Number(fecha.slice(5, 7)) }
     : null;
@@ -63,6 +70,7 @@ export default function NuevaLiquidacionInline({ anio, mes, onCreada }) {
     if (invalido) return;
     try {
       setCargando(true);
+      setConfirmaFuero(false);
       setPreview(await api.post('/api/liquidaciones/previsualizar', cuerpo()));
     } catch (e) {
       toast.error(e.message || 'No se pudo calcular la liquidación');
@@ -138,7 +146,7 @@ export default function NuevaLiquidacionInline({ anio, mes, onCreada }) {
         {preview && (
           <button
             onClick={crear}
-            disabled={invalido || creando}
+            disabled={invalido || creando || bloqueaFuero}
             className="h-[34px] flex items-center gap-2 px-4 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium"
           >
             {creando ? <Loader2 className="w-4 h-4 animate-spin" /> : (mesDestino ? <ArrowRight className="w-4 h-4" /> : <Plus className="w-4 h-4" />)}
@@ -152,6 +160,21 @@ export default function NuevaLiquidacionInline({ anio, mes, onCreada }) {
           El último día cae en {NOMBRES_MES[mesDestino.mes - 1]}{mesDestino.anio !== anio ? ` ${mesDestino.anio}` : ''}:
           la liquidación quedará en ese mes y la pantalla cambiará allí.
         </p>
+      )}
+
+      {fueroHasta && (
+        <div className="mt-3 flex flex-wrap items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+          <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p>Tiene fuero de maternidad hasta el {formatDate(fueroHasta)}.{esDespido ? ' Despedirla requiere autorización judicial previa (Código de Trabajo, Art. 106).' : ' Una renuncia o un mutuo acuerdo no lo requieren, pero conviene dejarlo por escrito.'}</p>
+            {esDespido && (
+              <label className="mt-1.5 flex items-center gap-2 text-xs text-amber-100">
+                <input type="checkbox" checked={confirmaFuero} onChange={e => setConfirmaFuero(e.target.checked)} className="accent-amber-500" />
+                Tenemos la autorización judicial para este despido
+              </label>
+            )}
+          </div>
+        </div>
       )}
 
       {preview && (

@@ -409,6 +409,20 @@ public class PayrollHeadersController : ControllerBase
                 .Where(h => h.PayrollHeaderId == payrollHeader.Id && h.TenantId == tenantId)
                 .ToDictionaryAsync(h => h.EmpleadoId);
 
+            // Licencias de maternidad del período: esos días no se pagan en la
+            // planilla (los paga la CSS). La colaboradora sigue en la planilla,
+            // con una nota con el motivo. La cuadrícula de horas no se toca: si
+            // la licencia se ajusta o se anula, recalcular vuelve a lo correcto.
+            var diasPeriodo = (int)(payrollHeader.PeriodEndDate.Date - payrollHeader.PeriodStartDate.Date).TotalDays + 1;
+            var licencias = await _context.LicenciasMaternidad
+                .Where(l => l.TenantId == tenantId && !l.Anulada
+                         && l.FechaInicio <= payrollHeader.PeriodEndDate && l.FechaFin >= payrollHeader.PeriodStartDate)
+                .ToListAsync();
+            var diasLicencia = licencias
+                .GroupBy(l => l.EmpleadoId)
+                .ToDictionary(g => g.Key, g => Math.Min(diasPeriodo,
+                    g.Sum(l => l.DiasDentro(payrollHeader.PeriodStartDate, payrollHeader.PeriodEndDate))));
+
             var detailDeduccionPairs = new List<(PayrollDetail detail, DeduccionesResult dedResult)>();
 
             // DEV-31: Pre-cargar datos compartidos UNA sola vez antes del loop (evita N+1)
@@ -456,10 +470,16 @@ public class PayrollHeadersController : ControllerBase
                 var prForEmployee = prestamosMap.TryGetValue(employee.Id, out var prList) ? prList : new List<Prestamo>();
                 var antForEmployee = anticiposMap.TryGetValue(employee.Id, out var antList) ? antList : new List<Anticipo>();
 
+                var conLicencia = diasLicencia.TryGetValue(employee.Id, out var diasSinSalario);
                 var (detail, deduccionesResult) = await _processingService.CalculateFromPreloadedDataAsync(
                     tenantId, employee, payrollHeader,
                     hoursForEmployee, dfForEmployee, prForEmployee, antForEmployee,
-                    salarioMinimoPeriodo);
+                    salarioMinimoPeriodo,
+                    conLicencia ? 1m - (decimal)diasSinSalario / diasPeriodo : 1m);
+                if (conLicencia)
+                    detail.Nota = diasSinSalario == diasPeriodo
+                        ? "Licencia de maternidad: todo el período sin salario en planilla; la CSS paga el subsidio."
+                        : $"Licencia de maternidad: {diasSinSalario} de {diasPeriodo} días sin salario en planilla; la CSS paga el subsidio.";
 
                 _context.PayrollDetails.Add(detail);
                 detailDeduccionPairs.Add((detail, deduccionesResult));
@@ -958,7 +978,7 @@ public class PayrollHeadersController : ControllerBase
                 empleado = new { d.Empleado!.Id, d.Empleado.Nombre, d.Empleado.Apellido, d.Empleado.NumeroIdentificacion },
                 d.GrossPay, d.CssEmployee, d.EducationalInsuranceEmployee, d.IncomeTax,
                 d.PensionAlimenticia, d.Embargos, d.DeduccionesFijas, d.Prestamos, d.Anticipos,
-                d.TotalDeductions, d.NetPay, d.TuvoLimitacionSalarioMinimo,
+                d.TotalDeductions, d.NetPay, d.TuvoLimitacionSalarioMinimo, d.Nota,
             })
             .ToListAsync();
 

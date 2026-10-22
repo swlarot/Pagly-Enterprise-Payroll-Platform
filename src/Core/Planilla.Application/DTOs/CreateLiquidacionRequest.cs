@@ -12,5 +12,8 @@ public record CreateLiquidacionRequest(
     bool IncluyePreaviso = false,
     decimal? DiasVacacionesPendientes = null,
     decimal? DiasSalarioPendiente = null,
-    string? Observaciones = null
+    string? Observaciones = null,
+    // Despedir a una colaboradora con fuero de maternidad requiere autorización
+    // judicial previa: quien liquida confirma que la tiene.
+    bool ConfirmaFueroMaternidad = false
 );

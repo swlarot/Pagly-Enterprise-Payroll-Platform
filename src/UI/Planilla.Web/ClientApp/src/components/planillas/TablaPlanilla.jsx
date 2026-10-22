@@ -187,7 +187,10 @@ export default function TablaPlanilla({ planilla }) {
                   <td className="py-2.5 px-2 text-center text-gray-400 text-xs select-none">
                     {cargando === d.id ? <span className="inline-block w-3 h-3 border border-gray-400 border-t-transparent rounded-full animate-spin" /> : (abierto ? '▾' : '▸')}
                   </td>
-                  <td className="py-2.5 px-3 text-sm text-gray-100">{d.empleado?.nombre} {d.empleado?.apellido}</td>
+                  <td className="py-2.5 px-3 text-sm text-gray-100">
+                    {d.empleado?.nombre} {d.empleado?.apellido}
+                    {d.nota && <span className="block text-xs text-amber-300/90 max-w-[22rem]">{d.nota}</span>}
+                  </td>
                   {td(d.grossPay)}{td(d.cssEmployee)}{td(d.educationalInsuranceEmployee)}{td(d.incomeTax)}
                   {hasPension && td(d.pensionAlimenticia || 0, 'text-red-400')}
                   {hasEmbargos && td(d.embargos || 0, 'text-orange-400')}
