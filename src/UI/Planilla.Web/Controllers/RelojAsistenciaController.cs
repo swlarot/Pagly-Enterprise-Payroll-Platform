@@ -16,6 +16,7 @@ public record RangoFechasRequest(DateTime Desde, DateTime Hasta);
 public record GuardarHorarioRequest(string Nombre, string HoraEntrada, string HoraSalida, int DiasLaborables,
     int ToleranciaMinutos, int MinutosParaHoraExtra, bool EsPredeterminado);
 public record AsignarHorarioRequest(int? HorarioId, List<int> EmpleadoIds);
+public record RegistrarDispositivoRequest(string? NumeroSerie, string? Nombre);
 
 /// <summary>
 /// Reloj de asistencia: importar sus marcaciones, asociar cada número a una
@@ -107,7 +108,7 @@ public class RelojAsistenciaController : ControllerBase
         var personas = await _context.Empleados.AsNoTracking()
             .Where(e => e.TenantId == tenantId && e.EstaActivo)
             .OrderBy(e => e.Apellido).ThenBy(e => e.Nombre)
-            .Select(e => new { e.Id, nombre = e.Nombre + " " + e.Apellido, cedula = e.NumeroIdentificacion, e.CodigoReloj, horarioId = e.HorarioLaboralId })
+            .Select(e => new { e.Id, nombre = e.Nombre + " " + e.Apellido, e.CodigoReloj, horarioId = e.HorarioLaboralId })
             .ToListAsync();
         return Ok(personas);
     }
@@ -140,6 +141,67 @@ public class RelojAsistenciaController : ControllerBase
         await _audit.LogAsync("HorasExtraPropuestasPorReloj", "HoraExtra", null,
             new Dictionary<string, string> { ["creadas"] = creadas.ToString(), ["desde"] = request.Desde.ToString("yyyy-MM-dd"), ["hasta"] = request.Hasta.ToString("yyyy-MM-dd") });
         return Ok(new { creadas });
+    }
+
+    // ----------------------------------------------------------------
+    // Relojes conectados por internet (ADMS)
+    // ----------------------------------------------------------------
+
+    /// <summary>Qué escribir en el reloj para que envíe las marcaciones solo.</summary>
+    [HttpGet("conexion")]
+    public IActionResult Conexion([FromServices] IConfiguration config)
+    {
+        var baseUrl = config["App:BaseUrl"];
+        if (string.IsNullOrWhiteSpace(baseUrl) || !Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri))
+            return Ok(new { configurado = false });
+        return Ok(new { configurado = true, servidor = uri.Host, puerto = uri.Port, https = uri.Scheme == Uri.UriSchemeHttps });
+    }
+
+    [HttpGet("dispositivos")]
+    public async Task<IActionResult> Dispositivos()
+    {
+        var tenantId = _tenant.TenantId;
+        var lista = await _context.DispositivosReloj.AsNoTracking()
+            .Where(d => d.TenantId == tenantId)
+            .OrderByDescending(d => d.Activo).ThenBy(d => d.Nombre)
+            .Select(d => new { d.Id, d.NumeroSerie, d.Nombre, d.Activo, d.UltimaConexion, d.UltimaMarcacion, d.MarcasRecibidas })
+            .ToListAsync();
+        return Ok(lista);
+    }
+
+    [HttpPost("dispositivos")]
+    public async Task<IActionResult> RegistrarDispositivo([FromBody] RegistrarDispositivoRequest request)
+    {
+        var tenantId = _tenant.TenantId;
+        var sn = request.NumeroSerie?.Trim().ToUpperInvariant() ?? "";
+        if (!System.Text.RegularExpressions.Regex.IsMatch(sn, "^[A-Z0-9-]{5,50}$"))
+            return BadRequest(new { message = "El número de serie lleva solo letras y números (está en «Información del sistema» del reloj)." });
+        var nombre = string.IsNullOrWhiteSpace(request.Nombre) ? "Reloj" : request.Nombre.Trim();
+        if (nombre.Length > 100) return BadRequest(new { message = "El nombre puede tener hasta 100 caracteres." });
+
+        // El número de serie identifica al reloj en todo Pagly.
+        if (await _context.DispositivosReloj.IgnoreQueryFilters().AnyAsync(d => d.NumeroSerie == sn))
+            return BadRequest(new { message = "Ese reloj ya está registrado. Si aparece en tu lista desactivado, actívalo; si no, escríbenos." });
+
+        var d = new DispositivoReloj { TenantId = tenantId, NumeroSerie = sn, Nombre = nombre, Activo = true, CreatedAt = DateTime.UtcNow };
+        _context.DispositivosReloj.Add(d);
+        await _context.SaveChangesAsync();
+        await _audit.LogAsync("RelojRegistrado", "DispositivoReloj", d.Id.ToString(), new Dictionary<string, string> { ["numeroSerie"] = sn });
+        return StatusCode(201, new { d.Id, d.NumeroSerie, d.Nombre, d.Activo });
+    }
+
+    /// <summary>Desactivar deja de aceptar sus envíos (no se borra; se puede volver a activar).</summary>
+    [HttpPost("dispositivos/{id:int}/{accion:regex(^(activar|desactivar)$)}")]
+    public async Task<IActionResult> CambiarDispositivo(int id, string accion)
+    {
+        var tenantId = _tenant.TenantId;
+        var d = await _context.DispositivosReloj.FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId);
+        if (d == null) return NotFound(new { message = "Ese reloj no existe." });
+        d.Activo = accion == "activar";
+        await _context.SaveChangesAsync();
+        await _audit.LogAsync(d.Activo ? "RelojActivado" : "RelojDesactivado", "DispositivoReloj", id.ToString(),
+            new Dictionary<string, string> { ["numeroSerie"] = d.NumeroSerie });
+        return NoContent();
     }
 
     // ----------------------------------------------------------------

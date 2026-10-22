@@ -20,6 +20,7 @@ const ESTADO = {
     Vacaciones: 'border-navy-700 text-gray-400',
     'Ausencia registrada': 'border-navy-700 text-gray-400',
     'Sin datos': 'border-navy-800 text-gray-600',
+    'En curso': 'border-navy-600 text-gray-300',
 };
 
 const DIA = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];

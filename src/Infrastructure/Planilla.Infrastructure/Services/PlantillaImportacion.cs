@@ -220,11 +220,13 @@ public static class PlantillaImportacion
     public static Lectura Leer(Stream archivo, int anioSaldos)
     {
         var lectura = new Lectura();
-        XLWorkbook wb;
-        try { wb = new XLWorkbook(archivo); }
-        catch (Exception)
+        // Con tope de tamaño descomprimido: un .xlsx pequeño puede inflarse en cientos de MB.
+        var wb = ExcelSubido.Abrir(archivo, out var problema);
+        if (wb is null)
         {
-            lectura.ProblemasDelArchivo.Add("El archivo no es un Excel válido (.xlsx). Descarga la plantilla y llénala.");
+            lectura.ProblemasDelArchivo.Add(problema == "demasiado grande"
+                ? "El Excel es demasiado grande para una plantilla de empleados. Revisa que sea la plantilla de Pagly."
+                : "El archivo no es un Excel válido (.xlsx). Descarga la plantilla y llénala.");
             return lectura;
         }
 

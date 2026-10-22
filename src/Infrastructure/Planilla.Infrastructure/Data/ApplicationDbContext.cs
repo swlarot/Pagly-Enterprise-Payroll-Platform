@@ -58,6 +58,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     // Reloj de asistencia: marcaciones y horarios contra los que se comparan
     public DbSet<Marcacion> Marcaciones { get; set; }
     public DbSet<HorarioLaboral> HorariosLaborales { get; set; }
+    public DbSet<DispositivoReloj> DispositivosReloj { get; set; }
     public DbSet<TaxBracket> TaxBrackets { get; set; }
 
     // Phase D: Workflow de planilla
@@ -221,6 +222,16 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
                 .WithMany()
                 .HasForeignKey(m => m.EmpleadoId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<DispositivoReloj>(entity =>
+        {
+            // El reloj se identifica solo por su número de serie: uno por reloj en todo Pagly.
+            entity.HasIndex(d => d.NumeroSerie)
+                .IsUnique()
+                .HasDatabaseName("IX_DispositivoReloj_NumeroSerie");
+            entity.Property(d => d.NumeroSerie).HasMaxLength(50);
+            entity.Property(d => d.Nombre).HasMaxLength(100);
         });
 
         modelBuilder.Entity<HorarioLaboral>(entity =>

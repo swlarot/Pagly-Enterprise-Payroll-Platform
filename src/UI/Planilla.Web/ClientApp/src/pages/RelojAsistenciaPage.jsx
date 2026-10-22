@@ -8,6 +8,7 @@ import SelectorMes from '../components/planillas/SelectorMes';
 import ImportarArchivoReloj from '../components/reloj/ImportarArchivoReloj';
 import FilaAsistencia from '../components/reloj/FilaAsistencia';
 import HorariosReloj from '../components/reloj/HorariosReloj';
+import ConexionReloj from '../components/reloj/ConexionReloj';
 
 // ============================================================
 // Reloj de asistencia.
@@ -254,6 +255,10 @@ export default function RelojAsistenciaPage() {
 
             <div className="pt-4 border-t border-navy-800">
                 <HorariosReloj horarios={horarios} onCambio={() => cargar(true)} />
+            </div>
+
+            <div className="pt-4 border-t border-navy-800">
+                <ConexionReloj />
             </div>
         </div>
     );
