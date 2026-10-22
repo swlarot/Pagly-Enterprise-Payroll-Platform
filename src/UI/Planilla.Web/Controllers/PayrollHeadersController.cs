@@ -585,6 +585,35 @@ public class PayrollHeadersController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
 
+        // Horas extra del período de los empleados de esta planilla.
+        var detallesPorEmpleado = await _context.PayrollDetails
+            .Where(d => d.PayrollHeaderId == id && d.TenantId == tenantId)
+            .Select(d => new { d.EmpleadoId, d.Id })
+            .ToDictionaryAsync(d => d.EmpleadoId, d => d.Id);
+        var empleadosPlanilla = detallesPorEmpleado.Keys.ToList();
+        var horasDelPeriodo = await _context.HorasExtra
+            .Where(h => h.TenantId == tenantId
+                     && empleadosPlanilla.Contains(h.EmpleadoId)
+                     && h.PlanillaDetailId == null
+                     && h.Fecha >= payrollHeader.PeriodStartDate
+                     && h.Fecha <= payrollHeader.PeriodEndDate)
+            .ToListAsync();
+
+        // Si el director decidió algo después del cálculo, la planilla ya no
+        // refleja lo aprobado: hay que recalcular antes de aprobar.
+        var calculadaEn = payrollHeader.ProcessedDate ?? DateTime.MinValue;
+        if (horasDelPeriodo.Any(h => (h.FechaAprobacion ?? DateTime.MinValue) > calculadaEn
+                                  || (h.FechaRechazo ?? DateTime.MinValue) > calculadaEn
+                                  || (h.UpdatedAt ?? DateTime.MinValue) > calculadaEn))
+        {
+            return BadRequest(new { message = "Cambiaron horas extra de este período después de calcular la planilla. Recalcúlala antes de aprobarla." });
+        }
+
+        // Las horas extra aprobadas quedan pagadas en esta planilla: ya no se
+        // pueden cambiar ni volver a entrar en otra del mismo período.
+        foreach (var h in horasDelPeriodo.Where(h => h.EstaAprobada))
+            h.PlanillaDetailId = detallesPorEmpleado[h.EmpleadoId];
+
         // Marcar como aprobada
         payrollHeader.Status = PayrollStatus.Approved;
         payrollHeader.IsApproved = true;
@@ -753,6 +782,18 @@ public class PayrollHeadersController : ControllerBase
         {
             return BadRequest(new { message = ex.Message });
         }
+
+        // Las horas extra que esta planilla daba por pagadas vuelven a estar
+        // aprobadas y sin pagar, listas para la planilla que la reemplace.
+        var detalleIds = await _context.PayrollDetails
+            .Where(d => d.PayrollHeaderId == id && d.TenantId == tenantId)
+            .Select(d => d.Id)
+            .ToListAsync();
+        var horasPagadas = await _context.HorasExtra
+            .Where(h => h.TenantId == tenantId && h.PlanillaDetailId != null && detalleIds.Contains(h.PlanillaDetailId.Value))
+            .ToListAsync();
+        foreach (var h in horasPagadas)
+            h.PlanillaDetailId = null;
 
         // Marcar como cancelada
         var estadoAnterior = payrollHeader.Status;

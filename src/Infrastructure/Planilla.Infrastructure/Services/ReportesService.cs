@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Vorluno.Planilla.Application.DTOs.Reportes;
 using Vorluno.Planilla.Application.Helpers;
 using Vorluno.Planilla.Application.Interfaces;
+using Vorluno.Planilla.Application.Services;
 using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
 using Vorluno.Planilla.Infrastructure.Data;
@@ -543,6 +544,120 @@ public class ReportesService
     {
         public string Cedula = "", Nombre = "";
         public decimal Bruto, Base, CssEmp, CssPat, SeEmp, SePat, Riesgo, Vacaciones;
+    }
+
+    /// <summary>
+    /// Control interno de horas extra del mes (por día trabajado): registradas,
+    /// decididas por el director, pagadas, y lo que le cuestan a la empresa en
+    /// cuotas patronales (CSS, Seguro Educativo y riesgo profesional) con las
+    /// tasas vigentes. Es una estimación: la cuota real sale de cada planilla.
+    /// </summary>
+    public async Task<ReporteHorasExtraDto> GenerarReporteHorasExtra(int mes, int anio)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var inicio = new DateTime(anio, mes, 1, 0, 0, 0, DateTimeKind.Utc);
+        var fin = inicio.AddMonths(1);
+        var (nombre, ruc) = await GetTenantInfo();
+
+        var horas = await _context.HorasExtra
+            .AsNoTracking()
+            .Where(h => h.TenantId == tenantId && h.Fecha >= inicio && h.Fecha < fin)
+            .OrderBy(h => h.Fecha).ThenBy(h => h.HoraInicio)
+            .Select(h => new
+            {
+                h.Id, h.EmpleadoId, h.Fecha, h.TipoHoraExtra, h.HoraInicio, h.HoraFin,
+                h.CantidadHoras, Monto = h.MontoCalculado ?? 0m, h.EstaAprobada, h.FechaRechazo,
+                h.PlanillaDetailId, h.AprobadoPor, h.RechazadoPor, h.MotivoRechazo, h.Motivo,
+                h.Empleado.NumeroIdentificacion, h.Empleado.Nombre, h.Empleado.Apellido,
+                h.Empleado.CssRiskPercentage,
+            })
+            .ToListAsync();
+
+        var config = await _context.PayrollTaxConfigurations
+            .AsNoTracking()
+            .Where(c => c.TenantId == tenantId && c.IsActive
+                     && c.EffectiveStartDate <= fin
+                     && (c.EffectiveEndDate == null || c.EffectiveEndDate >= inicio))
+            .OrderByDescending(c => c.EffectiveStartDate)
+            .FirstOrDefaultAsync();
+        var tasaCss = config?.CssEmployerBaseRate ?? 0m;
+        var tasaSe = config?.EducationalInsuranceEmployerRate ?? 0m;
+
+        // Quien decidió, por nombre (no por id).
+        var ids = horas.SelectMany(h => new[] { h.AprobadoPor, h.RechazadoPor })
+            .Where(x => !string.IsNullOrEmpty(x)).Select(x => x!).Distinct().ToList();
+        var nombres = ids.Count == 0
+            ? new Dictionary<string, string>()
+            : await _context.Users.AsNoTracking()
+                .Where(u => ids.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => !string.IsNullOrWhiteSpace(u.NombreCompleto) ? u.NombreCompleto! : u.Email ?? "");
+        string? NombreDe(string? id) => id == null ? null : nombres.TryGetValue(id, out var n) && n != "" ? n : id;
+
+        static string Estado(bool aprobada, DateTime? rechazo, int? detalle) =>
+            detalle != null ? "Pagada" : aprobada ? "Aprobada" : rechazo != null ? "Rechazada" : "Pendiente";
+
+        var empleados = horas
+            .GroupBy(h => h.EmpleadoId)
+            .Select(g =>
+            {
+                var primero = g.First();
+                var aprobadas = g.Where(h => h.EstaAprobada).ToList();
+                var montoAprobado = aprobadas.Sum(h => h.Monto);
+                var cuotas = Math.Round(montoAprobado * (tasaCss + tasaSe + primero.CssRiskPercentage) / 100m, 2);
+                return new EmpleadoHorasExtraItem(
+                    g.Key,
+                    primero.NumeroIdentificacion,
+                    $"{primero.Nombre} {primero.Apellido}",
+                    g.Sum(h => h.CantidadHoras),
+                    aprobadas.Sum(h => h.CantidadHoras),
+                    g.Where(h => h.FechaRechazo != null).Sum(h => h.CantidadHoras),
+                    g.Where(h => !h.EstaAprobada && h.FechaRechazo == null).Sum(h => h.CantidadHoras),
+                    montoAprobado,
+                    g.Where(h => h.PlanillaDetailId != null).Sum(h => h.Monto),
+                    cuotas,
+                    g.Select(h => new RegistroHoraExtraItem(
+                        h.Id,
+                        h.Fecha,
+                        OvertimeClassifier.Nombre(h.TipoHoraExtra),
+                        $"{h.HoraInicio:hh\\:mm}–{h.HoraFin:hh\\:mm}",
+                        h.CantidadHoras,
+                        h.Monto,
+                        Estado(h.EstaAprobada, h.FechaRechazo, h.PlanillaDetailId),
+                        NombreDe(h.EstaAprobada ? h.AprobadoPor : h.RechazadoPor),
+                        h.MotivoRechazo,
+                        h.Motivo)).ToList());
+            })
+            .OrderBy(e => e.NombreCompleto)
+            .ToList();
+
+        var porTipo = horas
+            .Where(h => h.EstaAprobada)
+            .GroupBy(h => h.TipoHoraExtra)
+            .OrderBy(g => g.Key)
+            .Select(g => new HorasExtraPorTipoItem(
+                OvertimeClassifier.Nombre(g.Key), g.Sum(h => h.CantidadHoras), g.Sum(h => h.Monto)))
+            .ToList();
+
+        var montoAprobadoTotal = empleados.Sum(e => e.MontoAprobado);
+        var cuotasTotal = empleados.Sum(e => e.CuotasPatronales);
+        var totales = new TotalesHorasExtra(
+            empleados.Sum(e => e.HorasRegistradas),
+            empleados.Sum(e => e.HorasAprobadas),
+            empleados.Sum(e => e.HorasRechazadas),
+            empleados.Sum(e => e.HorasPendientes),
+            montoAprobadoTotal,
+            empleados.Sum(e => e.MontoPagado),
+            horas.Where(h => h.FechaRechazo != null).Sum(h => h.Monto),
+            cuotasTotal,
+            montoAprobadoTotal + cuotasTotal);
+
+        var nombresMes = new[] { "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre" };
+        return new ReporteHorasExtraDto(
+            nombre, ruc,
+            $"{nombresMes[mes - 1]} {anio}",
+            DateTimeHelper.NowPanama(),
+            empleados, porTipo, totales,
+            tasaCss, tasaSe);
     }
 
     /// <summary>Reporte 5: Comprobantes de Pago — recibos individuales por empleado</summary>

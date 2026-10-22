@@ -130,10 +130,17 @@ public class DecimoYLiquidacionEndpointsTests : IClassFixture<CustomWebApplicati
         var empleadoId = await CrearEmpleadoAsync(client, "LIQ");
         await PlanillaAprobadaAsync(client, empleadoId, "2026-01-01", "2026-01-15");
 
+        // El empleado de prueba se contrata hoy: la terminación es el último
+        // día del mes en curso para que la prueba no dependa de la fecha.
+        var hoy = DateTime.Today;
+        var fin = new DateTime(hoy.Year, hoy.Month, DateTime.DaysInMonth(hoy.Year, hoy.Month));
+        var otroMes = fin.AddMonths(-1);
+        var deMes = $"/api/liquidaciones?anio={fin.Year}&mes={fin.Month}";
+
         var cuerpo = new
         {
             empleadoId,
-            fechaTerminacion = "2026-09-30",
+            fechaTerminacion = fin.ToString("yyyy-MM-dd"),
             tipoTerminacion = (int)TipoTerminacion.MutuoAcuerdo,
             incluyePreaviso = false,
             diasSalarioPendiente = 15m,
@@ -146,7 +153,7 @@ public class DecimoYLiquidacionEndpointsTests : IClassFixture<CustomWebApplicati
         pj.GetProperty("usaDevengadoReal").GetBoolean().Should().BeTrue("el empleado tiene una planilla aprobada");
         pj.GetProperty("bases").GetProperty("meses").GetArrayLength().Should().BeGreaterThan(0);
         pj.GetProperty("calculo").GetProperty("salarioPendiente").GetDecimal().Should().BeGreaterThan(0m);
-        (await client.GetFromJsonAsync<JsonElement>("/api/liquidaciones?anio=2026&mes=9")).GetArrayLength()
+        (await client.GetFromJsonAsync<JsonElement>(deMes)).GetArrayLength()
             .Should().Be(0, "previsualizar no guarda");
 
         // 2) Crear: queda en el mes de su último día de trabajo.
@@ -155,15 +162,14 @@ public class DecimoYLiquidacionEndpointsTests : IClassFixture<CustomWebApplicati
         var liq = await creada.Content.ReadFromJsonAsync<JsonElement>();
         var liqId = liq.GetProperty("id").GetInt32();
 
-        var deSeptiembre = await client.GetFromJsonAsync<JsonElement>("/api/liquidaciones?anio=2026&mes=9");
-        deSeptiembre.GetArrayLength().Should().Be(1);
-        (await client.GetFromJsonAsync<JsonElement>("/api/liquidaciones?anio=2026&mes=8")).GetArrayLength().Should().Be(0);
+        (await client.GetFromJsonAsync<JsonElement>(deMes)).GetArrayLength().Should().Be(1);
+        (await client.GetFromJsonAsync<JsonElement>($"/api/liquidaciones?anio={otroMes.Year}&mes={otroMes.Month}")).GetArrayLength().Should().Be(0);
 
         // 3) Anular: se conserva, marcada, y el empleado queda libre para liquidarse otra vez.
         var anular = await client.PostAsJsonAsync($"/api/liquidaciones/{liqId}/anular", new { motivo = "fecha equivocada" });
         anular.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var tras = await client.GetFromJsonAsync<JsonElement>("/api/liquidaciones?anio=2026&mes=9");
+        var tras = await client.GetFromJsonAsync<JsonElement>(deMes);
         tras.GetArrayLength().Should().Be(1);
         tras[0].GetProperty("estado").GetInt32().Should().Be((int)EstadoLiquidacion.Anulada);
 

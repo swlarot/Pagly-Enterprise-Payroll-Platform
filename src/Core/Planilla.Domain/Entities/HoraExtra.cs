@@ -85,6 +85,27 @@ public class HoraExtra : ITenantEntity
     public DateTime? FechaAprobacion { get; set; }
 
     /// <summary>
+    /// Fecha en que se rechazó. El registro se conserva: rechazar no borra,
+    /// solo deja constancia de que no se paga.
+    /// </summary>
+    public DateTime? FechaRechazo { get; set; }
+
+    /// <summary>
+    /// Usuario que la rechazó
+    /// </summary>
+    public string? RechazadoPor { get; set; }
+
+    /// <summary>
+    /// Por qué no se paga, en palabras de quien decidió
+    /// </summary>
+    public string? MotivoRechazo { get; set; }
+
+    /// <summary>
+    /// Ni aprobada ni rechazada: espera la decisión
+    /// </summary>
+    public bool EstaPendiente => !EstaAprobada && FechaRechazo == null;
+
+    /// <summary>
     /// ID del detalle de planilla cuando se paga
     /// </summary>
     public int? PlanillaDetailId { get; set; }
