@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Vorluno.Planilla.Infrastructure.Data;
+using Vorluno.Planilla.Infrastructure.Services;
 
 namespace Planilla.Web.IntegrationTests;
 
@@ -12,6 +13,9 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
     // Shared database name for all requests within this factory instance
     // Each test class gets its own factory instance, thus its own database
     private readonly string _dbName = $"TestDb_{Guid.NewGuid()}";
+
+    /// <summary>Correos que la app habría enviado durante las pruebas de esta clase.</summary>
+    public CorreoDePrueba Correos { get; } = new();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -40,6 +44,11 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>, IAsyn
                 options.ConfigureWarnings(warnings =>
                     warnings.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.InMemoryEventId.TransactionIgnoredWarning));
             });
+
+            // Las pruebas nunca mandan correos de verdad: se anotan para revisarlos.
+            services.RemoveAll<IBrevoEmailService>();
+            services.AddSingleton(Correos);
+            services.AddSingleton<IBrevoEmailService>(Correos);
         });
     }
 

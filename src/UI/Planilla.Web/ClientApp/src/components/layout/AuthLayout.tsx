@@ -5,12 +5,13 @@ import { TenantRole } from '../../types/api';
 import { canAccessModule } from '../../services/permissionService';
 import { PaglyLogo } from '../ui/PaglyLogo';
 import { GlobalSearch } from '../ui/GlobalSearch';
+import CampanaAvisos from './CampanaAvisos.jsx';
 import { useState } from 'react';
 import {
   LayoutDashboard, Users, Users2, User, Building2, Building, Briefcase,
   DollarSign, CreditCard, Minus, Clock, XCircle, TreePalm,
   ClipboardList, BarChart3, ShieldCheck, FileText, Settings,
-  ChevronDown, ChevronRight, Search, Bell, LogOut, Banknote, Check, Loader2,
+  ChevronDown, ChevronRight, Search, LogOut, Banknote, Check, Loader2,
   Key, Activity, Receipt, Menu, X,
 } from 'lucide-react';
 
@@ -132,6 +133,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
       '/settings/api-keys': 'API Keys',
       '/settings/api-usage': 'Uso del API',
       '/mi-perfil': 'Mi Perfil',
+      '/avisos': 'Avisos y revisiones',
     };
     return routes[location.pathname] || 'Dashboard';
   };
@@ -310,11 +312,8 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
             <kbd className="text-[10px] text-gray-600 bg-white/[0.06] px-1.5 py-0.5 rounded">⌘K</kbd>
           </button>
 
-          {/* Notificaciones */}
-          <button className="relative p-1.5 rounded-lg text-gray-500 hover:text-gray-300 hover:bg-white/[0.06] transition-all duration-150">
-            <Bell className="w-3.5 h-3.5" />
-            <span className="absolute top-1 right-1 w-1 h-1 bg-primary-500 rounded-full" />
-          </button>
+          {/* Avisos: revisiones pedidas y respondidas */}
+          <CampanaAvisos />
 
           {/* Fecha */}
           <span className="text-[10px] text-gray-600 hidden md:block px-0.5">

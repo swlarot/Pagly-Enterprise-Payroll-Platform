@@ -40,6 +40,20 @@ public interface IBrevoEmailService
         int currentRequests,
         int limit,
         string planName);
+
+    /// <summary>
+    /// Envía un aviso de Pagly (una revisión pedida o respondida) con un botón
+    /// que lleva a la pantalla. Los textos se escapan: pueden traer lo que
+    /// escribió una persona.
+    /// </summary>
+    Task<bool> SendAvisoEmailAsync(
+        string toEmail,
+        string toName,
+        string asunto,
+        string titulo,
+        IReadOnlyList<string> parrafos,
+        string textoBoton,
+        string enlace);
 }
 
 /// <summary>
@@ -306,6 +320,78 @@ public class BrevoEmailService : IBrevoEmailService
                 threshold, toEmail, ex.Message);
             return false;
         }
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> SendAvisoEmailAsync(
+        string toEmail,
+        string toName,
+        string asunto,
+        string titulo,
+        IReadOnlyList<string> parrafos,
+        string textoBoton,
+        string enlace)
+    {
+        if (string.IsNullOrWhiteSpace(toEmail))
+        {
+            _logger.LogWarning("Aviso sin correo de destino: no se envía");
+            return false;
+        }
+
+        try
+        {
+            sib_api_v3_sdk.Client.Configuration.Default.ApiKey["api-key"] = _apiKey;
+            var apiInstance = new TransactionalEmailsApi();
+            var sendSmtpEmail = new SendSmtpEmail
+            {
+                Sender = new SendSmtpEmailSender(_senderName, _senderEmail),
+                To = new List<SendSmtpEmailTo> { new SendSmtpEmailTo(toEmail, toName) },
+                Subject = asunto,
+                HtmlContent = GenerateAvisoEmailHtml(toName, titulo, parrafos, textoBoton, enlace)
+            };
+
+            var result = await apiInstance.SendTransacEmailAsync(sendSmtpEmail);
+            if (result != null)
+            {
+                _logger.LogInformation("Aviso «{Asunto}» enviado a {ToEmail}. MessageId: {MessageId}", asunto, toEmail, result.MessageId);
+                return true;
+            }
+
+            _logger.LogWarning("Brevo retornó null al enviar el aviso a {ToEmail}", toEmail);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "No se pudo enviar el aviso «{Asunto}» a {ToEmail}: {Error}", asunto, toEmail, ex.Message);
+            return false;
+        }
+    }
+
+    private static string GenerateAvisoEmailHtml(
+        string toName, string titulo, IReadOnlyList<string> parrafos, string textoBoton, string enlace)
+    {
+        static string E(string? t) => System.Net.WebUtility.HtmlEncode(t ?? string.Empty);
+        var cuerpo = string.Concat(parrafos.Select(p =>
+            $"<p style='font-size: 15px; color: #374151; margin: 0 0 14px;'>{E(p)}</p>"));
+
+        return $@"<!DOCTYPE html>
+<html lang='es'>
+<head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>{E(titulo)}</title></head>
+<body style='font-family: Arial, sans-serif; line-height: 1.6; color: #1f2937; max-width: 600px; margin: 0 auto; padding: 20px;'>
+    <div style='background-color: #047857; color: #ffffff; padding: 18px 24px; border-radius: 8px 8px 0 0;'>
+        <p style='margin: 0; font-size: 13px; letter-spacing: 0.04em;'>PAGLY</p>
+        <h1 style='margin: 4px 0 0; font-size: 20px;'>{E(titulo)}</h1>
+    </div>
+    <div style='background-color: #f9fafb; padding: 24px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 8px 8px;'>
+        <p style='font-size: 15px; color: #374151; margin: 0 0 14px;'>Hola {E(toName)},</p>
+        {cuerpo}
+        <div style='margin: 24px 0 8px;'>
+            <a href='{E(enlace)}' style='background-color: #047857; color: #ffffff; padding: 12px 22px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold; font-size: 15px;'>{E(textoBoton)}</a>
+        </div>
+        <p style='font-size: 12px; color: #9ca3af; margin: 20px 0 0;'>Correo automático de Pagly. Lo recibes porque alguien de tu empresa te asignó esta revisión.</p>
+    </div>
+</body>
+</html>";
     }
 
     /// <summary>

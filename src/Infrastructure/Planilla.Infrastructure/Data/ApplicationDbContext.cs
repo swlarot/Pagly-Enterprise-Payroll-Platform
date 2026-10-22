@@ -47,6 +47,10 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     public DbSet<OvertimeFactorConfiguration> OvertimeFactorConfigurations { get; set; }
     public DbSet<AcumuladoFiscalEmpleado> AcumuladosFiscalesEmpleados { get; set; }
     public DbSet<DevengadoMensual> DevengadosMensuales { get; set; }
+
+    // Revisiones entre el equipo y avisos de la campana
+    public DbSet<SolicitudRevision> SolicitudesRevision { get; set; }
+    public DbSet<Aviso> Avisos { get; set; }
     public DbSet<TaxBracket> TaxBrackets { get; set; }
 
     // Phase D: Workflow de planilla
@@ -170,6 +174,30 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
         });
 
         // Phase A: Configuraci�n de PayrollTaxConfiguration
+        modelBuilder.Entity<SolicitudRevision>(entity =>
+        {
+            entity.HasIndex(r => new { r.TenantId, r.Tipo, r.EntidadId })
+                .HasDatabaseName("IX_SolicitudRevision_Tenant_Tipo_Entidad");
+            entity.HasIndex(r => new { r.TenantId, r.RevisorId, r.Estado })
+                .HasDatabaseName("IX_SolicitudRevision_Tenant_Revisor_Estado");
+            entity.Property(r => r.Referencia).HasMaxLength(200);
+            entity.Property(r => r.Enlace).HasMaxLength(300);
+            entity.Property(r => r.SolicitadoPor).HasMaxLength(450);
+            entity.Property(r => r.RevisorId).HasMaxLength(450);
+            entity.Property(r => r.Comentario).HasMaxLength(1000);
+            entity.Property(r => r.Respuesta).HasMaxLength(1000);
+        });
+
+        modelBuilder.Entity<Aviso>(entity =>
+        {
+            entity.HasIndex(a => new { a.TenantId, a.UsuarioId, a.Leido, a.CreatedAt })
+                .HasDatabaseName("IX_Aviso_Tenant_Usuario_Leido_Fecha");
+            entity.Property(a => a.UsuarioId).HasMaxLength(450);
+            entity.Property(a => a.Titulo).HasMaxLength(200);
+            entity.Property(a => a.Mensaje).HasMaxLength(1000);
+            entity.Property(a => a.Enlace).HasMaxLength(300);
+        });
+
         modelBuilder.Entity<DevengadoMensual>(entity =>
         {
             // Un solo registro por empleado y mes.

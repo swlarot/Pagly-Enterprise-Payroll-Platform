@@ -5,6 +5,7 @@ import { api } from '../../services/api';
 import { formatCurrency } from '../../utils/currency';
 import { formatDate } from '../../utils/date';
 import TablaDecimo from './TablaDecimo';
+import PedirRevision from '../revisiones/PedirRevision';
 
 // ============================================================
 // Una partida de décimo del mes: cabecera con estado y totales, sus
@@ -146,6 +147,7 @@ export default function FilaDecimo({ partida, abierta, ocupada, atenuada, error,
             <Btn onClick={() => descargar('pdf')} icon={FileDown}>PDF</Btn>
           </>
         )}
+        {partida.estado !== 'Pagada' && <PedirRevision tipo={2} entidadId={partida.id} disabled={ocupada} />}
         <span className="ml-auto">
           <Btn onClick={onBorrar} icon={Trash2} peligro disabled={ocupada} title="Borrado permanente: pide el número de la partida">Borrar</Btn>
         </span>

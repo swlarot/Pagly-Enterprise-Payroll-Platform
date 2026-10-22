@@ -5,6 +5,7 @@ import { api } from '../../services/api';
 import { formatCurrency } from '../../utils/currency';
 import { formatDate } from '../../utils/date';
 import DetalleLiquidacion from './DetalleLiquidacion';
+import PedirRevision from '../revisiones/PedirRevision';
 
 // ============================================================
 // Una liquidación del mes: cabecera con el empleado, su estado y el neto,
@@ -116,6 +117,7 @@ export default function FilaLiquidacion({ liquidacion, abierta, ocupada, atenuad
           {liquidacion.estado === 1 && <Btn onClick={() => onAccion('aprobar')} icon={CheckCheck} primario disabled={ocupada}>Aprobar</Btn>}
           {liquidacion.estado === 2 && <Btn onClick={() => onAccion('pagar')} icon={Banknote} primario disabled={ocupada}>Marcar pagada</Btn>}
           <Btn onClick={descargarPdf} icon={FileDown}>PDF</Btn>
+          {liquidacion.estado <= 2 && <PedirRevision tipo={3} entidadId={liquidacion.id} disabled={ocupada} />}
           <span className="ml-auto flex items-center gap-2">
             {liquidacion.estado === 1 && <Btn onClick={() => onAccion('eliminar')} icon={Trash2} peligro disabled={ocupada} title="Solo mientras está calculada">Eliminar</Btn>}
             {liquidacion.estado >= 1 && <Btn onClick={() => onAccion('anular')} icon={Ban} peligro disabled={ocupada}>Anular</Btn>}
