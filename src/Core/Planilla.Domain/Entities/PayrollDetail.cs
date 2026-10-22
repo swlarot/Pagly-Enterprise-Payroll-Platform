@@ -187,6 +187,12 @@ public class PayrollDetail : ITenantEntity
     /// </summary>
     public string? OtrasDeduccionesDetalle { get; set; }
 
+    /// <summary>
+    /// Por qué esta fila es distinta, en palabras del producto (por ejemplo,
+    /// días de licencia de maternidad sin salario). Se ve en la planilla.
+    /// </summary>
+    public string? Nota { get; set; }
+
     // ====================================================================
     // Asistencia: Horas Extra
     // ====================================================================

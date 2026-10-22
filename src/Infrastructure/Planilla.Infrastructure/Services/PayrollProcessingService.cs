@@ -322,14 +322,22 @@ public class PayrollProcessingService
         List<DeduccionFija> deduccionesFijas,
         List<Prestamo> prestamosActivos,
         List<Anticipo> anticiposAprobados,
-        decimal salarioMinimoPeriodo)
+        decimal salarioMinimoPeriodo,
+        decimal fraccionSalario = 1m)
     {
         var periodsPerYear = PayrollConstants.GetPeriodsPerYear(payrollHeader.PayPeriodType);
+
+        // Parte del período con salario: menos de 1 cuando hay días de licencia
+        // de maternidad (esos días los paga la CSS, no la planilla). Con 1, el
+        // salario del período queda exactamente como siempre.
+        decimal salarioPeriodo = fraccionSalario >= 1m
+            ? employee.GetSalarioPeriodo()
+            : RoundingPolicy.Round(employee.GetSalarioPeriodo() * Math.Max(0m, fraccionSalario));
 
         // ====================================================================
         // PASO 1: Calcular GrossPay
         // ====================================================================
-        decimal grossPay = employee.GetSalarioPeriodo();
+        decimal grossPay = salarioPeriodo;
 
         if (hours != null)
         {
@@ -358,11 +366,12 @@ public class PayrollProcessingService
             // DEV-92: RegularPay incluye TODAS las horas (incluyendo domingo y feriado) a tasa base 1.0x.
             // Las 104 horas regulares ya contienen el pago base de cada día trabajado; domingo y feriado
             // solo añaden el recargo adicional (0.50x y 1.50x respectivamente).
-            hours.RegularPay = hours.RegularHours * hourlyRate;
+            // Con licencia de maternidad en el período solo se paga la parte trabajada.
+            hours.RegularPay = hours.RegularHours * hourlyRate * Math.Clamp(fraccionSalario, 0m, 1m);
             // Snap a salario exacto cuando no hay horas especiales (evita diferencia de centavos por redondeo)
             if (hours.SundayHours == 0 && hours.HolidayHours == 0)
             {
-                var salarioPeriodoExacto = employee.GetSalarioPeriodo();
+                var salarioPeriodoExacto = salarioPeriodo;
                 if (Math.Abs(hours.RegularPay - salarioPeriodoExacto) < 0.05m)
                     hours.RegularPay = salarioPeriodoExacto;
             }
@@ -387,7 +396,9 @@ public class PayrollProcessingService
 
         // El gasto de representación entra al bruto: para la Caja de Seguro Social
         // es salario. La renta lo separa después, con su propia tarifa.
-        decimal gastoRepresentacion = employee.GetGastoRepresentacionPeriodo();
+        decimal gastoRepresentacion = fraccionSalario >= 1m
+            ? employee.GetGastoRepresentacionPeriodo()
+            : RoundingPolicy.Round(employee.GetGastoRepresentacionPeriodo() * Math.Max(0m, fraccionSalario));
         grossPay += gastoRepresentacion;
         decimal isrGastoRepresentacion = 0m;
 

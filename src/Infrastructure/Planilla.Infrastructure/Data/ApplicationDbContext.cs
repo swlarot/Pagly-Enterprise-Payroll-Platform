@@ -51,6 +51,9 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     // Revisiones entre el equipo y avisos de la campana
     public DbSet<SolicitudRevision> SolicitudesRevision { get; set; }
     public DbSet<Aviso> Avisos { get; set; }
+
+    // Licencias de maternidad (sin salario en planilla; la CSS paga el subsidio)
+    public DbSet<LicenciaMaternidad> LicenciasMaternidad { get; set; }
     public DbSet<TaxBracket> TaxBrackets { get; set; }
 
     // Phase D: Workflow de planilla
@@ -186,6 +189,20 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             entity.Property(r => r.RevisorId).HasMaxLength(450);
             entity.Property(r => r.Comentario).HasMaxLength(1000);
             entity.Property(r => r.Respuesta).HasMaxLength(1000);
+        });
+
+        modelBuilder.Entity<LicenciaMaternidad>(entity =>
+        {
+            entity.HasIndex(l => new { l.TenantId, l.EmpleadoId, l.FechaInicio })
+                .HasDatabaseName("IX_LicenciaMaternidad_Tenant_Empleado_Inicio");
+            entity.Property(l => l.Observaciones).HasMaxLength(500);
+            entity.Property(l => l.MotivoAnulacion).HasMaxLength(500);
+            entity.Property(l => l.CreadaPor).HasMaxLength(450);
+            entity.Property(l => l.AnuladaPor).HasMaxLength(450);
+            entity.HasOne(l => l.Empleado)
+                .WithMany()
+                .HasForeignKey(l => l.EmpleadoId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Aviso>(entity =>

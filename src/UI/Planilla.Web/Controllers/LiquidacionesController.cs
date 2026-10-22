@@ -126,11 +126,14 @@ public class LiquidacionesController : ControllerBase
 
         var bases = await _basesProvider.ObtenerAsync(empleado.Id, empleado.FechaContratacion, request.FechaTerminacion);
         var r = _calculationService.Calcular(empleado, request, ultimaFechaVacaciones: null, bases: bases);
+        var fuero = await FueroMaternidadHastaAsync(empleado.Id, request.FechaTerminacion);
 
         return Ok(new
         {
             empleado = new { empleado.Id, empleado.Nombre, empleado.Apellido, empleado.NumeroIdentificacion, empleado.FechaContratacion },
             calculo = r,
+            // Fecha hasta la que tiene fuero de maternidad, si lo tiene en la fecha de terminación.
+            fueroMaternidadHasta = fuero,
             // Sin historial se liquida con el salario base: la pantalla lo avisa.
             usaDevengadoReal = bases is not null,
             bases = bases is null ? null : new
@@ -147,6 +150,20 @@ public class LiquidacionesController : ControllerBase
                 meses = bases.Meses60,
             },
         });
+    }
+
+    /// <summary>
+    /// Hasta cuándo tiene fuero de maternidad en esa fecha (desde el inicio de
+    /// la licencia hasta un año después del regreso), o null si no lo tiene.
+    /// </summary>
+    private async Task<DateTime?> FueroMaternidadHastaAsync(int empleadoId, DateTime fecha)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var licencias = await _context.LicenciasMaternidad.AsNoTracking()
+            .Where(l => l.TenantId == tenantId && l.EmpleadoId == empleadoId && !l.Anulada && l.FechaInicio <= fecha)
+            .ToListAsync();
+        var vigente = licencias.Where(l => l.FueroHasta >= fecha.Date).OrderByDescending(l => l.FueroHasta).FirstOrDefault();
+        return vigente?.FueroHasta;
     }
 
     /// <summary>
@@ -180,6 +197,16 @@ public class LiquidacionesController : ControllerBase
 
         if (liquidacionExistente != null)
             return BadRequest(new { message = "Ya existe una liquidación pendiente para este empleado. Debe pagarla o eliminarla antes de crear otra." });
+
+        // Fuero de maternidad: un despido necesita autorización judicial previa.
+        var fueroHasta = await FueroMaternidadHastaAsync(empleado.Id, request.FechaTerminacion);
+        var esDespido = request.TipoTerminacion is TipoTerminacion.Despido or TipoTerminacion.DespidoJustificado;
+        if (fueroHasta.HasValue && esDespido && !request.ConfirmaFueroMaternidad)
+            return BadRequest(new
+            {
+                message = $"Tiene fuero de maternidad hasta el {fueroHasta.Value:dd/MM/yyyy}: despedirla requiere autorización judicial previa (Código de Trabajo, Art. 106). Si ya la tienen, confírmalo para continuar.",
+                fueroMaternidadHasta = fueroHasta,
+            });
 
         // Calcular liquidación con el devengado real del empleado (60 meses,
         // última vacación y última partida de décimo). Sin historial, el

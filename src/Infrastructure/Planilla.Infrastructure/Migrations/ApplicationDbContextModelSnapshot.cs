@@ -1519,6 +1519,64 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.ToTable("IdempotencyRecords");
                 });
 
+            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.LicenciaMaternidad", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Anulada")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime?>("AnuladaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AnuladaPor")
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)");
+
+                    b.Property<string>("CreadaPor")
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("EmpleadoId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("FechaFin")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("FechaInicio")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("MotivoAnulacion")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Observaciones")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpleadoId");
+
+                    b.HasIndex("TenantId", "EmpleadoId", "FechaInicio")
+                        .HasDatabaseName("IX_LicenciaMaternidad_Tenant_Empleado_Inicio");
+
+                    b.ToTable("LicenciasMaternidad");
+                });
+
             modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.Liquidacion", b =>
                 {
                     b.Property<int>("Id")
@@ -1898,6 +1956,9 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.Property<decimal>("NetPay")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
+
+                    b.Property<string>("Nota")
+                        .HasColumnType("text");
 
                     b.Property<decimal>("OtherDeductions")
                         .HasPrecision(18, 2)
@@ -3709,6 +3770,25 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("ApiKey");
+                });
+
+            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.LicenciaMaternidad", b =>
+                {
+                    b.HasOne("Vorluno.Planilla.Domain.Entities.Empleado", "Empleado")
+                        .WithMany()
+                        .HasForeignKey("EmpleadoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Vorluno.Planilla.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Empleado");
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.Liquidacion", b =>
