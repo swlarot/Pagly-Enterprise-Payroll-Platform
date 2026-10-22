@@ -471,16 +471,27 @@ QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 // TODO: React will handle authentication UI - backend provides Identity API endpoints
 
 // Detrás del proxy de CapRover, la IP del cliente llega en X-Forwarded-For.
-// ForwardLimit = 1 toma solo la que añade el proxy (la de más a la derecha):
-// un X-Forwarded-For inventado por el cliente no la cambia. La app solo es
-// alcanzable a través de ese proxy, por eso no se fija una lista de proxies.
+// Solo se cree si la petición viene de una red privada (la red interna de
+// Docker/CapRover donde vive el proxy); desde internet nadie llega con una IP
+// privada. ForwardLimit = 1 toma solo la que añade el proxy (la de más a la
+// derecha): un X-Forwarded-For inventado por el cliente no la cambia. Las
+// redes se pueden ajustar con Proxy:RedesConfiables (separadas por coma).
 builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(o =>
 {
     o.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
                        | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
     o.ForwardLimit = 1;
-    o.KnownNetworks.Clear();
-    o.KnownProxies.Clear();
+    var redes = builder.Configuration["Proxy:RedesConfiables"] ?? "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16";
+    foreach (var red in redes.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+    {
+        var partes = red.Split('/');
+        var ip = System.Net.IPAddress.Parse(partes[0]);
+        var prefijo = int.Parse(partes[1]);
+        o.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(ip, prefijo));
+        // La misma red escrita como IPv6 (::ffff:10.x.x.x), como la reporta a veces Kestrel.
+        if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+            o.KnownNetworks.Add(new Microsoft.AspNetCore.HttpOverrides.IPNetwork(ip.MapToIPv6(), 96 + prefijo));
+    }
 });
 
 var app = builder.Build();

@@ -1228,6 +1228,9 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.Property<DateTime?>("EsperandoVinculoHasta")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("IpEsperada")
+                        .HasColumnType("text");
+
                     b.Property<string>("IpPendiente")
                         .HasColumnType("text");
 

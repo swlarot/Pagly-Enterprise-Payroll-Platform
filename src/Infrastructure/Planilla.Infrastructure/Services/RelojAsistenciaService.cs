@@ -408,9 +408,18 @@ public class RelojAsistenciaService
             aceptada = dispositivo.IpVinculada == ip;
             if (!aceptada) { dispositivo.IpRechazada = ip; dispositivo.IpRechazadaEn = ahora; }
         }
+        else if (dispositivo.EsperandoVinculoHasta >= ahora && dispositivo.IpEsperada != null && dispositivo.IpEsperada == ip)
+        {
+            // Llega desde la misma red desde la que se registró: se vincula solo.
+            dispositivo.IpVinculada = ip;
+            dispositivo.VinculadoEn = ahora;
+            dispositivo.IpPendiente = null;
+            dispositivo.EsperandoVinculoHasta = null;
+            aceptada = true;
+        }
         else
         {
-            // Sin vincular todavía: solo dentro de la ventana, y queda pendiente de confirmar.
+            // Desde otra red: queda pendiente de que alguien la confirme viéndola.
             if (dispositivo.EsperandoVinculoHasta >= ahora && dispositivo.IpPendiente == null)
                 dispositivo.IpPendiente = ip;
             else if (dispositivo.IpPendiente != ip)
