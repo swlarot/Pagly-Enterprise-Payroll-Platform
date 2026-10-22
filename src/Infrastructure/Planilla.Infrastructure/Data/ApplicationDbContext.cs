@@ -59,6 +59,9 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
     public DbSet<Marcacion> Marcaciones { get; set; }
     public DbSet<HorarioLaboral> HorariosLaborales { get; set; }
     public DbSet<DispositivoReloj> DispositivosReloj { get; set; }
+
+    // Cambios de salario y bajas que esperan la confirmación de otra persona
+    public DbSet<CambioPendiente> CambiosPendientes { get; set; }
     public DbSet<TaxBracket> TaxBrackets { get; set; }
 
     // Phase D: Workflow de planilla
@@ -221,6 +224,23 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             entity.HasOne(m => m.Empleado)
                 .WithMany()
                 .HasForeignKey(m => m.EmpleadoId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CambioPendiente>(entity =>
+        {
+            entity.HasIndex(c => new { c.TenantId, c.Estado, c.CreatedAt })
+                .HasDatabaseName("IX_CambioPendiente_Tenant_Estado_Fecha");
+            entity.Property(c => c.Tipo).HasMaxLength(20);
+            entity.Property(c => c.Estado).HasMaxLength(20);
+            entity.Property(c => c.SolicitadoPor).HasMaxLength(450);
+            entity.Property(c => c.ResueltoPor).HasMaxLength(450);
+            entity.Property(c => c.Comentario).HasMaxLength(500);
+            entity.Property(c => c.SalarioAnterior).HasPrecision(18, 2);
+            entity.Property(c => c.SalarioNuevo).HasPrecision(18, 2);
+            entity.HasOne(c => c.Empleado)
+                .WithMany()
+                .HasForeignKey(c => c.EmpleadoId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

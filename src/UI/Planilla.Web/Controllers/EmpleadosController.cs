@@ -475,6 +475,22 @@ namespace Vorluno.Planilla.Web.Controllers
             if (!string.IsNullOrEmpty(empleado.UserId))
                 empleado.Email = emailOriginal;
 
+            // Si la empresa exige la confirmación de otra persona, el salario nuevo
+            // no se aplica: se guarda lo demás y el cambio queda pendiente.
+            CambioPendiente? salarioPendiente = null;
+            if (empleado.SalarioBase != salarioOriginal)
+            {
+                var cambios = HttpContext.RequestServices.GetRequiredService<CambiosSensiblesService>();
+                if (await cambios.ActivoAsync())
+                {
+                    var nuevo = empleado.SalarioBase;
+                    empleado.SalarioBase = salarioOriginal;
+                    var (pendiente, error) = await cambios.PedirSalarioAsync(empleado, salarioOriginal, nuevo, this.GetCurrentUserId());
+                    if (error != null) return BadRequest(new { message = error });
+                    salarioPendiente = pendiente;
+                }
+            }
+
             // B5: si cambió el salario, registrar el nuevo valor en el historial
             if (empleado.SalarioBase != salarioOriginal)
             {
@@ -511,6 +527,12 @@ namespace Vorluno.Planilla.Web.Controllers
                 // No bloqueamos la operación si falla el audit log
             }
 
+            if (salarioPendiente != null)
+                return Accepted(new
+                {
+                    cambioPendiente = true,
+                    message = "Se guardaron los cambios; el salario nuevo queda pendiente de que otra persona lo confirme.",
+                });
             return NoContent(); // Retorna un 204 No Content para indicar éxito
         }
 
@@ -554,6 +576,19 @@ namespace Vorluno.Planilla.Web.Controllers
 
             if (empleado.IsDeleted)
                 return BadRequest(new { error = "El empleado ya está eliminado" });
+
+            // Si la empresa exige la confirmación de otra persona, la baja queda pendiente.
+            var cambiosSensibles = HttpContext.RequestServices.GetRequiredService<CambiosSensiblesService>();
+            if (await cambiosSensibles.ActivoAsync())
+            {
+                var (_, errorBaja) = await cambiosSensibles.PedirBajaAsync(empleado, currentUserId);
+                if (errorBaja != null) return BadRequest(new { message = errorBaja });
+                return Accepted(new
+                {
+                    cambioPendiente = true,
+                    message = "La baja queda pendiente de que otra persona la confirme.",
+                });
+            }
 
             empleado.IsDeleted = true;
             empleado.DeletedAt = DateTime.UtcNow;

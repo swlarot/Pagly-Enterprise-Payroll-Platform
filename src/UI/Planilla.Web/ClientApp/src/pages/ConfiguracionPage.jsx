@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
+import ConfirmacionCambios from '../components/configuracion/ConfirmacionCambios';
 import { UsageDashboard } from '../components/UsageDashboard';
 import { TenantRole } from '../types/api';
 import { api } from '../services/api';
@@ -167,6 +168,7 @@ const ConfiguracionPage = () => {
         { id: 'isr', label: 'Tabla ISR', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z', visible: true },
         { id: 'salario-minimo', label: 'Salario Mínimo', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', visible: true },
         { id: 'horas-extra', label: 'Horas Extra', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', visible: true },
+        { id: 'confirmaciones', label: 'Confirmaciones', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', visible: hasRole ? hasRole(TenantRole.Owner) : false },
         { id: 'audit', label: 'Audit Log', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', visible: hasRole ? hasRole(TenantRole.Owner) : false },
         { id: 'plan', label: 'Uso del Plan', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z', visible: true },
         { id: 'soporte', label: 'Soporte', icon: 'M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z', visible: true }
@@ -632,6 +634,9 @@ const ConfiguracionPage = () => {
                             )}
                         </div>
                     )}
+
+                    {/* Tab: Confirmación de cambios sensibles */}
+                    {activeTab === 'confirmaciones' && hasRole(TenantRole.Owner) && <ConfirmacionCambios />}
 
                     {/* Tab: Audit Log */}
                     {activeTab === 'audit' && hasRole(TenantRole.Owner) && (

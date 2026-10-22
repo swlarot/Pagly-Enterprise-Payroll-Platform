@@ -182,8 +182,10 @@ const EmpleadosPage = () => {
                 payload.email = formData.email || null;
 
             if (editingId) {
-                await api.put(`/api/empleados/${editingId}`, payload);
-                toast.success('Empleado actualizado exitosamente');
+                const r = await api.put(`/api/empleados/${editingId}`, payload);
+                // Si la empresa exige confirmación, el salario nuevo queda pendiente.
+                if (r?.cambioPendiente) toast.success(r.message, { duration: 6000 });
+                else toast.success('Empleado actualizado exitosamente');
             } else {
                 await api.post('/api/empleados', payload);
                 toast.success('Empleado creado exitosamente');

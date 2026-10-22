@@ -4,6 +4,8 @@ import toast from 'react-hot-toast';
 import { Check, Undo2, ArrowRight, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 import { formatDate } from '../utils/date';
+import { useAuth } from '../contexts/AuthContext';
+import CambiosPorConfirmar from '../components/avisos/CambiosPorConfirmar';
 
 // ============================================================
 // Avisos y revisiones de la persona que entra.
@@ -19,6 +21,8 @@ const TIPO = { 1: 'Planilla', 2: 'Décimo', 3: 'Liquidación', 4: 'Horas extra' 
 
 export default function AvisosPage() {
     const navigate = useNavigate();
+    const { hasPermission } = useAuth();
+    const gestionaEmpleados = hasPermission('employees.update') || hasPermission('employees.delete');
     const [porRevisar, setPorRevisar] = useState([]);
     const [avisos, setAvisos] = useState({ items: [], noLeidos: 0 });
     const [cargando, setCargando] = useState(true);
@@ -137,6 +141,8 @@ export default function AvisosPage() {
                     </div>
                 ))}
             </section>
+
+            {gestionaEmpleados && <CambiosPorConfirmar />}
 
             <section aria-labelledby="todos-avisos" className="space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
