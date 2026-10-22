@@ -668,12 +668,12 @@ const ReportesPage = () => {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                             </svg>
                         </div>
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                             <h3 className="text-base font-bold text-gray-100 font-display mb-1">Reporte Mensual</h3>
                             <p className="text-sm text-gray-500 mb-4 leading-relaxed">Consolida todas las planillas del mes seleccionado: suma brutos, deducciones CSS/SE/ISR, acreedores y neto por empleado</p>
-                            <div className="flex items-end gap-4">
+                            <div className="flex flex-wrap items-end gap-4">
                                 {/* Selectores mes + año */}
-                                <div className="flex gap-3 flex-1">
+                                <div className="flex gap-3 flex-1 min-w-[12rem]">
                                     <div className="flex-1">
                                         <label className="block text-xs text-gray-500 mb-1">Mes</label>
                                         <select
