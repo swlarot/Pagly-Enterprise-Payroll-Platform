@@ -54,6 +54,10 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
 
     // Licencias de maternidad (sin salario en planilla; la CSS paga el subsidio)
     public DbSet<LicenciaMaternidad> LicenciasMaternidad { get; set; }
+
+    // Reloj de asistencia: marcaciones y horarios contra los que se comparan
+    public DbSet<Marcacion> Marcaciones { get; set; }
+    public DbSet<HorarioLaboral> HorariosLaborales { get; set; }
     public DbSet<TaxBracket> TaxBrackets { get; set; }
 
     // Phase D: Workflow de planilla
@@ -132,6 +136,17 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             entity.HasIndex(e => e.TenantId)
                 .HasDatabaseName("IX_Empleado_TenantId");
 
+            // Un número del reloj pertenece a una sola persona de la empresa.
+            entity.HasIndex(e => new { e.TenantId, e.CodigoReloj })
+                .IsUnique()
+                .HasFilter("\"CodigoReloj\" IS NOT NULL")
+                .HasDatabaseName("IX_Empleado_Tenant_CodigoReloj");
+
+            entity.HasOne(e => e.HorarioLaboral)
+                .WithMany()
+                .HasForeignKey(e => e.HorarioLaboralId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             // Índice compuesto para búsquedas por tenant y estado activo
             entity.HasIndex(e => new { e.TenantId, e.EstaActivo })
                 .HasDatabaseName("IX_Empleado_TenantId_EstaActivo");
@@ -189,6 +204,29 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             entity.Property(r => r.RevisorId).HasMaxLength(450);
             entity.Property(r => r.Comentario).HasMaxLength(1000);
             entity.Property(r => r.Respuesta).HasMaxLength(1000);
+        });
+
+        modelBuilder.Entity<Marcacion>(entity =>
+        {
+            // Re-importar el mismo archivo no duplica marcaciones.
+            entity.HasIndex(m => new { m.TenantId, m.CodigoReloj, m.FechaHora })
+                .IsUnique()
+                .HasDatabaseName("IX_Marcacion_Tenant_Codigo_FechaHora");
+            entity.HasIndex(m => new { m.TenantId, m.EmpleadoId, m.FechaHora })
+                .HasDatabaseName("IX_Marcacion_Tenant_Empleado_FechaHora");
+            entity.Property(m => m.CodigoReloj).HasMaxLength(30);
+            entity.Property(m => m.Origen).HasMaxLength(20);
+            entity.Property(m => m.Fuente).HasMaxLength(200);
+            entity.HasOne(m => m.Empleado)
+                .WithMany()
+                .HasForeignKey(m => m.EmpleadoId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<HorarioLaboral>(entity =>
+        {
+            entity.HasIndex(h => h.TenantId).HasDatabaseName("IX_HorarioLaboral_Tenant");
+            entity.Property(h => h.Nombre).HasMaxLength(100);
         });
 
         modelBuilder.Entity<LicenciaMaternidad>(entity =>

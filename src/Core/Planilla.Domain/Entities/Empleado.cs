@@ -204,6 +204,17 @@ public class Empleado : ITenantEntity
     List<HistorialSalarial>();
 
     // Navigation properties para Departamento y Posicion
+    /// <summary>
+    /// Número de la persona en el reloj de asistencia (no es la cédula). Se
+    /// asocia una sola vez y desde entonces sus marcaciones llegan a su ficha.
+    /// </summary>
+    [StringLength(30)]
+    public string? CodigoReloj { get; set; }
+
+    /// <summary>Horario contra el que se comparan sus marcaciones (si no, el predeterminado).</summary>
+    public int? HorarioLaboralId { get; set; }
+    public virtual HorarioLaboral? HorarioLaboral { get; set; }
+
     public virtual Departamento? Departamento { get; set; }
     public virtual Posicion? Posicion { get; set; }
 

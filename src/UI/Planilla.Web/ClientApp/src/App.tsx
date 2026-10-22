@@ -40,6 +40,7 @@ import AnticiposPage from './pages/AnticiposPage.jsx';
 import HorasExtraPage from './pages/HorasExtraPage.jsx';
 import AvisosPage from './pages/AvisosPage.jsx';
 import LicenciasMaternidadPage from './pages/LicenciasMaternidadPage.jsx';
+import RelojAsistenciaPage from './pages/RelojAsistenciaPage.jsx';
 import AusenciasPage from './pages/AusenciasPage.jsx';
 import VacacionesPage from './pages/VacacionesPage.jsx';
 import PlanillasPage from './pages/PlanillasPage.jsx';
@@ -378,6 +379,17 @@ function App() {
             <ProtectedRoute>
               <AuthLayout>
                 <AnticiposPage />
+              </AuthLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/reloj"
+          element={
+            <ProtectedRoute>
+              <AuthLayout>
+                <RelojAsistenciaPage />
               </AuthLayout>
             </ProtectedRoute>
           }

@@ -243,11 +243,13 @@ export const api = {
    * lo pone con el boundary. Reporta el progreso real del envío con XHR, porque
    * fetch no expone el progreso de subida.
    */
-  async upload<T>(endpoint: string, file: File, fieldName = 'archivo', onProgress?: (pct: number) => void): Promise<T> {
+  async upload<T>(endpoint: string, file: File, fieldName = 'archivo', onProgress?: (pct: number) => void, extra?: Record<string, string>): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
     const token = localStorage.getItem('auth_token');
     const form = new FormData();
     form.append(fieldName, file, file.name);
+    // Campos de texto que viajan junto al archivo (por ejemplo, asociaciones en JSON).
+    for (const [k, v] of Object.entries(extra ?? {})) form.append(k, v);
 
     return new Promise<T>((resolve, reject) => {
       const xhr = new XMLHttpRequest();

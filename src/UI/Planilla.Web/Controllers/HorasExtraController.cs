@@ -25,19 +25,22 @@ public class HorasExtraController : ControllerBase
     private readonly ITenantContext _tenantContext;
     private readonly IOvertimeFactorService _overtimeFactorService;
     private readonly IAuditLogService _auditLog;
+    private readonly RegistroHorasExtraService _registro;
 
     public HorasExtraController(
         IUnitOfWork unitOfWork,
         ApplicationDbContext context,
         ITenantContext tenantContext,
         IOvertimeFactorService overtimeFactorService,
-        IAuditLogService auditLog)
+        IAuditLogService auditLog,
+        RegistroHorasExtraService registro)
     {
         _unitOfWork = unitOfWork;
         _context = context;
         _tenantContext = tenantContext;
         _overtimeFactorService = overtimeFactorService;
         _auditLog = auditLog;
+        _registro = registro;
     }
 
     /// <summary>
@@ -183,48 +186,10 @@ public class HorasExtraController : ControllerBase
         if (empleado == null)
             return BadRequest(new { message = "El empleado especificado no existe." });
 
-        // Calcular horas
-        var cantidadHoras = CalcularHoras(request.HoraInicio, request.HoraFin);
-
-        // Determinar tipo automáticamente si no se especifica explícitamente (opcional - por ahora usar el del request)
-        // En el futuro se podría auto-detectar: var tipoDetectado = _overtimeFactorService.DetermineOvertimeType(request.Fecha, request.HoraInicio, request.HoraFin);
-        var tipo = request.TipoHoraExtra;
-
-        // Validar límites legales
-        var (esExceso, mensajeValidacion) = await _overtimeFactorService.ValidateOvertimeLimits(
-            request.EmpleadoId, request.Fecha, cantidadHoras);
-
-        // Calcular factores
-        var factorBase = await _overtimeFactorService.CalculateBaseFactorAsync(tipo);
-        var factorTotal = await _overtimeFactorService.CalculateFactorAsync(tipo, esExceso);
-        decimal? factorExceso = esExceso ? await _overtimeFactorService.GetFactorExcesoAsync() : null;
-
-        // Calcular monto
-        var montoCalculado = CalcularMonto(empleado, cantidadHoras, factorBase, factorExceso);
-
-        var horaExtra = new HoraExtra
-        {
-            TenantId = tenantId,
-            EmpleadoId = request.EmpleadoId,
-            Fecha = request.Fecha.Date,
-            TipoHoraExtra = tipo,
-            HoraInicio = request.HoraInicio,
-            HoraFin = request.HoraFin,
-            CantidadHoras = cantidadHoras,
-            FactorMultiplicador = factorTotal, // Factor total (base × exceso si aplica)
-            EsExceso = esExceso,
-            FactorExceso = factorExceso,
-            MontoCalculado = montoCalculado,
-            Motivo = request.Motivo,
-            EstaAprobada = false,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        // Si hay mensaje de validación (exceso), agregarlo a observaciones
-        if (!string.IsNullOrEmpty(mensajeValidacion))
-        {
-            horaExtra.Observaciones = mensajeValidacion;
-        }
+        // Horas, límites legales, factores y monto: las mismas cuentas que
+        // usa el reloj de asistencia al proponer horas extra.
+        var horaExtra = await _registro.ConstruirAsync(
+            empleado, tenantId, request.Fecha, request.TipoHoraExtra, request.HoraInicio, request.HoraFin, request.Motivo);
 
         await _unitOfWork.Repository<HoraExtra>().AddAsync(horaExtra);
         await _unitOfWork.CompleteAsync();
@@ -257,39 +222,8 @@ public class HorasExtraController : ControllerBase
             if (empleado == null)
                 continue;
 
-            var cantidadHoras = CalcularHoras(request.HoraInicio, request.HoraFin);
-            var tipo = request.TipoHoraExtra;
-
-            // Validar límites legales
-            var (esExceso, mensajeValidacion) = await _overtimeFactorService.ValidateOvertimeLimits(
-                request.EmpleadoId, request.Fecha, cantidadHoras);
-
-            // Calcular factores
-            var factorBase = await _overtimeFactorService.CalculateBaseFactorAsync(tipo);
-            var factorTotal = await _overtimeFactorService.CalculateFactorAsync(tipo, esExceso);
-            decimal? factorExceso = esExceso ? await _overtimeFactorService.GetFactorExcesoAsync() : null;
-
-            // Calcular monto
-            var montoCalculado = CalcularMonto(empleado, cantidadHoras, factorBase, factorExceso);
-
-            var horaExtra = new HoraExtra
-            {
-                TenantId = tenantId,
-                EmpleadoId = request.EmpleadoId,
-                Fecha = request.Fecha.Date,
-                TipoHoraExtra = tipo,
-                HoraInicio = request.HoraInicio,
-                HoraFin = request.HoraFin,
-                CantidadHoras = cantidadHoras,
-                FactorMultiplicador = factorTotal,
-                EsExceso = esExceso,
-                FactorExceso = factorExceso,
-                MontoCalculado = montoCalculado,
-                Motivo = request.Motivo,
-                EstaAprobada = false,
-                CreatedAt = DateTime.UtcNow,
-                Observaciones = !string.IsNullOrEmpty(mensajeValidacion) ? mensajeValidacion : null
-            };
+            var horaExtra = await _registro.ConstruirAsync(
+                empleado, tenantId, request.Fecha, request.TipoHoraExtra, request.HoraInicio, request.HoraFin, request.Motivo);
 
             horasExtra.Add(horaExtra);
         }
@@ -559,41 +493,10 @@ public class HorasExtraController : ControllerBase
     }
 
     // Métodos privados
-    private decimal CalcularHoras(TimeSpan inicio, TimeSpan fin)
-    {
-        var diferencia = fin - inicio;
-        if (diferencia.TotalHours < 0)
-            diferencia = diferencia.Add(TimeSpan.FromHours(24));
+    private static decimal CalcularHoras(TimeSpan inicio, TimeSpan fin) => RegistroHorasExtraService.CalcularHoras(inicio, fin);
 
-        return (decimal)diferencia.TotalHours;
-    }
-
-    /// <summary>
-    /// Calcula el monto de horas extra usando el HourlyRate del empleado.
-    /// Si HourlyRate es 0, calcula con base mensual: SalarioMensual / (HoursPerWeek × 4.333).
-    /// Considera FactorExceso si aplica.
-    /// </summary>
-    private decimal CalcularMonto(Empleado empleado, decimal cantidadHoras, decimal factorMultiplicador, decimal? factorExceso = null)
-    {
-        decimal hourlyRate = empleado.HourlyRate;
-
-        if (hourlyRate <= 0)
-        {
-            // SalarioBase ya es mensual, no necesita conversión por período
-            hourlyRate = Empleado.ComputeHourlyRateFromMonthly(
-                empleado.SalarioBase, empleado.HoursPerWeek);
-        }
-
-        // Calcular monto: tasa × horas × factor base × (factor exceso si aplica)
-        decimal factorTotal = factorMultiplicador;
-        if (factorExceso.HasValue && factorExceso.Value > 0)
-        {
-            factorTotal *= factorExceso.Value; // Multiplicar por factor de exceso (1.75x)
-        }
-
-        var monto = hourlyRate * cantidadHoras * factorTotal;
-        return Math.Round(monto, 2);
-    }
+    private static decimal CalcularMonto(Empleado empleado, decimal cantidadHoras, decimal factorMultiplicador, decimal? factorExceso = null) =>
+        RegistroHorasExtraService.CalcularMonto(empleado, cantidadHoras, factorMultiplicador, factorExceso);
 
     private string ObtenerNombreTipo(TipoHoraExtra tipo)
     {
