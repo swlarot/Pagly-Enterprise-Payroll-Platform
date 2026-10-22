@@ -11,6 +11,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using Microsoft.Extensions.DependencyInjection;
 using Vorluno.Planilla.Application.DTOs;
 using Vorluno.Planilla.Domain.Enums;
 using Xunit;
@@ -39,6 +40,44 @@ public class CambiosSensiblesTests : IClassFixture<CustomWebApplicationFactory>
     private static async Task<JsonElement> CambioAsync(HttpClient c, int empleadoId, string tipo) =>
         (await c.GetFromJsonAsync<JsonElement>("/api/cambios-pendientes")).EnumerateArray()
             .First(x => x.GetProperty("empleadoId").GetInt32() == empleadoId && x.GetProperty("tipo").GetString() == tipo);
+
+    [Fact]
+    public async Task LaPersonaAfectadaNoConfirmaLoSuyo_YQuienSoloDaDeBajaNoVeSalarios()
+    {
+        var tokenDueno = await TestTenantHelper.CreateTenantAndGetTokenAsync(_factory, "Colegio Separación E2E");
+        var dueno = Cliente(tokenDueno);
+        (await dueno.PutAsJsonAsync("/api/cambios-pendientes/opcion", new { activo = true })).EnsureSuccessStatusCode();
+
+        var r = await dueno.PostAsJsonAsync("/api/empleados", new EmpleadoCrearDto("Carla", "Prueba", $"8-{Guid.NewGuid().ToString()[..4]}-4", null, 1000m, null, null));
+        var carla = (await r.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+
+        // Carla también administra empleados, y su usuario es el de su ficha.
+        var (tokenCarla, userCarla, _) = await TestTenantHelper.CreateCompanionAsync(_factory, tokenDueno, "Carla Prueba", carla,
+            SystemPermission.EmployeesRead, SystemPermission.EmployeesUpdate);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Vorluno.Planilla.Infrastructure.Data.ApplicationDbContext>();
+            var ficha = await db.Empleados.FindAsync(carla);
+            ficha!.UserId = userCarla;
+            await db.SaveChangesAsync();
+        }
+        var (tokenBajas, _, _) = await TestTenantHelper.CreateCompanionAsync(_factory, tokenDueno, "Solo Bajas", null, SystemPermission.EmployeesDelete);
+
+        (await dueno.PutAsJsonAsync($"/api/empleados/{carla}", Datos("Carla", 1500m))).StatusCode.Should().Be(HttpStatusCode.Accepted);
+
+        // Carla ve el cambio pero no puede confirmar su propio aumento, ni le llega el aviso para hacerlo.
+        var carlaCliente = Cliente(tokenCarla);
+        var cambio = await CambioAsync(carlaCliente, carla, "Salario");
+        cambio.GetProperty("puedoConfirmar").GetBoolean().Should().BeFalse();
+        (await carlaCliente.PostAsync($"/api/cambios-pendientes/{cambio.GetProperty("id").GetInt32()}/confirmar", null))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await carlaCliente.GetFromJsonAsync<JsonElement>("/api/avisos")).GetProperty("noLeidos").GetInt32().Should().Be(0);
+        (await SalarioAsync(dueno, carla)).Should().Be(1000m);
+
+        // Quien solo da de baja no ve cambios de salario (ni sus montos).
+        (await Cliente(tokenBajas).GetFromJsonAsync<JsonElement>("/api/cambios-pendientes")).EnumerateArray()
+            .Should().NotContain(x => x.GetProperty("tipo").GetString() == "Salario");
+    }
 
     [Fact]
     public async Task SalarioYBaja_EsperanAOtraPersona()

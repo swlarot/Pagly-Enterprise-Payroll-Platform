@@ -115,7 +115,7 @@ public class CambiosSensiblesService
             : $"{quien} dio de baja a {persona}. No se aplica hasta que otra persona lo confirme.";
         var permiso = tipo == CambioPendiente.TipoSalario ? SystemPermission.EmployeesUpdate : SystemPermission.EmployeesDelete;
 
-        foreach (var u in await ConPermisoAsync(permiso, excepto: solicitante))
+        foreach (var u in await ConPermisoAsync(permiso, excepto: solicitante, afectado: empleado.UserId))
             await AvisarAsync(u.Id, u.Nombre, u.Email, titulo, mensaje, "Confirmar en Pagly", cambio.Id);
 
         await _audit.LogAsync(tipo == CambioPendiente.TipoSalario ? "CambioSalarioPedido" : "BajaPedida", "CambioPendiente", cambio.Id.ToString(),
@@ -144,6 +144,11 @@ public class CambiosSensiblesService
 
         var puedeSalario = await TienePermisoAsync(usuario, SystemPermission.EmployeesUpdate);
         var puedeBaja = await TienePermisoAsync(usuario, SystemPermission.EmployeesDelete);
+
+        // Cada quien ve solo lo que puede resolver o lo que pidió: quien solo da
+        // de baja no ve montos de salario.
+        lista = lista.Where(c => c.SolicitadoPor == usuario
+                              || (c.Tipo == CambioPendiente.TipoSalario ? puedeSalario : puedeBaja)).ToList();
         var ids = lista.SelectMany(c => new[] { c.SolicitadoPor, c.ResueltoPor }).Where(x => x != null).Select(x => x!).Distinct().ToList();
         var nombres = await _context.Users.AsNoTracking().Where(u => ids.Contains(u.Id))
             .ToDictionaryAsync(u => u.Id, u => u.NombreCompleto ?? u.Email ?? "");
@@ -152,7 +157,8 @@ public class CambiosSensiblesService
         return lista.Select(c => new CambioPendienteDto(
             c.Id, c.EmpleadoId, $"{c.Empleado.Nombre} {c.Empleado.Apellido}", c.Tipo, c.SalarioAnterior, c.SalarioNuevo,
             N(c.SolicitadoPor), c.SolicitadoPor == usuario,
-            c.Estado == "Pendiente" && c.SolicitadoPor != usuario && (c.Tipo == CambioPendiente.TipoSalario ? puedeSalario : puedeBaja),
+            c.Estado == "Pendiente" && c.SolicitadoPor != usuario && c.Empleado.UserId != usuario
+                && (c.Tipo == CambioPendiente.TipoSalario ? puedeSalario : puedeBaja),
             c.Estado, c.CreatedAt, c.ResueltoPor == null ? null : N(c.ResueltoPor), c.ResueltoEn, c.Comentario)).ToList();
     }
 
@@ -231,6 +237,10 @@ public class CambiosSensiblesService
         if (cambio == null) return (null, "Ese cambio no existe.");
         if (cambio.Estado != "Pendiente") return (null, "Ese cambio ya se resolvió.");
         if (cambio.SolicitadoPor == usuario) return (null, "Lo tiene que confirmar otra persona, no quien lo pidió.");
+        var usuarioAfectado = await _context.Empleados.AsNoTracking()
+            .Where(e => e.Id == cambio.EmpleadoId && e.TenantId == cambio.TenantId).Select(e => e.UserId).FirstOrDefaultAsync();
+        if (usuarioAfectado != null && usuarioAfectado == usuario)
+            return (null, "Un cambio sobre tu propia ficha lo tiene que resolver otra persona.");
         var permiso = cambio.Tipo == CambioPendiente.TipoSalario ? SystemPermission.EmployeesUpdate : SystemPermission.EmployeesDelete;
         if (!await TienePermisoAsync(usuario, permiso)) return (null, "No tienes permiso para confirmar este cambio.");
         return (cambio, null);
@@ -252,10 +262,11 @@ public class CambiosSensiblesService
         return permisos.Contains(permiso);
     }
 
-    private async Task<List<(string Id, string Nombre, string Email)>> ConPermisoAsync(string permiso, string excepto)
+    private async Task<List<(string Id, string Nombre, string Email)>> ConPermisoAsync(string permiso, string excepto, string? afectado)
     {
         var candidatos = await _context.TenantUsers.AsNoTracking()
-            .Where(tu => tu.TenantId == _tenant.TenantId && tu.IsActive && !tu.IsPendingInvitation && tu.UserId != excepto
+            .Where(tu => tu.TenantId == _tenant.TenantId && tu.IsActive && !tu.IsPendingInvitation
+                      && tu.UserId != excepto && (afectado == null || tu.UserId != afectado)
                       && tu.User != null && !tu.User.IsDeleted)
             .Select(tu => new { tu.UserId, Nombre = tu.User!.NombreCompleto ?? tu.User.Email ?? "", Email = tu.User.Email ?? "" })
             .ToListAsync();
