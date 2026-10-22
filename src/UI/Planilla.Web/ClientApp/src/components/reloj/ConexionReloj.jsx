@@ -7,8 +7,10 @@ import { formatDate } from '../../utils/date';
 // ============================================================
 // Conexión automática del reloj (opción «servidor en la nube» / ADMS):
 // qué escribir en el menú del reloj y la lista de relojes registrados.
-// Solo se aceptan marcas de relojes registrados y activos; a Pagly solo
-// llega quién marcó y a qué hora.
+// El protocolo no tiene contraseña, así que al registrarlo se espera su
+// primera conexión 30 minutos y alguien de la empresa confirma la
+// dirección de internet desde la que llegó; desde entonces solo se
+// aceptan sus envíos desde ahí. A Pagly solo llega quién marcó y a qué hora.
 // ============================================================
 
 function haceCuanto(fecha) {
@@ -46,7 +48,7 @@ export default function ConexionReloj() {
         setGuardando(true);
         try {
             await api.post('/api/reloj/dispositivos', nuevo);
-            toast.success('Reloj registrado; sus marcas entrarán en cuanto se conecte');
+            toast.success('Reloj registrado. Conéctalo en los próximos 30 minutos y confirma aquí su dirección.');
             setNuevo({ numeroSerie: '', nombre: '' });
             await cargar();
         } catch (e) {
@@ -56,16 +58,28 @@ export default function ConexionReloj() {
         }
     };
 
-    const cambiar = async (r) => {
+    const accion = async (r, que) => {
         setOcupado(r.id);
         try {
-            await api.post(`/api/reloj/dispositivos/${r.id}/${r.activo ? 'desactivar' : 'activar'}`);
+            await api.post(`/api/reloj/dispositivos/${r.id}/${que}`);
+            if (que === 'confirmar' || que === 'aceptar-ip') toast.success('Dirección confirmada; sus marcas ya entran');
             await cargar();
         } catch (e) {
             toast.error(e.message || 'No se pudo cambiar el reloj');
         } finally {
             setOcupado(null);
         }
+    };
+
+    const boton = 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-navy-800 hover:bg-navy-700 border border-navy-600 text-gray-200 disabled:opacity-50';
+
+    const vinculo = (r) => {
+        if (!r.activo) return <span className="text-gray-500">desactivado</span>;
+        if (r.ipVinculada) return <span className="text-gray-400">vinculado a <span className="font-mono">{r.ipVinculada}</span> · última conexión {haceCuanto(r.ultimaConexion)}</span>;
+        if (r.ipPendiente) return <span className="text-amber-200">se conectó desde <span className="font-mono">{r.ipPendiente}</span>: ¿es la dirección de internet del colegio?</span>;
+        if (r.esperandoVinculoHasta && new Date(r.esperandoVinculoHasta) > new Date())
+            return <span className="text-gray-400">esperando su primera conexión hasta las {new Date(r.esperandoVinculoHasta).toLocaleTimeString('es-PA', { hour: '2-digit', minute: '2-digit' })}</span>;
+        return <span className="text-gray-500">sin vincular: abre la espera y conecta el reloj</span>;
     };
 
     return (
@@ -117,13 +131,27 @@ export default function ConexionReloj() {
                             {r.activo && r.ultimaConexion ? <Wifi className="w-4 h-4 text-gray-300" /> : <WifiOff className="w-4 h-4 text-gray-500" />}
                             <span className="font-medium text-gray-100">{r.nombre}</span>
                             <span className="font-mono text-xs text-gray-500">{r.numeroSerie}</span>
-                            <span className="text-gray-400">{r.activo ? `última conexión ${haceCuanto(r.ultimaConexion)}` : 'desactivado'}</span>
+                            {vinculo(r)}
                             <span className="text-gray-500">{r.marcasRecibidas} {r.marcasRecibidas === 1 ? 'marca recibida' : 'marcas recibidas'}</span>
-                            <button onClick={() => cambiar(r)} disabled={ocupado === r.id}
-                                className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-navy-800 hover:bg-navy-700 border border-navy-600 text-gray-200 disabled:opacity-50">
-                                {ocupado === r.id && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                                {r.activo ? 'Desactivar' : 'Activar'}
-                            </button>
+                            <span className="ml-auto flex flex-wrap gap-2">
+                                {ocupado === r.id && <Loader2 className="w-4 h-4 text-primary-400 animate-spin self-center" />}
+                                {r.activo && r.ipPendiente && !r.ipVinculada && (
+                                    <button onClick={() => accion(r, 'confirmar')} disabled={ocupado === r.id} className={boton}>Sí, confirmar</button>
+                                )}
+                                {r.activo && !r.ipVinculada && !r.ipPendiente && !(r.esperandoVinculoHasta && new Date(r.esperandoVinculoHasta) > new Date()) && (
+                                    <button onClick={() => accion(r, 'esperar')} disabled={ocupado === r.id} className={boton}>Esperar conexión</button>
+                                )}
+                                <button onClick={() => accion(r, r.activo ? 'desactivar' : 'activar')} disabled={ocupado === r.id} className={boton}>
+                                    {r.activo ? 'Desactivar' : 'Activar'}
+                                </button>
+                            </span>
+                            {r.activo && r.ipRechazada && (
+                                <span className="basis-full flex flex-wrap items-center gap-2 text-xs text-amber-200">
+                                    Se rechazó una conexión desde <span className="font-mono">{r.ipRechazada}</span>
+                                    {r.ipRechazadaEn && <> ({haceCuanto(r.ipRechazadaEn)})</>}. Si el colegio cambió de internet, acéptala:
+                                    <button onClick={() => accion(r, 'aceptar-ip')} disabled={ocupado === r.id} className={boton}>Aceptar esta dirección</button>
+                                </span>
+                            )}
                         </li>
                     ))}
                 </ul>
