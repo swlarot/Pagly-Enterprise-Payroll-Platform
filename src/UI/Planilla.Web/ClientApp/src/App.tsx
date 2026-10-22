@@ -38,6 +38,7 @@ import DeduccionesPage from './pages/DeduccionesPage.jsx';
 import AcreedoresPage from './pages/AcreedoresPage.jsx';
 import AnticiposPage from './pages/AnticiposPage.jsx';
 import HorasExtraPage from './pages/HorasExtraPage.jsx';
+import AvisosPage from './pages/AvisosPage.jsx';
 import AusenciasPage from './pages/AusenciasPage.jsx';
 import VacacionesPage from './pages/VacacionesPage.jsx';
 import PlanillasPage from './pages/PlanillasPage.jsx';
@@ -376,6 +377,17 @@ function App() {
             <ProtectedRoute>
               <AuthLayout>
                 <AnticiposPage />
+              </AuthLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/avisos"
+          element={
+            <ProtectedRoute>
+              <AuthLayout>
+                <AvisosPage />
               </AuthLayout>
             </ProtectedRoute>
           }

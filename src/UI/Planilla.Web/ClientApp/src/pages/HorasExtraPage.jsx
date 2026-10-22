@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Plus, FileDown } from 'lucide-react';
 import { api } from '../services/api';
+import { leerEnlaceMes, useEnlaceMes } from '../utils/enlaceMes';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmModal from '../components/ConfirmModal';
 import { formatCurrency } from '../utils/currency';
@@ -9,6 +10,7 @@ import { NOMBRES_MES } from '../utils/periodos';
 import SelectorMes from '../components/planillas/SelectorMes';
 import GrupoColaborador from '../components/horasExtra/GrupoColaborador';
 import FormularioHoraExtra from '../components/horasExtra/FormularioHoraExtra';
+import PedirRevision from '../components/revisiones/PedirRevision';
 
 // ============================================================
 // Horas extra por mes, con la decisión del director.
@@ -34,6 +36,8 @@ const FILTROS = [
 ];
 
 function mesInicial() {
+  const enlace = leerEnlaceMes(window.location.search);
+  if (enlace) return { anio: enlace.anio, mes: enlace.mes };
     try {
         const g = JSON.parse(localStorage.getItem(CLAVE_MES) || 'null');
         if (g?.anio && g?.mes) return g;
@@ -62,6 +66,9 @@ export default function HorasExtraPage() {
         setPeriodo({ anio: a, mes: m });
         try { localStorage.setItem(CLAVE_MES, JSON.stringify({ anio: a, mes: m })); } catch { /* sin memoria */ }
     };
+
+    // Un aviso o un correo puede pedir un mes concreto.
+    useEnlaceMes(({ anio: a, mes: m }) => cambiarMes(a, m));
 
     const cargar = useCallback(async (silencioso = false) => {
         try {
@@ -190,6 +197,12 @@ export default function HorasExtraPage() {
                     )}
                 </div>
             </div>
+
+            {resumen.total > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                    <PedirRevision key={`${anio}-${mes}`} tipo={4} entidadId={anio * 100 + mes} />
+                </div>
+            )}
 
             {resumen.total > 0 && (
                 <div role="tablist" aria-label="Filtrar por estado" className="flex flex-wrap gap-1 p-1 bg-navy-900 border border-navy-700 rounded-lg w-fit max-w-full">

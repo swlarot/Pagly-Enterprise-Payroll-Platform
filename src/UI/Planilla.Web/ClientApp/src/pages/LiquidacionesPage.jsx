@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { api } from '../services/api';
+import { leerEnlaceMes, useEnlaceMes } from '../utils/enlaceMes';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../utils/currency';
 import { NOMBRES_MES } from '../utils/periodos';
@@ -25,6 +26,8 @@ import { Modal } from '../components/ui/Modal';
 const CLAVE_MES = 'pagly.liquidaciones.mes';
 
 function mesInicial() {
+  const enlace = leerEnlaceMes(window.location.search);
+  if (enlace) return { anio: enlace.anio, mes: enlace.mes };
   try {
     const g = JSON.parse(localStorage.getItem(CLAVE_MES) || 'null');
     if (g?.anio && g?.mes) return g;
@@ -38,7 +41,7 @@ export default function LiquidacionesPage() {
   const [{ anio, mes }, setPeriodo] = useState(mesInicial);
   const [liquidaciones, setLiquidaciones] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [abierta, setAbierta] = useState(null);
+  const [abierta, setAbierta] = useState(() => leerEnlaceMes(window.location.search)?.abrir ?? null);
   const [ocupada, setOcupada] = useState(null);
   const [errores, setErrores] = useState({});
   const [confirmacion, setConfirmacion] = useState(null); // { tipo, liquidacion }
@@ -49,6 +52,9 @@ export default function LiquidacionesPage() {
     setAbierta(null);
     try { localStorage.setItem(CLAVE_MES, JSON.stringify({ anio: a, mes: m })); } catch { /* sin memoria */ }
   };
+
+  // Un aviso o un correo puede pedir un mes y una fila concretos.
+  useEnlaceMes(({ anio: a, mes: m, abrir }) => { cambiarMes(a, m); if (abrir) setAbierta(abrir); });
 
   const cargar = useCallback(async (silencioso = false) => {
     try {

@@ -72,6 +72,9 @@ namespace Vorluno.Planilla.Web.Extensions
             services.AddScoped<ReportesService>();
             services.AddScoped<ExportacionService>();
 
+            // Revisiones entre el equipo y avisos de la campana
+            services.AddScoped<Vorluno.Planilla.Infrastructure.Services.RevisionesService>();
+
             // TODO: React SPA will communicate via REST API endpoints, no server-side interop needed
         }
     }

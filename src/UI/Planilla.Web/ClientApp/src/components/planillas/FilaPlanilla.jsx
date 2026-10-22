@@ -5,6 +5,7 @@ import { formatDayMonth, formatDate } from '../../utils/date';
 import { PAY_PERIOD_CONFIG } from '../../constants/payroll';
 import TablaPlanilla from './TablaPlanilla';
 import PanelHoras from './PanelHoras';
+import PedirRevision from '../revisiones/PedirRevision';
 
 // ============================================================
 // Una planilla del mes: cabecera con estado y totales, sus acciones según
@@ -24,6 +25,7 @@ const ESTADO = {
   4: { label: 'Anulada', cls: 'bg-red-900/60 text-red-200 line-through' },
 };
 
+// eslint-disable-next-line no-unused-vars -- Icon se usa como componente en el JSX
 const Btn = ({ onClick, icon: Icon, children, primario, peligro, disabled, title }) => (
   <button
     onClick={(e) => { e.stopPropagation(); onClick(); }}
@@ -100,6 +102,7 @@ export default function FilaPlanilla({ planilla, abierta, ocupada, atenuada, err
             </>
           )}
           {planilla.status === 2 && <Btn onClick={() => onAccion('pagar')} icon={Banknote} primario disabled={ocupada}>Marcar pagada</Btn>}
+          {planilla.status <= 2 && <PedirRevision tipo={1} entidadId={planilla.id} disabled={ocupada} />}
           <span className="ml-auto flex items-center gap-2">
             {planilla.status === 0 && <Btn onClick={() => onAccion('eliminar')} icon={Trash2} peligro disabled={ocupada} title="Solo borradores">Eliminar</Btn>}
             {(planilla.status === 1 || planilla.status === 2) && <Btn onClick={() => onAccion('anular')} icon={Ban} peligro disabled={ocupada}>Anular</Btn>}
