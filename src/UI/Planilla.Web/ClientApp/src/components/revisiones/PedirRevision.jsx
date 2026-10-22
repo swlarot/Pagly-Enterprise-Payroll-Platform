@@ -44,7 +44,7 @@ export default function PedirRevision({ tipo, entidadId, disabled }) {
         setTexto('');
         if (revisores == null) {
             try {
-                const r = await api.get('/api/revisiones/revisores');
+                const r = await api.get(`/api/revisiones/revisores?tipo=${tipo}`);
                 setRevisores(r);
                 if (r.length === 1) setRevisorId(r[0].userId);
             } catch (err) {
