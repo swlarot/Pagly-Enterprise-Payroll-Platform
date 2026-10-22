@@ -60,6 +60,10 @@ public class RelojAsistenciaService
     // 1. Leer
     // ----------------------------------------------------------------
 
+    // Topes de la hoja de un Excel: filas y columnas.
+    private const int MaximoFilas = 200_000;
+    private const int MaximoColumnas = 60;
+
     /// <summary>Lee el archivo según su tipo. El .xls antiguo no se lee: se pide guardarlo como .xlsx o .csv.</summary>
     public static ResultadoLectura LeerArchivo(Stream stream, string nombreArchivo)
     {
@@ -71,10 +75,17 @@ public class RelojAsistenciaService
         {
             try
             {
-                using var libro = new XLWorkbook(stream);
+                // Abrir con tope de tamaño descomprimido (un .xlsx es un zip).
+                using var libro = ExcelSubido.Abrir(stream, out var problema);
+                if (libro == null)
+                    return Falla(problema == "demasiado grande"
+                        ? "El Excel es demasiado grande. Exporta solo el período que necesitas o guárdalo como .csv."
+                        : "No se pudo abrir el Excel. Revisa que no esté protegido ni dañado.");
                 var hoja = libro.Worksheets.First();
                 var rango = hoja.RangeUsed();
                 if (rango == null) return Falla("La hoja está vacía.");
+                if (rango.RowCount() > MaximoFilas || rango.ColumnCount() > MaximoColumnas)
+                    return Falla($"La hoja pasa de {MaximoFilas:N0} filas o {MaximoColumnas} columnas. Exporta solo el período que necesitas.");
                 var filas = rango.Rows()
                     .Select(f => (IReadOnlyList<object?>)f.Cells(1, rango.ColumnCount()).Select(ValorCelda).ToList())
                     .ToList();
@@ -293,7 +304,7 @@ public class RelojAsistenciaService
                         : d < cubiertoDesde || d > cubiertoHasta ? "Sin datos"
                         : "Ausente";
                 }
-                else if (delDia.Count == 1) estado = "Sin salida";
+                else if (delDia.Count == 1) estado = d >= hoy ? "En curso" : "Sin salida";
                 else if (!laborable) estado = "Día libre trabajado";
                 else estado = tarde > 0 ? "Tarde" : "Completo";
 
@@ -363,6 +374,70 @@ public class RelojAsistenciaService
             }
         }
         return creadas;
+    }
+
+    // ----------------------------------------------------------------
+    // 5. Lo que envía el reloj solo (ADMS)
+    // ----------------------------------------------------------------
+
+    /// <summary>
+    /// Reloj registrado y activo con ese número de serie, o null. La petición
+    /// del reloj no trae sesión: la empresa sale del dispositivo, no del usuario.
+    /// </summary>
+    public Task<DispositivoReloj?> DispositivoAsync(string? numeroSerie)
+    {
+        var sn = numeroSerie?.Trim();
+        if (string.IsNullOrEmpty(sn)) return Task.FromResult<DispositivoReloj?>(null);
+        return _context.DispositivosReloj.IgnoreQueryFilters()
+            .FirstOrDefaultAsync(d => d.NumeroSerie == sn && d.Activo);
+    }
+
+    /// <summary>
+    /// Guarda las marcaciones que envió el reloj (tabla ATTLOG: «número⇥fecha hora⇥…»),
+    /// sin duplicar, en la empresa del dispositivo. Devuelve cuántas líneas recibió.
+    /// </summary>
+    public async Task<int> RecibirDelRelojAsync(DispositivoReloj dispositivo, string cuerpo)
+    {
+        var tenantId = dispositivo.TenantId;
+        var lectura = LectorMarcaciones.LeerTexto(cuerpo);
+        var ahora = DateTime.UtcNow;
+        dispositivo.UltimaConexion = ahora;
+
+        if (lectura.Marcas.Count > 0)
+        {
+            var codigos = lectura.Marcas.Select(m => m.Codigo).Distinct().ToList();
+            var (min, max) = (Utc(lectura.Marcas.Min(m => m.FechaHora)), Utc(lectura.Marcas.Max(m => m.FechaHora)));
+
+            // Sin sesión los filtros por empresa no actúan: se filtra a mano por la del reloj.
+            var existentes = (await _context.Marcaciones.IgnoreQueryFilters().AsNoTracking()
+                    .Where(m => m.TenantId == tenantId && codigos.Contains(m.CodigoReloj) && m.FechaHora >= min && m.FechaHora <= max)
+                    .Select(m => new { m.CodigoReloj, m.FechaHora })
+                    .ToListAsync())
+                .Select(x => (x.CodigoReloj, Utc(x.FechaHora))).ToHashSet();
+            var porCodigo = await _context.Empleados.IgnoreQueryFilters().AsNoTracking()
+                .Where(e => e.TenantId == tenantId && e.CodigoReloj != null && codigos.Contains(e.CodigoReloj))
+                .ToDictionaryAsync(e => e.CodigoReloj!, e => e.Id);
+
+            var nuevas = lectura.Marcas
+                .Where(m => !existentes.Contains((m.Codigo, Utc(m.FechaHora))))
+                .Select(m => new Marcacion
+                {
+                    TenantId = tenantId,
+                    CodigoReloj = m.Codigo,
+                    EmpleadoId = porCodigo.TryGetValue(m.Codigo, out var id) ? id : null,
+                    FechaHora = Utc(m.FechaHora),
+                    Origen = "Reloj",
+                    Fuente = dispositivo.NumeroSerie,
+                    CreatedAt = ahora,
+                })
+                .ToList();
+            _context.Marcaciones.AddRange(nuevas);
+            dispositivo.MarcasRecibidas += nuevas.Count;
+            if (nuevas.Count > 0) dispositivo.UltimaMarcacion = nuevas.Max(n => n.FechaHora);
+        }
+
+        await _context.SaveChangesAsync();
+        return lectura.Marcas.Count;
     }
 
     // ----------------------------------------------------------------

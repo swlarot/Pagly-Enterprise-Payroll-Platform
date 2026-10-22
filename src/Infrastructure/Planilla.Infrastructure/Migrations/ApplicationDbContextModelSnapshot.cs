@@ -1211,6 +1211,53 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.ToTable("DevengadosMensuales");
                 });
 
+            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.DispositivoReloj", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MarcasRecibidas")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("NumeroSerie")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UltimaConexion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UltimaMarcacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NumeroSerie")
+                        .IsUnique()
+                        .HasDatabaseName("IX_DispositivoReloj_NumeroSerie");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("DispositivosReloj");
+                });
+
             modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.Empleado", b =>
                 {
                     b.Property<int>("Id")
@@ -3815,6 +3862,17 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Empleado");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.DispositivoReloj", b =>
+                {
+                    b.HasOne("Vorluno.Planilla.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Tenant");
                 });
