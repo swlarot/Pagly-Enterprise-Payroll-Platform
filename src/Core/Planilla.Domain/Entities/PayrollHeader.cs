@@ -67,6 +67,13 @@ public class PayrollHeader : ITenantEntity
     public TipoPlanilla TipoPlanilla { get; set; } = TipoPlanilla.Regular;
 
     /// <summary>
+    /// Planilla aparte para pagarle a una o pocas personas que se quedaron
+    /// fuera de la planilla de su período. Solo incluye a las elegidas al
+    /// crearla; se calcula como si hubieran estado en la original.
+    /// </summary>
+    public bool EsExtraordinaria { get; set; }
+
+    /// <summary>
     /// Estado actual de la planilla en el workflow.
     /// </summary>
     public PayrollStatus Status { get; set; } = PayrollStatus.Draft;

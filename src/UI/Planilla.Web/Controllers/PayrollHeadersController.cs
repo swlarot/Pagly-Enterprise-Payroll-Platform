@@ -131,7 +131,7 @@ public class PayrollHeadersController : ControllerBase
                     p.PayPeriodType, p.TipoPlanilla, p.Status,
                     p.TotalGrossPay, p.TotalDeductions, p.TotalNetPay, p.TotalEmployerCost,
                     p.Details.Count(d => linkedEmployeeId == null || d.EmpleadoId == linkedEmployeeId.Value),
-                    p.ProcessedDate, p.ApprovedDate, p.PaidDate, p.CreatedAt))
+                    p.ProcessedDate, p.ApprovedDate, p.PaidDate, p.CreatedAt, p.EsExtraordinaria))
                 .ToListAsync();
             return Ok(resumen);
         }
@@ -214,6 +214,19 @@ public class PayrollHeadersController : ControllerBase
 
         var payDate = request.PayDate ?? request.PeriodEndDate;
 
+        // Extraordinaria: hace falta saber a quién se le paga, y que estén activos.
+        List<int>? soloEmpleados = null;
+        if (request.EsExtraordinaria)
+        {
+            soloEmpleados = request.EmpleadoIds?.Distinct().ToList() ?? new List<int>();
+            if (soloEmpleados.Count == 0)
+                return BadRequest(new { message = "Elige al menos a una persona para la planilla extraordinaria." });
+            var validos = await _context.Empleados
+                .CountAsync(e => e.TenantId == tenantId && e.EstaActivo && soloEmpleados.Contains(e.Id));
+            if (validos != soloEmpleados.Count)
+                return BadRequest(new { message = "Alguna de las personas elegidas no existe o no está activa." });
+        }
+
         // ====================================================================
         // Auto-generar PayrollNumber si no se proporciona o si ya existe
         // ====================================================================
@@ -259,6 +272,7 @@ public class PayrollHeadersController : ControllerBase
             PayDate = DateTime.SpecifyKind(payDate, DateTimeKind.Utc),
             PayPeriodType = request.PayPeriodType,
             TipoPlanilla = request.TipoPlanilla,
+            EsExtraordinaria = request.EsExtraordinaria,
             Status = PayrollStatus.Draft,
             CreatedAt = DateTime.UtcNow
         };
@@ -274,7 +288,7 @@ public class PayrollHeadersController : ControllerBase
             // período. Todo en una transacción: o queda completa o no queda.
             await using var tx = await _context.Database.BeginTransactionAsync();
             await _context.SaveChangesAsync();
-            horasGeneradas = await _horasService.GenerarHorasPorDefectoAsync(payrollHeader);
+            horasGeneradas = await _horasService.GenerarHorasPorDefectoAsync(payrollHeader, soloEmpleados);
             novedades = await _horasService.ImportarNovedadesAsync(payrollHeader, ModoNovedades.Sobrescribir);
             await _context.SaveChangesAsync();
             await tx.CommitAsync();
@@ -293,6 +307,7 @@ public class PayrollHeadersController : ControllerBase
                         ["PeriodEnd"] = payrollHeader.PeriodEndDate.ToString("yyyy-MM-dd"),
                         ["PayDate"] = payrollHeader.PayDate.ToString("yyyy-MM-dd"),
                         ["Status"] = payrollHeader.Status.ToString(),
+                        ["Extraordinaria"] = payrollHeader.EsExtraordinaria ? "si" : "no",
                         ["HorasGeneradas"] = horasGeneradas.ToString(),
                         ["EmpleadosConNovedades"] = (novedades?.EmpleadosConNovedades ?? 0).ToString()
                     });
@@ -320,6 +335,7 @@ public class PayrollHeadersController : ControllerBase
             payrollHeader.PayDate,
             payrollHeader.PayPeriodType,
             payrollHeader.TipoPlanilla,
+            payrollHeader.EsExtraordinaria,
             payrollHeader.Status,
             horasGeneradas,
             novedades = new
@@ -329,6 +345,72 @@ public class PayrollHeadersController : ControllerBase
                 horasAusencia = novedades?.HorasAusencia ?? 0m,
             }
         });
+    }
+
+    /// <summary>
+    /// Antes de crear una extraordinaria: ¿alguna de esas personas ya está en
+    /// otra planilla (no anulada) que cubre parte de ese período? Para no
+    /// pagar dos veces. No bloquea: la pantalla lo enseña.
+    /// POST /api/payrollheaders/extraordinaria/verificar
+    /// </summary>
+    [HttpPost("extraordinaria/verificar")]
+    [RequirePermission(SystemPermission.PayrollCalculate)]
+    public async Task<ActionResult> VerificarExtraordinaria([FromBody] VerificarExtraordinariaRequest request)
+    {
+        var tenantId = _tenantContext.TenantId;
+        var ids = request.EmpleadoIds?.Distinct().ToList() ?? new List<int>();
+        if (ids.Count == 0) return Ok(Array.Empty<object>());
+
+        var inicio = request.PeriodStartDate.Date;
+        var fin = request.PeriodEndDate.Date;
+
+        // Está en una planilla si tiene su detalle (calculada) o su fila de horas (borrador).
+        var cruzadas = await _context.PayrollHeaders.AsNoTracking()
+            .Where(p => p.TenantId == tenantId && p.Status != PayrollStatus.Cancelled
+                     && p.PeriodStartDate <= fin && p.PeriodEndDate >= inicio)
+            .Select(p => new { p.Id, p.PayrollNumber, p.PeriodStartDate, p.PeriodEndDate, p.Status, p.EsExtraordinaria })
+            .ToListAsync();
+        var planillaIds = cruzadas.Select(p => p.Id).ToList();
+        var conDetalle = await _context.PayrollDetails.AsNoTracking()
+            .Where(d => planillaIds.Contains(d.PayrollHeaderId) && ids.Contains(d.EmpleadoId))
+            .Select(d => new { d.PayrollHeaderId, d.EmpleadoId })
+            .ToListAsync();
+        var conHoras = await _context.PayrollEmployeeHours.AsNoTracking()
+            .Where(h => planillaIds.Contains(h.PayrollHeaderId) && ids.Contains(h.EmpleadoId))
+            .Select(h => new { h.PayrollHeaderId, h.EmpleadoId })
+            .ToListAsync();
+        var pares = conDetalle.Concat(conHoras).Distinct().ToList();
+        var enPlanillas = cruzadas
+            .Select(p => new
+            {
+                p.PayrollNumber, p.PeriodStartDate, p.PeriodEndDate, p.Status, p.EsExtraordinaria,
+                Empleados = pares.Where(x => x.PayrollHeaderId == p.Id).Select(x => x.EmpleadoId).ToList(),
+            })
+            .ToList();
+
+        var nombres = await _context.Empleados.AsNoTracking()
+            .Where(e => e.TenantId == tenantId && ids.Contains(e.Id))
+            .ToDictionaryAsync(e => e.Id, e => $"{e.Nombre} {e.Apellido}");
+
+        var estado = new Dictionary<PayrollStatus, string>
+        {
+            [PayrollStatus.Draft] = "en borrador", [PayrollStatus.Calculated] = "calculada",
+            [PayrollStatus.Approved] = "aprobada", [PayrollStatus.Paid] = "pagada",
+        };
+
+        var resultado = ids
+            .Select(id => new
+            {
+                empleadoId = id,
+                nombre = nombres.TryGetValue(id, out var n) ? n : "",
+                planillas = enPlanillas.Where(p => p.Empleados.Contains(id))
+                    .Select(p => $"{p.PayrollNumber}{(p.EsExtraordinaria ? " (extraordinaria)" : "")}, {p.PeriodStartDate:dd/MM}–{p.PeriodEndDate:dd/MM}, {estado.GetValueOrDefault(p.Status, "")}")
+                    .ToList(),
+            })
+            .Where(x => x.planillas.Count > 0)
+            .ToList();
+
+        return Ok(resultado);
     }
 
     /// <summary>
@@ -408,6 +490,17 @@ public class PayrollHeadersController : ControllerBase
             var employeeHoursMap = await _context.PayrollEmployeeHours
                 .Where(h => h.PayrollHeaderId == payrollHeader.Id && h.TenantId == tenantId)
                 .ToDictionaryAsync(h => h.EmpleadoId);
+
+            // Una extraordinaria solo calcula a las personas que se eligieron al crearla.
+            if (payrollHeader.EsExtraordinaria)
+            {
+                activeEmployees = activeEmployees.Where(e => employeeHoursMap.ContainsKey(e.Id)).ToList();
+                if (activeEmployees.Count == 0)
+                {
+                    await transaction.RollbackAsync();
+                    return BadRequest(new { message = "Esta planilla extraordinaria no tiene a nadie activo para calcular." });
+                }
+            }
 
             // Licencias de maternidad del período: esos días no se pagan en la
             // planilla (los paga la CSS). La colaboradora sigue en la planilla,
@@ -1467,8 +1560,13 @@ public record CreatePayrollHeaderRequest(
     // nada en el cálculo. Si no viene, se usa el fin del período.
     DateTime? PayDate = null,
     PayPeriodType PayPeriodType = PayPeriodType.Quincenal,
-    TipoPlanilla TipoPlanilla = TipoPlanilla.Regular
+    TipoPlanilla TipoPlanilla = TipoPlanilla.Regular,
+    // Extraordinaria: solo para estas personas (las que se quedaron fuera).
+    bool EsExtraordinaria = false,
+    List<int>? EmpleadoIds = null
 );
+
+public record VerificarExtraordinariaRequest(DateTime PeriodStartDate, DateTime PeriodEndDate, List<int> EmpleadoIds);
 
 public record UpsertEmployeeHoursRequest(
     decimal RegularHours,

@@ -22,9 +22,14 @@ public class HorasPlanillaService : IHorasPlanillaService
         _context = context ?? throw new ArgumentNullException(nameof(context));
     }
 
-    public async Task<int> GenerarHorasPorDefectoAsync(PayrollHeader planilla, CancellationToken ct = default)
+    public async Task<int> GenerarHorasPorDefectoAsync(PayrollHeader planilla, IReadOnlyCollection<int>? soloEmpleados = null, CancellationToken ct = default)
     {
         var tenantId = planilla.TenantId;
+
+        // Una extraordinaria solo lleva a las personas elegidas al crearla:
+        // nunca se le agregan todos los activos.
+        if (planilla.EsExtraordinaria && soloEmpleados == null)
+            return 0;
 
         var existentes = await _context.PayrollEmployeeHours
             .Where(h => h.PayrollHeaderId == planilla.Id && h.TenantId == tenantId)
@@ -42,7 +47,7 @@ public class HorasPlanillaService : IHorasPlanillaService
             .ToListAsync(ct);
 
         var nuevas = activos
-            .Where(e => !existentes.Contains(e.Id))
+            .Where(e => !existentes.Contains(e.Id) && (soloEmpleados == null || soloEmpleados.Contains(e.Id)))
             .Select(e => new PayrollEmployeeHours
             {
                 PayrollHeaderId = planilla.Id,
@@ -118,6 +123,14 @@ public class HorasPlanillaService : IHorasPlanillaService
         foreach (var e in _context.ChangeTracker.Entries<PayrollEmployeeHours>())
             if (e.State == EntityState.Added && e.Entity.PayrollHeaderId == planilla.Id && !filas.ContainsKey(e.Entity.EmpleadoId))
                 filas[e.Entity.EmpleadoId] = e.Entity;
+
+        // En una extraordinaria, las novedades solo van a quienes ya están en ella.
+        if (planilla.EsExtraordinaria)
+        {
+            conNovedades = conNovedades.Where(kv => filas.ContainsKey(kv.Key)).ToList();
+            if (conNovedades.Count == 0)
+                return new ResumenNovedades(false, 0, 0, 0, 0, 0);
+        }
 
         var conPrevios = conNovedades.Count(kv =>
             filas.TryGetValue(kv.Key, out var f) && (f.OvertimeDayHours > 0 || f.OvertimeNightHours > 0 || f.AbsenceHours > 0));

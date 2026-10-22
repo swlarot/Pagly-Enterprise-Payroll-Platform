@@ -69,6 +69,7 @@ export default function FilaPlanilla({ planilla, abierta, ocupada, atenuada, err
           <span className="font-mono font-semibold text-gray-100">{planilla.payrollNumber}</span>
           <span className="text-xs px-1.5 py-0.5 rounded bg-navy-800 border border-navy-600 text-gray-300">{tipo}</span>
           {planilla.tipoPlanilla === 1 && <span className="text-xs px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-200">Sin deducciones</span>}
+          {planilla.esExtraordinaria && <span className="text-xs px-1.5 py-0.5 rounded bg-violet-900/40 text-violet-200">Extraordinaria</span>}
         </div>
         <span className="text-sm text-gray-300">
           {formatDayMonth(planilla.periodStartDate)} – {formatDayMonth(planilla.periodEndDate)}
@@ -76,10 +77,10 @@ export default function FilaPlanilla({ planilla, abierta, ocupada, atenuada, err
         </span>
         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.cls}`}>{st.label}</span>
         {calculada && (
-          <span className="text-sm text-gray-300 ml-auto whitespace-nowrap">
+          <span className="text-sm text-gray-300 ml-auto sm:whitespace-nowrap">
             <span className="text-gray-500">{empleados} {empleados === 1 ? 'empleado' : 'empleados'} ·</span>{' '}
-            Bruto <span className="font-mono text-gray-100">{formatCurrency(planilla.totalGrossPay)}</span>{' '}
-            <span className="text-gray-500">·</span> Neto <span className="font-mono text-emerald-400">{formatCurrency(planilla.totalNetPay)}</span>
+            Bruto <span className="font-mono text-gray-100 whitespace-nowrap">{formatCurrency(planilla.totalGrossPay)}</span>{' '}
+            <span className="text-gray-500">·</span> Neto <span className="font-mono text-emerald-400 whitespace-nowrap">{formatCurrency(planilla.totalNetPay)}</span>
           </span>
         )}
       </div>

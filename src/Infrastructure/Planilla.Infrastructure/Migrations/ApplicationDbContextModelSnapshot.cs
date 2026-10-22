@@ -2148,6 +2148,9 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("EsExtraordinaria")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsApproved")
                         .HasColumnType("boolean");
 
