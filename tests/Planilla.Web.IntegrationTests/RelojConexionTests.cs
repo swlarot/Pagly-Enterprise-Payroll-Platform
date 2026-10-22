@@ -125,6 +125,23 @@ public class RelojConexionTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task ConIpPrivada_NoSeVinculaSolo()
+    {
+        // Si la IP fuera la de la red interna (o el proxy no añadiera la real), no se adivina.
+        var colegio = await ClienteAsync("Colegio ADMS IP Privada E2E", ip: "10.0.3.7");
+        var reloj = Reloj("10.0.3.7");
+        var sn = NuevoSn();
+        (await colegio.PostAsJsonAsync("/api/reloj/dispositivos", new { numeroSerie = sn, nombre = "Entrada" })).EnsureSuccessStatusCode();
+
+        (await reloj.GetAsync($"/iclock/cdata?SN={sn}&options=all")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+        (await DispositivoAsync(colegio, sn)).GetProperty("ipPendiente").GetString().Should().Be("10.0.3.7");
+
+        Vorluno.Planilla.Infrastructure.Services.RelojAsistenciaService.EsIpPublica("190.140.10.20").Should().BeTrue();
+        foreach (var privada in new[] { "10.1.2.3", "172.20.0.1", "192.168.1.10", "127.0.0.1", "::1", "100.64.0.9", "desconocida", "::ffff:10.0.0.1" })
+            Vorluno.Planilla.Infrastructure.Services.RelojAsistenciaService.EsIpPublica(privada).Should().BeFalse(privada);
+    }
+
+    [Fact]
     public async Task RegistradoDesdeOtraRed_QuedaPendienteHastaConfirmarLaIpVista()
     {
         var colegio = await ClienteAsync("Colegio ADMS Pendiente E2E", ip: "181.1.1.1"); // registra desde su casa
