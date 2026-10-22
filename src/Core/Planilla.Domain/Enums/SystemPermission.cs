@@ -84,6 +84,9 @@ public static class SystemPermission
     /// <summary>Gestionar horas extra</summary>
     public const string OvertimeManage = "overtime.manage";
 
+    /// <summary>Decidir qué horas extra se pagan (aprobar, rechazar o dejar pendiente)</summary>
+    public const string OvertimeApprove = "overtime.approve";
+
     /// <summary>Gestionar ausencias e inasistencias</summary>
     public const string AbsencesManage = "absences.manage";
 
@@ -162,7 +165,8 @@ public static class SystemPermission
             // Conceptos de nómina
             new(LoansManage, "Gestionar Préstamos", "Administrar préstamos de empleados", "payroll-concepts"),
             new(DeductionsManage, "Gestionar Deducciones", "Administrar deducciones fijas", "payroll-concepts"),
-            new(OvertimeManage, "Gestionar Horas Extra", "Registrar y aprobar horas extra", "payroll-concepts"),
+            new(OvertimeManage, "Gestionar Horas Extra", "Registrar y corregir horas extra", "payroll-concepts"),
+            new(OvertimeApprove, "Aprobar Horas Extra", "Decidir qué horas extra se pagan", "payroll-concepts"),
             new(AbsencesManage, "Gestionar Ausencias", "Registrar ausencias e inasistencias", "payroll-concepts"),
             new(VacationsManage, "Gestionar Vacaciones", "Aprobar solicitudes de vacaciones", "payroll-concepts"),
             new(AdvancesManage, "Gestionar Anticipos", "Administrar anticipos de salario", "payroll-concepts"),

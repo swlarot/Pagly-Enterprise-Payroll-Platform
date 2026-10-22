@@ -910,6 +910,117 @@ public class ExportacionService
     }
 
     // ====================================================================
+    // Horas extra — control interno (Excel)
+    // ====================================================================
+
+    /// <summary>
+    /// Dos hojas: el resumen por persona con lo que costó, y cada registro con
+    /// la decisión del director. Vacío si el mes no tiene horas extra.
+    /// </summary>
+    public byte[] ExportarExcelHorasExtra(ReporteHorasExtraDto reporte)
+    {
+        if (!reporte.Empleados.Any())
+            return Array.Empty<byte>();
+
+        using var workbook = new XLWorkbook();
+        var ws = workbook.Worksheets.Add("Resumen");
+
+        const int cols = 10;
+        AplicarEstiloEncabezado(ws, "HORAS EXTRA — CONTROL INTERNO", reporte.NombreEmpresa, reporte.Ruc, reporte.Periodo, cols);
+        ws.Cell("A5").Value = $"Generado: {reporte.FechaGeneracion:dd/MM/yyyy HH:mm}  |  Cuotas patronales estimadas con CSS {reporte.TasaCssPatronal:0.##} %, SE {reporte.TasaSePatronal:0.##} % y el riesgo profesional de cada persona";
+
+        var hr = 7;
+        string[] titulos = { "Cédula", "Nombre", "Horas registradas", "Aprobadas", "Rechazadas", "Pendientes", "Monto aprobado", "Pagado en planilla", "Cuotas patronales", "Costo total" };
+        for (var i = 0; i < titulos.Length; i++) ws.Cell(hr, i + 1).Value = titulos[i];
+        AplicarEstiloHeaderFila(ws, hr, cols);
+
+        var row = hr + 1;
+        foreach (var e in reporte.Empleados)
+        {
+            ws.Cell(row, 1).Value = e.Cedula;
+            ws.Cell(row, 2).Value = e.NombreCompleto;
+            ws.Cell(row, 3).Value = e.HorasRegistradas;
+            ws.Cell(row, 4).Value = e.HorasAprobadas;
+            ws.Cell(row, 5).Value = e.HorasRechazadas;
+            ws.Cell(row, 6).Value = e.HorasPendientes;
+            ws.Cell(row, 7).Value = e.MontoAprobado;
+            ws.Cell(row, 8).Value = e.MontoPagado;
+            ws.Cell(row, 9).Value = e.CuotasPatronales;
+            ws.Cell(row, 10).Value = e.MontoAprobado + e.CuotasPatronales;
+            ws.Range(row, 3, row, 6).Style.NumberFormat.Format = "0.00";
+            ws.Range(row, 7, row, 10).Style.NumberFormat.Format = "#,##0.00";
+            row++;
+        }
+
+        var t = reporte.Totales;
+        ws.Cell(row, 2).Value = "TOTALES";
+        ws.Cell(row, 3).Value = t.HorasRegistradas;
+        ws.Cell(row, 4).Value = t.HorasAprobadas;
+        ws.Cell(row, 5).Value = t.HorasRechazadas;
+        ws.Cell(row, 6).Value = t.HorasPendientes;
+        ws.Cell(row, 7).Value = t.MontoAprobado;
+        ws.Cell(row, 8).Value = t.MontoPagado;
+        ws.Cell(row, 9).Value = t.CuotasPatronales;
+        ws.Cell(row, 10).Value = t.CostoTotal;
+        AplicarEstiloTotales(ws, row, cols);
+        ws.Range(row, 3, row, 6).Style.NumberFormat.Format = "0.00";
+        ws.Range(row, 7, row, 10).Style.NumberFormat.Format = "#,##0.00";
+
+        if (reporte.PorTipo.Count > 0)
+        {
+            row += 2;
+            ws.Cell(row, 2).Value = "Aprobado por tipo";
+            ws.Cell(row, 2).Style.Font.Bold = true;
+            row++;
+            foreach (var tipo in reporte.PorTipo)
+            {
+                ws.Cell(row, 2).Value = tipo.Tipo;
+                ws.Cell(row, 4).Value = tipo.HorasAprobadas;
+                ws.Cell(row, 7).Value = tipo.MontoAprobado;
+                ws.Cell(row, 4).Style.NumberFormat.Format = "0.00";
+                ws.Cell(row, 7).Style.NumberFormat.Format = "#,##0.00";
+                row++;
+            }
+        }
+        ws.Columns().AdjustToContents();
+
+        var det = workbook.Worksheets.Add("Detalle");
+        const int colsDet = 9;
+        AplicarEstiloEncabezado(det, "HORAS EXTRA — CADA REGISTRO", reporte.NombreEmpresa, reporte.Ruc, reporte.Periodo, colsDet);
+        string[] titulosDet = { "Nombre", "Fecha", "Tipo", "Horario", "Horas", "Monto", "Estado", "Decidió", "Motivo / razón del rechazo" };
+        var hrDet = 6;
+        for (var i = 0; i < titulosDet.Length; i++) det.Cell(hrDet, i + 1).Value = titulosDet[i];
+        AplicarEstiloHeaderFila(det, hrDet, colsDet);
+
+        var r = hrDet + 1;
+        foreach (var e in reporte.Empleados)
+        {
+            foreach (var reg in e.Registros)
+            {
+                det.Cell(r, 1).Value = e.NombreCompleto;
+                det.Cell(r, 2).Value = reg.Fecha.ToString("dd/MM/yyyy");
+                det.Cell(r, 3).Value = reg.Tipo;
+                det.Cell(r, 4).Value = reg.Horario;
+                det.Cell(r, 5).Value = reg.Horas;
+                det.Cell(r, 6).Value = reg.Monto;
+                det.Cell(r, 7).Value = reg.Estado;
+                det.Cell(r, 8).Value = reg.DecididoPor ?? "";
+                det.Cell(r, 9).Value = reg.Estado == "Rechazada" && !string.IsNullOrWhiteSpace(reg.MotivoRechazo)
+                    ? $"Rechazo: {reg.MotivoRechazo}"
+                    : reg.Motivo;
+                det.Cell(r, 5).Style.NumberFormat.Format = "0.00";
+                det.Cell(r, 6).Style.NumberFormat.Format = "#,##0.00";
+                r++;
+            }
+        }
+        det.Columns().AdjustToContents();
+
+        using var stream = new MemoryStream();
+        workbook.SaveAs(stream);
+        return stream.ToArray();
+    }
+
+    // ====================================================================
     // REPORTE 4: SIP — PDF
     // ====================================================================
 

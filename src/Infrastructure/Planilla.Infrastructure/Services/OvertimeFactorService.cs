@@ -102,6 +102,7 @@ public class OvertimeFactorService : IOvertimeFactorService
         var horasDelDia = await _context.HorasExtra
             .Where(h => h.EmpleadoId == empleadoId
                 && h.Fecha.Date == fecha.Date
+                && h.FechaRechazo == null
                 && h.PlanillaDetailId == null)
             .SumAsync(h => h.CantidadHoras);
 
@@ -109,6 +110,7 @@ public class OvertimeFactorService : IOvertimeFactorService
             .Where(h => h.EmpleadoId == empleadoId
                 && h.Fecha >= inicioSemana
                 && h.Fecha <= finSemana
+                && h.FechaRechazo == null
                 && h.PlanillaDetailId == null)
             .SumAsync(h => h.CantidadHoras);
 

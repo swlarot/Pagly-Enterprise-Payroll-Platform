@@ -20,5 +20,19 @@ public record HoraExtraDto(
     string? AprobadoPor,
     string Motivo,
     string? Observaciones,
-    int? PlanillaDetailId
+    int? PlanillaDetailId,
+    // "Pendiente" | "Aprobada" | "Rechazada" | "Pagada"
+    string Estado,
+    DateTime? FechaAprobacion,
+    DateTime? FechaRechazo,
+    string? RechazadoPor,
+    string? MotivoRechazo
 );
+
+/// <summary>
+/// Decisión del director sobre varias horas extra a la vez.
+/// Decision: "aprobar" | "rechazar" | "pendiente".
+/// </summary>
+public record DecidirHorasExtraRequest(List<int> Ids, string Decision, string? Motivo);
+
+public record RechazarHoraExtraRequest(string? Motivo);

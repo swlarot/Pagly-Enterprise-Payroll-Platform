@@ -317,6 +317,30 @@ public class ReportesController : ControllerBase
         return File(bytes, "application/pdf", $"SIPE_{anio}-{mes:D2}.pdf");
     }
 
+    /// <summary>
+    /// Horas extra del mes, control interno: registradas, decisión del director,
+    /// pagadas y costo para la empresa. GET api/reportes/horas-extra?mes=4&amp;anio=2026
+    /// </summary>
+    [HttpGet("horas-extra")]
+    public async Task<IActionResult> GetHorasExtra([FromQuery] int mes, [FromQuery] int anio)
+    {
+        if (mes is < 1 or > 12 || anio is < 2000 or > 2100)
+            return BadRequest(new { message = "Mes o año fuera de rango." });
+        return Ok(await _reportesService.GenerarReporteHorasExtra(mes, anio));
+    }
+
+    [HttpGet("horas-extra/excel")]
+    [PlanLimits(PlanLimitType.ExportExcel)]
+    public async Task<IActionResult> ExportarHorasExtraExcel([FromQuery] int mes, [FromQuery] int anio)
+    {
+        if (mes is < 1 or > 12 || anio is < 2000 or > 2100)
+            return BadRequest(new { message = "Mes o año fuera de rango." });
+        var reporte = await _reportesService.GenerarReporteHorasExtra(mes, anio);
+        var bytes = _exportacionService.ExportarExcelHorasExtra(reporte);
+        if (bytes.Length == 0) return NotFound(new { message = "Ese mes no tiene horas extra registradas." });
+        return File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"HorasExtra_{anio}-{mes:D2}.xlsx");
+    }
+
     /// <summary>Exporta el reporte SIP a Excel.</summary>
     [HttpGet("sip/{planillaId}/excel")]
     [PlanLimits(PlanLimitType.ExportExcel)]

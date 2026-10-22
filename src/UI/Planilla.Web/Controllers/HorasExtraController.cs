@@ -24,17 +24,20 @@ public class HorasExtraController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly ITenantContext _tenantContext;
     private readonly IOvertimeFactorService _overtimeFactorService;
+    private readonly IAuditLogService _auditLog;
 
     public HorasExtraController(
         IUnitOfWork unitOfWork,
         ApplicationDbContext context,
         ITenantContext tenantContext,
-        IOvertimeFactorService overtimeFactorService)
+        IOvertimeFactorService overtimeFactorService,
+        IAuditLogService auditLog)
     {
         _unitOfWork = unitOfWork;
         _context = context;
         _tenantContext = tenantContext;
         _overtimeFactorService = overtimeFactorService;
+        _auditLog = auditLog;
     }
 
     /// <summary>
@@ -45,7 +48,10 @@ public class HorasExtraController : ControllerBase
         [FromQuery] int? empleadoId = null,
         [FromQuery] DateTime? fecha = null,
         [FromQuery] TipoHoraExtra? tipo = null,
-        [FromQuery] bool? aprobadas = null)
+        [FromQuery] bool? aprobadas = null,
+        [FromQuery] int? anio = null,
+        [FromQuery] int? mes = null,
+        [FromQuery] string? estado = null)
     {
         var tenantId = _tenantContext.TenantId;
         var query = _context.HorasExtra
@@ -65,10 +71,28 @@ public class HorasExtraController : ControllerBase
         if (aprobadas.HasValue)
             query = query.Where(h => h.EstaAprobada == aprobadas.Value);
 
-        var horasExtra = await query.AsNoTracking().OrderByDescending(h => h.Fecha).ToListAsync();
+        // Mes del día trabajado, igual que las planillas.
+        if (anio.HasValue && mes is >= 1 and <= 12)
+        {
+            var desde = new DateTime(anio.Value, mes.Value, 1, 0, 0, 0, DateTimeKind.Utc);
+            var hasta = desde.AddMonths(1);
+            query = query.Where(h => h.Fecha >= desde && h.Fecha < hasta);
+        }
 
-        var dtos = horasExtra.Select(MapToDto);
-        return Ok(dtos);
+        query = estado?.ToLowerInvariant() switch
+        {
+            "pendiente" => query.Where(h => !h.EstaAprobada && h.FechaRechazo == null),
+            "aprobada" => query.Where(h => h.EstaAprobada && h.PlanillaDetailId == null),
+            "rechazada" => query.Where(h => h.FechaRechazo != null),
+            "pagada" => query.Where(h => h.PlanillaDetailId != null),
+            _ => query,
+        };
+
+        var horasExtra = await query.AsNoTracking()
+            .OrderByDescending(h => h.Fecha).ThenBy(h => h.HoraInicio)
+            .ToListAsync();
+
+        return Ok(await MapToDtosAsync(horasExtra));
     }
 
     /// <summary>
@@ -87,7 +111,7 @@ public class HorasExtraController : ControllerBase
         if (horaExtra == null)
             return NotFound();
 
-        return Ok(MapToDto(horaExtra));
+        return Ok((await MapToDtosAsync(new[] { horaExtra }))[0]);
     }
 
     /// <summary>
@@ -104,8 +128,7 @@ public class HorasExtraController : ControllerBase
             .OrderByDescending(h => h.Fecha)
             .ToListAsync();
 
-        var dtos = horasExtra.Select(MapToDto);
-        return Ok(dtos);
+        return Ok(await MapToDtosAsync(horasExtra));
     }
 
     /// <summary>
@@ -116,14 +139,13 @@ public class HorasExtraController : ControllerBase
     {
         var tenantId = _tenantContext.TenantId;
         var pendientes = await _context.HorasExtra
-            .Where(h => h.TenantId == tenantId && !h.EstaAprobada && h.PlanillaDetailId == null)
+            .Where(h => h.TenantId == tenantId && !h.EstaAprobada && h.FechaRechazo == null && h.PlanillaDetailId == null)
             .Include(h => h.Empleado)
             .AsNoTracking()
             .OrderBy(h => h.Fecha)
             .ToListAsync();
 
-        var dtos = pendientes.Select(MapToDto);
-        return Ok(dtos);
+        return Ok(await MapToDtosAsync(pendientes));
     }
 
     /// <summary>
@@ -212,7 +234,7 @@ public class HorasExtraController : ControllerBase
             .Include(h => h.Empleado)
             .FirstOrDefaultAsync(h => h.Id == horaExtra.Id);
 
-        return CreatedAtAction(nameof(GetById), new { id = horaExtra!.Id }, MapToDto(horaExtra));
+        return CreatedAtAction(nameof(GetById), new { id = horaExtra!.Id }, (await MapToDtosAsync(new[] { horaExtra! }))[0]);
     }
 
     /// <summary>
@@ -316,6 +338,7 @@ public class HorasExtraController : ControllerBase
             .Where(h => h.EmpleadoId == horaExtra.EmpleadoId 
                 && h.Fecha.Date == request.Fecha.Date
                 && h.Id != id // Excluir la hora extra que se está actualizando
+                && h.FechaRechazo == null
                 && h.PlanillaDetailId == null)
             .SumAsync(h => h.CantidadHoras);
 
@@ -324,6 +347,7 @@ public class HorasExtraController : ControllerBase
                 && h.Fecha >= request.Fecha.Date.AddDays(-((int)request.Fecha.DayOfWeek + 6) % 7)
                 && h.Fecha <= request.Fecha.Date.AddDays(6 - ((int)request.Fecha.DayOfWeek + 6) % 7)
                 && h.Id != id
+                && h.FechaRechazo == null
                 && h.PlanillaDetailId == null)
             .SumAsync(h => h.CantidadHoras);
 
@@ -349,6 +373,11 @@ public class HorasExtraController : ControllerBase
         horaExtra.Motivo = request.Motivo;
         horaExtra.UpdatedAt = DateTime.UtcNow;
 
+        // Corregir una rechazada la vuelve a poner frente al director.
+        horaExtra.FechaRechazo = null;
+        horaExtra.RechazadoPor = null;
+        horaExtra.MotivoRechazo = null;
+
         _unitOfWork.Repository<HoraExtra>().Update(horaExtra);
         await _unitOfWork.CompleteAsync();
 
@@ -356,67 +385,155 @@ public class HorasExtraController : ControllerBase
     }
 
     /// <summary>
-    /// Aprueba una hora extra
+    /// Aprueba una hora extra. También sirve para cambiar de opinión sobre una
+    /// rechazada, mientras no se haya pagado.
     /// </summary>
     [HttpPost("{id}/aprobar")]
-    [RequirePermission(SystemPermission.OvertimeManage)]
+    [RequirePermission(SystemPermission.OvertimeApprove)]
     public async Task<IActionResult> Aprobar(int id)
     {
-        var tenantId = _tenantContext.TenantId;
-        var horaExtra = await _context.HorasExtra
-            .FirstOrDefaultAsync(h => h.Id == id && h.TenantId == tenantId);
-
-        if (horaExtra == null)
-            return NotFound();
-
-        if (horaExtra.EstaAprobada)
-            return BadRequest(new { message = "La hora extra ya está aprobada." });
-
-        // Obtener empleado para recalcular monto (por si cambió el salario)
-        var empleado = await _context.Empleados
-            .FirstOrDefaultAsync(e => e.Id == horaExtra.EmpleadoId && e.TenantId == tenantId);
-        if (empleado == null)
-            return BadRequest(new { message = "El empleado asociado no existe." });
-
-        // Recalcular monto al aprobar (por si cambió el salario del empleado)
-        // Usar factor base y factor exceso por separado para cálculo correcto
-        var factorBase = await _overtimeFactorService.CalculateBaseFactorAsync(horaExtra.TipoHoraExtra);
-        var montoCalculado = CalcularMonto(empleado, horaExtra.CantidadHoras, factorBase, horaExtra.FactorExceso);
-
-        horaExtra.EstaAprobada = true;
-        horaExtra.FechaAprobacion = DateTime.UtcNow;
-        horaExtra.AprobadoPor = User.FindFirst("sub")?.Value ?? User.FindFirst("email")?.Value ?? "Sistema";
-        horaExtra.MontoCalculado = montoCalculado;
-        horaExtra.UpdatedAt = DateTime.UtcNow;
-
-        _unitOfWork.Repository<HoraExtra>().Update(horaExtra);
-        await _unitOfWork.CompleteAsync();
-
-        return NoContent();
+        var r = await DecidirAsync(new[] { id }, "aprobar", null);
+        return r ?? NoContent();
     }
 
     /// <summary>
-    /// Rechaza una hora extra
+    /// Rechaza una hora extra. No se borra: queda guardada con quién la
+    /// rechazó, cuándo y por qué, y no entra a ninguna planilla.
     /// </summary>
     [HttpPost("{id}/rechazar")]
-    [RequirePermission(SystemPermission.OvertimeManage)]
-    public async Task<IActionResult> Rechazar(int id)
+    [RequirePermission(SystemPermission.OvertimeApprove)]
+    public async Task<IActionResult> Rechazar(int id, [FromBody] RechazarHoraExtraRequest? request = null)
     {
-        var tenantId = _tenantContext.TenantId;
-        var horaExtra = await _context.HorasExtra
-            .FirstOrDefaultAsync(h => h.Id == id && h.TenantId == tenantId);
-
-        if (horaExtra == null)
-            return NotFound();
-
-        _context.HorasExtra.Remove(horaExtra);
-        await _context.SaveChangesAsync();
-
-        return NoContent();
+        var r = await DecidirAsync(new[] { id }, "rechazar", request?.Motivo);
+        return r ?? NoContent();
     }
 
     /// <summary>
-    /// Elimina una hora extra
+    /// Devuelve una hora extra a pendiente (deshace la aprobación o el rechazo).
+    /// </summary>
+    [HttpPost("{id}/pendiente")]
+    [RequirePermission(SystemPermission.OvertimeApprove)]
+    public async Task<IActionResult> DejarPendiente(int id)
+    {
+        var r = await DecidirAsync(new[] { id }, "pendiente", null);
+        return r ?? NoContent();
+    }
+
+    /// <summary>
+    /// Decisión del director sobre varias horas extra a la vez:
+    /// aprobar, rechazar (con motivo) o dejar pendiente. Todo o nada.
+    /// </summary>
+    [HttpPost("decidir")]
+    [RequirePermission(SystemPermission.OvertimeApprove)]
+    public async Task<IActionResult> Decidir([FromBody] DecidirHorasExtraRequest request)
+    {
+        if (request?.Ids == null || request.Ids.Count == 0)
+            return BadRequest(new { message = "Elige al menos una hora extra." });
+
+        var r = await DecidirAsync(request.Ids.Distinct().ToList(), request.Decision, request.Motivo);
+        return r ?? Ok(new { decididas = request.Ids.Distinct().Count() });
+    }
+
+    private async Task<IActionResult?> DecidirAsync(IReadOnlyCollection<int> ids, string? decision, string? motivo)
+    {
+        decision = decision?.Trim().ToLowerInvariant();
+        if (decision is not ("aprobar" or "rechazar" or "pendiente"))
+            return BadRequest(new { message = "La decisión debe ser aprobar, rechazar o pendiente." });
+
+        var tenantId = _tenantContext.TenantId;
+        var horas = await _context.HorasExtra
+            .Where(h => h.TenantId == tenantId && ids.Contains(h.Id))
+            .ToListAsync();
+
+        if (horas.Count != ids.Count)
+            return NotFound(new { message = "Alguna de las horas extra ya no existe." });
+
+        if (horas.Any(h => h.PlanillaDetailId != null))
+            return BadRequest(new { message = "Hay horas extra que ya se pagaron en una planilla; esas no se pueden cambiar." });
+
+        var usuario = UsuarioActual();
+        var ahora = DateTime.UtcNow;
+
+        if (decision == "aprobar")
+        {
+            // El monto se recalcula al aprobar, por si cambió el salario.
+            var empleadoIds = horas.Select(h => h.EmpleadoId).Distinct().ToList();
+            var empleados = await _context.Empleados
+                .Where(e => e.TenantId == tenantId && empleadoIds.Contains(e.Id))
+                .ToDictionaryAsync(e => e.Id);
+
+            foreach (var h in horas)
+            {
+                if (!empleados.TryGetValue(h.EmpleadoId, out var empleado))
+                    return BadRequest(new { message = "El empleado asociado no existe." });
+
+                var factorBase = await _overtimeFactorService.CalculateBaseFactorAsync(h.TipoHoraExtra);
+                h.MontoCalculado = CalcularMonto(empleado, h.CantidadHoras, factorBase, h.FactorExceso);
+                h.EstaAprobada = true;
+                h.FechaAprobacion = ahora;
+                h.AprobadoPor = usuario;
+                h.FechaRechazo = null;
+                h.RechazadoPor = null;
+                h.MotivoRechazo = null;
+                h.UpdatedAt = ahora;
+            }
+        }
+        else if (decision == "rechazar")
+        {
+            var texto = string.IsNullOrWhiteSpace(motivo) ? null : motivo.Trim();
+            if (texto?.Length > 500)
+                return BadRequest(new { message = "El motivo no puede pasar de 500 caracteres." });
+
+            foreach (var h in horas)
+            {
+                h.EstaAprobada = false;
+                h.FechaAprobacion = null;
+                h.AprobadoPor = null;
+                h.FechaRechazo = ahora;
+                h.RechazadoPor = usuario;
+                h.MotivoRechazo = texto;
+                h.UpdatedAt = ahora;
+            }
+        }
+        else
+        {
+            foreach (var h in horas)
+            {
+                h.EstaAprobada = false;
+                h.FechaAprobacion = null;
+                h.AprobadoPor = null;
+                h.FechaRechazo = null;
+                h.RechazadoPor = null;
+                h.MotivoRechazo = null;
+                h.UpdatedAt = ahora;
+            }
+        }
+
+        await _context.SaveChangesAsync();
+
+        await _auditLog.LogAsync(
+            decision switch { "aprobar" => "HorasExtraAprobadas", "rechazar" => "HorasExtraRechazadas", _ => "HorasExtraDevueltasAPendiente" },
+            "HoraExtra",
+            horas.Count == 1 ? horas[0].Id.ToString() : null,
+            new Dictionary<string, string>
+            {
+                ["ids"] = string.Join(",", horas.Select(h => h.Id)),
+                ["horas"] = horas.Sum(h => h.CantidadHoras).ToString("0.##"),
+                ["motivo"] = motivo ?? string.Empty,
+            });
+
+        return null;
+    }
+
+    private string UsuarioActual() =>
+        User.FindFirst("sub")?.Value
+        ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+        ?? User.FindFirst("email")?.Value
+        ?? "Sistema";
+
+    /// <summary>
+    /// Elimina una hora extra registrada por error. Solo mientras espera
+    /// decisión: una aprobada o rechazada se conserva como constancia.
     /// </summary>
     [HttpDelete("{id}")]
     [RequirePermission(SystemPermission.OvertimeManage)]
@@ -431,6 +548,9 @@ public class HorasExtraController : ControllerBase
 
         if (horaExtra.PlanillaDetailId != null)
             return BadRequest(new { message = "No se puede eliminar una hora extra ya pagada." });
+
+        if (!horaExtra.EstaPendiente)
+            return BadRequest(new { message = "Esta hora extra ya tiene decisión del director; se conserva. Devuélvela a pendiente si fue un error." });
 
         _context.HorasExtra.Remove(horaExtra);
         await _context.SaveChangesAsync();
@@ -494,28 +614,52 @@ public class HorasExtraController : ControllerBase
         };
     }
 
-    private HoraExtraDto MapToDto(HoraExtra horaExtra)
+    private static string EstadoDe(HoraExtra h) =>
+        h.PlanillaDetailId != null ? "Pagada"
+        : h.EstaAprobada ? "Aprobada"
+        : h.FechaRechazo != null ? "Rechazada"
+        : "Pendiente";
+
+    /// <summary>
+    /// Convierte a DTO y cambia el id de quien decidió por su nombre: en pantalla
+    /// se ve «Aprobado por Ana Pérez», no un identificador.
+    /// </summary>
+    private async Task<List<HoraExtraDto>> MapToDtosAsync(IReadOnlyList<HoraExtra> horas)
     {
-        return new HoraExtraDto(
-            horaExtra.Id,
-            horaExtra.EmpleadoId,
-            $"{horaExtra.Empleado.Nombre} {horaExtra.Empleado.Apellido}",
-            horaExtra.Fecha,
-            horaExtra.TipoHoraExtra,
-            ObtenerNombreTipo(horaExtra.TipoHoraExtra),
-            horaExtra.HoraInicio,
-            horaExtra.HoraFin,
-            horaExtra.CantidadHoras,
-            horaExtra.FactorMultiplicador,
-            horaExtra.EsExceso,
-            horaExtra.FactorExceso,
-            horaExtra.MontoCalculado,
-            horaExtra.EstaAprobada,
-            horaExtra.AprobadoPor,
-            horaExtra.Motivo,
-            horaExtra.Observaciones,
-            horaExtra.PlanillaDetailId
-        );
+        var ids = horas.SelectMany(h => new[] { h.AprobadoPor, h.RechazadoPor })
+            .Where(x => !string.IsNullOrEmpty(x)).Select(x => x!).Distinct().ToList();
+        var nombres = ids.Count == 0
+            ? new Dictionary<string, string>()
+            : await _context.Users.AsNoTracking()
+                .Where(u => ids.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => !string.IsNullOrWhiteSpace(u.NombreCompleto) ? u.NombreCompleto! : u.Email ?? "");
+        string? Nombre(string? id) => id == null ? null : nombres.TryGetValue(id, out var n) && n != "" ? n : id;
+
+        return horas.Select(h => new HoraExtraDto(
+            h.Id,
+            h.EmpleadoId,
+            $"{h.Empleado.Nombre} {h.Empleado.Apellido}",
+            h.Fecha,
+            h.TipoHoraExtra,
+            ObtenerNombreTipo(h.TipoHoraExtra),
+            h.HoraInicio,
+            h.HoraFin,
+            h.CantidadHoras,
+            h.FactorMultiplicador,
+            h.EsExceso,
+            h.FactorExceso,
+            h.MontoCalculado,
+            h.EstaAprobada,
+            Nombre(h.AprobadoPor),
+            h.Motivo,
+            h.Observaciones,
+            h.PlanillaDetailId,
+            EstadoDe(h),
+            h.FechaAprobacion,
+            h.FechaRechazo,
+            Nombre(h.RechazadoPor),
+            h.MotivoRechazo
+        )).ToList();
     }
 
     /// <summary>

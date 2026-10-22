@@ -1367,6 +1367,9 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.Property<DateTime?>("FechaAprobacion")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("FechaRechazo")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<TimeSpan>("HoraFin")
                         .HasColumnType("interval");
 
@@ -1381,11 +1384,17 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("MotivoRechazo")
+                        .HasColumnType("text");
+
                     b.Property<string>("Observaciones")
                         .HasColumnType("text");
 
                     b.Property<int?>("PlanillaDetailId")
                         .HasColumnType("integer");
+
+                    b.Property<string>("RechazadoPor")
+                        .HasColumnType("text");
 
                     b.Property<int>("TenantId")
                         .HasColumnType("integer");
