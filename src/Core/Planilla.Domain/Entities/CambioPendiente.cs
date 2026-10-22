@@ -26,6 +26,12 @@ public class CambioPendiente : ITenantEntity
     public decimal? SalarioNuevo { get; set; }
 
     public string SolicitadoPor { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Usuario de la persona afectada al momento de pedirlo (si tenía). Se
+    /// guarda para que desvincularse después no le permita confirmar lo suyo.
+    /// </summary>
+    public string? AfectadoUserId { get; set; }
     public DateTime CreatedAt { get; set; }
 
     /// <summary>"Pendiente", "Confirmado", "Rechazado" o "Retirado".</summary>

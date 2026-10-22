@@ -74,6 +74,19 @@ public class CambiosSensiblesTests : IClassFixture<CustomWebApplicationFactory>
         (await carlaCliente.GetFromJsonAsync<JsonElement>("/api/avisos")).GetProperty("noLeidos").GetInt32().Should().Be(0);
         (await SalarioAsync(dueno, carla)).Should().Be(1000m);
 
+        // Tampoco sirve desvincularse: con el cambio pendiente no se puede, y aunque se quitara
+        // el vínculo por otra vía, el pedido recuerda quién era la persona afectada.
+        (await carlaCliente.PostAsync($"/api/empleados/{carla}/desvincular-usuario", null)).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<Vorluno.Planilla.Infrastructure.Data.ApplicationDbContext>();
+            (await db.Empleados.FindAsync(carla))!.UserId = null;
+            await db.SaveChangesAsync();
+        }
+        (await carlaCliente.PostAsync($"/api/cambios-pendientes/{cambio.GetProperty("id").GetInt32()}/confirmar", null))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest, "el pedido guardó quién era la persona afectada");
+        (await SalarioAsync(dueno, carla)).Should().Be(1000m);
+
         // Quien solo da de baja no ve cambios de salario (ni sus montos).
         (await Cliente(tokenBajas).GetFromJsonAsync<JsonElement>("/api/cambios-pendientes")).EnumerateArray()
             .Should().NotContain(x => x.GetProperty("tipo").GetString() == "Salario");

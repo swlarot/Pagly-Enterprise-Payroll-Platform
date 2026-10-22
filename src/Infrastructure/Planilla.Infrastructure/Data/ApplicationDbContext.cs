@@ -235,6 +235,7 @@ public class ApplicationDbContext : IdentityDbContext<AppUser>
             entity.Property(c => c.Estado).HasMaxLength(20);
             entity.Property(c => c.SolicitadoPor).HasMaxLength(450);
             entity.Property(c => c.ResueltoPor).HasMaxLength(450);
+            entity.Property(c => c.AfectadoUserId).HasMaxLength(450);
             entity.Property(c => c.Comentario).HasMaxLength(500);
             entity.Property(c => c.SalarioAnterior).HasPrecision(18, 2);
             entity.Property(c => c.SalarioNuevo).HasPrecision(18, 2);
