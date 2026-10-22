@@ -1227,6 +1227,10 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.Property<decimal>("AverageSalaryLast10Years")
                         .HasColumnType("decimal(18, 2)");
 
+                    b.Property<string>("CodigoReloj")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
                     b.Property<decimal>("CssRiskPercentage")
                         .HasColumnType("decimal(5, 2)");
 
@@ -1255,6 +1259,9 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
 
                     b.Property<decimal>("GastoRepresentacionMensual")
                         .HasColumnType("decimal(18, 2)");
+
+                    b.Property<int?>("HorarioLaboralId")
+                        .HasColumnType("integer");
 
                     b.Property<decimal>("HourlyRate")
                         .HasPrecision(18, 4)
@@ -1320,6 +1327,8 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
 
                     b.HasIndex("DepartamentoId");
 
+                    b.HasIndex("HorarioLaboralId");
+
                     b.HasIndex("NumeroIdentificacion")
                         .IsUnique()
                         .HasDatabaseName("IX_Empleado_NumeroIdentificacion");
@@ -1330,6 +1339,11 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                         .HasDatabaseName("IX_Empleado_TenantId");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("TenantId", "CodigoReloj")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Empleado_Tenant_CodigoReloj")
+                        .HasFilter("\"CodigoReloj\" IS NOT NULL");
 
                     b.HasIndex("TenantId", "DepartamentoId")
                         .HasDatabaseName("IX_Empleado_TenantId_DepartamentoId");
@@ -1440,6 +1454,9 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.Property<string>("Observaciones")
                         .HasColumnType("text");
 
+                    b.Property<string>("Origen")
+                        .HasColumnType("text");
+
                     b.Property<int?>("PlanillaDetailId")
                         .HasColumnType("integer");
 
@@ -1466,6 +1483,57 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                         .HasDatabaseName("IX_HoraExtra_EstaAprobada_Fecha");
 
                     b.ToTable("HorasExtra");
+                });
+
+            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.HorarioLaboral", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<bool>("Activo")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("DiasLaborables")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("EsPredeterminado")
+                        .HasColumnType("boolean");
+
+                    b.Property<TimeSpan>("HoraEntrada")
+                        .HasColumnType("interval");
+
+                    b.Property<TimeSpan>("HoraSalida")
+                        .HasColumnType("interval");
+
+                    b.Property<int>("MinutosParaHoraExtra")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ToleranciaMinutos")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("IX_HorarioLaboral_Tenant");
+
+                    b.ToTable("HorariosLaborales");
                 });
 
             modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.IdempotencyRecord", b =>
@@ -1734,6 +1802,54 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                         .HasDatabaseName("IX_Liquidacion_TenantId_Numero");
 
                     b.ToTable("Liquidaciones");
+                });
+
+            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.Marcacion", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CodigoReloj")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("EmpleadoId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("FechaHora")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Fuente")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Origen")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("EmpleadoId");
+
+                    b.HasIndex("TenantId", "CodigoReloj", "FechaHora")
+                        .IsUnique()
+                        .HasDatabaseName("IX_Marcacion_Tenant_Codigo_FechaHora");
+
+                    b.HasIndex("TenantId", "EmpleadoId", "FechaHora")
+                        .HasDatabaseName("IX_Marcacion_Tenant_Empleado_FechaHora");
+
+                    b.ToTable("Marcaciones");
                 });
 
             modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.OvertimeFactorConfiguration", b =>
@@ -3710,6 +3826,11 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                         .HasForeignKey("DepartamentoId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("Vorluno.Planilla.Domain.Entities.HorarioLaboral", "HorarioLaboral")
+                        .WithMany()
+                        .HasForeignKey("HorarioLaboralId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Vorluno.Planilla.Domain.Entities.Posicion", "Posicion")
                         .WithMany("Empleados")
                         .HasForeignKey("PosicionId")
@@ -3726,6 +3847,8 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                         .HasForeignKey("UserId");
 
                     b.Navigation("Departamento");
+
+                    b.Navigation("HorarioLaboral");
 
                     b.Navigation("Posicion");
 
@@ -3760,6 +3883,17 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Empleado");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.HorarioLaboral", b =>
+                {
+                    b.HasOne("Vorluno.Planilla.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Tenant");
                 });
@@ -3801,6 +3935,24 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                         .HasForeignKey("EmpleadoId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("Vorluno.Planilla.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Empleado");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("Vorluno.Planilla.Domain.Entities.Marcacion", b =>
+                {
+                    b.HasOne("Vorluno.Planilla.Domain.Entities.Empleado", "Empleado")
+                        .WithMany()
+                        .HasForeignKey("EmpleadoId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Vorluno.Planilla.Domain.Entities.Tenant", "Tenant")
                         .WithMany()

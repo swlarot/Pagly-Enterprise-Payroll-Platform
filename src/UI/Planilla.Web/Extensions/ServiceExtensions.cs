@@ -75,6 +75,10 @@ namespace Vorluno.Planilla.Web.Extensions
             // Revisiones entre el equipo y avisos de la campana
             services.AddScoped<Vorluno.Planilla.Infrastructure.Services.RevisionesService>();
 
+            // Horas extra (registro compartido) y reloj de asistencia
+            services.AddScoped<Vorluno.Planilla.Infrastructure.Services.RegistroHorasExtraService>();
+            services.AddScoped<Vorluno.Planilla.Infrastructure.Services.RelojAsistenciaService>();
+
             // TODO: React SPA will communicate via REST API endpoints, no server-side interop needed
         }
     }

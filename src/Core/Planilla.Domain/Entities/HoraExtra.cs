@@ -112,6 +112,12 @@ public class HoraExtra : ITenantEntity
 
     public string? Observaciones { get; set; }
 
+    /// <summary>
+    /// De dónde salió: null si la registró una persona, "Reloj" si la propuso
+    /// Pagly a partir de las marcaciones del reloj de asistencia.
+    /// </summary>
+    public string? Origen { get; set; }
+
     // Auditoría
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
