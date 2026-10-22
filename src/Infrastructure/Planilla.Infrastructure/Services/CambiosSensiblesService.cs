@@ -94,6 +94,10 @@ public class CambiosSensiblesService
         return (cambio, null);
     }
 
+    /// <summary>¿Tiene esta persona algún cambio sensible esperando confirmación?</summary>
+    public Task<bool> TienePendientesAsync(int empleadoId) =>
+        _context.CambiosPendientes.AnyAsync(c => c.TenantId == _tenant.TenantId && c.EmpleadoId == empleadoId && c.Estado == "Pendiente");
+
     private Task<bool> HayPendienteAsync(int empleadoId, string tipo) =>
         _context.CambiosPendientes.AnyAsync(c => c.TenantId == _tenant.TenantId && c.EmpleadoId == empleadoId && c.Tipo == tipo && c.Estado == "Pendiente");
 
@@ -103,6 +107,7 @@ public class CambiosSensiblesService
         {
             TenantId = _tenant.TenantId, EmpleadoId = empleado.Id, Tipo = tipo,
             SalarioAnterior = anterior, SalarioNuevo = nuevo, SolicitadoPor = solicitante, CreatedAt = DateTime.UtcNow,
+            AfectadoUserId = empleado.UserId,
         };
         _context.CambiosPendientes.Add(cambio);
         await _context.SaveChangesAsync();
@@ -157,7 +162,7 @@ public class CambiosSensiblesService
         return lista.Select(c => new CambioPendienteDto(
             c.Id, c.EmpleadoId, $"{c.Empleado.Nombre} {c.Empleado.Apellido}", c.Tipo, c.SalarioAnterior, c.SalarioNuevo,
             N(c.SolicitadoPor), c.SolicitadoPor == usuario,
-            c.Estado == "Pendiente" && c.SolicitadoPor != usuario && c.Empleado.UserId != usuario
+            c.Estado == "Pendiente" && c.SolicitadoPor != usuario && c.Empleado.UserId != usuario && c.AfectadoUserId != usuario
                 && (c.Tipo == CambioPendiente.TipoSalario ? puedeSalario : puedeBaja),
             c.Estado, c.CreatedAt, c.ResueltoPor == null ? null : N(c.ResueltoPor), c.ResueltoEn, c.Comentario)).ToList();
     }
@@ -239,7 +244,8 @@ public class CambiosSensiblesService
         if (cambio.SolicitadoPor == usuario) return (null, "Lo tiene que confirmar otra persona, no quien lo pidió.");
         var usuarioAfectado = await _context.Empleados.AsNoTracking()
             .Where(e => e.Id == cambio.EmpleadoId && e.TenantId == cambio.TenantId).Select(e => e.UserId).FirstOrDefaultAsync();
-        if (usuarioAfectado != null && usuarioAfectado == usuario)
+        // Se mira el vínculo de hoy y el que tenía al pedirlo: desvincularse no sirve para confirmar lo suyo.
+        if ((usuarioAfectado != null && usuarioAfectado == usuario) || cambio.AfectadoUserId == usuario)
             return (null, "Un cambio sobre tu propia ficha lo tiene que resolver otra persona.");
         var permiso = cambio.Tipo == CambioPendiente.TipoSalario ? SystemPermission.EmployeesUpdate : SystemPermission.EmployeesDelete;
         if (!await TienePermisoAsync(usuario, permiso)) return (null, "No tienes permiso para confirmar este cambio.");

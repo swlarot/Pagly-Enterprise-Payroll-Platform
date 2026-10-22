@@ -780,6 +780,10 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("AfectadoUserId")
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)");
+
                     b.Property<string>("Comentario")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");

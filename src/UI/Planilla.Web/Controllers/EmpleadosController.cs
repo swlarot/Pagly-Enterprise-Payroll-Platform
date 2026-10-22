@@ -761,6 +761,11 @@ namespace Vorluno.Planilla.Web.Controllers
                 return NotFound(new { error = "Empleado no encontrado" });
             }
 
+            // Mientras haya un cambio de salario o una baja pendiente, el usuario
+            // de la ficha no se cambia (no sirve para confirmar lo propio).
+            if (await HttpContext.RequestServices.GetRequiredService<CambiosSensiblesService>().TienePendientesAsync(empleado.Id))
+                return BadRequest(new { error = "Esta persona tiene un cambio esperando confirmación; resuélvelo antes de cambiar su usuario." });
+
             // Verificar que el usuario pertenece al tenant
             var tenantUser = await _context.TenantUsers
                 .Include(tu => tu.User)
@@ -830,6 +835,11 @@ namespace Vorluno.Planilla.Web.Controllers
             {
                 return NotFound(new { error = "Empleado no encontrado" });
             }
+
+            // Mientras haya un cambio de salario o una baja pendiente, el usuario
+            // de la ficha no se cambia (no sirve para confirmar lo propio).
+            if (await HttpContext.RequestServices.GetRequiredService<CambiosSensiblesService>().TienePendientesAsync(empleado.Id))
+                return BadRequest(new { error = "Esta persona tiene un cambio esperando confirmación; resuélvelo antes de cambiar su usuario." });
 
             if (empleado.UserId == null)
             {
