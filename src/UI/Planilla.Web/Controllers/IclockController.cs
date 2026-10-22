@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Vorluno.Planilla.Infrastructure.Data;
+using Microsoft.AspNetCore.RateLimiting;
 using Vorluno.Planilla.Infrastructure.Services;
 
 namespace Vorluno.Planilla.Web.Controllers;
@@ -10,45 +10,60 @@ namespace Vorluno.Planilla.Web.Controllers;
 /// reloj saluda, Pagly le dice qué enviar (solo marcaciones: nada de fotos,
 /// huellas ni rostros) y el reloj envía cada marcación por su cuenta.
 ///
-/// El reloj no inicia sesión: se acepta solo si su número de serie está
-/// registrado y activo en una empresa. A uno desconocido se le responde 401
-/// para que conserve sus marcas y reintente cuando lo registren.
+/// El protocolo no tiene contraseña: el reloj se identifica por su número de
+/// serie, que va impreso en el aparato. Por eso además se exige la IP que la
+/// empresa confirmó al vincularlo. A un reloj desconocido, sin vincular o que
+/// llega desde otra IP se le responde lo mismo (401), así conserva sus marcas
+/// y reintenta. Lo que llega solo son marcas; ninguna se paga sin el director.
 /// </summary>
 [AllowAnonymous]
 [ApiController]
 [Route("iclock")]
+[EnableRateLimiting("iclock")]
 public class IclockController : ControllerBase
 {
     private const long TamanoMaximo = 1024 * 1024; // un envío del reloj es texto; 1 MB sobra
 
     private readonly RelojAsistenciaService _reloj;
-    private readonly ApplicationDbContext _context;
     private readonly ILogger<IclockController> _logger;
 
-    public IclockController(RelojAsistenciaService reloj, ApplicationDbContext context, ILogger<IclockController> logger)
+    public IclockController(RelojAsistenciaService reloj, ILogger<IclockController> logger)
     {
         _reloj = reloj;
-        _context = context;
         _logger = logger;
     }
 
     private ContentResult Texto(string cuerpo, int estado = 200) =>
         new() { Content = cuerpo, ContentType = "text/plain; charset=utf-8", StatusCode = estado };
 
+    private ContentResult NoAutorizado() => Texto("Unauthorized", 401);
+
+    private string Ip => HttpContext.Connection.RemoteIpAddress?.ToString() ?? "desconocida";
+
+    /// <summary>El reloj registrado, activo y desde su IP confirmada; si no, null.</summary>
+    private async Task<Domain.Entities.DispositivoReloj?> AutorizadoAsync(string? sn)
+    {
+        var dispositivo = await _reloj.DispositivoAsync(sn);
+        if (dispositivo == null)
+        {
+            _logger.LogWarning("Reloj sin registrar intentó conectarse: {SN} desde {Ip}", sn, Ip);
+            return null;
+        }
+        if (!await _reloj.AceptarConexionAsync(dispositivo, Ip))
+        {
+            _logger.LogWarning("Reloj {SN} rechazado desde {Ip} (sin vincular u otra dirección)", dispositivo.NumeroSerie, Ip);
+            return null;
+        }
+        return dispositivo;
+    }
+
     /// <summary>Saludo del reloj: GET /iclock/cdata?SN=XXXX&amp;options=all</summary>
     [HttpGet("cdata")]
     [HttpGet("cdata.aspx")]
     public async Task<IActionResult> Saludo([FromQuery(Name = "SN")] string? sn)
     {
-        var dispositivo = await _reloj.DispositivoAsync(sn);
-        if (dispositivo == null)
-        {
-            _logger.LogWarning("Reloj sin registrar intentó conectarse: {SN}", sn);
-            return Texto("Unauthorized", 401);
-        }
-
-        dispositivo.UltimaConexion = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
+        var dispositivo = await AutorizadoAsync(sn);
+        if (dispositivo == null) return NoAutorizado();
 
         // Solo marcaciones (TransFlag=TransData AttLog): ni fotos ni datos biométricos.
         // OPERLOGStamp=9999 evita que envíe su bitácora de operaciones.
@@ -75,12 +90,8 @@ public class IclockController : ControllerBase
     [RequestSizeLimit(TamanoMaximo)]
     public async Task<IActionResult> Envio([FromQuery(Name = "SN")] string? sn, [FromQuery] string? table)
     {
-        var dispositivo = await _reloj.DispositivoAsync(sn);
-        if (dispositivo == null)
-        {
-            _logger.LogWarning("Reloj sin registrar intentó enviar datos: {SN}", sn);
-            return Texto("Unauthorized", 401);
-        }
+        var dispositivo = await AutorizadoAsync(sn);
+        if (dispositivo == null) return NoAutorizado();
 
         using var lector = new StreamReader(Request.Body);
         var cuerpo = await lector.ReadToEndAsync();
@@ -98,11 +109,8 @@ public class IclockController : ControllerBase
     [HttpGet("getrequest.aspx")]
     public async Task<IActionResult> Ordenes([FromQuery(Name = "SN")] string? sn)
     {
-        var dispositivo = await _reloj.DispositivoAsync(sn);
-        if (dispositivo == null) return Texto("Unauthorized", 401);
-        dispositivo.UltimaConexion = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
-        return Texto("OK");
+        var dispositivo = await AutorizadoAsync(sn);
+        return dispositivo == null ? NoAutorizado() : Texto("OK");
     }
 
     /// <summary>Respuesta del reloj a una orden (Pagly no envía órdenes).</summary>
@@ -110,7 +118,7 @@ public class IclockController : ControllerBase
     [HttpPost("devicecmd.aspx")]
     public async Task<IActionResult> RespuestaOrden([FromQuery(Name = "SN")] string? sn)
     {
-        var dispositivo = await _reloj.DispositivoAsync(sn);
-        return dispositivo == null ? Texto("Unauthorized", 401) : Texto("OK");
+        var dispositivo = await AutorizadoAsync(sn);
+        return dispositivo == null ? NoAutorizado() : Texto("OK");
     }
 }

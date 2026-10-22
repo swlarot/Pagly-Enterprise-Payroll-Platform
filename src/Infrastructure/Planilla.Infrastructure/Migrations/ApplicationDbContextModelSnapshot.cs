@@ -1225,6 +1225,21 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("EsperandoVinculoHasta")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IpPendiente")
+                        .HasColumnType("text");
+
+                    b.Property<string>("IpRechazada")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("IpRechazadaEn")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("IpVinculada")
+                        .HasColumnType("text");
+
                     b.Property<int>("MarcasRecibidas")
                         .HasColumnType("integer");
 
@@ -1245,6 +1260,9 @@ namespace Vorluno.Planilla.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime?>("UltimaMarcacion")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("VinculadoEn")
                         .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");

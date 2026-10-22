@@ -393,6 +393,40 @@ public class RelojAsistenciaService
     }
 
     /// <summary>
+    /// ¿Se acepta esta petición del reloj? Solo desde la IP confirmada. La
+    /// primera conexión dentro de la ventana de vinculación deja la IP
+    /// pendiente de confirmar por alguien de la empresa; cualquier otra se
+    /// rechaza y queda anotada para que la empresa la vea. Guarda los cambios.
+    /// </summary>
+    public async Task<bool> AceptarConexionAsync(DispositivoReloj dispositivo, string ip)
+    {
+        var ahora = DateTime.UtcNow;
+        bool aceptada;
+
+        if (dispositivo.IpVinculada != null)
+        {
+            aceptada = dispositivo.IpVinculada == ip;
+            if (!aceptada) { dispositivo.IpRechazada = ip; dispositivo.IpRechazadaEn = ahora; }
+        }
+        else
+        {
+            // Sin vincular todavía: solo dentro de la ventana, y queda pendiente de confirmar.
+            if (dispositivo.EsperandoVinculoHasta >= ahora && dispositivo.IpPendiente == null)
+                dispositivo.IpPendiente = ip;
+            else if (dispositivo.IpPendiente != ip)
+            {
+                dispositivo.IpRechazada = ip;
+                dispositivo.IpRechazadaEn = ahora;
+            }
+            aceptada = false;
+        }
+
+        if (aceptada) dispositivo.UltimaConexion = ahora;
+        await _context.SaveChangesAsync();
+        return aceptada;
+    }
+
+    /// <summary>
     /// Guarda las marcaciones que envió el reloj (tabla ATTLOG: «número⇥fecha hora⇥…»),
     /// sin duplicar, en la empresa del dispositivo. Devuelve cuántas líneas recibió.
     /// </summary>

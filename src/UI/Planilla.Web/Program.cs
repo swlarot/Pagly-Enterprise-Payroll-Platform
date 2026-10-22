@@ -264,6 +264,18 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = 429;
 
+    // Reloj de asistencia (ADMS): sin sesión, se limita por IP. Un reloj real
+    // manda una petición por marca y consulta órdenes cada pocos segundos.
+    options.AddPolicy("iclock", httpContext =>
+        System.Threading.RateLimiting.RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "desconocida",
+            _ => new System.Threading.RateLimiting.FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 120,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+            }));
+
     options.AddPolicy("calculator-v1", httpContext =>
     {
         // Partition key: el api_key_id del claim (scheme "ApiKey") o la IP como fallback.
@@ -458,7 +470,22 @@ QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
 // TODO: React will handle authentication UI - backend provides Identity API endpoints
 
+// Detrás del proxy de CapRover, la IP del cliente llega en X-Forwarded-For.
+// ForwardLimit = 1 toma solo la que añade el proxy (la de más a la derecha):
+// un X-Forwarded-For inventado por el cliente no la cambia. La app solo es
+// alcanzable a través de ese proxy, por eso no se fija una lista de proxies.
+builder.Services.Configure<Microsoft.AspNetCore.Builder.ForwardedHeadersOptions>(o =>
+{
+    o.ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
+                       | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto;
+    o.ForwardLimit = 1;
+    o.KnownNetworks.Clear();
+    o.KnownProxies.Clear();
+});
+
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 // --- MIGRACIONES Y SEEDING ---
 // Aplicar migraciones pendientes y ejecutar seed de configuración
@@ -607,7 +634,8 @@ app.UseApiProblemDetailsMiddleware();
 
 app.UseExceptionHandlingMiddleware();
 
-app.UseHttpsRedirection();
+// El reloj de asistencia (/iclock) puede hablar solo HTTP: no se le redirige.
+app.UseWhen(ctx => !ctx.Request.Path.StartsWithSegments("/iclock"), rama => rama.UseHttpsRedirection());
 // Vite genera app.js, app.css y chunks JS/CSS con nombres fijos sin hash de contenido.
 // Cache-Control: no-cache fuerza revalidación en cada request para todos los JS/CSS,
 // evitando que los usuarios vean versiones desactualizadas después de un deploy.

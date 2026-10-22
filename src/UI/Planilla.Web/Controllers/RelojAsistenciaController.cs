@@ -164,7 +164,11 @@ public class RelojAsistenciaController : ControllerBase
         var lista = await _context.DispositivosReloj.AsNoTracking()
             .Where(d => d.TenantId == tenantId)
             .OrderByDescending(d => d.Activo).ThenBy(d => d.Nombre)
-            .Select(d => new { d.Id, d.NumeroSerie, d.Nombre, d.Activo, d.UltimaConexion, d.UltimaMarcacion, d.MarcasRecibidas })
+            .Select(d => new
+            {
+                d.Id, d.NumeroSerie, d.Nombre, d.Activo, d.UltimaConexion, d.UltimaMarcacion, d.MarcasRecibidas,
+                d.EsperandoVinculoHasta, d.IpPendiente, d.IpVinculada, d.VinculadoEn, d.IpRechazada, d.IpRechazadaEn,
+            })
             .ToListAsync();
         return Ok(lista);
     }
@@ -181,13 +185,65 @@ public class RelojAsistenciaController : ControllerBase
 
         // El número de serie identifica al reloj en todo Pagly.
         if (await _context.DispositivosReloj.IgnoreQueryFilters().AnyAsync(d => d.NumeroSerie == sn))
+        {
+            // Puede ser un error o alguien que intenta quedarse con un reloj ajeno: se deja constancia.
+            await _audit.LogAsync("RelojYaRegistrado", "DispositivoReloj", null, new Dictionary<string, string> { ["numeroSerie"] = sn });
             return BadRequest(new { message = "Ese reloj ya está registrado. Si aparece en tu lista desactivado, actívalo; si no, escríbenos." });
+        }
 
-        var d = new DispositivoReloj { TenantId = tenantId, NumeroSerie = sn, Nombre = nombre, Activo = true, CreatedAt = DateTime.UtcNow };
+        // Se espera su primera conexión durante 30 minutos; su IP queda pendiente de confirmar.
+        var d = new DispositivoReloj
+        {
+            TenantId = tenantId, NumeroSerie = sn, Nombre = nombre, Activo = true, CreatedAt = DateTime.UtcNow,
+            EsperandoVinculoHasta = DateTime.UtcNow.AddMinutes(30),
+        };
         _context.DispositivosReloj.Add(d);
         await _context.SaveChangesAsync();
         await _audit.LogAsync("RelojRegistrado", "DispositivoReloj", d.Id.ToString(), new Dictionary<string, string> { ["numeroSerie"] = sn });
         return StatusCode(201, new { d.Id, d.NumeroSerie, d.Nombre, d.Activo });
+    }
+
+    /// <summary>
+    /// Vinculación: «confirmar» acepta la IP de su primera conexión; «aceptar-ip»
+    /// cambia a la última IP rechazada (si el colegio cambió de internet);
+    /// «esperar» abre otra ventana de 30 minutos para vincularlo de nuevo.
+    /// </summary>
+    [HttpPost("dispositivos/{id:int}/{accion:regex(^(confirmar|aceptar-ip|esperar)$)}")]
+    public async Task<IActionResult> Vincular(int id, string accion)
+    {
+        var tenantId = _tenant.TenantId;
+        var d = await _context.DispositivosReloj.FirstOrDefaultAsync(x => x.Id == id && x.TenantId == tenantId);
+        if (d == null) return NotFound(new { message = "Ese reloj no existe." });
+
+        switch (accion)
+        {
+            case "confirmar":
+                if (d.IpPendiente == null) return BadRequest(new { message = "Todavía no se ha conectado: no hay dirección que confirmar." });
+                d.IpVinculada = d.IpPendiente;
+                d.IpPendiente = null;
+                d.VinculadoEn = DateTime.UtcNow;
+                d.EsperandoVinculoHasta = null;
+                break;
+            case "aceptar-ip":
+                if (d.IpRechazada == null) return BadRequest(new { message = "No hay otra dirección que aceptar." });
+                d.IpVinculada = d.IpRechazada;
+                d.IpRechazada = null;
+                d.IpRechazadaEn = null;
+                d.VinculadoEn = DateTime.UtcNow;
+                break;
+            default: // esperar
+                d.IpVinculada = null;
+                d.IpPendiente = null;
+                d.EsperandoVinculoHasta = DateTime.UtcNow.AddMinutes(30);
+                break;
+        }
+        await _context.SaveChangesAsync();
+        await _audit.LogAsync($"Reloj{accion}", "DispositivoReloj", id.ToString(), new Dictionary<string, string>
+        {
+            ["numeroSerie"] = d.NumeroSerie,
+            ["ip"] = d.IpVinculada ?? string.Empty,
+        });
+        return NoContent();
     }
 
     /// <summary>Desactivar deja de aceptar sus envíos (no se borra; se puede volver a activar).</summary>
