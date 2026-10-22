@@ -95,30 +95,7 @@ public class HorasPlanillaService : IHorasPlanillaService
         }
 
         foreach (var he in horasExtra.Where(h => activos.Contains(h.EmpleadoId)))
-        {
-            var n = De(he.EmpleadoId);
-            // Campos antiguos (diurna/nocturna) por compatibilidad, más el específico.
-            switch (he.TipoHoraExtra)
-            {
-                case TipoHoraExtra.Diurna:
-                case TipoHoraExtra.DomingoFeriado:
-                    n.Diurna += he.CantidadHoras; break;
-                case TipoHoraExtra.Nocturna:
-                case TipoHoraExtra.NocturnaDomingoFeriado:
-                    n.Nocturna += he.CantidadHoras; break;
-                case TipoHoraExtra.FiestaNacionalDiurna:
-                    n.Diurna += he.CantidadHoras; n.Festivo += he.CantidadHoras; break;
-                case TipoHoraExtra.FiestaNacionalNocturna:
-                    n.Nocturna += he.CantidadHoras; n.Festivo += he.CantidadHoras; break;
-                case TipoHoraExtra.MixtaDiurnaNocturna:
-                    n.Diurna += he.CantidadHoras; n.Mixta += he.CantidadHoras; break;
-                case TipoHoraExtra.MixtaNocturnaDiurna:
-                    n.Nocturna += he.CantidadHoras; n.Mixta += he.CantidadHoras; break;
-                default:
-                    n.Diurna += he.CantidadHoras; break;
-            }
-            if (he.EsExceso) n.Exceso += he.CantidadHoras;
-        }
+            De(he.EmpleadoId).Sumar(he.TipoHoraExtra, he.CantidadHoras, he.EsExceso);
 
         foreach (var a in ausencias.Where(x => activos.Contains(x.EmpleadoId)))
         {
@@ -197,9 +174,79 @@ public class HorasPlanillaService : IHorasPlanillaService
         return new ResumenNovedades(false, conPrevios, conNovedades.Count, totDiurna, totNocturna, totAusencia);
     }
 
+    public async Task<int> SincronizarHorasExtraAsync(PayrollHeader planilla, CancellationToken ct = default)
+    {
+        var tenantId = planilla.TenantId;
+
+        // Registros del período que no se pagaron en otra planilla, en cualquier estado.
+        var registros = await _context.HorasExtra
+            .AsNoTracking()
+            .Where(h => h.TenantId == tenantId && h.PlanillaDetailId == null
+                     && h.Fecha >= planilla.PeriodStartDate && h.Fecha <= planilla.PeriodEndDate)
+            .Select(h => new { h.EmpleadoId, h.TipoHoraExtra, h.CantidadHoras, h.EsExceso, h.EstaAprobada })
+            .ToListAsync(ct);
+        if (registros.Count == 0) return 0;
+
+        var aprobadas = new Dictionary<int, Novedad>();
+        foreach (var r in registros)
+        {
+            if (!aprobadas.TryGetValue(r.EmpleadoId, out var n)) aprobadas[r.EmpleadoId] = n = new Novedad();
+            if (r.EstaAprobada) n.Sumar(r.TipoHoraExtra, r.CantidadHoras, r.EsExceso);
+        }
+
+        var ids = aprobadas.Keys.ToList();
+        var filas = await _context.PayrollEmployeeHours
+            .Where(h => h.PayrollHeaderId == planilla.Id && h.TenantId == tenantId && ids.Contains(h.EmpleadoId))
+            .ToListAsync(ct);
+
+        var cambiadas = 0;
+        foreach (var fila in filas)
+        {
+            var n = aprobadas[fila.EmpleadoId];
+            if (fila.OvertimeDayHours == n.Diurna && fila.OvertimeNightHours == n.Nocturna
+                && fila.OvertimeHolidayHours == n.Festivo && fila.OvertimeMixedHours == n.Mixta
+                && fila.OvertimeExcessHours == n.Exceso)
+                continue;
+
+            fila.OvertimeDayHours = n.Diurna;
+            fila.OvertimeNightHours = n.Nocturna;
+            fila.OvertimeHolidayHours = n.Festivo;
+            fila.OvertimeMixedHours = n.Mixta;
+            fila.OvertimeExcessHours = n.Exceso;
+            fila.UpdatedAt = DateTime.UtcNow;
+            cambiadas++;
+        }
+        return cambiadas;
+    }
+
     private sealed class Novedad
     {
         public decimal Diurna, Nocturna, Festivo, Mixta, Exceso, Ausencia;
         public bool Vacia => Diurna == 0 && Nocturna == 0 && Festivo == 0 && Mixta == 0 && Exceso == 0 && Ausencia == 0;
+
+        /// <summary>Campos antiguos (diurna/nocturna) por compatibilidad, más el específico.</summary>
+        public void Sumar(TipoHoraExtra tipo, decimal horas, bool esExceso)
+        {
+            switch (tipo)
+            {
+                case TipoHoraExtra.Diurna:
+                case TipoHoraExtra.DomingoFeriado:
+                    Diurna += horas; break;
+                case TipoHoraExtra.Nocturna:
+                case TipoHoraExtra.NocturnaDomingoFeriado:
+                    Nocturna += horas; break;
+                case TipoHoraExtra.FiestaNacionalDiurna:
+                    Diurna += horas; Festivo += horas; break;
+                case TipoHoraExtra.FiestaNacionalNocturna:
+                    Nocturna += horas; Festivo += horas; break;
+                case TipoHoraExtra.MixtaDiurnaNocturna:
+                    Diurna += horas; Mixta += horas; break;
+                case TipoHoraExtra.MixtaNocturnaDiurna:
+                    Nocturna += horas; Mixta += horas; break;
+                default:
+                    Diurna += horas; break;
+            }
+            if (esExceso) Exceso += horas;
+        }
     }
 }

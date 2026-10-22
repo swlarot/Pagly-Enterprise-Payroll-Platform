@@ -118,6 +118,13 @@ public class HorasExtraDirectorTests : IClassFixture<CustomWebApplicationFactory
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
         (await client.PostAsync($"/api/payrollheaders/{planillaId}/calculate", null)).EnsureSuccessStatusCode();
+
+        // Recalcular recoge la que se aprobó después de crear la planilla.
+        var montoC = (await DelMesAsync(client)).Single(h => h.GetProperty("id").GetInt32() == idC).GetProperty("montoCalculado").GetDecimal();
+        var trasRecalcular = await client.GetFromJsonAsync<JsonElement>($"/api/payrollheaders/{planillaId}/details");
+        trasRecalcular.GetProperty("items")[0].GetProperty("grossPay").GetDecimal()
+            .Should().BeApproximately(350m + montoA + montoC, 0.05m, "lo aprobado después del cálculo entra al recalcular");
+
         (await client.PostAsync($"/api/payrollheaders/{planillaId}/approve", null)).EnsureSuccessStatusCode();
 
         // 5) Aprobada la planilla, lo aprobado queda pagado y ya no se cambia.
@@ -146,6 +153,36 @@ public class HorasExtraDirectorTests : IClassFixture<CustomWebApplicationFactory
         // 7) Anular la planilla libera las horas: vuelven a aprobadas sin pagar.
         (await client.PostAsJsonAsync($"/api/payrollheaders/{planillaId}/cancel", new { reason = "prueba" })).EnsureSuccessStatusCode();
         (await DelMesAsync(client, "aprobada")).Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task RechazadaDespuesDeCrearLaPlanilla_SaleAlRecalcular()
+    {
+        var client = await ClienteAsync("Colegio Rechazo Tardío E2E");
+        var empleadoId = await CrearEmpleadoAsync(client);
+        var h = await RegistrarAsync(client, empleadoId, "2026-04-09", "15:00:00", "17:00:00");
+        var id = h.GetProperty("id").GetInt32();
+        (await client.PostAsync($"/api/horasextra/{id}/aprobar", null)).EnsureSuccessStatusCode();
+
+        // La planilla nace con la hora aprobada en su cuadrícula.
+        var crear = await client.PostAsJsonAsync("/api/payrollheaders", new
+        {
+            PayrollNumber = "", PeriodStartDate = "2026-04-01", PeriodEndDate = "2026-04-15", PayPeriodType = 2,
+        });
+        var planillaId = (await crear.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetInt32();
+        (await client.PostAsync($"/api/payrollheaders/{planillaId}/calculate", null)).EnsureSuccessStatusCode();
+        var antes = (await client.GetFromJsonAsync<JsonElement>($"/api/payrollheaders/{planillaId}/details"))
+            .GetProperty("items")[0].GetProperty("grossPay").GetDecimal();
+        antes.Should().BeGreaterThan(350m);
+
+        // El director la rechaza: al recalcular ya no se paga, y aprobar no la marca como pagada.
+        (await client.PostAsJsonAsync($"/api/horasextra/{id}/rechazar", new { motivo = "no autorizada" })).EnsureSuccessStatusCode();
+        (await client.PostAsync($"/api/payrollheaders/{planillaId}/calculate", null)).EnsureSuccessStatusCode();
+        (await client.GetFromJsonAsync<JsonElement>($"/api/payrollheaders/{planillaId}/details"))
+            .GetProperty("items")[0].GetProperty("grossPay").GetDecimal().Should().Be(350m);
+
+        (await client.PostAsync($"/api/payrollheaders/{planillaId}/approve", null)).EnsureSuccessStatusCode();
+        (await DelMesAsync(client)).Single().GetProperty("estado").GetString().Should().Be("Rechazada");
     }
 
     [Fact]
