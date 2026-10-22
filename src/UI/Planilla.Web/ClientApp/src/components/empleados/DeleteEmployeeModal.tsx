@@ -69,8 +69,10 @@ export function DeleteEmployeeModal({
     setState('deleting');
 
     try {
-      await api.post(`/api/empleados/${empleadoId}/force-delete`, { confirmed: true });
-      toast.success(`Empleado ${empleadoNombre} eliminado exitosamente`);
+      const r = await api.post<{ cambioPendiente?: boolean; message?: string }>(`/api/empleados/${empleadoId}/force-delete`, { confirmed: true });
+      // Si la empresa exige confirmación, la baja queda pendiente de otra persona.
+      if (r?.cambioPendiente) toast.success(r.message ?? 'La baja queda pendiente de confirmación', { duration: 6000 });
+      else toast.success(`Empleado ${empleadoNombre} eliminado exitosamente`);
       onSuccess();
       onClose();
     } catch (error: any) {

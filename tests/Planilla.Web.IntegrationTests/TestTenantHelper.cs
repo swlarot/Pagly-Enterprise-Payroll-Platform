@@ -151,4 +151,62 @@ public static class TestTenantHelper
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    /// <summary>
+    /// Otra persona en la misma empresa que el dueño del token, con su propio
+    /// usuario y un rol con esos permisos (sin permisos es como un empleado de
+    /// autoservicio). Con empleadoId, su usuario queda vinculado a esa ficha.
+    /// </summary>
+    public static async Task<(string Token, string UserId, string Email)> CreateCompanionAsync(
+        CustomWebApplicationFactory factory, string ownerToken, string nombre, int? empleadoId = null, params string[] permisos)
+    {
+        var tenantId = int.Parse(new JwtSecurityTokenHandler().ReadJwtToken(ownerToken).Claims.First(c => c.Type == "tenant_id").Value);
+        using var scope = factory.Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+
+        var email = $"companero-{Guid.NewGuid():N}@example.com";
+        var user = new AppUser { UserName = email, Email = email, EmailConfirmed = true, NombreCompleto = nombre };
+        var r = await userManager.CreateAsync(user, "Test@1234");
+        if (!r.Succeeded) throw new Exception(string.Join(", ", r.Errors.Select(e => e.Description)));
+
+        CustomTenantRole? rol = null;
+        if (permisos.Length > 0)
+        {
+            rol = new CustomTenantRole { TenantId = tenantId, Name = $"Rol de {nombre}" };
+            foreach (var permiso in permisos)
+                rol.Permissions.Add(new RolePermission { TenantId = tenantId, Permission = permiso });
+            context.CustomTenantRoles.Add(rol);
+            await context.SaveChangesAsync();
+        }
+        context.TenantUsers.Add(new TenantUser
+        {
+            TenantId = tenantId, UserId = user.Id, Role = TenantRole.User, CustomTenantRoleId = rol?.Id,
+            IsActive = true, JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow,
+        });
+        await context.SaveChangesAsync();
+
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, user.Id),
+            new(JwtRegisteredClaimNames.Email, email),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new("tenant_id", tenantId.ToString()),
+            new("tenant_role", "User"),
+            new(ClaimTypes.Role, "User"),
+            new("plan", "Professional"),
+            new("is_system_admin", "false"),
+        };
+        if (empleadoId.HasValue) claims.Add(new Claim("employee_id", empleadoId.Value.ToString()));
+
+        var jwtKey = config["Jwt:Key"] ?? "test-secret-key-must-be-at-least-32-characters-long-for-hmacsha256";
+        var token = new JwtSecurityToken(
+            issuer: config["Jwt:Issuer"] ?? "https://test.planilla.vorluno.dev",
+            audience: config["Jwt:Audience"] ?? "https://test.planilla.vorluno.dev",
+            claims: claims,
+            expires: DateTime.UtcNow.AddHours(1),
+            signingCredentials: new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)), SecurityAlgorithms.HmacSha256));
+        return (new JwtSecurityTokenHandler().WriteToken(token), user.Id, email);
+    }
 }

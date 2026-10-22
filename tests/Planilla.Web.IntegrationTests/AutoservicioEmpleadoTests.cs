@@ -3,21 +3,13 @@
 // básicos, pero no su salario, su cargo ni sus datos de planilla.
 // ====================================================================
 
-using System.IdentityModel.Tokens.Jwt;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Security.Claims;
-using System.Text;
 using System.Text.Json;
 using FluentAssertions;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.IdentityModel.Tokens;
 using Vorluno.Planilla.Application.DTOs;
-using Vorluno.Planilla.Domain.Entities;
 using Vorluno.Planilla.Domain.Enums;
-using Vorluno.Planilla.Infrastructure.Data;
 using Xunit;
 
 namespace Planilla.Web.IntegrationTests;
@@ -31,41 +23,10 @@ public class AutoservicioEmpleadoTests : IClassFixture<CustomWebApplicationFacto
     /// <summary>Usuario vinculado a su ficha de empleado, con solo permisos de autoservicio.</summary>
     private async Task<HttpClient> EmpleadaConAutoservicioAsync(string tokenDueno, int empleadoId)
     {
-        var tenantId = int.Parse(new JwtSecurityTokenHandler().ReadJwtToken(tokenDueno).Claims.First(c => c.Type == "tenant_id").Value);
-        using var scope = _factory.Services.CreateScope();
-        var users = scope.ServiceProvider.GetRequiredService<UserManager<AppUser>>();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-
-        var email = $"empleada-{Guid.NewGuid():N}@example.com";
-        var user = new AppUser { UserName = email, Email = email, EmailConfirmed = true, NombreCompleto = "Empleada" };
-        (await users.CreateAsync(user, "Test@1234")).Succeeded.Should().BeTrue();
-        var rol = new CustomTenantRole { TenantId = tenantId, Name = "Autoservicio" };
-        rol.Permissions.Add(new RolePermission { TenantId = tenantId, Permission = SystemPermission.EmployeeUpdateSelf });
-        rol.Permissions.Add(new RolePermission { TenantId = tenantId, Permission = SystemPermission.EmployeeViewSelf });
-        db.CustomTenantRoles.Add(rol);
-        await db.SaveChangesAsync();
-        db.TenantUsers.Add(new TenantUser { TenantId = tenantId, UserId = user.Id, Role = TenantRole.User, CustomTenantRoleId = rol.Id, IsActive = true, JoinedAt = DateTime.UtcNow, CreatedAt = DateTime.UtcNow });
-        await db.SaveChangesAsync();
-
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("test-secret-key-must-be-at-least-32-characters-long-for-hmacsha256"));
-        var jwt = new JwtSecurityToken(
-            issuer: "https://test.planilla.vorluno.dev", audience: "https://test.planilla.vorluno.dev",
-            claims: new[]
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id),
-                new Claim(JwtRegisteredClaimNames.Email, email),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim("tenant_id", tenantId.ToString()),
-                new Claim("tenant_role", "User"),
-                new Claim(ClaimTypes.Role, "User"),
-                new Claim("plan", "Professional"),
-                new Claim("is_system_admin", "false"),
-                new Claim("employee_id", empleadoId.ToString()),
-            },
-            expires: DateTime.UtcNow.AddHours(1),
-            signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
+        var (token, _, _) = await TestTenantHelper.CreateCompanionAsync(_factory, tokenDueno, "Empleada", empleadoId,
+            SystemPermission.EmployeeUpdateSelf, SystemPermission.EmployeeViewSelf);
         var c = _factory.CreateClient();
-        c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", new JwtSecurityTokenHandler().WriteToken(jwt));
+        c.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return c;
     }
 
