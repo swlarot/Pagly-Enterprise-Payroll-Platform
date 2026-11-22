@@ -794,13 +794,8 @@ public class AuthController : ControllerBase
 
     private string GenerateUniqueSubdomain(string companyName)
     {
-        // Generar subdomain base limpiando el nombre de la empresa
-        var baseSubdomain = new string(companyName
-            .ToLower()
-            .Where(c => char.IsLetterOrDigit(c) || c == '-')
-            .Take(20)
-            .ToArray())
-            .Replace(' ', '-');
+        // Subdominio base: sin tildes ni símbolos, palabras unidas por guiones
+        var baseSubdomain = Vorluno.Planilla.Application.Helpers.SubdominioHelper.Base(companyName);
 
         // Verificar si existe
         var subdomain = baseSubdomain;
