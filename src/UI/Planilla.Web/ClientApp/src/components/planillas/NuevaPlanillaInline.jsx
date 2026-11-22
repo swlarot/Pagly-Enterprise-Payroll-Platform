@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Loader2, ArrowRight, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { api } from '../../services/api';
@@ -17,6 +17,13 @@ import SelectorPersonas from './SelectorPersonas';
 // fila lo dice y el botón crea en ese mes y lleva allí. Al crear, el servidor
 // genera las horas de todos los empleados activos y trae las novedades
 // aprobadas; la pantalla abre la planilla nueva en Horas.
+//
+// El tipo arranca en el de la última planilla del mes; si el mes está vacío,
+// en la frecuencia de pago más común entre las personas activas. Si el tipo
+// elegido no es el de algunas personas, se avisa: su renta se proyecta con
+// la frecuencia de la planilla, y una persona de pago mensual en una
+// planilla quincenal sale con un ISR muchas veces mayor. Solo avisa, no
+// bloquea: hay empresas que usan a propósito dos frecuencias con la misma gente.
 //
 // «Extraordinaria» es para pagarle a quien se quedó fuera de la planilla
 // de su período: se eligen las personas y, antes de crear, se avisa si
@@ -40,6 +47,7 @@ function Campo({ id, label, nota, ancho, children }) {
 
 export default function NuevaPlanillaInline({ anio, mes, planillasDelMes, tipoPorDefecto = 2, onCreada }) {
   const [tipo, setTipo] = useState(tipoPorDefecto);
+  const [tipoTocado, setTipoTocado] = useState(false);
   const [inicio, setInicio] = useState(() => inicioSugerido(anio, mes, tipoPorDefecto, planillasDelMes));
   const [fin, setFin] = useState(() => finDePeriodo(inicioSugerido(anio, mes, tipoPorDefecto, planillasDelMes), tipoPorDefecto) ?? '');
   const [finTocado, setFinTocado] = useState(false);
@@ -51,13 +59,35 @@ export default function NuevaPlanillaInline({ anio, mes, planillasDelMes, tipoPo
   const [yaCobraron, setYaCobraron] = useState([]);
   const esExtra = tipoPlanilla === 'ext';
 
-  // La lista de empleados se pide solo cuando se elige «Extraordinaria».
+  // La lista de empleados activos: para la extraordinaria y para comparar
+  // su frecuencia de pago con el tipo de la planilla. Si falla, no hay aviso.
   useEffect(() => {
-    if (!esExtra || empleados) return;
+    if (empleados) return;
     api.get('/api/empleados')
       .then(d => setEmpleados((Array.isArray(d) ? d : d?.items ?? []).filter(e => e.estaActivo !== false)))
       .catch(() => setEmpleados([]));
-  }, [esExtra, empleados]);
+  }, [empleados]);
+
+  // Cuántas personas activas hay de cada frecuencia, y la más común.
+  const porFrecuencia = useMemo(() => {
+    const cuenta = {};
+    for (const e of empleados ?? []) {
+      const t = e.payPeriodTypeValue ?? e.payPeriodType;
+      if (PAY_PERIOD_CONFIG[t]) cuenta[t] = (cuenta[t] ?? 0) + 1;
+    }
+    const comun = Object.entries(cuenta).sort((a, b) => b[1] - a[1])[0];
+    return { cuenta, total: (empleados ?? []).length, comun: comun ? Number(comun[0]) : null };
+  }, [empleados]);
+
+  // Mes sin planillas: el tipo arranca en la frecuencia más común (si nadie lo cambió).
+  useEffect(() => {
+    if (tipoTocado || planillasDelMes.length > 0 || porFrecuencia.comun == null) return;
+    setTipo(porFrecuencia.comun);
+  }, [tipoTocado, planillasDelMes.length, porFrecuencia.comun]);
+
+  const otras = esExtra ? 0 : porFrecuencia.total - (porFrecuencia.cuenta[tipo] ?? 0);
+  const nombreTipo = t => PAY_PERIOD_CONFIG[t]?.name?.toLowerCase();
+  const frecuenciasDistintas = Object.keys(porFrecuencia.cuenta).map(Number).filter(t => t !== Number(tipo));
 
   // ¿Alguna ya está en otra planilla de esas fechas? Se revisa al elegir.
   useEffect(() => {
@@ -134,7 +164,7 @@ export default function NuevaPlanillaInline({ anio, mes, planillasDelMes, tipoPo
 
       <div className="flex flex-wrap items-end gap-3">
         <Campo id="np-tipo" label="Tipo" ancho="w-[130px]">
-          <select id="np-tipo" value={tipo} onChange={e => setTipo(Number(e.target.value))} className={selectCls + ' w-full'}>
+          <select id="np-tipo" value={tipo} onChange={e => { setTipo(Number(e.target.value)); setTipoTocado(true); }} className={selectCls + ' w-full'}>
             {Object.entries(PAY_PERIOD_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.name}</option>)}
           </select>
         </Campo>
@@ -164,6 +194,23 @@ export default function NuevaPlanillaInline({ anio, mes, planillasDelMes, tipoPo
         </button>
       </div>
 
+      {otras > 0 && (
+        <div role="status" className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+          <p className="flex items-start gap-1.5 min-w-0">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>
+              {otras === porFrecuencia.total ? `Las ${otras} personas activas` : `${otras} de ${porFrecuencia.total} personas activas`} tienen pago {frecuenciasDistintas.map(nombreTipo).join(' o ')}.
+              {' '}En una planilla {nombreTipo(tipo)} su renta se proyecta como {nombreTipo(tipo)}: revisa sus horas antes de calcular.
+            </span>
+          </p>
+          {porFrecuencia.comun != null && porFrecuencia.comun !== Number(tipo) && (
+            <button type="button" onClick={() => { setTipo(porFrecuencia.comun); setTipoTocado(true); }}
+              className="text-xs font-medium px-2.5 py-1 rounded-md border border-amber-400/40 hover:bg-amber-500/20 whitespace-nowrap">
+              Usar {nombreTipo(porFrecuencia.comun)}
+            </button>
+          )}
+        </div>
+      )}
       {fin && inicio && fin <= inicio && <p className="text-xs text-red-300 mt-2">El fin debe ser posterior al inicio.</p>}
       {pago && inicio && pago < inicio && <p className="text-xs text-red-300 mt-2">La fecha de pago no puede ser anterior al inicio.</p>}
       {esExtra && (
